@@ -2,9 +2,9 @@
 // 데이터 탭: 엑셀·CSV 업로드 → 열 이름이 "알약"이 되고, 지면의 텍스트/셀에 끌어다
 // 놓으면 {{열이름}} 토큰이 박힌다. 미리보기 스테퍼로 레코드를 넘겨보고 일괄 생성.
 import { useRef, useState, type ReactNode } from "react";
-import { useDraggable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { type BlockType } from "../../modules/document/model";
+import { type Block, type BlockType } from "../../modules/document/model";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { useMergeStore } from "../../modules/merge/store";
 import { parseSheetFile } from "../../modules/merge/parseSheet";
@@ -77,12 +77,66 @@ function FieldPill({ column }: { column: string }) {
   );
 }
 
-function BlocksTab() {
-  const blocks = useCanvasStore((s) => s.doc.blocks);
+const iconFor = (t: BlockType) =>
+  t === "text" ? <IcText size={14} /> : t === "table" ? <IcTable size={14} /> : <IcImage size={14} />;
+const labelFor = (b: Block) =>
+  b.type === "text" ? (b.text?.trim() || "빈 텍스트") : b.type === "table" ? "표" : "이미지";
+
+// 레이어 행 — 드래그(kind:layer)해서 다른 행에 놓으면 그 블록의 자식이 된다
+function LayerRow({ block, depth }: { block: Block; depth: number }) {
   const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
-  const iconFor = (t: BlockType) =>
-    t === "text" ? <IcText size={14} /> : t === "table" ? <IcTable size={14} /> : <IcImage size={14} />;
+  const drag = useDraggable({ id: `layer-${block.id}`, data: { kind: "layer", blockId: block.id } });
+  const drop = useDroppable({ id: `layerdrop-${block.id}`, data: { kind: "layer", blockId: block.id } });
+  const selectedRow = selectedId === block.id;
+  return (
+    <button
+      ref={(n) => {
+        drag.setNodeRef(n);
+        drop.setNodeRef(n);
+      }}
+      {...drag.listeners}
+      {...drag.attributes}
+      onClick={() => select(block.id)}
+      style={{
+        paddingLeft: 8 + depth * 14,
+        transform: CSS.Translate.toString(drag.transform),
+        touchAction: "none",
+      }}
+      className={`flex items-center gap-2 text-left pr-2 py-1.5 rounded-lg text-[12px] transition-colors w-full ${
+        drop.isOver && !drag.isDragging
+          ? "bg-accentsoft outline outline-2 outline-accent -outline-offset-2"
+          : selectedRow
+            ? "bg-accentsoft text-accent font-medium"
+            : "text-inksoft hover:bg-paper"
+      } ${drag.isDragging ? "opacity-50 z-50 relative" : ""}`}
+    >
+      {depth > 0 && <span className="text-inkfaint/60 -ml-1">└</span>}
+      <span className={selectedRow ? "text-accent" : "text-inkfaint"}>{iconFor(block.type)}</span>
+      <span className="truncate">{labelFor(block)}</span>
+    </button>
+  );
+}
+
+function BlocksTab() {
+  const blocks = useCanvasStore((s) => s.doc.blocks);
+  // 루트 해제 드롭 영역 (레이어 목록 하단)
+  const rootDrop = useDroppable({ id: "layerroot", data: { kind: "layerroot" } });
+
+  // parentId 트리를 y좌표순으로 평탄화 (들여쓰기 렌더용)
+  const rows: { block: Block; depth: number }[] = [];
+  const byY = (a: Block, b: Block) => a.y - b.y || a.x - b.x;
+  const walk = (parentId: string | undefined, depth: number) => {
+    blocks
+      .filter((b) => (b.parentId ?? undefined) === parentId)
+      .sort(byY)
+      .forEach((b) => {
+        rows.push({ block: b, depth });
+        walk(b.id, depth + 1);
+      });
+  };
+  walk(undefined, 0);
+
   return (
     <>
       <div className="px-3.5 py-3.5 border-b border-line">
@@ -93,31 +147,32 @@ function BlocksTab() {
           ))}
         </div>
       </div>
-      <div className="px-3.5 py-3.5 flex-1 overflow-auto">
+      <div className="px-3.5 py-3.5 flex-1 overflow-auto flex flex-col">
         <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2.5">
-          레이어 {blocks.length > 0 && <span className="text-inkfaint/70">· {blocks.length}</span>}
+          구조 {blocks.length > 0 && <span className="text-inkfaint/70">· {blocks.length}</span>}
         </p>
         <div className="flex flex-col gap-0.5">
-          {blocks.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => select(b.id)}
-              className={`flex items-center gap-2 text-left px-2 py-1.5 rounded-lg text-[12px] transition-colors ${
-                selectedId === b.id
-                  ? "bg-accentsoft text-accent font-medium"
-                  : "text-inksoft hover:bg-paper"
-              }`}
-            >
-              <span className={selectedId === b.id ? "text-accent" : "text-inkfaint"}>{iconFor(b.type)}</span>
-              <span className="truncate">
-                {b.type === "text" ? (b.text?.trim() || "빈 텍스트") : b.type === "table" ? "표" : "이미지"}
-              </span>
-            </button>
+          {rows.map(({ block, depth }) => (
+            <LayerRow key={block.id} block={block} depth={depth} />
           ))}
           {blocks.length === 0 && (
             <p className="text-[12px] text-inkfaint px-2 py-1">아직 블록이 없습니다</p>
           )}
         </div>
+        {/* 루트 해제 영역 — 행을 여기로 끌면 최상위로 */}
+        {blocks.length > 0 && (
+          <div
+            ref={rootDrop.setNodeRef}
+            className={`mt-2 rounded-lg border border-dashed px-2 py-2 text-[11px] text-center transition-colors ${
+              rootDrop.isOver ? "border-accent bg-accentsoft text-accent" : "border-line text-inkfaint"
+            }`}
+          >
+            여기로 끌면 최상위로
+          </div>
+        )}
+        <p className="text-[11px] text-inkfaint leading-relaxed mt-2">
+          행을 다른 행에 끌어다 놓으면 하위로 연결됩니다. 부모를 움직이면 하위가 함께 움직여요.
+        </p>
       </div>
     </>
   );

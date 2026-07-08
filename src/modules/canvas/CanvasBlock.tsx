@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { type Block, type TableKingData, TEXT_DEFAULTS } from "../document/model";
 import { SCALE, mmToPx, pxToMm } from "./geometry";
 import { useCanvasStore } from "./store";
+import { useFollowStore } from "./snap";
 import { useMergeStore } from "../merge/store";
 import { TOKEN_RE, resolveTokens } from "../merge/resolve";
 import { IcGrip } from "../../ui/icons";
@@ -54,6 +55,23 @@ export function CanvasBlock({ block }: { block: Block }) {
     data: { kind: "block" },
     disabled: editing,
   });
+
+  // 자석 그룹: 조상이 드래그 중이면 같은 시각 델타로 실시간 따라간다 (탯줄 이동).
+  // 최종 좌표는 store.moveBlock이 자손까지 함께 커밋하므로 드롭 후에도 이어진다.
+  // ⚠ zustand 셀렉터는 반드시 원시값 반환 — 객체를 새로 만들면 스냅샷 불안정으로
+  //    useSyncExternalStore가 무한 리렌더(Maximum update depth)에 빠진다.
+  const following = useFollowStore((s) => {
+    if (!s.activeId || s.activeId === block.id) return false;
+    const blocks = useCanvasStore.getState().doc.blocks;
+    let p = block.parentId;
+    while (p) {
+      if (p === s.activeId) return true;
+      p = blocks.find((b) => b.id === p)?.parentId;
+    }
+    return false;
+  });
+  const followX = useFollowStore((s) => (following ? s.dxPx : 0));
+  const followY = useFollowStore((s) => (following ? s.dyPx : 0));
 
   // 8방향 리사이즈 (텍스트/이미지 전용 — 표는 table-king이 자체 크기 조절)
   const startResize = (e: RPointerEvent, dir: string) => {
@@ -116,8 +134,10 @@ export function CanvasBlock({ block }: { block: Block }) {
         // 표는 스냅샷에서, 텍스트는 내용에서 높이 파생(auto-height) — h는 export용 기록
         height: isTable || block.type === "text" ? undefined : mmToPx(block.h),
         minHeight: block.type === "text" ? mmToPx(8) : undefined,
-        transform: CSS.Translate.toString(transform),
-        zIndex: isDragging ? 20 : selected ? 10 : 1,
+        transform: following
+          ? `translate3d(${followX}px, ${followY}px, 0)`
+          : CSS.Translate.toString(transform),
+        zIndex: isDragging ? 20 : following ? 19 : selected ? 10 : 1,
         cursor: editing ? "text" : isTable ? "default" : "grab",
         touchAction: "none",
       }}

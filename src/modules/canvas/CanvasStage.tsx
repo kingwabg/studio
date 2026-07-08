@@ -54,12 +54,21 @@ function SnapGuides() {
   );
 }
 
-const RULER = 22; // 눈금자 두께(px)
-const TICK_FAINT = "#d5dae3";
-const TICK_STRONG = "#98a2b3";
-const LABEL = "#8a94a6";
+const RULER = 28; // 눈금자 두께(px)
+const RULER_BG = "#f8fafc";
+const RULER_BORDER = "#dbe2ec";
+const TICK_MINOR = "#e5eaf2";
+const TICK_MID = "#cfd7e4";
+const TICK_MAJOR = "#8d98aa";
+const LABEL = "#6f7a8d";
 
-// 수평 눈금자 — mm 길이만큼, 10mm마다 cm 숫자
+const rulerSurface = {
+  display: "block",
+  userSelect: "none",
+  pointerEvents: "none",
+} as const;
+
+// 수평 눈금자 — 1mm/5mm/10mm 위계를 나누고 cm 숫자는 큰 눈금 중앙에 둔다.
 function RulerH({ mm }: { mm: number }) {
   const w = mmToPx(mm);
   const ticks = useMemo(() => {
@@ -73,15 +82,24 @@ function RulerH({ mm }: { mm: number }) {
           key={m}
           x1={x}
           x2={x}
-          y1={major ? 6 : mid ? 12 : 16}
-          y2={RULER}
-          stroke={major ? TICK_STRONG : TICK_FAINT}
-          strokeWidth={major ? 1 : 0.6}
+          y1={major ? 13 : mid ? 18 : 22}
+          y2={RULER - 1}
+          stroke={major ? TICK_MAJOR : mid ? TICK_MID : TICK_MINOR}
+          strokeWidth={major ? 1.1 : 0.65}
         />
       );
       if (major && m > 0 && m < mm)
         t.push(
-          <text key={`t${m}`} x={x + 3} y={11} fontSize={8.5} fill={LABEL} fontFamily="Pretendard, sans-serif">
+          <text
+            key={`t${m}`}
+            x={x}
+            y={10}
+            textAnchor="middle"
+            fontSize={9}
+            fontWeight={650}
+            fill={LABEL}
+            fontFamily="Pretendard, sans-serif"
+          >
             {m / 10}
           </text>
         );
@@ -89,7 +107,14 @@ function RulerH({ mm }: { mm: number }) {
     return t;
   }, [mm]);
   return (
-    <svg width={w} height={RULER} className="block bg-white" style={{ borderBottom: "1px solid #e4e8ef" }}>
+    <svg
+      width={w}
+      height={RULER}
+      className="block select-none"
+      style={{ ...rulerSurface, background: RULER_BG, borderBottom: `1px solid ${RULER_BORDER}` }}
+      aria-hidden="true"
+    >
+      <rect x="0" y="0" width={w} height={RULER} fill={RULER_BG} />
       {ticks}
     </svg>
   );
@@ -109,15 +134,24 @@ function RulerV({ mm }: { mm: number }) {
           key={m}
           y1={y}
           y2={y}
-          x1={major ? 6 : mid ? 12 : 16}
-          x2={RULER}
-          stroke={major ? TICK_STRONG : TICK_FAINT}
-          strokeWidth={major ? 1 : 0.6}
+          x1={major ? 13 : mid ? 18 : 22}
+          x2={RULER - 1}
+          stroke={major ? TICK_MAJOR : mid ? TICK_MID : TICK_MINOR}
+          strokeWidth={major ? 1.1 : 0.65}
         />
       );
       if (major && m > 0 && m < mm)
         t.push(
-          <text key={`t${m}`} x={4} y={y + 10} fontSize={8.5} fill={LABEL} fontFamily="Pretendard, sans-serif">
+          <text
+            key={`t${m}`}
+            x={8}
+            y={y + 3}
+            textAnchor="middle"
+            fontSize={8.5}
+            fontWeight={650}
+            fill={LABEL}
+            fontFamily="Pretendard, sans-serif"
+          >
             {m / 10}
           </text>
         );
@@ -125,7 +159,14 @@ function RulerV({ mm }: { mm: number }) {
     return t;
   }, [mm]);
   return (
-    <svg width={RULER} height={h} className="block bg-white" style={{ borderRight: "1px solid #e4e8ef" }}>
+    <svg
+      width={RULER}
+      height={h}
+      className="block select-none"
+      style={{ ...rulerSurface, background: RULER_BG, borderRight: `1px solid ${RULER_BORDER}` }}
+      aria-hidden="true"
+    >
+      <rect x="0" y="0" width={RULER} height={h} fill={RULER_BG} />
       {ticks}
     </svg>
   );
@@ -151,9 +192,12 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
             left: 0,
             width: RULER,
             height: RULER,
-            background: "white",
-            borderRight: "1px solid #e4e8ef",
-            borderBottom: "1px solid #e4e8ef",
+            background: RULER_BG,
+            borderRight: `1px solid ${RULER_BORDER}`,
+            borderBottom: `1px solid ${RULER_BORDER}`,
+            boxShadow: "inset -1px -1px 0 rgba(255,255,255,0.9)",
+            pointerEvents: "none",
+            userSelect: "none",
           }}
         />
         {/* 상단 눈금자 */}

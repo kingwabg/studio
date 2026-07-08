@@ -15,6 +15,8 @@ import {
   type TableKingData,
   createBlock,
   createDoc,
+  descendantIds,
+  isSelfOrDescendant,
 } from "../document/model";
 // 표는 기존 앱에서 검증된 table-king 엔진을 그대로 이관해 쓴다 (Strangler Fig 기능 이관)
 import { makeTableKingData } from "../../table-king/TableKingBlock.jsx";
@@ -51,7 +53,8 @@ interface CanvasState {
   updateBlock: (id: string, patch: Partial<Block>) => void;
   setTableData: (id: string, data: TableKingData) => void; // 표 스냅샷 교체 + w/h 동기화
   setCell: (id: string, r: number, c: number, text: string) => void; // 표 셀 하나 수정 (구형 rows용)
-  removeBlock: (id: string) => void;
+  setParent: (id: string, parentId: string | null) => void; // 트리 연결/해제 (순환 방지)
+  removeBlock: (id: string) => void; // 서브트리째 삭제 (실행취소 가능)
   undo: () => void;
   redo: () => void;
   select: (id: string | null) => void;
@@ -105,29 +108,62 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     set((s) => {
       const src = s.doc.blocks.find((b) => b.id === id);
       if (!src) return {};
-      const copy: Block = {
-        ...structuredClone(src),
-        id: createBlock(src.type, 0, 0).id, // 새 고유 id만 발급
-        x: Math.min(src.x + 5, s.doc.page.w - src.w),
-        y: Math.min(src.y + 5, s.doc.page.h - src.h),
-      };
+      // 서브트리째 복제 — 새 id 발급 + parentId 재배선, 전체 +5mm 오프셋
+      const kidIds = descendantIds(s.doc.blocks, id);
+      const subtree = s.doc.blocks.filter((b) => b.id === id || kidIds.has(b.id));
+      const idMap = new Map<string, string>();
+      for (const b of subtree) idMap.set(b.id, createBlock(b.type, 0, 0).id);
+      const copies: Block[] = subtree.map((b) => ({
+        ...structuredClone(b),
+        id: idMap.get(b.id)!,
+        parentId: b.id === id ? src.parentId : idMap.get(b.parentId!) ?? b.parentId,
+        x: Math.min(b.x + 5, s.doc.page.w - b.w),
+        y: Math.min(b.y + 5, s.doc.page.h - b.h),
+      }));
       return {
         ...record(s),
-        doc: { ...s.doc, blocks: [...s.doc.blocks, copy] },
-        selectedId: copy.id,
+        doc: { ...s.doc, blocks: [...s.doc.blocks, ...copies] },
+        selectedId: idMap.get(id)!,
       };
     }),
 
   moveBlock: (id, x, y) =>
-    set((s) => ({
-      ...record(s, `move:${id}`),
-      doc: {
-        ...s.doc,
-        blocks: s.doc.blocks.map((b) =>
-          b.id === id ? { ...b, x: clamp(x, s.doc.page.w - b.w), y: clamp(y, s.doc.page.h - b.h) } : b
-        ),
-      },
-    })),
+    set((s) => {
+      const target = s.doc.blocks.find((b) => b.id === id);
+      if (!target) return {};
+      const nx = clamp(x, s.doc.page.w - target.w);
+      const ny = clamp(y, s.doc.page.h - target.h);
+      // 자석 그룹: 자손들도 같은 델타로 함께 이동 (탯줄 이동)
+      const dx = nx - target.x;
+      const dy = ny - target.y;
+      const kids = descendantIds(s.doc.blocks, id);
+      return {
+        ...record(s, `move:${id}`),
+        doc: {
+          ...s.doc,
+          blocks: s.doc.blocks.map((b) =>
+            b.id === id
+              ? { ...b, x: nx, y: ny }
+              : kids.has(b.id)
+                ? { ...b, x: clamp(b.x + dx, s.doc.page.w - b.w), y: clamp(b.y + dy, s.doc.page.h - b.h) }
+                : b
+          ),
+        },
+      };
+    }),
+
+  setParent: (id, parentId) =>
+    set((s) => {
+      // 순환 방지: 자기 자신·자기 자손 밑으로는 못 들어간다
+      if (parentId && isSelfOrDescendant(s.doc.blocks, id, parentId)) return {};
+      return {
+        ...record(s),
+        doc: {
+          ...s.doc,
+          blocks: s.doc.blocks.map((b) => (b.id === id ? { ...b, parentId: parentId ?? undefined } : b)),
+        },
+      };
+    }),
 
   updateBlock: (id, patch) =>
     set((s) => {
@@ -168,11 +204,16 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     })),
 
   removeBlock: (id) =>
-    set((s) => ({
-      ...record(s),
-      doc: { ...s.doc, blocks: s.doc.blocks.filter((b) => b.id !== id) },
-      selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    set((s) => {
+      // 서브트리째 삭제 — 그룹 삭제 기대에 부합. 실수는 실행취소가 복구
+      const gone = descendantIds(s.doc.blocks, id);
+      gone.add(id);
+      return {
+        ...record(s),
+        doc: { ...s.doc, blocks: s.doc.blocks.filter((b) => !gone.has(b.id)) },
+        selectedId: s.selectedId && gone.has(s.selectedId) ? null : s.selectedId,
+      };
+    }),
 
   undo: () =>
     set((s) => {

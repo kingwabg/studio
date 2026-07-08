@@ -15,7 +15,7 @@ import {
 import { type BlockType } from "../modules/document/model";
 import { mmToPx, pxToMm } from "../modules/canvas/geometry";
 import { useCanvasStore } from "../modules/canvas/store";
-import { computeSnap, isAltPressed, setAltPressed, useGuideStore } from "../modules/canvas/snap";
+import { computeSnap, isAltPressed, setAltPressed, useFollowStore, useGuideStore } from "../modules/canvas/snap";
 import { CanvasStage } from "../modules/canvas/CanvasStage";
 import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
@@ -157,6 +157,18 @@ export default function StudioEditor() {
         moveBlock(b.id, pos.x, pos.y);
       }
       useGuideStore.getState().clear();
+      useFollowStore.getState().clear();
+      return;
+    }
+
+    // 레이어 트리 중첩: 레이어 행을 다른 행에 드롭 → 자식으로, 루트 영역에 드롭 → 해제
+    if (kind === "layer") {
+      const draggedId = active.data.current?.blockId as string;
+      const target = over?.data.current;
+      if (!draggedId || !target) return;
+      const st = useCanvasStore.getState();
+      if (target.kind === "layer" && target.blockId !== draggedId) st.setParent(draggedId, target.blockId);
+      else if (target.kind === "layerroot") st.setParent(draggedId, null);
       return;
     }
 
@@ -262,20 +274,33 @@ export default function StudioEditor() {
         collisionDetection={preferInner}
         modifiers={[snapModifier]}
         onDragMove={(e) => {
-          // 가이드 표시 — 이벤트 핸들러에서 안전하게 setState
+          // 가이드 표시 + 자석 그룹 팔로우 — 이벤트 핸들러에서 안전하게 setState
           const a = e.active;
-          if (a?.data.current?.kind !== "block" || isAltPressed()) {
+          if (a?.data.current?.kind !== "block") {
             useGuideStore.getState().clear();
             return;
           }
           const st = useCanvasStore.getState();
           const b = st.doc.blocks.find((x) => x.id === a.id);
           if (!b) return;
-          const snap = computeSnap(st.doc, b.id, b.x + pxToMm(e.delta.x), b.y + pxToMm(e.delta.y), b.w, b.h);
+          const candX = b.x + pxToMm(e.delta.x);
+          const candY = b.y + pxToMm(e.delta.y);
+          if (isAltPressed()) {
+            useGuideStore.getState().clear();
+            // Alt(스냅 해제)여도 자손 팔로우는 유지
+            useFollowStore.getState().setFollow(String(a.id), e.delta.x, e.delta.y);
+            return;
+          }
+          const snap = computeSnap(st.doc, b.id, candX, candY, b.w, b.h);
           useGuideStore.getState().setGuides(snap.guidesV, snap.guidesH);
+          // 자손이 따라올 시각 델타 = 스냅 반영된 최종 델타 (부모의 실제 화면 이동량)
+          useFollowStore.getState().setFollow(String(a.id), mmToPx(snap.x - b.x), mmToPx(snap.y - b.y));
         }}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => useGuideStore.getState().clear()}
+        onDragCancel={() => {
+          useGuideStore.getState().clear();
+          useFollowStore.getState().clear();
+        }}
       >
         <div className="flex-1 flex min-h-0">
           <LeftPanel />

@@ -21,6 +21,9 @@ export type TextAlign = "left" | "center" | "right";
 export interface Block {
   id: string;
   type: BlockType;
+  // 트리(부모-자식) — 문서의 논리 구조. 부모를 끌면 자손이 함께 움직이고(자석 그룹),
+  // 내보내기 때 트리 상하관계가 개요 번호(Ⅰ/1/가)로 펴진다. 없으면 루트 블록.
+  parentId?: string;
   x: number; // mm, 지면 좌상단 기준
   y: number; // mm
   w: number; // mm
@@ -96,4 +99,26 @@ export function createBlock(type: BlockType, x: number, y: number): Block {
 
 export function createDoc(title = "제목 없는 문서"): CanvasDoc {
   return { id: uid("doc"), title, page: { ...A4 }, blocks: [] };
+}
+
+// ── 트리 헬퍼 (parentId 기반) ──
+
+// id의 모든 자손 id 집합 (자석 그룹 이동·서브트리 삭제/복제용)
+export function descendantIds(blocks: Block[], id: string): Set<string> {
+  const out = new Set<string>();
+  const walk = (pid: string) => {
+    for (const b of blocks) {
+      if (b.parentId === pid && !out.has(b.id)) {
+        out.add(b.id);
+        walk(b.id);
+      }
+    }
+  };
+  walk(id);
+  return out;
+}
+
+// candidate가 id 자신이거나 자손인가 — setParent 순환 방지용
+export function isSelfOrDescendant(blocks: Block[], id: string, candidate: string): boolean {
+  return id === candidate || descendantIds(blocks, id).has(candidate);
 }

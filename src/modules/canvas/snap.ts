@@ -38,6 +38,29 @@ export const useGuideStore = create<GuideState>((set, get) => ({
   },
 }));
 
+// ── 드래그 팔로우 (자석 그룹) — 부모를 끄는 동안 자손이 실시간으로 따라오도록,
+//    스냅 반영된 시각 델타(px)를 공유한다. CanvasBlock의 자손들이 구독. ──
+interface FollowState {
+  activeId: string | null;
+  dxPx: number;
+  dyPx: number;
+  setFollow: (activeId: string, dxPx: number, dyPx: number) => void;
+  clear: () => void;
+}
+export const useFollowStore = create<FollowState>((set, get) => ({
+  activeId: null,
+  dxPx: 0,
+  dyPx: 0,
+  setFollow: (activeId, dxPx, dyPx) => {
+    const s = get();
+    if (s.activeId === activeId && s.dxPx === dxPx && s.dyPx === dyPx) return;
+    set({ activeId, dxPx, dyPx });
+  },
+  clear: () => {
+    if (get().activeId !== null) set({ activeId: null, dxPx: 0, dyPx: 0 });
+  },
+}));
+
 // ── 스냅 계산 ──
 export interface SnapResult {
   x: number;
