@@ -182,6 +182,34 @@ export function RightPanel() {
                   />
                 </div>
                 <TextStyleControls block={block} />
+
+                {/* 본문(흐름) 토글 — 한글에서 이어 쓸 수 있는 진짜 문단으로 내보내기 */}
+                <button
+                  onClick={() => updateBlock(block.id, { flow: !block.flow })}
+                  className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors ${
+                    block.flow ? "border-emerald-300 bg-emerald-50" : "border-line hover:border-accentline"
+                  }`}
+                >
+                  <span>
+                    <span className={`block text-[12px] font-semibold ${block.flow ? "text-emerald-700" : "text-ink"}`}>
+                      본문으로 내보내기
+                    </span>
+                    <span className="block text-[11px] text-inkfaint mt-0.5">
+                      한글에서 커서가 흐르는 진짜 문단 (길면 페이지 넘김)
+                    </span>
+                  </span>
+                  <span
+                    className={`w-8 h-[18px] rounded-full relative transition-colors shrink-0 ${
+                      block.flow ? "bg-emerald-500" : "bg-line"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-all ${
+                        block.flow ? "left-[16px]" : "left-[2px]"
+                      }`}
+                    />
+                  </span>
+                </button>
                 <div className="h-px bg-line" />
               </>
             )}
@@ -192,7 +220,16 @@ export function RightPanel() {
                 <NumberField label="X" value={block.x} onChange={(v) => updateBlock(block.id, { x: v })} />
                 <NumberField label="Y" value={block.y} onChange={(v) => updateBlock(block.id, { y: v })} />
                 <NumberField label="폭" value={block.w} onChange={(v) => updateBlock(block.id, { w: v })} />
-                <NumberField label="높이" value={block.h} onChange={(v) => updateBlock(block.id, { h: v })} />
+                {block.type === "text" ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] text-inkfaint">높이</span>
+                    <span className="h-8 px-2.5 rounded-lg bg-paper text-inkfaint text-[12px] flex items-center justify-end">
+                      자동 · {Math.round(block.h)}
+                    </span>
+                  </label>
+                ) : (
+                  <NumberField label="높이" value={block.h} onChange={(v) => updateBlock(block.id, { h: v })} />
+                )}
               </div>
             </div>
           </div>

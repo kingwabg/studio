@@ -78,8 +78,14 @@ export function makeStyleRegistry(baseHeaderXml) {
     if (!s) return "0";
     const align = H_ALIGN[s.align] ?? "LEFT";
     const ls = Math.min(500, Math.max(100, Math.round(s.lineSpacing ?? 160))); // % — 비정상 실측값 방어
-    const key = `${align}|${ls}`;
-    if (!parasReg.has(key)) parasReg.set(key, { id: paraBase + parasReg.size, align, ls });
+    // 흐름 문단(본문) 배치용 마진 — 좌/우 들여쓰기와 앞 간격(mm → HWPUNIT).
+    // ⚠ ×2: 문단 여백 값은 렌더러가 "반단위(HWPUNIT/2)"로 해석한다 — rhwp 실측으로
+    // 캘리브레이션(50mm 지정 → 25mm에 찍힘). HWP 바이너리의 문단 여백 2배 저장 관례와 일치.
+    const ml = Math.max(0, Math.round((s.marginLeftMm ?? 0) * HWPUNIT_PER_MM * 2));
+    const mr = Math.max(0, Math.round((s.marginRightMm ?? 0) * HWPUNIT_PER_MM * 2));
+    const mp = Math.max(0, Math.round((s.marginPrevMm ?? 0) * HWPUNIT_PER_MM * 2));
+    const key = `${align}|${ls}|${ml}|${mr}|${mp}`;
+    if (!parasReg.has(key)) parasReg.set(key, { id: paraBase + parasReg.size, align, ls, ml, mr, mp });
     return String(parasReg.get(key).id);
   };
   const fillId = (bg) => {
@@ -140,7 +146,7 @@ export function makeStyleRegistry(baseHeaderXml) {
             `<hh:heading type="NONE" idRef="0" level="0"/>` +
             `<hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="BREAK_WORD" widowOrphan="0" keepWithNext="0" keepLines="0" pageBreakBefore="0" lineWrap="BREAK"/>` +
             `<hh:autoSpacing eAsianEng="0" eAsianNum="0"/>` +
-            `<hh:margin><hc:intent value="0" unit="HWPUNIT"/><hc:left value="0" unit="HWPUNIT"/><hc:right value="0" unit="HWPUNIT"/><hc:prev value="0" unit="HWPUNIT"/><hc:next value="0" unit="HWPUNIT"/></hh:margin>` +
+            `<hh:margin><hc:intent value="0" unit="HWPUNIT"/><hc:left value="${p.ml ?? 0}" unit="HWPUNIT"/><hc:right value="${p.mr ?? 0}" unit="HWPUNIT"/><hc:prev value="${p.mp ?? 0}" unit="HWPUNIT"/><hc:next value="0" unit="HWPUNIT"/></hh:margin>` +
             `<hh:lineSpacing type="PERCENT" value="${p.ls}"/>` +
             `<hh:border borderFillIDRef="1" offsetLeft="0" offsetRight="0" offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0"/>` +
             `</hh:paraPr>`
@@ -297,16 +303,52 @@ function buildSection(refSectionXml, canvas, reg) {
     byPage.get(p).push(el);
   }
   const lastPage = Math.max(0, ...byPage.keys());
+  const pageW = canvas.page?.w ?? 210;
   const hosts = [];
   for (let p = 0; p <= lastPage; p++) {
-    const controls = (byPage.get(p) ?? [])
+    const els = byPage.get(p) ?? [];
+    // 흐름 본문(flowText)은 절대배치 개체가 아니라 "진짜 문단" — 한글에서 커서가
+    // 흐르고, 이어 쓰면 밀리고, 길면 페이지를 넘는다. 배치는 문단 마진으로:
+    //   좌 들여쓰기 = x, 우 들여쓰기 = 종이폭−x−폭, 첫 문단 앞 간격 = y
+    // (용지 여백이 0이므로 앞 간격 y가 곧 종이 위 시작 위치가 된다)
+    const flows = els.filter((el) => el.type === "flowText").sort((a, b) => (a.y ?? 0) - (b.y ?? 0));
+    const abs = els.filter((el) => el.type !== "flowText");
+    const controls = abs
       .map((el) => (el.type === "table" ? tableXml(el, reg) : textXml(el, reg)))
       .join("");
+    // 흐름 문단이 있으면 앵커(호스트) 문단의 줄 높이를 0.1pt로 소거 — 안 그러면
+    // 빈 줄 하나만큼 본문이 아래로 밀린다. 절대배치 개체는 PAPER 기준이라 영향 없음.
+    const hostChar = flows.length ? reg.charId({ pt: 0.1 }) : "0";
+    const hostPara = flows.length ? reg.paraId({ align: "left", lineSpacing: 100 }) : "0";
     hosts.push(
-      `<hp:p paraPrIDRef="0" styleIDRef="0"${p > 0 ? ` pageBreak="1"` : ""}><hp:run charPrIDRef="0">` +
+      `<hp:p paraPrIDRef="${hostPara}" styleIDRef="0"${p > 0 ? ` pageBreak="1"` : ""}><hp:run charPrIDRef="${hostChar}">` +
         controls +
         `<hp:t></hp:t></hp:run></hp:p>`
     );
+    // 호스트(앵커) 문단을 0.1pt로 줄여도 렌더러 최소 줄높이 ≈6mm가 남는다 —
+    // rhwp 실측 캘리브레이션(y=0 지정 시 첫 줄 top이 ~6mm에서 시작). 첫 간격에서 차감.
+    const HOST_LINE_MM = 6;
+    let cursorY = HOST_LINE_MM; // 흐름 커서 추정치(mm) — 다음 본문 블록과의 간격 계산용
+    for (const f of flows) {
+      const charRef = reg.charId(f.style);
+      const gap = Math.max(0, (f.y ?? 0) - cursorY);
+      const lines = String(f.text ?? "").split("\n");
+      const paraXml = lines
+        .map((line, i) => {
+          const paraRef = reg.paraId({
+            align: f.style?.align ?? "left",
+            lineSpacing: f.style?.lineSpacing ?? 160,
+            marginLeftMm: f.x ?? 0,
+            marginRightMm: Math.max(0, pageW - (f.x ?? 0) - (f.w ?? pageW)),
+            marginPrevMm: i === 0 ? gap : 0,
+          });
+          return `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0"><hp:run charPrIDRef="${charRef}"><hp:t>${esc(line)}</hp:t></hp:run></hp:p>`;
+        })
+        .join("");
+      hosts.push(paraXml);
+      // 캔버스에서 실측된 블록 높이(auto-height)로 커서 전진 — 한글 조판과 근사
+      cursorY = (f.y ?? 0) + (f.h ?? 0);
+    }
   }
   return head + hosts.join("") + `</hs:sec>`;
 }
@@ -314,7 +356,7 @@ function buildSection(refSectionXml, canvas, reg) {
 const previewText = (canvas) =>
   canvas.elements
     .map((el) =>
-      el.type === "text"
+      el.type === "text" || el.type === "flowText"
         ? el.text
         : (el.grid?.cellsText ?? el.rows).map((r) => r.join(" ")).join("\n")
     )

@@ -49,6 +49,11 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 - 다중 페이지: 요소에 `page`(0부터)와 페이지 로컬 y를 부여 → 페이지마다 앵커 문단 1개,
   2페이지부터 `<hp:p pageBreak="1">`. rhwp·한글은 존중하지만 **kordoc 렌더러는 미지원**
   (페이지 수 게이트는 verify ⑤ rhwp 단계가 담당).
+- 흐름 본문(flowText): 캔버스의 flow 텍스트 블록은 절대배치 개체가 아니라 진짜 hp:p
+  문단으로 — 배치는 문단 마진(좌=x, 우=종이폭−x−폭, 첫 앞간격=y−6mm).
+  ⚠ 문단 여백(hh:margin) 값은 렌더러가 반단위로 해석 → **HWPUNIT ×2로 기록** (rhwp 실측).
+  ⚠ 앵커(호스트) 문단은 0.1pt로 줄여도 최소 줄높이 ≈6mm가 남음 → HOST_LINE_MM=6 차감.
+  검증 오차 ±0.6mm. 여러 flow 블록은 y순으로 이어 붙고, 캔버스 실측 h로 간격 근사.
 - 스타일: makeStyleRegistry가 화면 실측 스타일(pt·굵기·기울임·색·정렬·줄간격·셀 배경·글꼴)을
   charPr/paraPr/borderFill/fontface로 동적 생성해 header.xml에 주입.
   ⚠ IDRef는 리더에 따라 "배열 인덱스"로 해석된다(rhwp) — 새 id는 반드시 기존 itemCnt에

@@ -26,6 +26,9 @@ export interface Block {
   w: number; // mm
   h: number; // mm
   text?: string; // text 블록
+  // 본문(흐름) 플래그 — true면 hwpx로 나갈 때 절대배치 개체가 아니라 "진짜 문단"으로
+  // 내보낸다: 한글에서 커서가 흐르고, 이어 쓰면 밀리고, 길면 페이지를 넘는다.
+  flow?: boolean;
   rows?: string[][]; // table 블록 구형 포맷 (data 없을 때 폴백 — 저장된 옛 문서 호환)
   data?: TableKingData; // table 블록 — table-king 엔진 스냅샷 (진실)
   src?: string; // image 블록 (Phase 2 Storage)

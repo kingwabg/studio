@@ -36,7 +36,7 @@ interface CanvasState {
   doc: CanvasDoc;
   selectedId: string | null;
 
-  addBlock: (type: BlockType, x: number, y: number) => void;
+  addBlock: (type: BlockType, x: number, y: number, extra?: Partial<Block>) => void;
   moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동
   updateBlock: (id: string, patch: Partial<Block>) => void;
   setTableData: (id: string, data: TableKingData) => void; // 표 스냅샷 교체 + w/h 동기화
@@ -52,9 +52,10 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   doc: createDoc(),
   selectedId: null,
 
-  addBlock: (type, x, y) =>
+  addBlock: (type, x, y, extra) =>
     set((s) => {
       const block = createBlock(type, x, y);
+      if (extra) Object.assign(block, extra);
       if (type === "table") {
         // 표는 table-king 스냅샷이 진실 — 크기(w/h)는 스냅샷에서 파생
         block.data = makeTableKingData(DEFAULT_TABLE_ROWS, 420) as TableKingData;

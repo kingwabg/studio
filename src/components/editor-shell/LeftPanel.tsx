@@ -18,6 +18,7 @@ import {
   IcText,
   IcTable,
   IcImage,
+  IcFile,
   IcUpload,
   IcDownload,
   IcChevronLeft,
@@ -25,16 +26,18 @@ import {
   IcSparkles,
 } from "../../ui/icons";
 
-const PALETTE: { type: BlockType; label: string; icon: ReactNode }[] = [
+const PALETTE: { type: BlockType; label: string; icon: ReactNode; flow?: boolean }[] = [
   { type: "text", label: "텍스트", icon: <IcText size={17} /> },
+  // 본문 = 흐름 텍스트: hwpx로 나갈 때 절대배치 개체가 아니라 진짜 문단이 된다
+  { type: "text", label: "본문", icon: <IcFile size={17} />, flow: true },
   { type: "table", label: "표", icon: <IcTable size={17} /> },
   { type: "image", label: "이미지", icon: <IcImage size={17} /> },
 ];
 
-function PaletteItem({ type, label, icon }: { type: BlockType; label: string; icon: ReactNode }) {
+function PaletteItem({ type, label, icon, flow }: { type: BlockType; label: string; icon: ReactNode; flow?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `palette-${type}`,
-    data: { kind: "palette", type },
+    id: `palette-${flow ? "flow" : type}`,
+    data: { kind: "palette", type, flow },
   });
   return (
     <div
@@ -84,9 +87,9 @@ function BlocksTab() {
     <>
       <div className="px-3.5 py-3.5 border-b border-line">
         <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2.5">블록 추가</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {PALETTE.map((p) => (
-            <PaletteItem key={p.type} type={p.type} label={p.label} icon={p.icon} />
+            <PaletteItem key={p.label} type={p.type} label={p.label} icon={p.icon} flow={p.flow} />
           ))}
         </div>
       </div>

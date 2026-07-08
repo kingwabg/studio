@@ -63,21 +63,112 @@
 /* ── table-king을 자유배치 캔버스에 띄울 때의 배치 보정 ──
    원본은 문서 흐름 안에서 툴바가 표 위에 "쌓이는" 구조인데, 캔버스 블록은 크기가
    표 자체와 같아야 하므로 툴바·상태줄을 블록 밖으로 절대배치로 띄운다. */
-.studio-root .tk-root { position: relative; }
+.studio-root .tk-root {
+  position: relative;
+}
+
 .studio-root .tk-root .toolbar {
   position: absolute;
-  bottom: calc(100% + 44px);
   left: 0;
   z-index: 60;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
   width: max-content;
-  max-width: 760px;
-  box-shadow: 0 4px 16px rgba(26, 34, 51, 0.12);
+  max-width: min(520px, calc(100vw - 360px));
+  min-height: 30px;
+  padding: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e4e8ef;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(26, 34, 51, 0.12);
+  backdrop-filter: blur(8px);
 }
-.studio-root .tk-root .toolbar.secondary { bottom: calc(100% + 6px); }
+
+.studio-root .tk-root .toolbar:first-of-type {
+  bottom: calc(100% + 58px);
+}
+
+.studio-root .tk-root .toolbar.secondary {
+  bottom: calc(100% + 8px);
+}
+
+.studio-root .tk-root .toolbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.studio-root .tk-root .toolbar::-webkit-scrollbar-thumb {
+  background: #cbd2de;
+  border-radius: 999px;
+}
+
+.studio-root .tk-root .toolbar button,
+.studio-root .tk-root .toolbar label {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #5b6577;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.studio-root .tk-root .toolbar button:hover {
+  border-color: #c4d4f9;
+  color: #2b5ce6;
+  background: #edf2fe;
+}
+
+.studio-root .tk-root .toolbar button:disabled {
+  color: #98a2b3;
+  background: #f6f7fa;
+  cursor: default;
+}
+
+.studio-root .tk-root .toolbar .icon-button,
+.studio-root .tk-root .toolbar .align-button,
+.studio-root .tk-root .toolbar .swatch {
+  width: 24px;
+  min-width: 24px;
+  padding: 0;
+  text-align: center;
+}
+
+.studio-root .tk-root .toolbar .segmented-control,
+.studio-root .tk-root .toolbar .swatch-group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+}
+
+.studio-root .tk-root .toolbar .swatch {
+  height: 24px;
+  border-radius: 999px;
+}
+
+.studio-root .tk-root .toolbar input {
+  width: 42px;
+  height: 24px;
+  margin-left: 4px;
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
+  color: #1a2233;
+  text-align: center;
+}
+
 .studio-root .tk-root .status-line {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   z-index: 60;
   width: max-content;
+  color: #98a2b3;
+  font-size: 11px;
 }

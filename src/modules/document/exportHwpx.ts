@@ -11,7 +11,9 @@ import { SCALE } from "../canvas/geometry";
 function elementOf(b: Block, page: number) {
   if (b.type === "text")
     return {
-      type: "text",
+      // flow(본문)는 절대배치 개체가 아니라 진짜 문단으로 — 한글에서 이어 쓸 수 있고
+      // 길면 페이지를 넘는다. exportCore가 들여쓰기(x·우측여백)와 앞 간격(y)으로 배치.
+      type: b.flow ? "flowText" : "text",
       page,
       x: b.x,
       y: b.y,

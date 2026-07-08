@@ -124,11 +124,18 @@ export default function StudioEditor() {
 
     if (kind === "palette" && over) {
       const type = active.data.current?.type as BlockType;
+      const flow = active.data.current?.flow as boolean | undefined;
       const stage = stageRef.current;
       const dropped = active.rect.current.translated;
       if (!stage || !dropped) return;
       const rect = stage.getBoundingClientRect();
-      addBlock(type, pxToMm(dropped.left - rect.left), pxToMm(dropped.top - rect.top));
+      addBlock(
+        type,
+        pxToMm(dropped.left - rect.left),
+        pxToMm(dropped.top - rect.top),
+        // 본문(흐름): 본문답게 넓은 기본 폭 + 안내 문구
+        flow ? { flow: true, w: 170, text: "본문을 입력하세요. 한글에서 이어 쓸 수 있는 진짜 문단으로 내보내집니다." } : undefined
+      );
     }
   }
 
