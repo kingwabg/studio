@@ -1,4 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { TableKingBlock, makeTableKingData, tableDataToRows } from "./table-king/TableKingBlock.jsx";
+import "./table-king/table-king.css";
+import { buildHwpx } from "./hwpx/exportCore.js";
 
 // ═════════════════════════════════════════════
 // 디자인 토큰
@@ -24,9 +27,19 @@ const PAGE_W = Math.round(210 * MM);
 const PAGE_H = Math.round(297 * MM);
 const MARGIN = Math.round(10 * MM);
 const CONTENT_W = PAGE_W - MARGIN * 2 - 20;
-const MIN_COL_W = 30;
-const MIN_ROW_H = 24;
-const HANDLE = 6;
+
+// table-king 블록에 주입하는 CSS 변수 — 색의 진실은 T 하나 (table-king.css의 폴백은 복제본일 뿐)
+const TK_THEME_VARS = {
+  "--tk-ink": T.ink,
+  "--tk-ink-soft": T.inkSoft,
+  "--tk-ink-faint": T.inkFaint,
+  "--tk-paper": T.paper,
+  "--tk-surface": T.surface,
+  "--tk-line": T.line,
+  "--tk-line-strong": T.lineStrong,
+  "--tk-accent": T.accent,
+  "--tk-accent-soft": T.accentSoft,
+};
 
 // ═════════════════════════════════════════════
 // 섹션 번호 자동 할당 (명세 [3.2])
@@ -53,18 +66,9 @@ function assignNumbers(sections) {
 }
 
 // ═════════════════════════════════════════════
-// 표 데이터 팩토리: rows 배열 → 격리 엔진용 데이터
+// 표 데이터 팩토리: rows 배열 → table-king 스냅샷
 // ═════════════════════════════════════════════
-const makeTableData = (rows) => {
-  const nCols = rows[0].length;
-  const w = Math.max(MIN_COL_W + 20, Math.floor(Math.min(CONTENT_W, 620) / nCols));
-  return {
-    cells: rows.map((r) => [...r]),
-    widths: rows.map(() => Array(nCols).fill(w)),
-    heights: rows.map(() => 30),
-    vAligns: {},
-  };
-};
+const makeTableData = (rows) => makeTableKingData(rows, CONTENT_W);
 const DEFAULT_ROWS = [
   ["구분", "내용", "비고"],
   ["", "", ""],
@@ -129,7 +133,7 @@ const serializeDoc = (doc) => ({
     heading: s.heading,
     level: s.level,
     blocks: s.blocks.map((b) =>
-      b.type === "table" ? { type: "table", rows: b.data.cells } : b
+      b.type === "table" ? { type: "table", rows: tableDataToRows(b.data) } : b
     ),
   })),
 });
@@ -143,6 +147,7 @@ const Icon = ({ d, size = 16, ...props }) => (
   </svg>
 );
 const IcTable = (p) => <Icon {...p} d={<><rect x="1.5" y="2.5" width="13" height="11" rx="1" /><path d="M1.5 6.5h13M6.5 2.5v11M11 6.5v7" /></>} />;
+const IcDownload = (p) => <Icon {...p} d={<><path d="M8 2.5v7" /><path d="M5 6.5l3 3 3-3" /><path d="M2.5 12.5h11" /></>} />;
 const IcText = (p) => <Icon {...p} d={<path d="M3 3.5h10M8 3.5v9M5.5 12.5h5" />} />;
 const IcImage = (p) => <Icon {...p} d={<><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" /><circle cx="5.5" cy="6" r="1.2" /><path d="M14 10.5l-3.5-3L5 13" /></>} />;
 const IcFolder = (p) => <Icon {...p} d={<path d="M1.5 4a1 1 0 0 1 1-1h3l1.5 2h6.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4z" />} />;
@@ -208,179 +213,8 @@ function PaperDoc({ kind, w = 88, h = 116 }) {
 }
 
 // ═════════════════════════════════════════════
-// 표 블록 (격리 엔진 + 세로 정렬)
+// 표 블록 — table-king 엔진 이식본으로 교체됨 (src/table-king/TableKingBlock.jsx)
 // ═════════════════════════════════════════════
-function TableBlock({ tableId, data, update, focus, setFocus, showGuides }) {
-  const dragRef = useRef(null);
-  const [editing, setEditing] = useState(null);
-
-  const xs = useMemo(() => {
-    const raw = [0];
-    for (const rowW of data.widths) {
-      let acc = 0;
-      for (const w of rowW) raw.push((acc += w));
-    }
-    raw.sort((a, b) => a - b);
-    const out = [raw[0]];
-    for (const v of raw) if (v - out[out.length - 1] > 0.6) out.push(v);
-    return out;
-  }, [data.widths]);
-  const findIdx = (v) => {
-    let lo = 0, hi = xs.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (xs[mid] < v - 0.6) lo = mid + 1;
-      else hi = mid;
-    }
-    return lo;
-  };
-  const totalW = xs[xs.length - 1];
-  const totalH = data.heights.reduce((s, h) => s + h, 0);
-
-  const startDrag = useCallback(
-    (e, type, index) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragRef.current = {
-        type, index,
-        startX: e.clientX, startY: e.clientY,
-        startWidths: data.widths.map((r) => [...r]),
-        startHeights: [...data.heights],
-      };
-      const onMove = (ev) => {
-        const d = dragRef.current;
-        if (!d) return;
-        const dx = ev.clientX - d.startX;
-        const dy = ev.clientY - d.startY;
-        if (d.type === "col") {
-          update((t) => ({
-            ...t,
-            widths: d.startWidths.map((row) => {
-              const next = [...row];
-              next[d.index] = Math.max(MIN_COL_W, row[d.index] + dx);
-              return next;
-            }),
-          }));
-        } else {
-          update((t) => {
-            const next = [...d.startHeights];
-            next[d.index] = Math.max(MIN_ROW_H, d.startHeights[d.index] + dy);
-            return { ...t, heights: next };
-          });
-        }
-      };
-      const onUp = () => {
-        dragRef.current = null;
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-      document.body.style.cursor = type === "col" ? "col-resize" : "row-resize";
-      document.body.style.userSelect = "none";
-    },
-    [data, update]
-  );
-
-  const commitEdit = (r, c, value) => {
-    update((t) => {
-      const cells = t.cells.map((row) => [...row]);
-      cells[r][c] = value;
-      return { ...t, cells };
-    });
-    setEditing(null);
-  };
-  const cellStartX = (r, c) => {
-    let acc = 0;
-    for (let i = 0; i < c; i++) acc += data.widths[r][i];
-    return acc;
-  };
-
-  return (
-    <div style={{ position: "relative", width: totalW, height: totalH, margin: "10px auto" }}>
-      <table style={{ tableLayout: "fixed", borderCollapse: "collapse", width: totalW, height: totalH, userSelect: "none" }}>
-        <colgroup>
-          {xs.slice(1).map((x, i) => (
-            <col key={i} style={{ width: x - xs[i] }} />
-          ))}
-        </colgroup>
-        <tbody>
-          {data.cells.map((row, r) => (
-            <tr key={r} style={{ height: data.heights[r] }}>
-              {row.map((text, c) => {
-                const startX = cellStartX(r, c);
-                const w = data.widths[r][c];
-                const colSpan = findIdx(startX + w) - findIdx(startX);
-                const focused = focus && focus.tableId === tableId && focus.r === r && focus.c === c;
-                const isEd = editing && editing.r === r && editing.c === c;
-                const vAlign = data.vAligns[`${r}-${c}`] || "middle";
-                const isHeader = r === 0;
-                return (
-                  <td
-                    key={c}
-                    colSpan={colSpan > 1 ? colSpan : undefined}
-                    onMouseDown={(e) => {
-                      if (e.button !== 0) return;
-                      setFocus({ tableId, r, c });
-                    }}
-                    onDoubleClick={() => setEditing({ r, c })}
-                    style={{
-                      position: "relative", boxSizing: "border-box",
-                      border: `1px solid ${T.lineStrong}`, padding: 0,
-                      overflow: "hidden", cursor: "cell",
-                      background: isHeader ? T.paper : "white",
-                      fontWeight: isHeader ? 600 : 400,
-                      fontSize: 12.5, color: T.ink, verticalAlign: "top",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%", display: "flex", flexDirection: "column",
-                        justifyContent: vAlign === "top" ? "flex-start" : vAlign === "bottom" ? "flex-end" : "center",
-                        padding: "3px 8px", boxSizing: "border-box",
-                        textAlign: isHeader ? "center" : "left",
-                      }}
-                    >
-                      {isEd ? (
-                        <input
-                          autoFocus
-                          defaultValue={text}
-                          onBlur={(e) => commitEdit(r, c, e.target.value)}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === "Enter") commitEdit(r, c, e.target.value);
-                            if (e.key === "Escape") setEditing(null);
-                          }}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          style={{ width: "100%", border: "none", outline: `1.5px solid ${T.accent}`, fontSize: 12.5, padding: "1px 2px", fontFamily: T.font, boxSizing: "border-box" }}
-                        />
-                      ) : (
-                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{text}</span>
-                      )}
-                    </div>
-                    {focused && !isEd && (
-                      <div style={{ position: "absolute", inset: 0, boxShadow: `inset 0 0 0 2px ${T.accent}`, background: "rgba(43,92,230,0.06)", pointerEvents: "none", zIndex: 5 }} />
-                    )}
-                    <div
-                      onMouseDown={(e) => startDrag(e, "col", c)}
-                      style={{ position: "absolute", top: 0, right: 0, width: HANDLE, height: "100%", cursor: "col-resize", zIndex: 10, background: showGuides ? "rgba(43,92,230,0.14)" : "transparent" }}
-                    />
-                    <div
-                      onMouseDown={(e) => startDrag(e, "row", r)}
-                      style={{ position: "absolute", left: 0, bottom: 0, width: "100%", height: HANDLE, cursor: "row-resize", zIndex: 10, background: showGuides ? "rgba(43,92,230,0.14)" : "transparent" }}
-                    />
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 // ═════════════════════════════════════════════
 // AI 문서 도우미 (명세의 Agent→Gateway→Service 이식)
@@ -749,7 +583,8 @@ function Workspace({ onHome }) {
       },
     ],
   });
-  const [focus, setFocus] = useState(null); // {tableId:"sec-blk", r, c}
+  const [activeTableId, setActiveTableId] = useState(null); // "sec-blk" — 툴바·단축키가 붙는 활성 표
+  const [docRev, setDocRev] = useState(0); // AI 적용 등 문서 통째 교체 시 표 블록 리마운트(시드 갱신)용
   const [zoom, setZoom] = useState(100);
   const [showGuides, setShowGuides] = useState(true);
   const [rightTab, setRightTab] = useState("props"); // "props" | "ai"
@@ -767,18 +602,93 @@ function Workspace({ onHome }) {
       ),
     }));
 
-  const parseFocusId = (id) => id.split("-").map(Number);
-  const focusedData = useMemo(() => {
-    if (!focus) return null;
-    const [si, bi] = parseFocusId(focus.tableId);
+  // 활성 표 데이터 — 우측 속성 패널 표시용 (셀 조작은 table-king 툴바가 담당)
+  const activeData = useMemo(() => {
+    if (!activeTableId) return null;
+    const [si, bi] = activeTableId.split("-").map(Number);
     return doc.sections[si]?.blocks[bi]?.data ?? null;
-  }, [focus, doc]);
-  const focusedVAlign = focusedData?.vAligns[`${focus?.r}-${focus?.c}`] || "middle";
+  }, [activeTableId, doc]);
 
-  const setVAlign = (v) => {
-    if (!focus) return;
-    const [si, bi] = parseFocusId(focus.tableId);
-    updateTableAt(si, bi)((t) => ({ ...t, vAligns: { ...t.vAligns, [`${focus.r}-${focus.c}`]: v } }));
+  // ── HWPX 내보내기: 화면에 보이는 배치를 그대로 mm 좌표로 수집 ──
+  const pageRef = useRef(null);
+  const collectCanvas = () => {
+    const pageEl = pageRef.current;
+    if (!pageEl) return null;
+    const pageRect = pageEl.getBoundingClientRect();
+    const scale = pageRect.width / PAGE_W; // 줌 transform 보정 (rect는 scale 반영값)
+    const toMm = (px) => px / scale / MM;
+    const rectOf = (sel) => {
+      const el = pageEl.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: toMm(r.left - pageRect.left),
+        y: toMm(r.top - pageRect.top),
+        w: toMm(r.width),
+        h: toMm(r.height),
+      };
+    };
+
+    const elements = [];
+    const titleRect = rectOf('[data-hwpx="title"]');
+    if (titleRect && doc.title.trim())
+      elements.push({ type: "text", ...titleRect, text: doc.title });
+
+    numbered.forEach((sec, si) => {
+      const hr = rectOf(`[data-hwpx="heading-${si}"]`);
+      if (hr) elements.push({ type: "text", ...hr, text: `${sec.number}. ${sec.heading}` });
+
+      sec.blocks.forEach((blk, bi) => {
+        const key = `blk-${si}-${bi}`;
+        if (blk.type === "table") {
+          // 위치는 실측, 크기는 모델에서 파생 — 셀 합계와 표 크기가 어긋나면 한글이 격자를 재계산한다
+          const fr = rectOf(`[data-hwpx="${key}"] .table-frame`) || rectOf(`[data-hwpx="${key}"]`);
+          if (!fr) return;
+          const d = blk.data;
+          const nCols = d.cells[0]?.length ?? 0;
+          const wPx = Math.max(...d.widths.map((row) => row.reduce((s, v) => s + v, 0)));
+          let hPx = 0;
+          for (let c = 0; c < nCols; c++)
+            hPx = Math.max(hPx, d.cellHeights.reduce((s, row) => s + (row[c] ?? 0), 0));
+          elements.push({
+            type: "table",
+            x: fr.x, y: fr.y, w: wPx / MM, h: hPx / MM,
+            grid: {
+              cellsText: tableDataToRows(d),
+              merges: d.merges ?? [],
+              colWidthsMm: d.widths.map((row) => row.map((v) => v / MM)),
+              rowHeightsMm: d.cellHeights.map((row) => row.map((v) => v / MM)),
+            },
+          });
+        } else if (blk.type === "para") {
+          const r = rectOf(`[data-hwpx="${key}"]`);
+          if (r) elements.push({ type: "text", ...r, text: blk.text });
+        } else if (blk.type === "list") {
+          const r = rectOf(`[data-hwpx="${key}"]`);
+          if (!r) return;
+          const lines = blk.items
+            .map((it, i) => (blk.ordered ? `${i + 1}. ${it}` : `• ${it}`))
+            .join("\n");
+          elements.push({ type: "text", ...r, text: lines });
+        }
+      });
+    });
+
+    return { page: { w: 210, h: 297 }, elements };
+  };
+
+  const exportHwpx = () => {
+    const canvas = collectCanvas();
+    if (!canvas) return;
+    const bytes = buildHwpx(canvas);
+    const blob = new Blob([bytes], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(doc.title || "문서").replace(/[\\/:*?"<>|]/g, "_")}.hwpx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log(`[hwpx] 요소 ${canvas.elements.length}개 → ${bytes.length} bytes 내보냄`);
   };
 
   const addTable = () =>
@@ -836,41 +746,20 @@ function Workspace({ onHome }) {
         <button style={{ ...iconBtn(false), fontWeight: 800, fontSize: 13 }}>B</button>
         <button style={{ ...iconBtn(false), fontStyle: "italic", fontSize: 13, fontWeight: 600 }}>I</button>
         <button style={{ ...iconBtn(false), textDecoration: "underline", fontSize: 13, fontWeight: 600 }}>U</button>
-        <Divider />
-        <span style={{ fontSize: 11, color: T.inkFaint, margin: "0 4px 0 2px" }}>세로 정렬</span>
-        <div style={{ display: "inline-flex", gap: 1, padding: 2, background: T.paper, borderRadius: 9, border: `1px solid ${T.line}` }}>
-          {[
-            { v: "top", icon: <IcVTop />, label: "상단 정렬" },
-            { v: "middle", icon: <IcVMid />, label: "가운데 정렬" },
-            { v: "bottom", icon: <IcVBottom />, label: "하단 정렬" },
-          ].map((o) => {
-            const active = focus && focusedVAlign === o.v;
-            return (
-              <button
-                key={o.v}
-                title={o.label}
-                disabled={!focus}
-                onClick={() => setVAlign(o.v)}
-                style={{
-                  width: 26, height: 22, borderRadius: 6, border: "none",
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  background: active ? T.surface : "transparent",
-                  boxShadow: active ? "0 1px 3px rgba(26,34,51,0.15)" : "none",
-                  color: !focus ? T.inkFaint : active ? T.accent : T.inkSoft,
-                  cursor: focus ? "pointer" : "default", transition: "all .12s",
-                }}
-              >
-                {o.icon}
-              </button>
-            );
-          })}
-        </div>
+        {/* 세로 정렬 그룹은 table-king StyleToolbar(활성 표 위)가 대체 */}
         <Divider />
         <button
           onClick={() => setShowGuides((v) => !v)}
           style={{ height: 28, padding: "0 10px", borderRadius: 8, border: `1px solid ${showGuides ? T.accentLine : T.line}`, background: showGuides ? T.accentSoft : T.surface, color: showGuides ? T.accent : T.inkSoft, fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: T.font }}
         >
           핸들 가이드
+        </button>
+        <button
+          onClick={exportHwpx}
+          title="현재 문서를 .hwpx로 다운로드"
+          style={{ marginLeft: "auto", height: 30, padding: "0 13px", borderRadius: 8, border: "none", background: T.accent, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: T.font, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
+        >
+          <IcDownload size={14} /> HWPX 내보내기
         </button>
       </div>
 
@@ -910,9 +799,10 @@ function Workspace({ onHome }) {
         </div>
 
         {/* ── 중앙 캔버스 ── */}
-        <div style={{ flex: 1, overflow: "auto", display: "flex", justifyContent: "center", padding: "36px 0" }} onMouseDown={() => setFocus(null)}>
+        <div style={{ flex: 1, overflow: "auto", display: "flex", justifyContent: "center", padding: "36px 0" }} onMouseDown={() => setActiveTableId(null)}>
           <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
             <div
+              ref={pageRef}
               onMouseDown={(e) => e.stopPropagation()}
               style={{ position: "relative", width: PAGE_W, minHeight: PAGE_H, background: "white", boxShadow: "0 1px 3px rgba(26,34,51,0.10), 0 16px 48px rgba(26,34,51,0.14)", borderRadius: 2 }}
             >
@@ -930,41 +820,44 @@ function Workspace({ onHome }) {
 
               {/* 본문: 제목 + 섹션(자동 번호 Ⅰ/1/가) + 블록 */}
               <div style={{ padding: MARGIN + 10, boxSizing: "border-box", minHeight: PAGE_H }}>
-                <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", textAlign: "center", margin: "6px 0 20px" }}>
+                <h1 data-hwpx="title" style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", textAlign: "center", margin: "6px 0 20px" }}>
                   {doc.title}
                 </h1>
                 {numbered.map((sec, si) => (
                   <div key={si}>
-                    <div style={headingStyle(sec.level)}>
+                    <div data-hwpx={`heading-${si}`} style={headingStyle(sec.level)}>
                       {sec.number}. {sec.heading}
                     </div>
                     {sec.blocks.map((blk, bi) => {
                       if (blk.type === "para")
                         return (
-                          <p key={bi} style={{ fontSize: 12.5, lineHeight: 1.75, margin: "6px 0 10px", paddingLeft: sec.level > 1 ? 8 : 0, textAlign: "justify" }}>
+                          <p key={bi} data-hwpx={`blk-${si}-${bi}`} style={{ fontSize: 12.5, lineHeight: 1.75, margin: "6px 0 10px", paddingLeft: sec.level > 1 ? 8 : 0, textAlign: "justify" }}>
                             {blk.text}
                           </p>
                         );
                       if (blk.type === "list") {
                         const ListTag = blk.ordered ? "ol" : "ul";
                         return (
-                          <ListTag key={bi} style={{ fontSize: 12.5, lineHeight: 1.8, margin: "4px 0 10px", paddingLeft: 26 }}>
+                          <ListTag key={bi} data-hwpx={`blk-${si}-${bi}`} style={{ fontSize: 12.5, lineHeight: 1.8, margin: "4px 0 10px", paddingLeft: 26 }}>
                             {blk.items.map((it, k) => (
                               <li key={k}>{it}</li>
                             ))}
                           </ListTag>
                         );
                       }
+                      const tableId = `${si}-${bi}`;
                       return (
-                        <TableBlock
-                          key={bi}
-                          tableId={`${si}-${bi}`}
-                          data={blk.data}
-                          update={updateTableAt(si, bi)}
-                          focus={focus}
-                          setFocus={setFocus}
-                          showGuides={showGuides}
-                        />
+                        <div key={`${tableId}:${docRev}`} data-hwpx={`blk-${si}-${bi}`}>
+                          <TableKingBlock
+                            value={blk.data}
+                            onChange={(next) => updateTableAt(si, bi)(() => next)}
+                            active={activeTableId === tableId}
+                            onActivate={() => setActiveTableId(tableId)}
+                            showHandles={showGuides}
+                            setShowHandles={setShowGuides}
+                            themeVars={TK_THEME_VARS}
+                          />
+                        </div>
                       );
                     })}
                   </div>
@@ -977,22 +870,30 @@ function Workspace({ onHome }) {
         {/* ── 우측 패널: 속성 또는 AI ── */}
         <div style={{ width: 260, background: T.surface, borderLeft: `1px solid ${T.line}`, padding: 16, flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {rightTab === "ai" ? (
-            <AiPanel doc={doc} setDoc={setDoc} />
-          ) : focus ? (
+            <AiPanel
+              doc={doc}
+              setDoc={(next) => {
+                // 문서 통째 교체 — key(docRev)를 바꿔 표 블록이 새 값으로 리마운트되게 한다
+                setDocRev((r) => r + 1);
+                setActiveTableId(null);
+                setDoc(next);
+              }}
+            />
+          ) : activeData ? (
             <div style={{ fontSize: 12, color: T.inkSoft }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 12 }}>셀 속성</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 12 }}>표 속성</div>
               <div style={{ background: T.paper, border: `1px solid ${T.line}`, borderRadius: 10, padding: 12, fontFamily: T.mono, fontSize: 11.5, display: "grid", gridTemplateColumns: "auto 1fr", rowGap: 7, columnGap: 12 }}>
-                <span style={{ color: T.inkFaint }}>rowIndex</span>
-                <span style={{ color: T.ink }}>{focus.r}</span>
-                <span style={{ color: T.inkFaint }}>colIndex</span>
-                <span style={{ color: T.ink }}>{focus.c}</span>
-                <span style={{ color: T.inkFaint }}>vAlign</span>
-                <span style={{ color: T.accent }}>"{focusedVAlign}"</span>
+                <span style={{ color: T.inkFaint }}>rows</span>
+                <span style={{ color: T.ink }}>{activeData.cells.length}</span>
+                <span style={{ color: T.inkFaint }}>cols</span>
+                <span style={{ color: T.ink }}>{activeData.cells[0]?.length ?? 0}</span>
+                <span style={{ color: T.inkFaint }}>merges</span>
+                <span style={{ color: T.ink }}>{activeData.merges?.length ?? 0}</span>
                 <span style={{ color: T.inkFaint }}>width</span>
-                <span style={{ color: T.ink }}>{Math.round(focusedData?.widths[focus.r][focus.c] ?? 0)}px</span>
+                <span style={{ color: T.ink }}>{Math.round((activeData.widths[0] ?? []).reduce((s, w) => s + w, 0))}px</span>
               </div>
               <p style={{ fontSize: 11, color: T.inkFaint, lineHeight: 1.6, marginTop: 12 }}>
-                세로 정렬 버튼은 이 셀의 vAlign만 바꿉니다.
+                셀 스타일·병합·나누기는 표 위 툴바에서, 개별 경계선은 Shift+드래그로 조절합니다.
               </p>
             </div>
           ) : (

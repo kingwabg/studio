@@ -1,0 +1,264 @@
+/* table-king-Custom App.css의 스코프 이식본.
+   원본은 body/table/button 등 전역 선택자를 쓰므로 문서 앱을 오염시킨다.
+   전부 .tk-root 아래로 가두고, 색은 디자인 토큰 T와 동일한 CSS 변수(--tk-*)로 받는다.
+   변수 기본값 = T 객체 값 (DocumentStudio.jsx의 단일 진실을 복제한 폴백일 뿐). */
+
+.tk-root {
+  --tk-ink: #1a2233;
+  --tk-ink-soft: #5b6577;
+  --tk-ink-faint: #98a2b3;
+  --tk-paper: #f6f7fa;
+  --tk-surface: #ffffff;
+  --tk-line: #e4e8ef;
+  --tk-line-strong: #cbd2de;
+  --tk-accent: #2b5ce6;
+  --tk-accent-soft: #edf2fe;
+
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  margin: 10px auto;
+  color: var(--tk-ink);
+}
+
+.tk-root * {
+  box-sizing: border-box;
+}
+
+/* ── 툴바 (활성 표 위에만 표시) ── */
+.tk-root .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tk-root .toolbar.secondary {
+  margin-bottom: 10px;
+}
+
+.tk-root button {
+  min-height: 26px;
+  border: 1px solid var(--tk-line);
+  border-radius: 7px;
+  background: var(--tk-surface);
+  color: var(--tk-ink-soft);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 0 9px;
+}
+
+.tk-root button:hover:not(:disabled) {
+  background: var(--tk-accent-soft);
+  border-color: var(--tk-accent);
+  color: var(--tk-accent);
+}
+
+.tk-root button:disabled {
+  color: var(--tk-ink-faint);
+  cursor: not-allowed;
+}
+
+.tk-root .icon-button {
+  width: 26px;
+  padding: 0;
+}
+
+.tk-root .segmented-control {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--tk-line);
+  border-radius: 7px;
+  background: var(--tk-surface);
+}
+
+.tk-root .segmented-control .align-button {
+  min-width: 26px;
+  min-height: 24px;
+  border: 0;
+  border-radius: 0;
+  border-right: 1px solid var(--tk-line);
+  padding: 0 7px;
+}
+
+.tk-root .segmented-control .align-button:last-child {
+  border-right: 0;
+}
+
+.tk-root .swatch-group {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.tk-root .swatch {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  border-radius: 999px;
+  padding: 0;
+}
+
+.tk-root label {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--tk-ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.tk-root label input {
+  width: 46px;
+  height: 26px;
+  border: 1px solid var(--tk-line);
+  border-radius: 7px;
+  font-family: inherit;
+  padding: 0 7px;
+}
+
+/* ── 표 캔버스 ── */
+.tk-root .workspace {
+  overflow: visible;
+  max-width: 100%;
+}
+
+/* 원본의 두꺼운 프레임(2px 남색 테두리 + 그림자)은 문서 지면에 안 어울려서 제거.
+   바깥 테두리는 boundary-segment가 이미 그린다. */
+.tk-root .table-frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--tk-surface);
+}
+
+.tk-root .corner-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(135deg, transparent 50%, rgb(43 92 230 / 60%) 50%);
+  cursor: nwse-resize;
+  transition: opacity 150ms ease;
+}
+
+.tk-root table {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tk-root .boundary-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.tk-root .boundary-segment {
+  position: absolute;
+  background: var(--tk-line-strong);
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.tk-root .boundary-segment-hover {
+  z-index: 2;
+  background: var(--tk-accent);
+  box-shadow: 0 0 0 1px rgb(43 92 230 / 35%);
+}
+
+/* 드래그 중인 경계는 상태색(주황) 유지 — 호버(파랑)와 구분되어야 조작 대상이 보인다. */
+.tk-root .boundary-segment-active {
+  z-index: 3;
+  background: #f97316;
+  box-shadow: 0 0 0 2px rgb(249 115 22 / 35%);
+}
+
+.tk-root th,
+.tk-root td {
+  position: relative;
+  overflow: hidden;
+  min-width: 30px;
+  border: 0;
+  background: var(--tk-surface);
+  padding: 0;
+}
+
+/* 원본의 다크 헤더·얼룩 줄무늬는 데이터 그리드용 — 공문서 표 관례(옅은 머리행)로 교체. */
+.tk-root th {
+  background: var(--tk-paper);
+  color: var(--tk-ink);
+  font-weight: 600;
+}
+
+.tk-root th.selected,
+.tk-root td.selected {
+  outline: 2px solid var(--tk-accent);
+  outline-offset: -2px;
+}
+
+.tk-root .cell-editor {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+}
+
+.tk-root th input,
+.tk-root td input {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: inherit;
+  padding: 0 8px;
+  padding-block: 0;
+  text-overflow: ellipsis;
+}
+
+.tk-root input:focus {
+  outline: 0;
+}
+
+.tk-root .resize-handle {
+  position: absolute;
+  z-index: 20;
+  background: rgb(43 92 230 / 30%);
+  transition: opacity 150ms ease;
+}
+
+.tk-root .col-handle {
+  top: 0;
+  right: 0;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.tk-root .row-handle {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  cursor: row-resize;
+}
+
+.tk-root .status-line {
+  margin-top: 5px;
+  color: var(--tk-ink-faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
