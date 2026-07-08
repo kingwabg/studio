@@ -131,6 +131,8 @@ export function RightPanel() {
   const block = useCanvasStore((s) => s.doc.blocks.find((b) => b.id === s.selectedId) ?? null);
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
+  const cascadeStyle = useCanvasStore((s) => s.cascadeStyle);
+  const hasKids = useCanvasStore((s) => s.doc.blocks.some((b) => b.parentId === s.selectedId));
 
   const kind =
     block?.type === "text"
@@ -210,6 +212,19 @@ export function RightPanel() {
                     />
                   </span>
                 </button>
+
+                {/* 서식 유전 — 이 블록 크기 기준으로 하위 텍스트를 깊이당 −2pt 계단 정리 */}
+                {hasKids && (
+                  <button
+                    onClick={() => cascadeStyle(block.id)}
+                    className="flex flex-col items-start rounded-lg border border-line px-3 py-2 text-left hover:border-accentline hover:bg-accentsoft/30 transition-colors"
+                  >
+                    <span className="text-[12px] font-semibold text-ink">하위 서식 계단 적용</span>
+                    <span className="text-[11px] text-inkfaint mt-0.5">
+                      이 블록({block.fontSize ?? TEXT_DEFAULTS.fontSize}pt) 기준, 하위 텍스트를 한 단계씩 −2pt (최소 9pt)
+                    </span>
+                  </button>
+                )}
                 <div className="h-px bg-line" />
               </>
             )}

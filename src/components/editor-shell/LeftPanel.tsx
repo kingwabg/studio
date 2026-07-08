@@ -4,7 +4,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { type Block, type BlockType } from "../../modules/document/model";
+import { type Block, type BlockType, descendantIds } from "../../modules/document/model";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { useMergeStore } from "../../modules/merge/store";
 import { parseSheetFile } from "../../modules/merge/parseSheet";
@@ -82,10 +82,12 @@ const iconFor = (t: BlockType) =>
 const labelFor = (b: Block) =>
   b.type === "text" ? (b.text?.trim() || "빈 텍스트") : b.type === "table" ? "표" : "이미지";
 
-// 레이어 행 — 드래그(kind:layer)해서 다른 행에 놓으면 그 블록의 자식이 된다
-function LayerRow({ block, depth }: { block: Block; depth: number }) {
+// 레이어 행 — 드래그(kind:layer)해서 다른 행에 놓으면 그 블록의 자식이 된다.
+// 자식이 있으면 ▾/▸ 토글로 가지를 접는다(캔버스·패널 모두 숨김, 보기 전용).
+function LayerRow({ block, depth, kidCount }: { block: Block; depth: number; kidCount: number }) {
   const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
+  const updateBlock = useCanvasStore((s) => s.updateBlock);
   const drag = useDraggable({ id: `layer-${block.id}`, data: { kind: "layer", blockId: block.id } });
   const drop = useDroppable({ id: `layerdrop-${block.id}`, data: { kind: "layer", blockId: block.id } });
   const selectedRow = selectedId === block.id;
@@ -112,8 +114,30 @@ function LayerRow({ block, depth }: { block: Block; depth: number }) {
       } ${drag.isDragging ? "opacity-50 z-50 relative" : ""}`}
     >
       {depth > 0 && <span className="text-inkfaint/60 -ml-1">└</span>}
+      {kidCount > 0 ? (
+        // 접기 토글 — 부모 <button> 안이라 span으로 (중첩 button 금지), 드래그 시작도 차단
+        <span
+          role="button"
+          aria-label={block.collapsed ? "펴기" : "접기"}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            updateBlock(block.id, { collapsed: !block.collapsed });
+          }}
+          className="w-4 h-4 -ml-1 flex items-center justify-center rounded text-inkfaint hover:text-accent hover:bg-accentsoft text-[10px] shrink-0"
+        >
+          {block.collapsed ? "▸" : "▾"}
+        </span>
+      ) : (
+        depth === 0 && <span className="w-4 -ml-1 shrink-0" />
+      )}
       <span className={selectedRow ? "text-accent" : "text-inkfaint"}>{iconFor(block.type)}</span>
       <span className="truncate">{labelFor(block)}</span>
+      {block.collapsed && kidCount > 0 && (
+        <span className="ml-auto text-[10px] text-inkfaint bg-paper rounded-full px-1.5 py-0.5 shrink-0">
+          +{kidCount}
+        </span>
+      )}
     </button>
   );
 }
@@ -123,16 +147,16 @@ function BlocksTab() {
   // 루트 해제 드롭 영역 (레이어 목록 하단)
   const rootDrop = useDroppable({ id: "layerroot", data: { kind: "layerroot" } });
 
-  // parentId 트리를 y좌표순으로 평탄화 (들여쓰기 렌더용)
-  const rows: { block: Block; depth: number }[] = [];
+  // parentId 트리를 y좌표순으로 평탄화 (들여쓰기 렌더용) — 접힌 가지는 건너뛴다
+  const rows: { block: Block; depth: number; kidCount: number }[] = [];
   const byY = (a: Block, b: Block) => a.y - b.y || a.x - b.x;
   const walk = (parentId: string | undefined, depth: number) => {
     blocks
       .filter((b) => (b.parentId ?? undefined) === parentId)
       .sort(byY)
       .forEach((b) => {
-        rows.push({ block: b, depth });
-        walk(b.id, depth + 1);
+        rows.push({ block: b, depth, kidCount: descendantIds(blocks, b.id).size });
+        if (!b.collapsed) walk(b.id, depth + 1);
       });
   };
   walk(undefined, 0);
@@ -152,8 +176,8 @@ function BlocksTab() {
           구조 {blocks.length > 0 && <span className="text-inkfaint/70">· {blocks.length}</span>}
         </p>
         <div className="flex flex-col gap-0.5">
-          {rows.map(({ block, depth }) => (
-            <LayerRow key={block.id} block={block} depth={depth} />
+          {rows.map(({ block, depth, kidCount }) => (
+            <LayerRow key={block.id} block={block} depth={depth} kidCount={kidCount} />
           ))}
           {blocks.length === 0 && (
             <p className="text-[12px] text-inkfaint px-2 py-1">아직 블록이 없습니다</p>

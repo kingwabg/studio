@@ -57,6 +57,7 @@ export function flattenDoc(src: CanvasDoc): CanvasDoc {
       const clone = structuredClone(b) as Block;
       clone.id = createBlock(b.type, 0, 0).id; // 새 문서용 새 id
       clone.parentId = newParentId;
+      clone.collapsed = undefined; // 접기는 보기 상태 — 펴진 문서는 전부 보인다
       const indent = MARGIN + depth * INDENT;
 
       if (clone.type === "text") {

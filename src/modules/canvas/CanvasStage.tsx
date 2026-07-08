@@ -8,6 +8,7 @@
 import { forwardRef, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SCALE, mmToPx } from "./geometry";
+import { collapsedHiddenIds } from "../document/model";
 import { useCanvasStore } from "./store";
 import { useGuideStore } from "./snap";
 import { CanvasBlock } from "./CanvasBlock";
@@ -66,6 +67,7 @@ const PROJECTION_FILL = "rgba(43, 92, 230, 0.18)";
 const PROJECTION_STROKE = "rgba(43, 92, 230, 0.78)";
 const PROJECTION_ALERT_FILL = "rgba(239, 68, 68, 0.2)";
 const PROJECTION_ALERT_STROKE = "rgba(220, 38, 38, 0.82)";
+const BOX_EPSILON_MM = 0.05;
 
 type RulerProjection = {
   start: number;
@@ -79,6 +81,16 @@ type MeasuredBlockBox = {
   w: number;
   h: number;
 };
+
+function isSameMeasuredBox(a: MeasuredBlockBox | null, b: MeasuredBlockBox) {
+  if (!a) return false;
+  return (
+    Math.abs(a.x - b.x) < BOX_EPSILON_MM &&
+    Math.abs(a.y - b.y) < BOX_EPSILON_MM &&
+    Math.abs(a.w - b.w) < BOX_EPSILON_MM &&
+    Math.abs(a.h - b.h) < BOX_EPSILON_MM
+  );
+}
 
 const rulerSurface = {
   display: "block",
@@ -228,6 +240,11 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
   const pageW = mmToPx(doc.page.w);
   const pageH = mmToPx(doc.page.h);
   const selectedBlock = doc.blocks.find((block) => block.id === selectedId);
+  // 아코디언 접기 — 접힌 조상을 가진 블록은 지면에서 숨긴다 (문서에는 그대로 존재)
+  const visibleBlocks = useMemo(() => {
+    const hidden = collapsedHiddenIds(doc.blocks);
+    return hidden.size ? doc.blocks.filter((b) => !hidden.has(b.id)) : doc.blocks;
+  }, [doc.blocks]);
 
   useLayoutEffect(() => {
     const pageNode = pageRef.current;
@@ -238,27 +255,44 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
 
     const safeId = selectedId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const blockNode = pageNode.querySelector<HTMLElement>(`[data-block-id="${safeId}"]`);
-    if (!blockNode) {
+    const tableNode = blockNode?.querySelector<HTMLElement>(`[data-tableblock="${safeId}"]`);
+    const measuredNode = tableNode ?? blockNode;
+    if (!measuredNode) {
       setMeasuredBlockBox(null);
       return;
     }
 
+    let frameId = 0;
+    let lastBox: MeasuredBlockBox | null = null;
+
     const measure = () => {
       const pageRect = pageNode.getBoundingClientRect();
-      const blockRect = blockNode.getBoundingClientRect();
-      setMeasuredBlockBox({
+      const blockRect = measuredNode.getBoundingClientRect();
+      const nextBox = {
         x: (blockRect.left - pageRect.left) / SCALE,
         y: (blockRect.top - pageRect.top) / SCALE,
         w: blockRect.width / SCALE,
         h: blockRect.height / SCALE,
-      });
+      };
+
+      if (!isSameMeasuredBox(lastBox, nextBox)) {
+        lastBox = nextBox;
+        setMeasuredBlockBox(nextBox);
+      }
+    };
+
+    const measureFrame = () => {
+      measure();
+      frameId = window.requestAnimationFrame(measureFrame);
     };
 
     measure();
-    const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(blockNode);
+    frameId = window.requestAnimationFrame(measureFrame);
+    const resizeObserver = new ResizeObserver(() => measure());
+    resizeObserver.observe(measuredNode);
     window.addEventListener("resize", measure);
     return () => {
+      window.cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
       window.removeEventListener("resize", measure);
     };
@@ -317,7 +351,7 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
           style={{ width: pageW, height: pageH }}
           className="relative bg-white shrink-0 ring-1 ring-black/5 shadow-[0_1px_3px_rgba(26,34,51,0.08),0_20px_50px_-12px_rgba(26,34,51,0.18)]"
         >
-          {doc.blocks.map((block) => (
+          {visibleBlocks.map((block) => (
             <CanvasBlock key={block.id} block={block} />
           ))}
           <SnapGuides />

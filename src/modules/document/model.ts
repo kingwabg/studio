@@ -24,6 +24,9 @@ export interface Block {
   // 트리(부모-자식) — 문서의 논리 구조. 부모를 끌면 자손이 함께 움직이고(자석 그룹),
   // 내보내기 때 트리 상하관계가 개요 번호(Ⅰ/1/가)로 펴진다. 없으면 루트 블록.
   parentId?: string;
+  // 아코디언 접기 — true면 이 블록의 자손을 캔버스·레이어에서 숨긴다.
+  // 보기 전용 상태: 내보내기(hwpx)·펴기(flatten)는 무시하고 전부 포함한다.
+  collapsed?: boolean;
   x: number; // mm, 지면 좌상단 기준
   y: number; // mm
   w: number; // mm
@@ -121,4 +124,13 @@ export function descendantIds(blocks: Block[], id: string): Set<string> {
 // candidate가 id 자신이거나 자손인가 — setParent 순환 방지용
 export function isSelfOrDescendant(blocks: Block[], id: string, candidate: string): boolean {
   return id === candidate || descendantIds(blocks, id).has(candidate);
+}
+
+// 접힌(collapsed) 조상을 가진 블록 id 집합 — 캔버스·레이어 패널이 숨길 대상.
+// 내보내기·flatten은 이 집합을 쓰지 않는다 (접기는 조망용, 문서 내용은 그대로).
+export function collapsedHiddenIds(blocks: Block[]): Set<string> {
+  const out = new Set<string>();
+  for (const b of blocks)
+    if (b.collapsed) for (const id of descendantIds(blocks, b.id)) out.add(id);
+  return out;
 }

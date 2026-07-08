@@ -54,6 +54,7 @@ interface CanvasState {
   setTableData: (id: string, data: TableKingData) => void; // 표 스냅샷 교체 + w/h 동기화
   setCell: (id: string, r: number, c: number, text: string) => void; // 표 셀 하나 수정 (구형 rows용)
   setParent: (id: string, parentId: string | null) => void; // 트리 연결/해제 (순환 방지)
+  cascadeStyle: (id: string) => void; // 서식 유전 — 하위 텍스트 크기를 깊이당 −2pt 계단 적용
   removeBlock: (id: string) => void; // 서브트리째 삭제 (실행취소 가능)
   undo: () => void;
   redo: () => void;
@@ -165,11 +166,43 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       };
     }),
 
+  cascadeStyle: (id) =>
+    set((s) => {
+      // 서식 유전 — 선택 블록의 글자 크기를 기준으로, 하위 텍스트를 깊이당 −2pt(최소 9pt)
+      // 계단으로 정리한다. 자동 유전은 개별 설정을 침범하므로 "명시 버튼"으로만 발동.
+      const root = s.doc.blocks.find((b) => b.id === id);
+      if (!root || root.type !== "text") return {};
+      const base = root.fontSize ?? 10.5;
+      const byId = new Map(s.doc.blocks.map((b) => [b.id, b]));
+      const kids = descendantIds(s.doc.blocks, id);
+      // 루트로부터의 상대 깊이 — 부모 체인을 거슬러 센다
+      const depthOf = (b: Block): number => {
+        let d = 0;
+        let cur: Block | undefined = b;
+        while (cur && cur.id !== id) {
+          cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+          d++;
+        }
+        return d;
+      };
+      return {
+        ...record(s),
+        doc: {
+          ...s.doc,
+          blocks: s.doc.blocks.map((b) =>
+            kids.has(b.id) && b.type === "text"
+              ? { ...b, fontSize: Math.max(9, base - 2 * depthOf(b)) }
+              : b
+          ),
+        },
+      };
+    }),
+
   updateBlock: (id, patch) =>
     set((s) => {
-      // h만 바뀌는 갱신은 auto-height 파생 — 히스토리 제외
+      // h만 바뀌는 갱신은 auto-height 파생, collapsed는 보기 상태 — 히스토리 제외
       const keys = Object.keys(patch);
-      const derivedOnly = keys.every((k) => k === "h");
+      const derivedOnly = keys.every((k) => k === "h" || k === "collapsed");
       return {
         ...(derivedOnly ? {} : record(s, `upd:${id}:${keys.join(",")}`)),
         doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) },
