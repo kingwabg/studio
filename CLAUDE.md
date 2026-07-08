@@ -14,9 +14,12 @@
 [직렬화] HWPX 파일         ← 내보내기 어댑터로만 생성 (저장/공유 시점)
 [검증]   rhwp / 한글       ← 우리가 만든 HWPX를 여는 외부 렌더러
 ```
-- **rhwp** (github.com/rhwp-rs/rhwp, MIT): 조판·렌더링·파싱 담당. 우리는 재발명하지 않는다.
+- **rhwp** (github.com/edwardkim/rhwp, MIT): 조판·렌더링·파싱 담당. 우리는 재발명하지 않는다.
+  제품 의존성 `@rhwp/core`(WASM ~5.7MB)로 통합됨 — 단, "한글 미리보기"(파생) 전용.
+  dynamic import로 지연 로딩하므로 편집 화면 첫 로딩에는 영향 없음.
 - **kordoc** (npm): 개발용 비계(스키마 학습·검증 도구). **최종 제품에 포함 금지.**
 - 제품의 내보내기 코어는 **의존성 0** (자체 CRC32 + STORE ZIP + 내장 템플릿).
+  rhwp는 내보내기 경로에 관여하지 않는다 — exportCore가 만든 바이트를 소비만 한다.
 
 ## 검증 완료된 HWPX 매핑 (건드릴 때 주의)
 - 단위: 1mm = 283.465 HWPUNIT
@@ -26,7 +29,15 @@
   봉투 기본 여백(좌20·위30·머리말10mm)을 그대로 두면 그만큼 밀린다.
 - 텍스트 요소 = 무테두리 1×1 표 (`borderFillIDRef="1"`), 표 요소 = `borderFillIDRef="2"`
 - 셀 내 줄바꿈 = 여러 `<hp:p>` 문단
-- 내보내기는 kordoc `validateHwpx(ok)` + 내용 왕복 + SVG 렌더 3중 검증을 통과한 상태
+- 다중 페이지: 요소에 `page`(0부터)와 페이지 로컬 y를 부여 → 페이지마다 앵커 문단 1개,
+  2페이지부터 `<hp:p pageBreak="1">`. rhwp·한글은 존중하지만 **kordoc 렌더러는 미지원**
+  (페이지 수 게이트는 verify ⑤ rhwp 단계가 담당).
+- 스타일: makeStyleRegistry가 화면 실측 스타일(pt·굵기·기울임·색·정렬·줄간격·셀 배경·글꼴)을
+  charPr/paraPr/borderFill/fontface로 동적 생성해 header.xml에 주입.
+  ⚠ IDRef는 리더에 따라 "배열 인덱스"로 해석된다(rhwp) — 새 id는 반드시 기존 itemCnt에
+  연속으로 이어 붙일 것. ⚠ 굵게/기울임은 표준상 빈 자식 요소(`<hh:bold/>`) — 속성과 병기.
+- 내보내기는 kordoc `validateHwpx(ok)` + 내용 왕복 + SVG 렌더 + rhwp 조판(페이지 수)
+  + 스타일 조판(크기·굵기·배경·글꼴) + 가져오기 왕복(구조 복원) 7중 검증을 통과한 상태
 - 패키지 항목 순서: mimetype → META-INF/container.xml → Contents/content.hpf
   → Contents/header.xml → Contents/section0.xml → Preview/PrvText.txt
 
@@ -43,6 +54,13 @@
   검증된 매핑 + table-king 확장(병합 cellSpan, 행별 열 너비, 셀 내 줄바꿈=여러 hp:p).
 - `src/hwpx/hwpxBase.js` — 자동 생성(수정 금지). kordoc이 만든 유효 봉투를 내장.
   재생성: `npm run gen:hwpx-base`.
+- `src/hwpx/rhwpLoader.js` — @rhwp/core WASM 공용 로더 (미리보기·가져오기 공유, 1회 초기화).
+  measureTextWidth는 init 전 등록 필수(rhwp 요구). WASM은 Vite `?url` 임포트로 배포.
+  Vite 전용이므로 Node(하네스)에서 import 금지 — 순수 로직과 분리하는 이유.
+- `src/hwpx/hanPreview.js` — "한글 미리보기": hwpx 바이트 → 페이지 SVG 배열.
+- `src/hwpx/importCore.js` — 가져오기: HwpDocument → 문서 JSON (순수 — Node 하네스 공용).
+  1×1 표=텍스트 블록(우리 매핑의 역방향), 머리글 패턴(Ⅰ/1/가)은 번호를 벗겨 저장,
+  표는 중립형 {rows, merges}로 반환(테이블 모델 변환은 DocumentStudio hydrateImported).
 - `scripts/hwpx-verify.mjs` — 3중 검증 하네스 (kordoc devDependency 사용).
   `npm run verify:hwpx` → validateHwpx ok + 내용 왕복 + SVG 렌더 확인. 코어 수정 시 필수 실행.
 - `hwpx-export.mjs` — 초기 kordoc 기반 어댑터(참고용). 제품 경로는 src/hwpx/가 대체.
@@ -64,10 +82,17 @@
 - 파괴적 작업(파일 덮어쓰기, 대량 삭제)은 실행 전 사용자 확인.
 
 ## 다음 과제 (우선순위 순)
-1. HWPX 내보내기에 글꼴 크기/굵기 반영 (header.xml에 charPr 추가 + charPrIDRef 매핑)
-2. 다중 페이지 지원 (요소 y > 297mm → 다음 페이지 / section 분할)
-3. HWPX 가져오기 (rhwp @rhwp/core 파서로 외부 문서 → 캔버스 블록 삽입)
-4. 이미지 요소 타입 추가 (캔버스 + hp:pic 매핑)
+0. ~~한글 미리보기~~ ✅ 완료 — 툴바 "한글 미리보기" 버튼 → rhwp 조판 페이지 SVG 모달
+1. ~~다중 페이지 지원~~ ✅ 완료 — 에디터: 블록 단위 페이지 넘김(스페이서, 자연 위치
+   불변량으로 1회 수렴) + 페이지 구분선/여백 가이드. 내보내기: el.page + pageBreak 앵커.
+   한계: 한 페이지보다 큰 블록은 밀지 않고 걸친 채 둔다(표 행 분할은 나중 과제).
+2. ~~스타일 반영~~ ✅ 완료 — 화면 실측(computed style + table-king 셀 모델 + 실효 글꼴 감지)
+   → 스타일 레지스트리 → header.xml. 화면 px = 미리보기 px 일치 확인.
+3. ~~HWPX 가져오기~~ ✅ 완료 — 홈 "한글 문서 열기" → importCore(rhwp 파서) → 편집기.
+   verify ⑦ 왕복 게이트(내보내기→가져오기 구조 복원 + 열 너비 복원).
+   셀 크기는 getCellProperties(HWPUNIT÷75=px)로 복원 — 행별 반올림 금지(1px 유령 열).
+   한계: 셀 스타일·이미지·중첩표는 미지원. 표 기능 전수 점검: docs/table-features.md.
+4. 이미지 요소 타입 추가 (캔버스 + hp:pic 매핑 — rhwp getControlImageData로 가져오기도 가능)
 5. Undo/Redo (요소 배열 스냅샷 히스토리)
 
 ## 실행/검증 명령

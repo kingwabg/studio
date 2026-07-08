@@ -11,6 +11,7 @@
     "gen:hwpx-base": "node scripts/gen-hwpx-base.mjs"
   },
   "dependencies": {
+    "@rhwp/core": "^0.7.17",
     "@vitejs/plugin-react": "^4.3.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

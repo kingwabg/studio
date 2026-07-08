@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect, useLayoutEffect, Fragment } from "react";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "./table-king/TableKingBlock.jsx";
 import "./table-king/table-king.css";
 import { buildHwpx } from "./hwpx/exportCore.js";
@@ -162,6 +162,8 @@ const IcVBottom = (p) => <Icon {...p} d={<><path d="M2 13.5h12" /><rect x="5.5" 
 const IcSpark = (p) => <Icon {...p} d={<><path d="M8 1.5l1.4 3.6L13 6.5l-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4L8 1.5z" /><path d="M12.8 10.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6z" /></>} />;
 const IcSend = (p) => <Icon {...p} d={<path d="M2 8l12-5.5L11 13l-3-3.5L2 8z" />} />;
 const IcRestore = (p) => <Icon {...p} d={<><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9" /><path d="M2.5 2.5v3h3" /></>} />;
+const IcEye = (p) => <Icon {...p} d={<><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle cx="8" cy="8" r="2" /></>} />;
+const IcClose = (p) => <Icon {...p} d={<path d="M4 4l8 8M12 4l-8 8" />} />;
 
 // ═════════════════════════════════════════════
 // 종이 모형 (홈 카드 시그니처)
@@ -419,8 +421,24 @@ function AiPanel({ doc, setDoc }) {
 // ═════════════════════════════════════════════
 // 홈 대시보드
 // ═════════════════════════════════════════════
-function Home({ onOpenDoc }) {
+function Home({ onOpenDoc, onImportFile }) {
   const [hovered, setHovered] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef(null);
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 같은 파일 재선택도 change가 뜨게 초기화
+    if (!file) return;
+    setImporting(true);
+    try {
+      await onImportFile(file);
+    } catch (err) {
+      console.error("[가져오기]", err);
+      alert(`파일을 여는 데 실패했어요.\n${err?.message ?? err}`);
+    } finally {
+      setImporting(false);
+    }
+  };
   const cards = [
     { key: "doc", title: "문서", desc: "A4 위에 표와 텍스트를 배치하는 편집기", ready: true },
     { key: "sheet", title: "시트", desc: "수식으로 계산하는 격자 편집기", ready: false },
@@ -445,6 +463,15 @@ function Home({ onOpenDoc }) {
           <IcSearch size={15} />
           <input placeholder="프로젝트 검색" style={{ border: "none", outline: "none", background: "transparent", fontSize: 13, fontFamily: T.font, flex: 1, color: T.ink }} />
         </div>
+        <input ref={fileRef} type="file" accept=".hwp,.hwpx" onChange={handleFile} style={{ display: "none" }} />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={importing}
+          title="한글 문서(hwp/hwpx)를 열어 편집"
+          style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 10, border: `1px solid ${T.accentLine}`, background: T.accentSoft, color: T.accent, fontSize: 13, fontWeight: 700, cursor: importing ? "wait" : "pointer", fontFamily: T.font, flexShrink: 0 }}
+        >
+          <IcFolder size={15} /> {importing ? "여는 중…" : "한글 문서 열기"}
+        </button>
       </header>
 
       <main style={{ maxWidth: 880, margin: "0 auto", padding: "56px 32px 80px" }}>
@@ -563,26 +590,29 @@ function TemplateDialog({ onStart, onClose }) {
 // ═════════════════════════════════════════════
 // A4 워크스페이스 (문서 모델 + AI 탭)
 // ═════════════════════════════════════════════
-function Workspace({ onHome }) {
-  const [doc, setDoc] = useState({
-    title: "스프라이트 명세서",
-    sections: [
-      {
-        heading: "캐릭터 목록",
-        level: 1,
-        blocks: [
-          {
-            type: "table",
-            data: makeTableData([
-              ["캐릭터", "방향", "프레임", "상태"],
-              ["슬라임", "8방향", "6", "대기"],
-              ["기사", "8방향", "8", "이동"],
-            ]),
-          },
-        ],
-      },
-    ],
-  });
+function Workspace({ onHome, initialDoc }) {
+  // initialDoc(가져온 문서)이 있으면 그것으로, 없으면 기본 새 문서로 시작
+  const [doc, setDoc] = useState(
+    initialDoc ?? {
+      title: "스프라이트 명세서",
+      sections: [
+        {
+          heading: "캐릭터 목록",
+          level: 1,
+          blocks: [
+            {
+              type: "table",
+              data: makeTableData([
+                ["캐릭터", "방향", "프레임", "상태"],
+                ["슬라임", "8방향", "6", "대기"],
+                ["기사", "8방향", "8", "이동"],
+              ]),
+            },
+          ],
+        },
+      ],
+    }
+  );
   const [activeTableId, setActiveTableId] = useState(null); // "sec-blk" — 툴바·단축키가 붙는 활성 표
   const [docRev, setDocRev] = useState(0); // AI 적용 등 문서 통째 교체 시 표 블록 리마운트(시드 갱신)용
   const [zoom, setZoom] = useState(100);
@@ -611,6 +641,56 @@ function Workspace({ onHome }) {
 
   // ── HWPX 내보내기: 화면에 보이는 배치를 그대로 mm 좌표로 수집 ──
   const pageRef = useRef(null);
+
+  // ── 페이지네이션(블록 단위 넘김): 경계를 걸치는 블록을 스페이서로 다음 페이지 상단에 밀어낸다 ──
+  // 원리: 블록의 "자연 위치"(스페이서가 없을 때의 배치)는 불변량이다. 매 렌더마다
+  // 현재 측정값에서 기존 스페이서를 빼 자연 위치를 복원한 뒤 필요한 스페이서를 다시
+  // 계산한다 — 자연 위치가 같으면 결과도 같으므로 재렌더 1회로 수렴한다.
+  // 화면이 진실이므로, 여기서 확정된 배치를 collectCanvas가 그대로 실측해 내보낸다.
+  const PAGE_PAD = MARGIN + 10; // 본문 패딩(px) — 각 페이지의 상·하단 사용 한계
+  const [pgLayout, setPgLayout] = useState({ spacers: {}, pageCount: 1 });
+  const [, setFontsTick] = useState(0);
+  useEffect(() => {
+    // 웹폰트가 늦게 로드되면 블록 높이가 바뀐다 — 로드 완료 시 1회 재측정 유도
+    document.fonts?.ready?.then(() => setFontsTick(1));
+  }, []);
+  useLayoutEffect(() => {
+    const pageEl = pageRef.current;
+    if (!pageEl) return;
+    const pageRect = pageEl.getBoundingClientRect();
+    const scale = pageRect.width / PAGE_W; // 줌 transform 보정
+    const prev = pgLayout.spacers;
+    const usableH = PAGE_H - PAGE_PAD * 2;
+    let prevBefore = 0; // 지금까지 지나온 기존 스페이서 합 (자연 위치 복원용)
+    let added = 0; // 이번 계산에서 새로 쌓인 스페이서 합
+    let maxBottom = 0;
+    const next = {};
+    for (const n of pageEl.querySelectorAll("[data-hwpx]")) {
+      const key = n.dataset.hwpx;
+      prevBefore += prev[key] ?? 0; // 자신 앞에 놓인 자기 스페이서까지 포함해야 자연 위치가 나온다
+      const r = n.getBoundingClientRect();
+      const natTop = (r.top - pageRect.top) / scale - prevBefore;
+      const h = r.height / scale;
+      const top = natTop + added;
+      const p = Math.floor(top / PAGE_H);
+      // 하한 초과 시 다음 페이지로 — 단, 한 페이지보다 큰 블록은 밀어도 해결이 안 되므로 제외
+      if (h <= usableH && top + h > (p + 1) * PAGE_H - PAGE_PAD + 1) {
+        const spacer = Math.ceil((p + 1) * PAGE_H + PAGE_PAD - top);
+        next[key] = spacer;
+        added += spacer;
+        maxBottom = Math.max(maxBottom, top + spacer + h);
+      } else {
+        maxBottom = Math.max(maxBottom, top + h);
+      }
+    }
+    const pageCount = Math.max(1, Math.ceil((maxBottom + PAGE_PAD) / PAGE_H));
+    // 2px 허용 오차: 스페이서 삽입이 마진 상쇄를 끊으며 생기는 미세 오차로 인한 재렌더 루프 방지
+    const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+    const changed =
+      pageCount !== pgLayout.pageCount ||
+      [...keys].some((k) => Math.abs((next[k] ?? 0) - (prev[k] ?? 0)) > 2);
+    if (changed) setPgLayout({ spacers: next, pageCount });
+  });
   const collectCanvas = () => {
     const pageEl = pageRef.current;
     if (!pageEl) return null;
@@ -628,15 +708,76 @@ function Workspace({ onHome }) {
         h: toMm(r.height),
       };
     };
+    // 시트 전체 y(mm) → { page, 페이지 로컬 y }. 페이지네이션 스페이서가 "블록이 경계를
+    // 걸치지 않음"을 보장하므로 시작 y만으로 페이지가 확정된다.
+    const PAGE_H_MM = 297;
+    const paged = (r) => {
+      const pg = Math.max(0, Math.floor(r.y / PAGE_H_MM));
+      return { ...r, y: r.y - pg * PAGE_H_MM, page: pg };
+    };
+
+    // ── 스타일 실측: 화면의 computed style이 곧 문서 스타일 ──
+    const rgbToHex = (rgb) => {
+      const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb);
+      if (!m) return "#000000";
+      return "#" + [m[1], m[2], m[3]].map((v) => Number(v).toString(16).padStart(2, "0")).join("").toUpperCase();
+    };
+    const styleOf = (sel) => {
+      const el = pageEl.querySelector(sel);
+      if (!el) return undefined;
+      const cs = getComputedStyle(el);
+      const px = parseFloat(cs.fontSize); // computed font-size는 transform(줌) 영향을 안 받는다
+      const lh = parseFloat(cs.lineHeight);
+      return {
+        pt: Math.round(px * 0.75 * 10) / 10, // CSS px → pt (1pt = 4/3px)
+        bold: (parseInt(cs.fontWeight, 10) || 400) >= 600,
+        italic: cs.fontStyle === "italic",
+        color: rgbToHex(cs.color),
+        align: ["left", "center", "right", "justify"].includes(cs.textAlign) ? cs.textAlign : "left",
+        lineSpacing: lh > 0 && px > 0 ? Math.round((lh / px) * 100) : undefined,
+      };
+    };
+    // 실효 글꼴: CSS 스택에서 실제로 한글을 그리는 첫 글꼴 — hwpx fontface로 그대로 선언해
+    // "화면 글꼴 = 문서 글꼴"을 만든다. 어느 것도 없으면 Windows 한글 기본(맑은 고딕).
+    const effectiveFont = () => {
+      const candidates = ["Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic"];
+      for (const f of candidates)
+        if (document.fonts?.check?.(`12px "${f}"`)) return f === "Malgun Gothic" ? "맑은 고딕" : f;
+      return "맑은 고딕";
+    };
+    // 표 셀 스타일: table-king 모델이 진실. 머리행(th)은 화면 CSS(font-weight 600)가 굵게
+    // 그리므로 명시 스타일이 없어도 굵게로 내보낸다. 셀 글자는 12.5px(9.4pt) 고정(CSS).
+    const CELL_PT = 9.4;
+    const cellStylesOf = (cells) =>
+      cells.map((row, r) =>
+        row.map((cell) => {
+          const s = cell?.style ?? {};
+          return {
+            pt: CELL_PT,
+            bold: s.bold ?? r === 0,
+            italic: !!s.italic,
+            color: s.color ?? "#1A2233",
+            hAlign: s.hAlign ?? "left",
+            vAlign: s.vAlign ?? "center",
+            backgroundColor: s.backgroundColor,
+          };
+        })
+      );
 
     const elements = [];
     const titleRect = rectOf('[data-hwpx="title"]');
     if (titleRect && doc.title.trim())
-      elements.push({ type: "text", ...titleRect, text: doc.title });
+      elements.push({ type: "text", ...paged(titleRect), text: doc.title, style: styleOf('[data-hwpx="title"]') });
 
     numbered.forEach((sec, si) => {
       const hr = rectOf(`[data-hwpx="heading-${si}"]`);
-      if (hr) elements.push({ type: "text", ...hr, text: `${sec.number}. ${sec.heading}` });
+      if (hr)
+        elements.push({
+          type: "text",
+          ...paged(hr),
+          text: `${sec.number}. ${sec.heading}`,
+          style: styleOf(`[data-hwpx="heading-${si}"]`),
+        });
 
       sec.blocks.forEach((blk, bi) => {
         const key = `blk-${si}-${bi}`;
@@ -650,31 +791,33 @@ function Workspace({ onHome }) {
           let hPx = 0;
           for (let c = 0; c < nCols; c++)
             hPx = Math.max(hPx, d.cellHeights.reduce((s, row) => s + (row[c] ?? 0), 0));
+          const pos = paged({ x: fr.x, y: fr.y, w: wPx / MM, h: hPx / MM });
           elements.push({
             type: "table",
-            x: fr.x, y: fr.y, w: wPx / MM, h: hPx / MM,
+            ...pos,
             grid: {
               cellsText: tableDataToRows(d),
               merges: d.merges ?? [],
               colWidthsMm: d.widths.map((row) => row.map((v) => v / MM)),
               rowHeightsMm: d.cellHeights.map((row) => row.map((v) => v / MM)),
+              cellStyles: cellStylesOf(d.cells),
             },
           });
         } else if (blk.type === "para") {
           const r = rectOf(`[data-hwpx="${key}"]`);
-          if (r) elements.push({ type: "text", ...r, text: blk.text });
+          if (r) elements.push({ type: "text", ...paged(r), text: blk.text, style: styleOf(`[data-hwpx="${key}"]`) });
         } else if (blk.type === "list") {
           const r = rectOf(`[data-hwpx="${key}"]`);
           if (!r) return;
           const lines = blk.items
             .map((it, i) => (blk.ordered ? `${i + 1}. ${it}` : `• ${it}`))
             .join("\n");
-          elements.push({ type: "text", ...r, text: lines });
+          elements.push({ type: "text", ...paged(r), text: lines, style: styleOf(`[data-hwpx="${key}"]`) });
         }
       });
     });
 
-    return { page: { w: 210, h: 297 }, elements };
+    return { page: { w: 210, h: 297 }, font: effectiveFont(), elements };
   };
 
   const exportHwpx = () => {
@@ -689,6 +832,25 @@ function Workspace({ onHome }) {
     a.click();
     URL.revokeObjectURL(url);
     console.log(`[hwpx] 요소 ${canvas.elements.length}개 → ${bytes.length} bytes 내보냄`);
+  };
+
+  // ── 한글 미리보기: 내보낼 hwpx를 rhwp(WASM)로 조판해 "한글에서 보일 모습"을 확인 ──
+  // 내보내기 경로(exportCore, 의존성 0)는 그대로 두고 그 결과 바이트만 소비한다.
+  const [hanPreview, setHanPreview] = useState(null); // null | {status:"busy"|"error"|"ok", ...}
+  const openHanPreview = async () => {
+    const canvas = collectCanvas();
+    if (!canvas) return;
+    setHanPreview({ status: "busy" });
+    try {
+      const bytes = buildHwpx(canvas);
+      // dynamic import — WASM(약 5.7MB)은 미리보기를 처음 열 때만 내려받는다
+      const { renderHwpxPages } = await import("./hwpx/hanPreview.js");
+      const pages = await renderHwpxPages(bytes);
+      setHanPreview({ status: "ok", pages });
+    } catch (e) {
+      console.error("[한글 미리보기]", e);
+      setHanPreview({ status: "error", message: e?.message || String(e) });
+    }
   };
 
   const addTable = () =>
@@ -755,13 +917,62 @@ function Workspace({ onHome }) {
           핸들 가이드
         </button>
         <button
+          onClick={openHanPreview}
+          title="한글에서 열었을 때의 모습을 미리보기 (rhwp 조판)"
+          disabled={hanPreview?.status === "busy"}
+          style={{ marginLeft: "auto", height: 30, padding: "0 13px", borderRadius: 8, border: `1px solid ${T.accentLine}`, background: T.accentSoft, color: T.accent, fontSize: 12, fontWeight: 700, cursor: hanPreview?.status === "busy" ? "wait" : "pointer", fontFamily: T.font, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
+        >
+          <IcEye size={14} /> {hanPreview?.status === "busy" ? "조판 중…" : "한글 미리보기"}
+        </button>
+        <button
           onClick={exportHwpx}
           title="현재 문서를 .hwpx로 다운로드"
-          style={{ marginLeft: "auto", height: 30, padding: "0 13px", borderRadius: 8, border: "none", background: T.accent, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: T.font, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
+          style={{ marginLeft: 6, height: 30, padding: "0 13px", borderRadius: 8, border: "none", background: T.accent, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: T.font, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
         >
           <IcDownload size={14} /> HWPX 내보내기
         </button>
       </div>
+
+      {/* ── 한글 미리보기 모달: rhwp가 조판한 페이지 SVG를 그대로 보여준다 ── */}
+      {hanPreview && hanPreview.status !== "busy" && (
+        <div
+          onMouseDown={() => setHanPreview(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(26,34,51,0.45)", zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ width: "min(880px, 94vw)", height: "90vh", background: T.surface, borderRadius: 14, boxShadow: "0 24px 64px rgba(26,34,51,0.35)", display: "flex", flexDirection: "column", overflow: "hidden" }}
+          >
+            <div style={{ height: 52, padding: "0 18px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <IcEye size={16} />
+              <span style={{ fontSize: 13.5, fontWeight: 700 }}>한글 미리보기</span>
+              <span style={{ fontSize: 11.5, color: T.inkSoft }}>
+                {hanPreview.status === "ok" ? `${hanPreview.pages.length}페이지 · rhwp 조판 — 한글에서 여는 모습과 동일` : "조판 실패"}
+              </span>
+              <button
+                onClick={() => setHanPreview(null)}
+                title="닫기"
+                style={{ marginLeft: "auto", width: 30, height: 30, borderRadius: 8, border: "none", background: "transparent", color: T.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <IcClose size={15} />
+              </button>
+            </div>
+            <div style={{ flex: 1, overflow: "auto", background: T.canvas, padding: "24px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+              {hanPreview.status === "error" ? (
+                <div style={{ margin: "auto", textAlign: "center", color: T.inkSoft, fontSize: 12.5, lineHeight: 1.7 }}>
+                  미리보기 조판에 실패했어요.
+                  <br />
+                  <span style={{ fontFamily: T.mono, fontSize: 11, color: T.inkFaint }}>{hanPreview.message}</span>
+                </div>
+              ) : (
+                hanPreview.pages.map((svg, i) => (
+                  <div key={i} style={{ lineHeight: 0, background: "white", boxShadow: "0 1px 3px rgba(26,34,51,0.10), 0 12px 32px rgba(26,34,51,0.14)", borderRadius: 2 }} dangerouslySetInnerHTML={{ __html: svg }} />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {/* ── 좌측 사이드바 ── */}
@@ -804,9 +1015,19 @@ function Workspace({ onHome }) {
             <div
               ref={pageRef}
               onMouseDown={(e) => e.stopPropagation()}
-              style={{ position: "relative", width: PAGE_W, minHeight: PAGE_H, background: "white", boxShadow: "0 1px 3px rgba(26,34,51,0.10), 0 16px 48px rgba(26,34,51,0.14)", borderRadius: 2 }}
+              style={{ position: "relative", width: PAGE_W, minHeight: PAGE_H * pgLayout.pageCount, background: "white", boxShadow: "0 1px 3px rgba(26,34,51,0.10), 0 16px 48px rgba(26,34,51,0.14)", borderRadius: 2 }}
             >
-              <div style={{ position: "absolute", inset: MARGIN, border: `1px dashed ${T.accentLine}`, pointerEvents: "none" }} />
+              {/* 페이지별 여백 가이드 + 페이지 구분선 */}
+              {Array.from({ length: pgLayout.pageCount }, (_, k) => (
+                <div key={`mg-${k}`} style={{ position: "absolute", left: MARGIN, right: MARGIN, top: k * PAGE_H + MARGIN, height: PAGE_H - MARGIN * 2, border: `1px dashed ${T.accentLine}`, pointerEvents: "none" }} />
+              ))}
+              {Array.from({ length: pgLayout.pageCount - 1 }, (_, k) => (
+                <div key={`pb-${k}`} style={{ position: "absolute", left: 0, right: 0, top: (k + 1) * PAGE_H, borderTop: `2px dashed ${T.lineStrong}`, pointerEvents: "none" }}>
+                  <span style={{ position: "absolute", right: 10, top: 4, fontSize: 10, fontWeight: 600, color: T.inkFaint, background: T.paper, border: `1px solid ${T.line}`, borderRadius: 5, padding: "1px 7px" }}>
+                    {k + 2}페이지
+                  </span>
+                </div>
+              ))}
               {[
                 { text: "위 10mm", style: { top: -24, left: "50%", transform: "translateX(-50%)" } },
                 { text: "아래 10mm", style: { bottom: -24, left: "50%", transform: "translateX(-50%)" } },
@@ -825,39 +1046,53 @@ function Workspace({ onHome }) {
                 </h1>
                 {numbered.map((sec, si) => (
                   <div key={si}>
+                    {/* 페이지 스페이서: 경계를 걸치는 요소를 다음 페이지 상단으로 밀어낸다 */}
+                    {pgLayout.spacers[`heading-${si}`] > 0 && <div aria-hidden style={{ height: pgLayout.spacers[`heading-${si}`] }} />}
                     <div data-hwpx={`heading-${si}`} style={headingStyle(sec.level)}>
                       {sec.number}. {sec.heading}
                     </div>
                     {sec.blocks.map((blk, bi) => {
+                      const hwpxKey = `blk-${si}-${bi}`;
+                      const spacer =
+                        pgLayout.spacers[hwpxKey] > 0 ? <div aria-hidden style={{ height: pgLayout.spacers[hwpxKey] }} /> : null;
                       if (blk.type === "para")
                         return (
-                          <p key={bi} data-hwpx={`blk-${si}-${bi}`} style={{ fontSize: 12.5, lineHeight: 1.75, margin: "6px 0 10px", paddingLeft: sec.level > 1 ? 8 : 0, textAlign: "justify" }}>
-                            {blk.text}
-                          </p>
+                          <Fragment key={bi}>
+                            {spacer}
+                            <p data-hwpx={hwpxKey} style={{ fontSize: 12.5, lineHeight: 1.75, margin: "6px 0 10px", paddingLeft: sec.level > 1 ? 8 : 0, textAlign: "justify" }}>
+                              {blk.text}
+                            </p>
+                          </Fragment>
                         );
                       if (blk.type === "list") {
                         const ListTag = blk.ordered ? "ol" : "ul";
                         return (
-                          <ListTag key={bi} data-hwpx={`blk-${si}-${bi}`} style={{ fontSize: 12.5, lineHeight: 1.8, margin: "4px 0 10px", paddingLeft: 26 }}>
-                            {blk.items.map((it, k) => (
-                              <li key={k}>{it}</li>
-                            ))}
-                          </ListTag>
+                          <Fragment key={bi}>
+                            {spacer}
+                            <ListTag data-hwpx={hwpxKey} style={{ fontSize: 12.5, lineHeight: 1.8, margin: "4px 0 10px", paddingLeft: 26 }}>
+                              {blk.items.map((it, k) => (
+                                <li key={k}>{it}</li>
+                              ))}
+                            </ListTag>
+                          </Fragment>
                         );
                       }
                       const tableId = `${si}-${bi}`;
                       return (
-                        <div key={`${tableId}:${docRev}`} data-hwpx={`blk-${si}-${bi}`}>
-                          <TableKingBlock
-                            value={blk.data}
-                            onChange={(next) => updateTableAt(si, bi)(() => next)}
-                            active={activeTableId === tableId}
-                            onActivate={() => setActiveTableId(tableId)}
-                            showHandles={showGuides}
-                            setShowHandles={setShowGuides}
-                            themeVars={TK_THEME_VARS}
-                          />
-                        </div>
+                        <Fragment key={bi}>
+                          {spacer}
+                          <div key={`${tableId}:${docRev}`} data-hwpx={hwpxKey}>
+                            <TableKingBlock
+                              value={blk.data}
+                              onChange={(next) => updateTableAt(si, bi)(() => next)}
+                              active={activeTableId === tableId}
+                              onActivate={() => setActiveTableId(tableId)}
+                              showHandles={showGuides}
+                              setShowHandles={setShowGuides}
+                              themeVars={TK_THEME_VARS}
+                            />
+                          </div>
+                        </Fragment>
                       );
                     })}
                   </div>
@@ -919,7 +1154,7 @@ function Workspace({ onHome }) {
         <span style={{ margin: "0 auto", background: T.paper, border: `1px solid ${T.line}`, borderRadius: 6, padding: "2px 10px", fontWeight: 600, color: T.ink }}>1</span>
         <input type="range" min={50} max={200} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} style={{ width: 110, accentColor: T.accent }} />
         <span style={{ width: 38, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{zoom}%</span>
-        <span>페이지 1/1</span>
+        <span>총 {pgLayout.pageCount}페이지</span>
       </div>
     </div>
   );
@@ -928,17 +1163,58 @@ function Workspace({ onHome }) {
 // ═════════════════════════════════════════════
 // 앱 루트
 // ═════════════════════════════════════════════
+// 가져온 문서 JSON(importCore 산출) → 편집기 상태. hydrateDoc과 달리 표 병합을 보존한다.
+const hydrateImported = (json) => ({
+  title: json.title,
+  sections: json.sections.map((s) => ({
+    heading: s.heading,
+    level: s.level,
+    blocks: s.blocks.map((b) => {
+      if (b.type !== "table") return { ...b };
+      const data = makeTableData(b.rows);
+      data.merges = b.merges ?? [];
+      // 원본 셀 크기가 복원됐으면 균등 폭 대신 그대로 사용 (하한은 편집 가능 최소치).
+      // 반올림 금지 — 행마다 따로 반올림하면 같은 경계가 1px 어긋나 유령 열이 생긴다.
+      // 같은 mm에서 온 float은 행끼리 정확히 일치하므로 그대로 둬야 경계가 합쳐진다.
+      if (b.widthsPx) data.widths = b.widthsPx.map((row) => row.map((v) => Math.max(24, v)));
+      if (b.heightsPx) data.cellHeights = b.heightsPx.map((row) => row.map((v) => Math.max(16, v)));
+      return { type: "table", data };
+    }),
+  })),
+});
+
 export default function DocumentStudio() {
   const [view, setView] = useState("home");
   const [dialog, setDialog] = useState(false);
+  const [importedDoc, setImportedDoc] = useState(null); // 파일에서 가져온 문서 — 편집기 시드
+
+  // 한글 파일 열기: rhwp 파서(지연 로딩) → 문서 JSON → 편집기 진입
+  const importFile = async (file) => {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { importHwpx } = await import("./hwpx/importCore.js");
+    const json = await importHwpx(bytes, file.name.replace(/\.(hwpx?|HWPX?)$/, ""));
+    setImportedDoc(hydrateImported(json));
+    setView("editor");
+  };
+
   return (
     <>
-      {view === "home" && <Home onOpenDoc={() => setDialog(true)} />}
-      {view === "editor" && <Workspace onHome={() => setView("home")} />}
+      {view === "home" && <Home onOpenDoc={() => setDialog(true)} onImportFile={importFile} />}
+      {view === "editor" && (
+        <Workspace
+          key={importedDoc ? "imported" : "blank"} // 가져오기 후엔 시드가 바뀌므로 리마운트
+          onHome={() => {
+            setImportedDoc(null);
+            setView("home");
+          }}
+          initialDoc={importedDoc}
+        />
+      )}
       {dialog && (
         <TemplateDialog
           onStart={() => {
             setDialog(false);
+            setImportedDoc(null);
             setView("editor");
           }}
           onClose={() => setDialog(false)}

@@ -29,22 +29,162 @@ const szPos = (el) =>
   `vertOffset="${mmToUnit(el.y)}" horzOffset="${mmToUnit(el.x)}"/>` +
   `<hp:outMargin left="0" right="0" top="0" bottom="0"/>`;
 
-// 셀 내 줄바꿈 = 여러 hp:p (검증된 매핑)
-const paras = (text) =>
+// 셀 내 줄바꿈 = 여러 hp:p (검증된 매핑) — charPr/paraPr 참조로 글자·문단 스타일 적용
+const paras = (text, charRef = "0", paraRef = "0") =>
   String(text)
     .split("\n")
     .map(
       (line) =>
-        `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>${esc(line)}</hp:t></hp:run></hp:p>`
+        `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0"><hp:run charPrIDRef="${charRef}"><hp:t>${esc(line)}</hp:t></hp:run></hp:p>`
     )
     .join("");
 
+// ═════════════════ 스타일 레지스트리 ═════════════════
+// 화면에서 실측한 스타일(크기·굵기·기울임·색·정렬·줄간격·셀 배경·글꼴)을
+// hwpx의 charPr/paraPr/borderFill 항목으로 바꿔 id를 발급한다. 같은 스타일은
+// 같은 id로 합쳐지고, 쌓인 항목은 patchHeader가 header.xml에 주입한다.
+// "화면 = 진실" 원칙의 스타일판 — 봉투의 고정 항목을 고르는 게 아니라
+// 화면에 존재하는 스타일 조합을 그대로 문서 규격으로 옮긴다.
+// ⚠ id는 반드시 기존 목록에 "연속으로" 이어야 한다: rhwp 등 일부 리더는
+// IDRef를 id 속성이 아니라 배열 인덱스로 해석한다. 봉투가 id=인덱스를 지키므로
+// 우리도 (기존 itemCnt)부터 이어 붙이면 두 해석 모두에서 같은 항목이 잡힌다.
+const H_ALIGN = { left: "LEFT", center: "CENTER", right: "RIGHT", justify: "JUSTIFY" };
+const V_ALIGN = { top: "TOP", center: "CENTER", bottom: "BOTTOM" };
+
+export function makeStyleRegistry(baseHeaderXml) {
+  // 봉투의 현재 개수 = 새 항목의 시작 id (id가 0부터 연속이라는 봉투 불변식에 의존)
+  const countOf = (tag) => Number(new RegExp(`<hh:${tag} itemCnt="(\\d+)"`).exec(baseHeaderXml)?.[1] ?? 0);
+  const charBase = countOf("charProperties");
+  const paraBase = countOf("paraProperties");
+  // borderFill은 id가 1부터라 개수+1이 다음 id (봉투: itemCnt=2, id 1·2)
+  const fillBase = countOf("borderFills") + 1;
+
+  const chars = new Map();
+  const parasReg = new Map();
+  const fills = new Map();
+  let fontIdx = null; // patchHeader에서 실효 글꼴을 추가하면 그 id (HANGUL/LATIN 동일 인덱스)
+
+  const charId = (s) => {
+    if (!s) return "0";
+    const pt = s.pt ?? 10;
+    const bold = !!s.bold;
+    const italic = !!s.italic;
+    const color = s.color ?? "#000000";
+    const key = `${pt}|${bold}|${italic}|${color}`;
+    if (!chars.has(key)) chars.set(key, { id: charBase + chars.size, pt, bold, italic, color });
+    return String(chars.get(key).id);
+  };
+  const paraId = (s) => {
+    if (!s) return "0";
+    const align = H_ALIGN[s.align] ?? "LEFT";
+    const ls = Math.min(500, Math.max(100, Math.round(s.lineSpacing ?? 160))); // % — 비정상 실측값 방어
+    const key = `${align}|${ls}`;
+    if (!parasReg.has(key)) parasReg.set(key, { id: paraBase + parasReg.size, align, ls });
+    return String(parasReg.get(key).id);
+  };
+  const fillId = (bg) => {
+    if (!bg) return null;
+    if (!fills.has(bg)) fills.set(bg, { id: fillBase + fills.size, bg });
+    return String(fills.get(bg).id);
+  };
+
+  // header.xml에 실효 글꼴 fontface + 쌓인 charPr/paraPr/borderFill을 주입.
+  // itemCnt도 함께 갱신 — 검증기(validateHwpx)가 개수 불일치를 잡는다.
+  const patchHeader = (headerXml, fontName) => {
+    let xml = headerXml;
+
+    if (fontName) {
+      // HANGUL/LATIN 두 목록에 같은 인덱스로 추가 → charPr fontRef가 한 값으로 참조
+      for (const lang of ["HANGUL", "LATIN"]) {
+        const re = new RegExp(`(<hh:fontface lang="${lang}" fontCnt=")(\\d+)(">)([\\s\\S]*?)(</hh:fontface>)`);
+        xml = xml.replace(re, (m, p1, cnt, p3, body, close) => {
+          fontIdx = Number(cnt); // 다음 id = 기존 개수
+          const font =
+            `<hh:font id="${fontIdx}" face="${esc(fontName)}" type="TTF" isEmbedded="0">` +
+            `<hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>` +
+            `</hh:font>`;
+          return `${p1}${Number(cnt) + 1}${p3}${body}${font}${close}`;
+        });
+      }
+    }
+    const fh = fontIdx ?? 0; // 글꼴 미지정 시 봉투 기본(함초롬바탕)
+
+    if (chars.size) {
+      const entries = [...chars.values()]
+        .map(
+          (c) =>
+            // 굵게/기울임은 OWPML 표준상 "빈 자식 요소"(<hh:bold/>)다. kordoc 계열은 속성도
+            // 읽으므로 둘 다 기록 — 어떤 리더에서도 같은 결과가 나오게 한다.
+            `<hh:charPr id="${c.id}" height="${Math.round(c.pt * 100)}" textColor="${c.color}" shadeColor="none" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="1"${c.bold ? ` bold="1"` : ""}${c.italic ? ` italic="1"` : ""}>` +
+            `<hh:fontRef hangul="${fh}" latin="${fh}" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
+            `<hh:ratio hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100"/>` +
+            `<hh:spacing hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
+            `<hh:relSz hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100"/>` +
+            `<hh:offset hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
+            (c.italic ? `<hh:italic/>` : "") +
+            (c.bold ? `<hh:bold/>` : "") +
+            `</hh:charPr>`
+        )
+        .join("");
+      xml = xml
+        .replace(/(<hh:charProperties itemCnt=")(\d+)(")/, (m, p1, n, p3) => `${p1}${Number(n) + chars.size}${p3}`)
+        .replace("</hh:charProperties>", entries + "</hh:charProperties>");
+    }
+
+    if (parasReg.size) {
+      const entries = [...parasReg.values()]
+        .map(
+          (p) =>
+            `<hh:paraPr id="${p.id}" tabPrIDRef="0" condense="0" fontLineHeight="0" snapToGrid="1" suppressLineNumbers="0" checked="0" textDir="AUTO">` +
+            `<hh:align horizontal="${p.align}" vertical="BASELINE"/>` +
+            `<hh:heading type="NONE" idRef="0" level="0"/>` +
+            `<hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="BREAK_WORD" widowOrphan="0" keepWithNext="0" keepLines="0" pageBreakBefore="0" lineWrap="BREAK"/>` +
+            `<hh:autoSpacing eAsianEng="0" eAsianNum="0"/>` +
+            `<hh:margin><hc:intent value="0" unit="HWPUNIT"/><hc:left value="0" unit="HWPUNIT"/><hc:right value="0" unit="HWPUNIT"/><hc:prev value="0" unit="HWPUNIT"/><hc:next value="0" unit="HWPUNIT"/></hh:margin>` +
+            `<hh:lineSpacing type="PERCENT" value="${p.ls}"/>` +
+            `<hh:border borderFillIDRef="1" offsetLeft="0" offsetRight="0" offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0"/>` +
+            `</hh:paraPr>`
+        )
+        .join("");
+      xml = xml
+        .replace(/(<hh:paraProperties itemCnt=")(\d+)(")/, (m, p1, n, p3) => `${p1}${Number(n) + parasReg.size}${p3}`)
+        .replace("</hh:paraProperties>", entries + "</hh:paraProperties>");
+    }
+
+    if (fills.size) {
+      // 봉투 borderFill 2(사방 실선)와 같은 테두리에 채우기 색만 더한 항목
+      const entries = [...fills.values()]
+        .map(
+          (f) =>
+            `<hh:borderFill id="${f.id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">` +
+            `<hh:slash type="NONE" Crooked="0" isCounter="0"/>` +
+            `<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>` +
+            `<hh:leftBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
+            `<hh:rightBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
+            `<hh:topBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
+            `<hh:bottomBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
+            `<hc:fillBrush><hc:winBrush faceColor="${f.bg}" hatchColor="#999999" alpha="0"/></hc:fillBrush>` +
+            `</hh:borderFill>`
+        )
+        .join("");
+      xml = xml
+        .replace(/(<hh:borderFills itemCnt=")(\d+)(")/, (m, p1, n, p3) => `${p1}${Number(n) + fills.size}${p3}`)
+        .replace("</hh:borderFills>", entries + "</hh:borderFills>");
+    }
+
+    return xml;
+  };
+
+  return { charId, paraId, fillId, patchHeader };
+}
+
 // ── 셀 하나 (병합 스팬 확장) ──
-const cellXml = (text, r, c, wU, hU, borderFill, colSpan = 1, rowSpan = 1) =>
-  `<hp:tc name="" header="0" hasMargin="0" protect="0" editable="1" dirty="0" borderFillIDRef="${borderFill}">` +
-  `<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" ` +
+// refs: { charRef, paraRef, vertAlign, fill } — 스타일 레지스트리가 발급한 참조. 없으면 기본값.
+const cellXml = (text, r, c, wU, hU, borderFill, colSpan = 1, rowSpan = 1, refs = {}) =>
+  `<hp:tc name="" header="0" hasMargin="0" protect="0" editable="1" dirty="0" borderFillIDRef="${refs.fill ?? borderFill}">` +
+  `<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="${refs.vertAlign ?? "CENTER"}" ` +
   `linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">` +
-  paras(text) +
+  paras(text, refs.charRef ?? "0", refs.paraRef ?? "0") +
   `</hp:subList>` +
   `<hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="${colSpan}" rowSpan="${rowSpan}"/>` +
   `<hp:cellSz width="${wU}" height="${hU}"/>` +
@@ -55,9 +195,9 @@ let idSeq = 2000;
 // ── 표 요소 → hp:tbl ──
 // grid: { cellsText: string[][], merges: [{r,c,rs,cs}], colWidthsMm: number[][](행별), rowHeightsMm: number[][](셀별) }
 // grid가 없으면 el.rows(균등 격자)로 폴백 — 검증 하네스의 단순 캔버스와 호환.
-function tableXml(el, borderFill = "2") {
+function tableXml(el, reg, borderFill = "2") {
   const grid = el.grid ?? gridFromRows(el);
-  const { cellsText, merges, colWidthsMm, rowHeightsMm } = grid;
+  const { cellsText, merges, colWidthsMm, rowHeightsMm, cellStyles } = grid;
   const rc = cellsText.length;
   const cc = cellsText[0].length;
 
@@ -66,6 +206,18 @@ function tableXml(el, borderFill = "2") {
       (m) => r >= m.r && r < m.r + m.rs && c >= m.c && c < m.c + m.cs && !(r === m.r && c === m.c)
     );
   const mergeAt = (r, c) => merges.find((m) => m.r === r && m.c === c);
+
+  // 셀 스타일 → 레지스트리 참조. cellStyles가 없으면(구형 캔버스) 전부 기본값.
+  const refsAt = (r, c) => {
+    const s = cellStyles?.[r]?.[c];
+    if (!s || !reg) return {};
+    return {
+      charRef: reg.charId(s),
+      paraRef: reg.paraId({ align: s.hAlign ?? "center", lineSpacing: s.lineSpacing }),
+      vertAlign: V_ALIGN[s.vAlign] ?? "CENTER",
+      fill: s.backgroundColor ? reg.fillId(s.backgroundColor) : undefined,
+    };
+  };
 
   const trs = [];
   for (let r = 0; r < rc; r++) {
@@ -80,7 +232,7 @@ function tableXml(el, borderFill = "2") {
       for (let i = c; i < c + cs; i++) wMm += colWidthsMm[r][i];
       let hMm = 0;
       for (let i = r; i < r + rs; i++) hMm += rowHeightsMm[i][c];
-      tcs.push(cellXml(cellsText[r][c], r, c, mmToUnit(wMm), mmToUnit(hMm), borderFill, cs, rs));
+      tcs.push(cellXml(cellsText[r][c], r, c, mmToUnit(wMm), mmToUnit(hMm), borderFill, cs, rs, refsAt(r, c)));
     }
     if (tcs.length) trs.push(`<hp:tr>${tcs.join("")}</hp:tr>`);
   }
@@ -109,7 +261,12 @@ function gridFromRows(el) {
 }
 
 // ── 텍스트 요소 → 무테두리 1×1 표 (검증된 매핑) ──
-const textXml = (el) => tableXml({ ...el, rows: [[el.text]], grid: undefined }, "1");
+// el.style(화면 실측: pt·bold·italic·color·align·lineSpacing)을 1×1 셀의 스타일로 옮긴다.
+const textXml = (el, reg) => {
+  const grid = gridFromRows({ ...el, rows: [[el.text]] });
+  if (el.style) grid.cellStyles = [[{ ...el.style, hAlign: el.style.align, vAlign: "center" }]];
+  return tableXml({ ...el, grid }, reg, "1");
+};
 
 // ── 캔버스 → section0.xml ──
 // 검증된 봉투의 첫 문단(용지 설정 포함)까지 유지하고 본문만 교체한다.
@@ -119,7 +276,7 @@ const textXml = (el) => tableXml({ ...el, rows: [[el.text]], grid: undefined }, 
 //    여백/앵커 문단 원점으로 해석하는 경우(rhwp)가 있다. 여백이 0이면 두 원점이
 //    일치해 어느 해석에서도 같은 자리에 찍힌다. (0 초과 값은 그만큼 밀릴 수 있고,
 //    흐름 텍스트가 없는 자유 배치 문서라 여백의 의미도 없다)
-function buildSection(refSectionXml, canvas) {
+function buildSection(refSectionXml, canvas, reg) {
   const headEnd = refSectionXml.indexOf("</hp:p>") + "</hp:p>".length;
   let head = refSectionXml.slice(0, headEnd);
   head = head.replace(
@@ -130,14 +287,28 @@ function buildSection(refSectionXml, canvas) {
     /<hp:margin [^/]*\/>/,
     `<hp:margin header="0" footer="0" gutter="0" left="0" right="0" top="0" bottom="0"/>`
   );
-  const controls = canvas.elements
-    .map((el) => (el.type === "table" ? tableXml(el) : textXml(el)))
-    .join("");
-  const host =
-    `<hp:p paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0">` +
-    controls +
-    `<hp:t></hp:t></hp:run></hp:p>`;
-  return head + host + `</hs:sec>`;
+  // 다중 페이지: 요소를 el.page(0부터)로 그룹핑해 페이지마다 앵커 문단을 하나씩 둔다.
+  // 2페이지부터는 pageBreak="1"로 새 종이에서 시작 — 절대배치(vertRelTo="PAPER")는
+  // 앵커 문단이 놓인 페이지의 종이 원점을 기준으로 찍히므로, 로컬 y 좌표가 그대로 통한다.
+  const byPage = new Map();
+  for (const el of canvas.elements) {
+    const p = el.page ?? 0;
+    if (!byPage.has(p)) byPage.set(p, []);
+    byPage.get(p).push(el);
+  }
+  const lastPage = Math.max(0, ...byPage.keys());
+  const hosts = [];
+  for (let p = 0; p <= lastPage; p++) {
+    const controls = (byPage.get(p) ?? [])
+      .map((el) => (el.type === "table" ? tableXml(el, reg) : textXml(el, reg)))
+      .join("");
+    hosts.push(
+      `<hp:p paraPrIDRef="0" styleIDRef="0"${p > 0 ? ` pageBreak="1"` : ""}><hp:run charPrIDRef="0">` +
+        controls +
+        `<hp:t></hp:t></hp:run></hp:p>`
+    );
+  }
+  return head + hosts.join("") + `</hs:sec>`;
 }
 
 const previewText = (canvas) =>
@@ -267,10 +438,14 @@ function buildStoreZip(entries) {
 
 // ═════════════════ 공개 API ═════════════════
 
-// canvas: { page:{w,h}, elements:[...] } → .hwpx Uint8Array
+// canvas: { page:{w,h}, font?, elements:[...] } → .hwpx Uint8Array
+// canvas.font = 화면의 실효 글꼴 이름 (fontface로 선언되어 모든 생성 charPr가 참조)
 export function buildHwpx(canvas) {
   const files = { ...HWPX_BASE };
-  files["Contents/section0.xml"] = buildSection(HWPX_BASE["Contents/section0.xml"], canvas);
+  const reg = makeStyleRegistry(HWPX_BASE["Contents/header.xml"]);
+  // 순서 중요: 섹션을 먼저 만들어 레지스트리에 스타일이 쌓인 뒤 헤더를 패치한다
+  files["Contents/section0.xml"] = buildSection(HWPX_BASE["Contents/section0.xml"], canvas, reg);
+  files["Contents/header.xml"] = reg.patchHeader(HWPX_BASE["Contents/header.xml"], canvas.font);
   if (files["Preview/PrvText.txt"] !== undefined)
     files["Preview/PrvText.txt"] = previewText(canvas);
 
