@@ -1,8 +1,9 @@
-// RightPanel.tsx — 선택한 블록의 속성 편집(내용·글자 스타일·위치·크기).
-import { type ReactNode } from "react";
+// RightPanel.tsx — [속성] 선택 블록 편집 / [AI] 문서 도우미 탭.
+import { useState, type ReactNode } from "react";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { type Block, type TextAlign, TEXT_DEFAULTS } from "../../modules/document/model";
-import { IcText, IcTable, IcImage, IcTrash } from "../../ui/icons";
+import { AiPanel } from "./AiPanel";
+import { IcText, IcTable, IcImage, IcTrash, IcSparkles } from "../../ui/icons";
 
 const TEXT_COLORS = ["#1A2233", "#5B6577", "#2B5CE6", "#DC2626", "#16A34A", "#B45309"];
 
@@ -133,6 +134,7 @@ export function RightPanel() {
   const removeBlock = useCanvasStore((s) => s.removeBlock);
   const cascadeStyle = useCanvasStore((s) => s.cascadeStyle);
   const hasKids = useCanvasStore((s) => s.doc.blocks.some((b) => b.parentId === s.selectedId));
+  const [tab, setTab] = useState<"props" | "ai">("props");
 
   const kind =
     block?.type === "text"
@@ -142,8 +144,32 @@ export function RightPanel() {
         : { label: "이미지", icon: <IcImage size={15} /> };
 
   return (
-    <aside className="w-64 shrink-0 border-l border-line bg-white flex flex-col overflow-auto">
-      {!block ? (
+    <aside className={`${tab === "ai" ? "w-80" : "w-64"} shrink-0 border-l border-line bg-white flex flex-col overflow-auto transition-all`}>
+      {/* 탭: 속성 | AI */}
+      <div className="flex px-2 pt-2 gap-1 shrink-0">
+        {(
+          [
+            ["props", "속성", null],
+            ["ai", "AI", <IcSparkles key="i" size={13} />],
+          ] as const
+        ).map(([key, label, icon]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex-1 flex items-center justify-center gap-1 h-9 rounded-lg text-[12.5px] font-semibold transition-colors ${
+              tab === key ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper"
+            }`}
+          >
+            {icon}
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="h-px bg-line mt-2 shrink-0" />
+
+      {tab === "ai" ? (
+        <AiPanel />
+      ) : !block ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-2">
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-paper text-inkfaint">
             <IcText size={18} />

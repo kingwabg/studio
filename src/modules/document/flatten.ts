@@ -13,7 +13,8 @@ import { type Block, type CanvasDoc, createBlock, createDoc } from "./model";
 const ROMANS = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ", "Ⅶ", "Ⅷ", "Ⅸ", "Ⅹ", "Ⅺ", "Ⅻ"];
 const HANGULS = "가나다라마바사아자차카타파하";
 
-const numberFor = (depth: number, idx: number): string =>
+// 공문서 개요 번호 — aiToCanvas(AI 생성 문서)도 같은 규칙을 쓴다
+export const numberFor = (depth: number, idx: number): string =>
   depth === 0
     ? `${ROMANS[idx] ?? idx + 1}.`
     : depth === 1

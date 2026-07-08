@@ -130,3 +130,14 @@ export const IcClose = (p: P) => (
     <path d="M6 6l12 12M18 6L6 18" />
   </Svg>
 );
+export const IcSend = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 12l18-8-4.5 16-4.5-5.5L3 12z" />
+  </Svg>
+);
+export const IcRestore = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 12a8 8 0 1 0 2.3-5.7" />
+    <path d="M4 4v4.5h4.5" />
+  </Svg>
+);
