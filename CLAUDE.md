@@ -6,6 +6,18 @@
 "AI가 통합된, HWPX(한글) 호환 문서 도구"다.
 (별도 프로젝트 junha-ai/ 에서 데스크탑 AI 에이전트를 병행 개발 중 — 이 저장소와 섞지 말 것)
 
+## 두 편집 표면 공존 (Strangler Fig 마이그레이션)
+기존 흐름 에디터를 갈아엎지 않고, 새 모듈형 캔버스를 옆에 신설해 점진 이관한다.
+라우팅: `/` = 기존 앱(DocumentStudio, 무손상), `/studio` = 새 모듈형 캔버스.
+둘 다 `src/hwpx/` 코어를 공유. 목표 스택: Vite+react-router / TS(점진) / Tailwind(신규만) /
+Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
+- **기존(흐름 에디터)**: sections→blocks, 브라우저가 배치 → 실측 내보내기. JS.
+- **신규(자유배치 캔버스)**: 블록이 mm 좌표(x/y/w/h) 직접 소유. TS + Zustand + dnd-kit.
+  `src/modules/document/model.ts`(타입) · `src/modules/canvas/`(store·Stage·Block·geometry) ·
+  `src/components/editor-shell/`(L/C/R) · `src/routes/`(StudioHome/StudioEditor).
+- Tailwind는 **utilities만**(preflight 제외, tailwind.css 주석 참고) — 기존 앱 스타일 보호.
+- TS는 `allowJs`+`checkJs:false` — 기존 JS와 공존, table-king·hwpx는 JS 유지(불가침).
+
 ## 핵심 아키텍처 (변경 시 반드시 사용자와 상의)
 ```
 [진실]   캔버스 JSON 모델  ← 사용자가 조작하는 유일한 상태 (mm 단위, A4 210×297)
