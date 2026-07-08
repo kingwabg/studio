@@ -127,10 +127,13 @@
 }
 
 /* 원본의 두꺼운 프레임(2px 남색 테두리 + 그림자)은 문서 지면에 안 어울려서 제거.
-   바깥 테두리는 boundary-segment가 이미 그린다. */
+   바깥 테두리는 boundary-segment가 이미 그린다.
+   overflow는 반드시 visible — 세그먼트는 경계 "중심"에 그려져 외곽선의 절반(0.5px)이
+   프레임 밖에 있다. hidden이면 절반이 잘려 DPR/줌에 따라 왼쪽·위쪽 선이 통째로
+   사라진다(잘린 0.5px가 0으로 반올림). 외곽 경계의 호버/드래그 하이라이트도 같은 이유. */
 .tk-root .table-frame {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   background: var(--tk-surface);
 }
 
