@@ -11,6 +11,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type MouseEvent as RMouseEvent,
   type PointerEvent as RPointerEvent,
 } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
@@ -268,10 +269,10 @@ function TextContent({
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     return () => ro.disconnect();
-    // RO가 일부 갱신을 놓치는 경우가 있어(내용 교체 등) 파생 원인들을 deps로 명시 —
-    // 어느 쪽이 먼저든 sync는 멱등이라 안전하다.
+    // deps는 "시그니처 문자열" 하나로 고정 — RO가 놓치는 갱신(내용/폭/폰트 교체)에도
+    // 재실행되면서, 배열 길이가 항상 2라 HMR 중 deps 크기 변화 경고가 안 난다. sync는 멱등.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [block.id, block.text, block.w, block.fontSize, block.bold, block.italic, updateBlock]);
+  }, [block.id, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}`]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `textdrop:${block.id}`,
@@ -314,10 +315,51 @@ function TextContent({
 }
 
 // ── 표: table-king 엔진 (기존 앱에서 이관) ──
+type TableContextMenuState = { x: number; y: number };
+
+type TableMenuItem = {
+  label: string;
+  action?: string;
+  disabled?: boolean;
+};
+
+const TABLE_CONTEXT_ITEMS: TableMenuItem[] = [
+  { label: "복사", action: "복사" },
+  { label: "붙여넣기", action: "붙여넣기" },
+  { label: "행 추가", action: "행 추가" },
+  { label: "열 추가", action: "열 추가" },
+  { label: "행 삭제", action: "행 삭제" },
+  { label: "열 삭제", action: "열 삭제" },
+  { label: "셀 병합", action: "병합" },
+  { label: "셀 나누기", action: "나누기" },
+  { label: "테두리", disabled: true },
+];
+
+const TABLE_BG_SWATCHES = ["#fef08a", "#bbf7d0", "#bfdbfe", "#fecaca", ""];
+
+function UndoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 7H4v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.8 10.5A7.2 7.2 0 1 1 7 17.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function RedoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M16 7h4v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19.2 10.5A7.2 7.2 0 1 0 17 17.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
 function TableKingContent({ block, active }: { block: Block; active: boolean }) {
   const setTableData = useCanvasStore((s) => s.setTableData);
   const select = useCanvasStore((s) => s.select);
   const [showHandles, setShowHandles] = useState(true);
+  const [menu, setMenu] = useState<TableContextMenuState | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const dataset = useMergeStore((s) => s.dataset);
   const previewIndex = useMergeStore((s) => s.previewIndex);
 
@@ -331,6 +373,57 @@ function TableKingContent({ block, active }: { block: Block; active: boolean }) 
   const data: TableKingData =
     block.data ?? (makeTableKingData(block.rows ?? [[""]], 420) as TableKingData);
 
+  useEffect(() => {
+    if (!active) setMenu(null);
+  }, [active]);
+
+  useEffect(() => {
+    if (!menu) return undefined;
+    const close = (event: globalThis.PointerEvent) => {
+      if (shellRef.current?.contains(event.target as Node)) return;
+      setMenu(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenu(null);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+
+  // table-king 원본 액션을 직접 옮기지 않고, 숨겨둔 원본 툴바 버튼을 호출한다.
+  const runTableAction = (label: string) => {
+    const buttons = Array.from(shellRef.current?.querySelectorAll<HTMLButtonElement>(".toolbar button") ?? []);
+    const button = buttons.find((item) => item.textContent?.replace(/\s+/g, " ").trim() === label);
+    button?.click();
+    setMenu(null);
+  };
+
+  const runBackground = (index: number) => {
+    const swatchGroups = Array.from(shellRef.current?.querySelectorAll<HTMLElement>(".toolbar.secondary .swatch-group") ?? []);
+    const swatches = Array.from(swatchGroups[0]?.querySelectorAll<HTMLButtonElement>("button") ?? []);
+    swatches[index]?.click();
+    setMenu(null);
+  };
+
+  const openContextMenu = (event: RMouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const input = target.closest("input") ?? target.closest("td,th")?.querySelector("input");
+    input?.focus();
+    select(block.id);
+    event.preventDefault();
+    event.stopPropagation();
+    setMenu({ x: event.clientX, y: event.clientY });
+  };
+
+  const stopToolbarPointer = (event: RMouseEvent | RPointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   // 병합 미리보기 모드: 편집기 대신 값이 치환된 정적 표 (읽기 전용)
   if (dataset && previewIndex !== null)
     return <StaticResolvedTable data={data} columns={dataset.columns} row={dataset.rows[previewIndex] ?? []} />;
@@ -341,15 +434,84 @@ function TableKingContent({ block, active }: { block: Block; active: boolean }) 
       className={isOver ? "outline outline-2 outline-accent -outline-offset-1 rounded-[2px]" : ""}
       data-tableblock={block.id}
     >
-      <TableKingBlock
-        value={data}
-        onChange={(next: TableKingData) => setTableData(block.id, next)}
-        active={active}
-        onActivate={() => select(block.id)}
-        showHandles={showHandles}
-        setShowHandles={setShowHandles}
-        themeVars={TK_THEME_VARS}
-      />
+      <div ref={shellRef} className="table-action-shell" onContextMenu={openContextMenu}>
+        <TableKingBlock
+          value={data}
+          onChange={(next: TableKingData) => setTableData(block.id, next)}
+          active={active}
+          onActivate={() => select(block.id)}
+          showHandles={showHandles}
+          setShowHandles={setShowHandles}
+          themeVars={TK_THEME_VARS}
+        />
+
+        {active && (
+          <>
+            <div className="table-history-tools" onPointerDown={stopToolbarPointer}>
+              <button type="button" title="실행 취소" aria-label="실행 취소" onClick={() => runTableAction("실행 취소")}>
+                <UndoIcon />
+              </button>
+              <button type="button" title="다시 실행" aria-label="다시 실행" onClick={() => runTableAction("다시 실행")}>
+                <RedoIcon />
+              </button>
+            </div>
+
+            <div className="table-mini-toolbar" onPointerDown={stopToolbarPointer}>
+              <button type="button" onClick={() => runTableAction("병합")}>병합</button>
+              <button type="button" onClick={() => runTableAction("나누기")}>나누기</button>
+              <span className="table-mini-swatches" aria-label="배경색">
+                {TABLE_BG_SWATCHES.map((color, index) => (
+                  <button
+                    key={color || "transparent"}
+                    type="button"
+                    title={color ? "배경색" : "배경 지우기"}
+                    onClick={() => runBackground(index)}
+                    style={{ backgroundColor: color || "#ffffff" }}
+                  />
+                ))}
+              </span>
+            </div>
+
+            {menu && (
+              <div
+                className="table-context-menu"
+                style={{ left: menu.x, top: menu.y }}
+                onPointerDown={stopToolbarPointer}
+                role="menu"
+              >
+                {TABLE_CONTEXT_ITEMS.map((item, index) => (
+                  <Fragment key={item.label}>
+                    {index === 2 || index === 6 || index === 8 ? <div className="table-context-separator" /> : null}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={item.disabled}
+                      onClick={() => item.action && runTableAction(item.action)}
+                    >
+                      {item.label}
+                    </button>
+                  </Fragment>
+                ))}
+                <div className="table-context-separator" />
+                <div className="table-context-palette" aria-label="배경색">
+                  <span>배경색</span>
+                  <div>
+                    {TABLE_BG_SWATCHES.map((color, index) => (
+                      <button
+                        key={color || "transparent"}
+                        type="button"
+                        title={color ? "배경색" : "배경 지우기"}
+                        onClick={() => runBackground(index)}
+                        style={{ backgroundColor: color || "#ffffff" }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -19,7 +19,8 @@ import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
 import { getRepository } from "../modules/document/repository";
 import { buildHwpxBytes, downloadBytes } from "../modules/document/exportHwpx";
-import { IcBack, IcDownload, IcLogo } from "../ui/icons";
+import { HanPreviewModal } from "../components/editor-shell/HanPreviewModal";
+import { IcBack, IcDownload, IcEye, IcLogo } from "../ui/icons";
 
 // 중첩 드롭 대상(지면 안의 텍스트/셀) 우선 — 포인터가 안쪽 대상 위면 그걸 고른다.
 // 지면(stage)은 안쪽 대상이 없을 때의 폴백 (팔레트로 새 블록 만들 때).
@@ -38,6 +39,7 @@ export default function StudioEditor() {
   const stageRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false); // 로드 완료 전에는 오토세이브 금지(빈 문서로 덮어쓰기 방지)
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [previewing, setPreviewing] = useState(false);
 
   const title = useCanvasStore((s) => s.doc.title);
   const setTitle = useCanvasStore((s) => s.setTitle);
@@ -168,6 +170,12 @@ export default function StudioEditor() {
 
         <div className="ml-auto flex items-center gap-2">
           <button
+            onClick={() => setPreviewing(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-accentline bg-accentsoft text-accent text-[12.5px] font-semibold px-3 h-[34px] hover:bg-accent hover:text-white transition-colors"
+          >
+            <IcEye size={15} /> 한글 미리보기
+          </button>
+          <button
             onClick={() => downloadBytes(buildHwpxBytes(doc), `${title || "문서"}.hwpx`)}
             className="flex items-center gap-1.5 rounded-lg bg-accent text-white text-[12.5px] font-semibold px-3.5 h-[34px] hover:bg-accenthover active:scale-[0.98] transition-all shadow-[0_1px_2px_rgba(43,92,230,0.25)]"
           >
@@ -175,6 +183,8 @@ export default function StudioEditor() {
           </button>
         </div>
       </header>
+
+      {previewing && <HanPreviewModal doc={doc} onClose={() => setPreviewing(false)} />}
 
       <DndContext sensors={sensors} collisionDetection={preferInner} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex min-h-0">

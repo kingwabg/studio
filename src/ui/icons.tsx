@@ -103,3 +103,14 @@ export const IcLogo = (p: P) => (
     <rect x="3" y="3" width="18" height="18" rx="5" />
   </Svg>
 );
+export const IcEye = (p: P) => (
+  <Svg {...p}>
+    <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" />
+    <circle cx="12" cy="12" r="2.6" />
+  </Svg>
+);
+export const IcClose = (p: P) => (
+  <Svg {...p}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Svg>
+);
