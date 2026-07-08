@@ -59,3 +59,25 @@
 .focus\:border-accentline:focus { border-color: #c4d4f9; }
 .focus\:ring-accentsoft:focus { --tw-ring-color: #edf2fe; box-shadow: 0 0 0 2px #edf2fe; }
 .ring-accent { --tw-ring-color: #2b5ce6; }
+
+/* ── table-king을 자유배치 캔버스에 띄울 때의 배치 보정 ──
+   원본은 문서 흐름 안에서 툴바가 표 위에 "쌓이는" 구조인데, 캔버스 블록은 크기가
+   표 자체와 같아야 하므로 툴바·상태줄을 블록 밖으로 절대배치로 띄운다. */
+.studio-root .tk-root { position: relative; }
+.studio-root .tk-root .toolbar {
+  position: absolute;
+  bottom: calc(100% + 44px);
+  left: 0;
+  z-index: 60;
+  width: max-content;
+  max-width: 760px;
+  box-shadow: 0 4px 16px rgba(26, 34, 51, 0.12);
+}
+.studio-root .tk-root .toolbar.secondary { bottom: calc(100% + 6px); }
+.studio-root .tk-root .status-line {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  width: max-content;
+}

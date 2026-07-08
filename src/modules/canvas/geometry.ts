@@ -1,6 +1,8 @@
 // geometry.ts — 화면 px ↔ 문서 mm 변환. 모델은 mm(진실), 화면은 px(파생).
-// Phase 1은 고정 배율. 줌은 Phase 2에서 이 SCALE을 상태로 빼면 된다.
-export const SCALE = 3.2; // px per mm (A4 210×297mm → 672×950px)
+// SCALE은 CSS 표준 mm(96dpi ÷ 25.4)로 고정 — table-king(px 실측 엔진)의 px가
+// 곧 화면 px이자 mm×SCALE이 되어, 화면 크기 = 내보내기 크기가 정확히 일치한다.
+// (기존 흐름 에디터의 지면(794×1123px)과도 같은 크기)
+export const SCALE = 96 / 25.4; // ≈3.7795 px per mm
 
 export const mmToPx = (mm: number) => mm * SCALE;
 export const pxToMm = (px: number) => px / SCALE;

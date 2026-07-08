@@ -4,7 +4,9 @@
 // 이미 mm 좌표(진실)라 DOM 없이 순수 변환으로 끝난다 — Node/워커에서도 돌 수 있다.
 // 병합(다중 레코드)을 위해 문서 배열을 페이지별로 싣는 변형도 제공한다.
 import { buildHwpx } from "../../hwpx/exportCore.js";
-import { type Block, type CanvasDoc, TEXT_DEFAULTS } from "./model";
+import { tableDataToRows } from "../../table-king/TableKingBlock.jsx";
+import { type Block, type CanvasDoc, type TableKingData, TEXT_DEFAULTS } from "./model";
+import { SCALE } from "../canvas/geometry";
 
 function elementOf(b: Block, page: number) {
   if (b.type === "text")
@@ -26,8 +28,41 @@ function elementOf(b: Block, page: number) {
         lineSpacing: 140,
       },
     };
-  if (b.type === "table")
+  if (b.type === "table") {
+    // table-king 스냅샷 → grid (기존 앱 collectCanvas와 같은 매핑: 병합·행별 너비·셀 스타일)
+    if (b.data) {
+      const d = b.data as TableKingData;
+      return {
+        type: "table",
+        page,
+        x: b.x,
+        y: b.y,
+        w: b.w,
+        h: b.h,
+        grid: {
+          cellsText: tableDataToRows(d),
+          merges: d.merges ?? [],
+          colWidthsMm: d.widths.map((row) => row.map((v) => v / SCALE)),
+          rowHeightsMm: d.cellHeights.map((row) => row.map((v) => v / SCALE)),
+          cellStyles: d.cells.map((row, r) =>
+            row.map((cell) => {
+              const s = (cell?.style ?? {}) as Record<string, unknown>;
+              return {
+                pt: 9.4, // table-king 셀 글자 12.5px 고정(CSS)
+                bold: (s.bold as boolean) ?? r === 0, // 머리행은 화면 CSS가 굵게
+                italic: !!s.italic,
+                color: (s.color as string) ?? "#1A2233",
+                hAlign: (s.hAlign as string) ?? "left",
+                vAlign: (s.vAlign as string) ?? "center",
+                backgroundColor: s.backgroundColor as string | undefined,
+              };
+            })
+          ),
+        },
+      };
+    }
     return { type: "table", page, x: b.x, y: b.y, w: b.w, h: b.h, rows: b.rows ?? [[""]] };
+  }
   return null; // image: hp:pic 매핑은 별도 과제 — 내보내기에서 제외
 }
 

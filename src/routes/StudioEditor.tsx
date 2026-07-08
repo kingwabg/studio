@@ -45,7 +45,6 @@ export default function StudioEditor() {
   const addBlock = useCanvasStore((s) => s.addBlock);
   const moveBlock = useCanvasStore((s) => s.moveBlock);
   const updateBlock = useCanvasStore((s) => s.updateBlock);
-  const setCell = useCanvasStore((s) => s.setCell);
   const doc = useCanvasStore((s) => s.doc);
 
   // 로드: :id의 문서를 저장소에서 불러온다. 없으면 홈으로.
@@ -103,10 +102,22 @@ export default function StudioEditor() {
         // 시드 문구는 통째로 교체, 이미 내용이 있으면 뒤에 덧붙임
         const base = !b.text || b.text === "텍스트를 입력하세요" ? "" : b.text + " ";
         updateBlock(b.id, { text: base + token });
-      } else if (target.kind === "cell") {
-        const b = blocks.find((x) => x.id === target.blockId);
-        const cur = b?.rows?.[target.r]?.[target.c] ?? "";
-        setCell(target.blockId, target.r, target.c, cur ? cur + token : token);
+      } else if (target.kind === "tableblock") {
+        // table-king 셀 특정: 드롭 좌표 밑의 셀 input을 찾아 그 값에 토큰을 덧붙인다.
+        // table-king 내부를 안 건드리고 공개 DOM(제어 input의 onChange)만 쓰는 경로.
+        const ae = e.activatorEvent as PointerEvent;
+        const fx = (ae?.clientX ?? 0) + delta.x;
+        const fy = (ae?.clientY ?? 0) + delta.y;
+        const under = document.elementFromPoint(fx, fy);
+        const input =
+          under?.tagName === "INPUT"
+            ? (under as HTMLInputElement)
+            : under?.closest("td, th")?.querySelector("input");
+        if (input) {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+          setter.call(input, input.value ? input.value + token : token);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
       }
       return;
     }

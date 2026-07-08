@@ -19,6 +19,16 @@ export function resolveDoc(doc: CanvasDoc, columns: string[], row: string[]): Ca
     blocks: doc.blocks.map((b) => {
       if (b.type === "text" && b.text)
         return { ...b, text: resolveTokens(b.text, columns, row) };
+      if (b.type === "table" && b.data)
+        return {
+          ...b,
+          data: {
+            ...b.data,
+            cells: b.data.cells.map((r) =>
+              r.map((cell) => ({ ...cell, text: resolveTokens(cell.text ?? "", columns, row) }))
+            ),
+          },
+        };
       if (b.type === "table" && b.rows)
         return { ...b, rows: b.rows.map((r) => r.map((cell) => resolveTokens(cell, columns, row))) };
       return b;
@@ -34,6 +44,7 @@ export function usedTokens(doc: CanvasDoc): string[] {
   };
   for (const b of doc.blocks) {
     if (b.text) scan(b.text);
+    if (b.data) for (const r of b.data.cells) for (const c of r) scan(c.text ?? "");
     if (b.rows) for (const r of b.rows) for (const c of r) scan(c);
   }
   return [...found];

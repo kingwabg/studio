@@ -65,7 +65,7 @@ function FieldPill({ column }: { column: string }) {
       {...attributes}
       style={{ transform: CSS.Translate.toString(transform), touchAction: "none" }}
       className={`inline-flex items-center gap-1 rounded-full bg-accentsoft text-accent text-[12px] font-medium pl-2 pr-2.5 py-1 cursor-grab select-none border border-accentline hover:bg-accent hover:text-white transition-colors ${
-        isDragging ? "opacity-60 shadow-md z-50" : ""
+        isDragging ? "opacity-60 shadow-md z-50 pointer-events-none" : ""
       }`}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />

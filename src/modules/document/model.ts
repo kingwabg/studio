@@ -8,6 +8,14 @@
 
 export type BlockType = "text" | "table" | "image";
 
+// table-king 스냅샷 (src/table-king의 표 모델 — 병합·행별 너비·셀별 높이·셀 스타일)
+export interface TableKingData {
+  cells: { text: string; style: Record<string, unknown> }[][];
+  widths: number[][]; // px, 행별
+  cellHeights: number[][]; // px, 셀별
+  merges: { r: number; c: number; rs: number; cs: number }[];
+}
+
 export type TextAlign = "left" | "center" | "right";
 
 export interface Block {
@@ -18,7 +26,8 @@ export interface Block {
   w: number; // mm
   h: number; // mm
   text?: string; // text 블록
-  rows?: string[][]; // table 블록 (Phase 1은 정적 표본)
+  rows?: string[][]; // table 블록 구형 포맷 (data 없을 때 폴백 — 저장된 옛 문서 호환)
+  data?: TableKingData; // table 블록 — table-king 엔진 스냅샷 (진실)
   src?: string; // image 블록 (Phase 2 Storage)
   // 텍스트 스타일 (text 블록) — 없으면 기본값. 내보내기(exportHwpx)도 이 값을 쓴다.
   fontSize?: number; // pt
