@@ -1,9 +1,24 @@
 // StudioHome.tsx — 새 모듈형 스튜디오의 홈. 내 문서 목록 + 새 문서 생성.
+// Radix Themes 컴포넌트로 구성 (검증된 디자인 시스템 — 품질을 손 취향에 안 맡긴다).
 // 저장소는 repository(지금 localStorage, 나중에 Supabase) — 이 컴포넌트는 인터페이스만 안다.
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Container,
+  Flex,
+  Grid,
+  Heading,
+  IconButton,
+  Inset,
+  Link as RLink,
+  Text,
+} from "@radix-ui/themes";
 import { getRepository, type DocMeta } from "../modules/document/repository";
-import { IcPlus, IcTrash, IcLogo, IcFile } from "../ui/icons";
+import { IcPlus, IcTrash, IcFile, IcLogo } from "../ui/icons";
 
 const repo = getRepository();
 
@@ -31,84 +46,106 @@ export default function StudioHome() {
   };
 
   return (
-    <div className="studio-root min-h-screen bg-paper text-ink">
-      <header className="h-14 flex items-center px-8 border-b border-line bg-white">
-        <div className="flex items-center gap-2.5">
-          <span className="text-accent">
+    <Box style={{ minHeight: "100dvh", background: "var(--gray-2)" }}>
+      {/* 헤더 */}
+      <Flex
+        align="center"
+        px="6"
+        style={{ height: 60, borderBottom: "1px solid var(--gray-a5)", background: "var(--color-background)" }}
+      >
+        <Flex align="center" gap="2">
+          <Text style={{ color: "var(--accent-9)", display: "flex" }}>
             <IcLogo size={22} />
-          </span>
-          <span className="font-bold text-[15px] tracking-tight">문서 스튜디오</span>
-          <span className="text-[11px] font-semibold text-accent bg-accentsoft rounded-md px-2 py-0.5">
+          </Text>
+          <Heading size="4" weight="bold" style={{ letterSpacing: "-0.02em" }}>
+            문서 스튜디오
+          </Heading>
+          <Badge color="indigo" variant="soft" radius="full">
             베타
-          </span>
-        </div>
-        <Link
-          to="/"
-          className="ml-auto text-[13px] text-inksoft hover:text-ink transition-colors"
-        >
+          </Badge>
+        </Flex>
+        <RLink href="/" ml="auto" size="2" color="gray" highContrast={false}>
           기존 편집기 →
-        </Link>
-      </header>
+        </RLink>
+      </Flex>
 
-      <main className="max-w-4xl mx-auto px-8 py-14">
-        <h1 className="text-[26px] font-bold tracking-tight mb-1.5">내 문서</h1>
-        <p className="text-[14px] text-inksoft mb-9">
+      <Container size="3" px="6" py="8">
+        <Heading size="7" mb="1" style={{ letterSpacing: "-0.03em" }}>
+          내 문서
+        </Heading>
+        <Text size="3" color="gray" as="p" mb="6">
           빈 캔버스에서 시작해 블록을 자유롭게 배치하세요. 작업은 자동 저장됩니다.
-        </p>
+        </Text>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          <button
-            onClick={startNew}
-            className="group rounded-2xl border-2 border-dashed border-linestrong bg-white/60 px-5 py-10 text-center hover:border-accent hover:bg-accentsoft/40 transition-all duration-150"
-          >
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-accentsoft text-accent mb-3 group-hover:scale-110 transition-transform">
-              <IcPlus size={22} />
-            </span>
-            <div className="text-[13.5px] font-semibold text-ink">새 문서</div>
-            <div className="text-[11.5px] text-inkfaint mt-0.5">A4 · 자유 배치</div>
-          </button>
+        <Grid columns={{ initial: "2", sm: "3", md: "4" }} gap="4">
+          {/* 새 문서 카드 (클릭 가능한 Card = div, 내부에 중첩 버튼 없음) */}
+          <Card size="2" variant="surface" onClick={startNew} className="click-card" style={{ cursor: "pointer" }}>
+            <Flex direction="column" align="center" justify="center" gap="2" style={{ minHeight: 150 }}>
+              <Flex
+                align="center"
+                justify="center"
+                style={{ width: 44, height: 44, borderRadius: "var(--radius-5)", background: "var(--accent-3)", color: "var(--accent-11)" }}
+              >
+                <IcPlus size={22} />
+              </Flex>
+              <Text size="2" weight="medium">새 문서</Text>
+              <Text size="1" color="gray">A4 · 자유 배치</Text>
+            </Flex>
+          </Card>
 
           {loading
             ? Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="rounded-2xl border border-line bg-white animate-pulse">
-                  <div className="h-28 bg-canvas rounded-t-2xl" />
-                  <div className="px-3.5 py-3 space-y-2">
-                    <div className="h-3 w-3/4 bg-line rounded" />
-                    <div className="h-2.5 w-1/2 bg-line rounded" />
-                  </div>
-                </div>
+                <Card key={i} size="2">
+                  <Box style={{ height: 150, opacity: 0.5 }} />
+                </Card>
               ))
             : docs.map((d) => (
-                <div
+                <Card
                   key={d.id}
+                  size="2"
+                  variant="surface"
+                  className="doc-card click-card"
                   onClick={() => navigate(`/studio/editor/${d.id}`)}
-                  className="group relative rounded-2xl border border-line bg-white overflow-hidden cursor-pointer hover:border-accentline hover:shadow-[0_2px_8px_rgba(26,34,51,0.06),0_12px_28px_rgba(26,34,51,0.08)] transition-all duration-150"
+                  style={{ cursor: "pointer", position: "relative" }}
                 >
-                  <div className="h-28 thumb-grad flex items-center justify-center border-b border-line text-inkfaint">
-                    <IcFile size={26} />
-                  </div>
-                  <div className="px-3.5 py-3">
-                    <div className="text-[13px] font-semibold text-ink truncate">{d.title}</div>
-                    <div className="text-[11px] text-inkfaint mt-0.5">{fmt(d.updatedAt)}</div>
-                  </div>
-                  <button
-                    onClick={(e) => remove(d.id, e)}
-                    aria-label="삭제"
-                    className="absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-lg text-inkfaint bg-white/90 border border-line opacity-0 group-hover:opacity-100 hover:text-red-500 hover:border-red-200 transition-all"
-                  >
-                    <IcTrash size={15} />
-                  </button>
-                </div>
+                  <Inset side="top" pb="current">
+                    <Flex
+                      align="center"
+                      justify="center"
+                      style={{ height: 96, background: "var(--gray-3)", color: "var(--gray-8)" }}
+                    >
+                      <IcFile size={26} />
+                    </Flex>
+                  </Inset>
+                  <Text as="div" size="2" weight="medium" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {d.title}
+                  </Text>
+                  <Text as="div" size="1" color="gray" mt="1">
+                    {fmt(d.updatedAt)}
+                  </Text>
+                  <Box position="absolute" top="2" right="2" className="doc-del">
+                    <IconButton
+                      size="1"
+                      variant="soft"
+                      color="red"
+                      radius="full"
+                      aria-label="삭제"
+                      onClick={(e) => remove(d.id, e)}
+                    >
+                      <IcTrash size={14} />
+                    </IconButton>
+                  </Box>
+                </Card>
               ))}
-        </div>
+        </Grid>
 
         {!loading && docs.length === 0 && (
-          <p className="text-[13px] text-inkfaint mt-6">
+          <Text size="2" color="gray" mt="5" as="p">
             아직 문서가 없어요. 새 문서로 시작해보세요.
-          </p>
+          </Text>
         )}
-      </main>
-    </div>
+      </Container>
+    </Box>
   );
 }
 

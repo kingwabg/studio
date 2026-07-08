@@ -10,16 +10,19 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import { type BlockType } from "../modules/document/model";
-import { pxToMm } from "../modules/canvas/geometry";
+import { mmToPx, pxToMm } from "../modules/canvas/geometry";
 import { useCanvasStore } from "../modules/canvas/store";
+import { computeSnap, isAltPressed, setAltPressed, useGuideStore } from "../modules/canvas/snap";
 import { CanvasStage } from "../modules/canvas/CanvasStage";
 import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
 import { getRepository } from "../modules/document/repository";
 import { buildHwpxBytes, downloadBytes } from "../modules/document/exportHwpx";
 import { HanPreviewModal } from "../components/editor-shell/HanPreviewModal";
+import { EditorToolbar } from "../components/editor-shell/EditorToolbar";
 import { IcBack, IcDownload, IcEye, IcLogo } from "../ui/icons";
 
 // 중첩 드롭 대상(지면 안의 텍스트/셀) 우선 — 포인터가 안쪽 대상 위면 그걸 고른다.
@@ -28,6 +31,26 @@ const preferInner: CollisionDetection = (args) => {
   const within = pointerWithin(args);
   const inner = within.filter((c) => c.id !== "stage");
   return inner.length ? inner : within;
+};
+
+// 스마트 자석 스냅 — 드래그 중 실시간으로 다른 블록·지면 선에 ±2mm 하드 스냅.
+// Alt를 누르면 해제(정밀 조정). dragEnd에서도 같은 computeSnap을 적용해
+// 시각과 최종 좌표가 항상 일치한다.
+// ⚠ modifier는 렌더 경로에서 호출될 수 있어 여기서 setState 금지 —
+//    가이드 표시는 onDragMove(이벤트 핸들러)가 담당한다.
+const snapModifier: Modifier = ({ active, transform }) => {
+  if (active?.data.current?.kind !== "block" || isAltPressed()) return transform;
+  const s = useCanvasStore.getState();
+  const b = s.doc.blocks.find((x) => x.id === active.id);
+  if (!b) return transform;
+  const candX = b.x + pxToMm(transform.x);
+  const candY = b.y + pxToMm(transform.y);
+  const snap = computeSnap(s.doc, b.id, candX, candY, b.w, b.h);
+  return {
+    ...transform,
+    x: transform.x + mmToPx(snap.x - candX),
+    y: transform.y + mmToPx(snap.y - candY),
+  };
 };
 
 const repo = getRepository();
@@ -81,13 +104,59 @@ export default function StudioEditor() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
+  // Alt = 스냅 해제 (누르는 동안) — 스냅 모디파이어가 읽는 전역 플래그
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => e.key === "Alt" && setAltPressed(true);
+    const up = (e: KeyboardEvent) => e.key === "Alt" && setAltPressed(false);
+    const blur = () => setAltPressed(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
+
+  // 한글식 단축키: Ctrl+Z/Y(실행취소), Delete(선택 블록 삭제).
+  // 입력 중(인풋/텍스트영역/표 셀)에는 절대 가로채지 않는다 — 브라우저·table-king 몫.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      if (t?.closest('input, textarea, [contenteditable="true"]')) return;
+      const st = useCanvasStore.getState();
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        st.undo();
+      } else if ((mod && e.key.toLowerCase() === "y") || (mod && e.shiftKey && e.key.toLowerCase() === "z")) {
+        e.preventDefault();
+        st.redo();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && st.selectedId) {
+        e.preventDefault();
+        st.removeBlock(st.selectedId);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   function handleDragEnd(e: DragEndEvent) {
     const { active, over, delta } = e;
     const kind = active.data.current?.kind;
 
     if (kind === "block") {
-      const b = useCanvasStore.getState().doc.blocks.find((x) => x.id === active.id);
-      if (b) moveBlock(b.id, b.x + pxToMm(delta.x), b.y + pxToMm(delta.y));
+      const st = useCanvasStore.getState();
+      const b = st.doc.blocks.find((x) => x.id === active.id);
+      if (b) {
+        const candX = b.x + pxToMm(delta.x);
+        const candY = b.y + pxToMm(delta.y);
+        // 드래그 중 보여준 것과 같은 스냅을 최종 좌표에도 적용 (Alt면 원시 좌표)
+        const pos = isAltPressed() ? { x: candX, y: candY } : computeSnap(st.doc, b.id, candX, candY, b.w, b.h);
+        moveBlock(b.id, pos.x, pos.y);
+      }
+      useGuideStore.getState().clear();
       return;
     }
 
@@ -186,7 +255,28 @@ export default function StudioEditor() {
 
       {previewing && <HanPreviewModal doc={doc} onClose={() => setPreviewing(false)} />}
 
-      <DndContext sensors={sensors} collisionDetection={preferInner} onDragEnd={handleDragEnd}>
+      <EditorToolbar />
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={preferInner}
+        modifiers={[snapModifier]}
+        onDragMove={(e) => {
+          // 가이드 표시 — 이벤트 핸들러에서 안전하게 setState
+          const a = e.active;
+          if (a?.data.current?.kind !== "block" || isAltPressed()) {
+            useGuideStore.getState().clear();
+            return;
+          }
+          const st = useCanvasStore.getState();
+          const b = st.doc.blocks.find((x) => x.id === a.id);
+          if (!b) return;
+          const snap = computeSnap(st.doc, b.id, b.x + pxToMm(e.delta.x), b.y + pxToMm(e.delta.y), b.w, b.h);
+          useGuideStore.getState().setGuides(snap.guidesV, snap.guidesH);
+        }}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => useGuideStore.getState().clear()}
+      >
         <div className="flex-1 flex min-h-0">
           <LeftPanel />
           <CanvasStage ref={stageRef} />

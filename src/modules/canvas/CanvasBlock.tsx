@@ -354,6 +354,41 @@ function RedoIcon() {
     </svg>
   );
 }
+function AlignTopIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 5h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 10h8M8 14h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AlignMiddleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 8h8M8 16h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AlignBottomIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 10h6M8 14h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BorderIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="5" y="5" width="14" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5 12h14M12 5v14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
 function TableKingContent({ block, active }: { block: Block; active: boolean }) {
   const setTableData = useCanvasStore((s) => s.setTableData);
   const select = useCanvasStore((s) => s.select);
@@ -409,10 +444,20 @@ function TableKingContent({ block, active }: { block: Block; active: boolean }) 
     setMenu(null);
   };
 
+  const runStyleAction = (title: string) => {
+    const button = shellRef.current?.querySelector<HTMLButtonElement>(`.toolbar.secondary button[title="${title}"]`);
+    button?.click();
+    setMenu(null);
+  };
+
+  const preserveContextSelection = (event: RMouseEvent<HTMLDivElement>) => {
+    if (event.button !== 2) return;
+    event.preventDefault();
+    event.stopPropagation();
+    select(block.id);
+  };
+
   const openContextMenu = (event: RMouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
-    const input = target.closest("input") ?? target.closest("td,th")?.querySelector("input");
-    input?.focus();
     select(block.id);
     event.preventDefault();
     event.stopPropagation();
@@ -434,7 +479,12 @@ function TableKingContent({ block, active }: { block: Block; active: boolean }) 
       className={isOver ? "outline outline-2 outline-accent -outline-offset-1 rounded-[2px]" : ""}
       data-tableblock={block.id}
     >
-      <div ref={shellRef} className="table-action-shell" onContextMenu={openContextMenu}>
+      <div
+          ref={shellRef}
+          className="table-action-shell"
+          onMouseDownCapture={preserveContextSelection}
+          onContextMenu={openContextMenu}
+        >
         <TableKingBlock
           value={data}
           onChange={(next: TableKingData) => setTableData(block.id, next)}
@@ -447,19 +497,40 @@ function TableKingContent({ block, active }: { block: Block; active: boolean }) 
 
         {active && (
           <>
-            <div className="table-history-tools" onPointerDown={stopToolbarPointer}>
-              <button type="button" title="실행 취소" aria-label="실행 취소" onClick={() => runTableAction("실행 취소")}>
-                <UndoIcon />
-              </button>
-              <button type="button" title="다시 실행" aria-label="다시 실행" onClick={() => runTableAction("다시 실행")}>
-                <RedoIcon />
-              </button>
-            </div>
-
-            <div className="table-mini-toolbar" onPointerDown={stopToolbarPointer}>
-              <button type="button" onClick={() => runTableAction("병합")}>병합</button>
-              <button type="button" onClick={() => runTableAction("나누기")}>나누기</button>
+            <div className="table-mini-toolbar table-ribbon" onPointerDown={stopToolbarPointer}>
+              <span className="table-ribbon-group" aria-label="실행">
+                <button type="button" title="실행 취소" aria-label="실행 취소" onClick={() => runTableAction("실행 취소")}>
+                  <UndoIcon />
+                </button>
+                <button type="button" title="다시 실행" aria-label="다시 실행" onClick={() => runTableAction("다시 실행")}>
+                  <RedoIcon />
+                </button>
+              </span>
+              <span className="table-ribbon-group" aria-label="가로 정렬">
+                <span className="table-ribbon-label">정렬</span>
+                <button type="button" title="왼쪽 정렬" onClick={() => runStyleAction("왼쪽 정렬")}>좌</button>
+                <button type="button" title="가운데 정렬" onClick={() => runStyleAction("가운데 정렬")}>중</button>
+                <button type="button" title="오른쪽 정렬" onClick={() => runStyleAction("오른쪽 정렬")}>우</button>
+              </span>
+              <span className="table-ribbon-group" aria-label="세로 정렬">
+                <button type="button" title="위쪽 정렬" aria-label="상" onClick={() => runStyleAction("위쪽 정렬")}>
+                  <AlignTopIcon />
+                </button>
+                <button type="button" title="세로 가운데 정렬" aria-label="중" onClick={() => runStyleAction("세로 가운데 정렬")}>
+                  <AlignMiddleIcon />
+                </button>
+                <button type="button" title="아래쪽 정렬" aria-label="하" onClick={() => runStyleAction("아래쪽 정렬")}>
+                  <AlignBottomIcon />
+                </button>
+              </span>
+              <span className="table-ribbon-group" aria-label="테두리">
+                <button type="button" title="테두리" aria-label="테두리" disabled>
+                  <BorderIcon />
+                  <span>테두리</span>
+                </button>
+              </span>
               <span className="table-mini-swatches" aria-label="배경색">
+                <span className="table-ribbon-label">배경색</span>
                 {TABLE_BG_SWATCHES.map((color, index) => (
                   <button
                     key={color || "transparent"}

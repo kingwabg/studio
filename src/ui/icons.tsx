@@ -103,6 +103,22 @@ export const IcLogo = (p: P) => (
     <rect x="3" y="3" width="18" height="18" rx="5" />
   </Svg>
 );
+export const IcUndo = (p: P) => (
+  <Svg {...p}>
+    <path d="M4.5 9h9a5 5 0 0 1 0 10H8M4.5 9l4-4M4.5 9l4 4" />
+  </Svg>
+);
+export const IcRedo = (p: P) => (
+  <Svg {...p}>
+    <path d="M19.5 9h-9a5 5 0 0 0 0 10H16M19.5 9l-4-4M19.5 9l-4 4" />
+  </Svg>
+);
+export const IcCopy = (p: P) => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5" />
+  </Svg>
+);
 export const IcEye = (p: P) => (
   <Svg {...p}>
     <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" />

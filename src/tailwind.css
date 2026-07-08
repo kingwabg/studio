@@ -26,6 +26,19 @@
   background-image: linear-gradient(to bottom, #f6f7fa, #edf0f5);
 }
 
+/* Radix Themes 홈: 문서 카드 — 왼쪽 정렬 + 호버 시 삭제 버튼 노출 */
+.radix-themes .doc-card { text-align: left; }
+.radix-themes .doc-del { opacity: 0; transition: opacity 120ms ease; }
+.radix-themes .doc-card:hover .doc-del { opacity: 1; }
+/* 클릭 가능한 카드: 호버 시 살짝 떠오르고 테두리 강조 */
+.radix-themes .click-card {
+  transition: box-shadow 140ms ease, transform 140ms ease, border-color 140ms ease;
+}
+.radix-themes .click-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(26, 34, 51, 0.06), 0 12px 28px rgba(26, 34, 51, 0.1);
+}
+
 /* ── 브랜드 색 유틸리티 (기존 앱 디자인 토큰 T와 동일 값) ──
    @tailwindcss/vite의 @theme가 분리 임포트에서 안 먹어 직접 정의한다.
    레이어 밖 규칙이라 레이어된 기본 유틸리티보다 항상 우선한다. */
