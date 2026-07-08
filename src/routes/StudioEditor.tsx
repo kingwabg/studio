@@ -19,6 +19,7 @@ import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
 import { getRepository } from "../modules/document/repository";
 import { buildHwpxBytes, downloadBytes } from "../modules/document/exportHwpx";
+import { IcBack, IcDownload, IcLogo } from "../ui/icons";
 
 // 중첩 드롭 대상(지면 안의 텍스트/셀) 우선 — 포인터가 안쪽 대상 위면 그걸 고른다.
 // 지면(stage)은 안쪽 대상이 없을 때의 폴백 (팔레트로 새 블록 만들 때).
@@ -121,29 +122,39 @@ export default function StudioEditor() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-100 text-slate-800">
-      <header className="h-12 shrink-0 flex items-center gap-3 px-4 border-b border-slate-200 bg-white">
-        <Link to="/studio" className="text-slate-400 hover:text-slate-600 text-sm">
-          ← 내 문서
+    <div className="studio-root h-screen flex flex-col bg-canvas text-ink">
+      <header className="h-[52px] shrink-0 flex items-center gap-2 px-3 border-b border-line bg-white">
+        <Link
+          to="/studio"
+          className="flex items-center gap-1 h-8 pl-2 pr-3 rounded-lg text-inksoft hover:bg-paper hover:text-ink transition-colors text-[13px] font-medium"
+        >
+          <IcBack size={16} /> 내 문서
         </Link>
+        <span className="w-px h-5 bg-line mx-1" />
+        <span className="text-accent">
+          <IcLogo size={16} />
+        </span>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="text-sm font-medium text-slate-800 outline-none border-b border-transparent focus:border-slate-300 px-1"
+          placeholder="제목 없는 문서"
+          className="text-[14px] font-semibold text-ink outline-none border border-transparent hover:border-line focus:border-accentline rounded-md px-2 py-1 -ml-0.5 min-w-40 transition-colors"
         />
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[11px] text-slate-400">
-            {status === "saving" ? "저장 중…" : status === "saved" ? "저장됨" : ""}
-          </span>
+        <span
+          className={`text-[11.5px] transition-colors ${
+            status === "saving" ? "text-inkfaint" : status === "saved" ? "text-inksoft" : "text-transparent"
+          }`}
+        >
+          {status === "saving" ? "저장 중…" : "저장됨"}
+        </span>
+
+        <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => downloadBytes(buildHwpxBytes(doc), `${title || "문서"}.hwpx`)}
-            className="rounded-lg bg-blue-600 text-white text-[12px] font-medium px-3 py-1.5 hover:bg-blue-700"
+            className="flex items-center gap-1.5 rounded-lg bg-accent text-white text-[12.5px] font-semibold px-3.5 h-[34px] hover:bg-accenthover active:scale-[0.98] transition-all shadow-[0_1px_2px_rgba(43,92,230,0.25)]"
           >
-            HWPX 내보내기
+            <IcDownload size={15} /> HWPX 내보내기
           </button>
-          <Link to="/" className="text-[12px] text-blue-600 hover:underline">
-            기존 편집기 →
-          </Link>
         </div>
       </header>
 

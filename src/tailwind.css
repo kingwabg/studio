@@ -1,6 +1,60 @@
 /* Tailwind v4 — utilities만 로드하고 preflight(전역 리셋)는 제외한다.
    기존 앱(DocumentStudio, table-king)은 인라인 스타일·기본 마진/목록 스타일에
    의존하므로, preflight가 들어오면 목록 불릿이 사라지는 등 회귀가 난다.
-   새 /studio 셸은 Tailwind 유틸리티 클래스를 쓰고, 기존 앱은 영향받지 않는다. */
+   새 /studio 셸은 Tailwind 유틸리티 + 아래 브랜드 색 클래스를 쓴다. */
+@layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
+
+/* 새 스튜디오 루트에만 폰트 적용 (기존 앱은 자기 인라인 폰트 유지) */
+.studio-root {
+  font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo",
+    "Noto Sans KR", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A4 지면 뒤 은은한 점 격자 — 캔바식 캔버스 느낌 */
+.canvas-dots {
+  background-image: radial-gradient(circle, #cbd2de 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.thumb-grad {
+  background-image: linear-gradient(to bottom, #f6f7fa, #edf0f5);
+}
+
+/* ── 브랜드 색 유틸리티 (기존 앱 디자인 토큰 T와 동일 값) ──
+   @tailwindcss/vite의 @theme가 분리 임포트에서 안 먹어 직접 정의한다.
+   레이어 밖 규칙이라 레이어된 기본 유틸리티보다 항상 우선한다. */
+.text-ink { color: #1a2233; }
+.text-inksoft { color: #5b6577; }
+.text-inkfaint { color: #98a2b3; }
+.text-inkfaint\/70 { color: color-mix(in srgb, #98a2b3 70%, transparent); }
+.text-accent { color: #2b5ce6; }
+
+.bg-ink { background-color: #1a2233; }
+.bg-line { background-color: #e4e8ef; }
+.bg-paper { background-color: #f6f7fa; }
+.bg-canvas { background-color: #edf0f5; }
+.bg-accent { background-color: #2b5ce6; }
+.bg-accentsoft { background-color: #edf2fe; }
+
+.border-line { border-color: #e4e8ef; }
+.border-linestrong { border-color: #cbd2de; }
+.border-accentline { border-color: #c4d4f9; }
+
+/* 상태 변형 — 실제 사용한 조합만 손으로 정의 */
+.hover\:bg-accent:hover { background-color: #2b5ce6; }
+.hover\:bg-accenthover:hover { background-color: #1f49c4; }
+.hover\:bg-paper:hover { background-color: #f6f7fa; }
+.hover\:bg-accentsoft:hover { background-color: #edf2fe; }
+.hover\:bg-accentsoft\/40:hover { background-color: color-mix(in srgb, #edf2fe 40%, transparent); }
+.hover\:bg-accentsoft\/30:hover { background-color: color-mix(in srgb, #edf2fe 30%, transparent); }
+.hover\:text-accent:hover { color: #2b5ce6; }
+.hover\:text-ink:hover { color: #1a2233; }
+.hover\:border-line:hover { border-color: #e4e8ef; }
+.hover\:border-accent:hover { border-color: #2b5ce6; }
+.hover\:border-accentline:hover { border-color: #c4d4f9; }
+
+.focus\:border-accent:focus { border-color: #2b5ce6; }
+.focus\:border-accentline:focus { border-color: #c4d4f9; }
+.focus\:ring-accentsoft:focus { --tw-ring-color: #edf2fe; box-shadow: 0 0 0 2px #edf2fe; }

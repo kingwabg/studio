@@ -1,6 +1,7 @@
 // RightPanel.tsx — 선택한 블록의 속성 편집(위치·크기·내용).
 // Phase 1은 순수 상태 편집. 값은 mm(모델 단위) 그대로 노출한다.
 import { useCanvasStore } from "../../modules/canvas/store";
+import { IcText, IcTable, IcImage, IcTrash } from "../../ui/icons";
 
 function NumberField({
   label,
@@ -12,13 +13,13 @@ function NumberField({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-2 text-[12px] text-slate-500">
-      <span>{label}</span>
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] text-inkfaint">{label}</span>
       <input
         type="number"
         value={Math.round(value)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-20 h-7 px-2 rounded border border-slate-200 text-slate-800 text-right outline-none focus:border-blue-400"
+        className="h-8 px-2.5 rounded-lg border border-line text-ink text-[12.5px] text-right outline-none focus:border-accent focus:ring-2 focus:ring-accentsoft transition-all bg-white"
       />
     </label>
   );
@@ -29,38 +30,64 @@ export function RightPanel() {
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
 
+  const kind =
+    block?.type === "text"
+      ? { label: "텍스트", icon: <IcText size={15} /> }
+      : block?.type === "table"
+        ? { label: "표", icon: <IcTable size={15} /> }
+        : { label: "이미지", icon: <IcImage size={15} /> };
+
   return (
-    <aside className="w-64 shrink-0 border-l border-slate-200 bg-white p-4">
+    <aside className="w-64 shrink-0 border-l border-line bg-white flex flex-col">
       {!block ? (
-        <p className="text-[12px] text-slate-400">블록을 선택하면 속성이 여기에 표시됩니다.</p>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-2">
+          <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-paper text-inkfaint">
+            <IcText size={18} />
+          </span>
+          <p className="text-[12px] text-inkfaint leading-relaxed">
+            블록을 선택하면
+            <br />
+            속성이 여기에 표시됩니다
+          </p>
+        </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] font-medium text-slate-700">
-              {block.type === "text" ? "텍스트" : block.type === "table" ? "표" : "이미지"} 속성
-            </p>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2 px-4 h-12 border-b border-line">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-accentsoft text-accent">
+              {kind.icon}
+            </span>
+            <span className="text-[13px] font-semibold text-ink">{kind.label}</span>
             <button
               onClick={() => removeBlock(block.id)}
-              className="text-[12px] text-red-500 hover:text-red-600"
+              aria-label="블록 삭제"
+              className="ml-auto w-7 h-7 flex items-center justify-center rounded-lg text-inkfaint hover:text-red-500 hover:bg-red-50 transition-colors"
             >
-              삭제
+              <IcTrash size={15} />
             </button>
           </div>
 
-          {block.type === "text" && (
-            <textarea
-              value={block.text ?? ""}
-              onChange={(e) => updateBlock(block.id, { text: e.target.value })}
-              rows={3}
-              className="w-full px-2 py-1.5 rounded border border-slate-200 text-[13px] text-slate-800 outline-none focus:border-blue-400 resize-none"
-            />
-          )}
+          <div className="px-4 py-4 flex flex-col gap-4">
+            {block.type === "text" && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] text-inkfaint">내용</span>
+                <textarea
+                  value={block.text ?? ""}
+                  onChange={(e) => updateBlock(block.id, { text: e.target.value })}
+                  rows={3}
+                  className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accent focus:ring-2 focus:ring-accentsoft transition-all resize-none leading-relaxed bg-white"
+                />
+              </div>
+            )}
 
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <NumberField label="X (mm)" value={block.x} onChange={(v) => updateBlock(block.id, { x: v })} />
-            <NumberField label="Y (mm)" value={block.y} onChange={(v) => updateBlock(block.id, { y: v })} />
-            <NumberField label="폭 (mm)" value={block.w} onChange={(v) => updateBlock(block.id, { w: v })} />
-            <NumberField label="높이 (mm)" value={block.h} onChange={(v) => updateBlock(block.id, { h: v })} />
+            <div>
+              <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2">위치 · 크기 (mm)</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <NumberField label="X" value={block.x} onChange={(v) => updateBlock(block.id, { x: v })} />
+                <NumberField label="Y" value={block.y} onChange={(v) => updateBlock(block.id, { y: v })} />
+                <NumberField label="폭" value={block.w} onChange={(v) => updateBlock(block.id, { w: v })} />
+                <NumberField label="높이" value={block.h} onChange={(v) => updateBlock(block.id, { h: v })} />
+              </div>
+            </div>
           </div>
         </div>
       )}

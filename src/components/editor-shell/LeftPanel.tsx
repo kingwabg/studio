@@ -1,7 +1,7 @@
 // LeftPanel.tsx — 좌측 패널: [블록] 팔레트 + 레이어 / [데이터] 병합 데이터 연동.
 // 데이터 탭: 엑셀·CSV 업로드 → 열 이름이 "알약"이 되고, 지면의 텍스트/셀에 끌어다
 // 놓으면 {{열이름}} 토큰이 박힌다. 미리보기 스테퍼로 레코드를 넘겨보고 일괄 생성.
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { type BlockType } from "../../modules/document/model";
@@ -14,14 +14,24 @@ import {
   buildHwpxBytesMultiPage,
   downloadBytes,
 } from "../../modules/document/exportHwpx";
+import {
+  IcText,
+  IcTable,
+  IcImage,
+  IcUpload,
+  IcDownload,
+  IcChevronLeft,
+  IcChevronRight,
+  IcSparkles,
+} from "../../ui/icons";
 
-const PALETTE: { type: BlockType; label: string }[] = [
-  { type: "text", label: "텍스트" },
-  { type: "table", label: "표" },
-  { type: "image", label: "이미지" },
+const PALETTE: { type: BlockType; label: string; icon: ReactNode }[] = [
+  { type: "text", label: "텍스트", icon: <IcText size={17} /> },
+  { type: "table", label: "표", icon: <IcTable size={17} /> },
+  { type: "image", label: "이미지", icon: <IcImage size={17} /> },
 ];
 
-function PaletteItem({ type, label }: { type: BlockType; label: string }) {
+function PaletteItem({ type, label, icon }: { type: BlockType; label: string; icon: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `palette-${type}`,
     data: { kind: "palette", type },
@@ -32,11 +42,12 @@ function PaletteItem({ type, label }: { type: BlockType; label: string }) {
       {...listeners}
       {...attributes}
       style={{ transform: CSS.Translate.toString(transform), touchAction: "none" }}
-      className={`px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 cursor-grab select-none hover:border-blue-400 hover:text-blue-600 ${
-        isDragging ? "opacity-60 shadow-md z-50" : ""
+      className={`flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-xl border border-line bg-white text-inksoft cursor-grab select-none hover:border-accentline hover:text-accent hover:bg-accentsoft/40 transition-all ${
+        isDragging ? "opacity-60 shadow-md scale-95 z-50" : ""
       }`}
     >
-      {label}
+      {icon}
+      <span className="text-[12px] font-medium">{label}</span>
     </div>
   );
 }
@@ -53,10 +64,11 @@ function FieldPill({ column }: { column: string }) {
       {...listeners}
       {...attributes}
       style={{ transform: CSS.Translate.toString(transform), touchAction: "none" }}
-      className={`inline-flex items-center rounded-full bg-blue-100 text-blue-700 text-[12px] px-2.5 py-1 cursor-grab select-none hover:bg-blue-200 ${
+      className={`inline-flex items-center gap-1 rounded-full bg-accentsoft text-accent text-[12px] font-medium pl-2 pr-2.5 py-1 cursor-grab select-none border border-accentline hover:bg-accent hover:text-white transition-colors ${
         isDragging ? "opacity-60 shadow-md z-50" : ""
       }`}
     >
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
       {column}
     </div>
   );
@@ -66,31 +78,42 @@ function BlocksTab() {
   const blocks = useCanvasStore((s) => s.doc.blocks);
   const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
+  const iconFor = (t: BlockType) =>
+    t === "text" ? <IcText size={14} /> : t === "table" ? <IcTable size={14} /> : <IcImage size={14} />;
   return (
     <>
-      <div className="px-3 py-3 border-b border-slate-100">
-        <p className="text-[11px] font-semibold text-slate-400 tracking-wide mb-2">블록</p>
-        <div className="flex flex-col gap-2">
+      <div className="px-3.5 py-3.5 border-b border-line">
+        <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2.5">블록 추가</p>
+        <div className="grid grid-cols-3 gap-2">
           {PALETTE.map((p) => (
-            <PaletteItem key={p.type} type={p.type} label={p.label} />
+            <PaletteItem key={p.type} type={p.type} label={p.label} icon={p.icon} />
           ))}
         </div>
       </div>
-      <div className="px-3 py-3 flex-1 overflow-auto">
-        <p className="text-[11px] font-semibold text-slate-400 tracking-wide mb-2">레이어 ({blocks.length})</p>
-        <div className="flex flex-col gap-1">
+      <div className="px-3.5 py-3.5 flex-1 overflow-auto">
+        <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2.5">
+          레이어 {blocks.length > 0 && <span className="text-inkfaint/70">· {blocks.length}</span>}
+        </p>
+        <div className="flex flex-col gap-0.5">
           {blocks.map((b) => (
             <button
               key={b.id}
               onClick={() => select(b.id)}
-              className={`text-left px-2 py-1.5 rounded text-[12px] truncate ${
-                selectedId === b.id ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-50"
+              className={`flex items-center gap-2 text-left px-2 py-1.5 rounded-lg text-[12px] transition-colors ${
+                selectedId === b.id
+                  ? "bg-accentsoft text-accent font-medium"
+                  : "text-inksoft hover:bg-paper"
               }`}
             >
-              {b.type === "text" ? `텍스트 · ${b.text ?? ""}` : b.type === "table" ? "표" : "이미지"}
+              <span className={selectedId === b.id ? "text-accent" : "text-inkfaint"}>{iconFor(b.type)}</span>
+              <span className="truncate">
+                {b.type === "text" ? (b.text?.trim() || "빈 텍스트") : b.type === "table" ? "표" : "이미지"}
+              </span>
             </button>
           ))}
-          {blocks.length === 0 && <p className="text-[12px] text-slate-300">아직 블록이 없습니다</p>}
+          {blocks.length === 0 && (
+            <p className="text-[12px] text-inkfaint px-2 py-1">아직 블록이 없습니다</p>
+          )}
         </div>
       </div>
     </>
@@ -125,8 +148,8 @@ function DataTab() {
 
   const tokens = usedTokens(doc);
   const bound = dataset ? tokens.filter((t) => dataset.columns.includes(t)) : [];
+  const preview = previewIndex !== null;
 
-  // 일괄 생성 — 개별 파일 ZIP
   const generateZip = async () => {
     if (!dataset) return;
     setBusy(true);
@@ -145,7 +168,6 @@ function DataTab() {
     }
   };
 
-  // 일괄 생성 — 한 파일 N쪽 (레코드마다 페이지)
   const generateSingle = () => {
     if (!dataset) return;
     const docs = dataset.rows.map((row) => resolveDoc(doc, dataset.columns, row));
@@ -153,38 +175,52 @@ function DataTab() {
   };
 
   return (
-    <div className="px-3 py-3 flex-1 overflow-auto flex flex-col gap-3">
+    <div className="px-3.5 py-3.5 flex-1 overflow-auto flex flex-col gap-4">
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} className="hidden" />
 
       {!dataset ? (
         <>
-          <p className="text-[11px] font-semibold text-slate-400 tracking-wide">데이터 연동</p>
           <button
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="rounded-lg border-2 border-dashed border-slate-300 px-3 py-6 text-center text-[12px] text-slate-500 hover:border-blue-400 hover:text-blue-600"
+            className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-linestrong px-3 py-7 text-center text-inksoft hover:border-accent hover:text-accent hover:bg-accentsoft/30 transition-all disabled:opacity-50"
           >
-            {busy ? "읽는 중…" : "엑셀 · CSV 업로드\n(첫 행 = 열 이름)"}
+            <IcUpload size={22} />
+            <span className="text-[12.5px] font-medium">{busy ? "읽는 중…" : "엑셀 · CSV 업로드"}</span>
+            <span className="text-[11px] text-inkfaint">첫 행 = 열 이름</span>
           </button>
-          {error && <p className="text-[11px] text-red-500">{error}</p>}
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            업로드하면 열 이름이 알약이 됩니다. 지면의 텍스트나 표 칸에 끌어다 놓으세요.
-          </p>
+          {error && (
+            <p className="text-[11px] text-red-500 bg-red-50 rounded-lg px-2.5 py-2">{error}</p>
+          )}
+          <div className="rounded-xl bg-paper px-3 py-3">
+            <p className="text-[11px] text-inksoft leading-relaxed">
+              업로드하면 열 이름이 <span className="text-accent font-medium">알약</span>이 됩니다. 지면의
+              텍스트나 표 칸에 끌어다 놓으면 자동으로 값이 채워져요.
+            </p>
+          </div>
         </>
       ) : (
         <>
-          <div className="flex items-center justify-between">
-            <p className="text-[12px] font-medium text-slate-700 truncate">{dataset.name}</p>
-            <button onClick={clearDataset} className="text-[11px] text-slate-400 hover:text-red-500 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-accentsoft text-accent shrink-0">
+              <IcTable size={15} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12.5px] font-semibold text-ink truncate">{dataset.name}</p>
+              <p className="text-[11px] text-inkfaint">
+                {dataset.rows.length}행 · 매핑 {bound.length}/{dataset.columns.length}
+              </p>
+            </div>
+            <button
+              onClick={clearDataset}
+              className="text-[11px] text-inkfaint hover:text-red-500 shrink-0"
+            >
               제거
             </button>
           </div>
-          <p className="text-[11px] text-slate-400 -mt-2">
-            {dataset.rows.length}행 · 매핑 {bound.length}/{dataset.columns.length}
-          </p>
 
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 tracking-wide mb-2">
+            <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2">
               열 알약 — 지면에 끌어다 놓기
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -194,55 +230,67 @@ function DataTab() {
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-3">
-            <p className="text-[11px] font-semibold text-slate-400 tracking-wide mb-2">미리보기</p>
-            <div className="flex items-center gap-2">
+          <div className="border-t border-line pt-3.5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-semibold text-inkfaint tracking-wide">미리보기</p>
               <button
-                onClick={() => setPreviewIndex(previewIndex === null ? 0 : Math.max(0, previewIndex - 1))}
-                className="w-7 h-7 rounded border border-slate-200 text-slate-500 hover:border-blue-400"
+                onClick={() => setPreviewIndex(preview ? null : 0)}
+                className="text-[11px] text-accent font-medium hover:underline"
               >
-                ‹
+                {preview ? "칩 보기" : "값 보기"}
               </button>
-              <span className="text-[12px] text-slate-600 min-w-14 text-center">
-                {previewIndex === null ? "칩 보기" : `${previewIndex + 1} / ${dataset.rows.length}`}
-              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPreviewIndex(preview ? Math.max(0, previewIndex! - 1) : 0)}
+                disabled={!preview || previewIndex === 0}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-line text-inksoft hover:border-accent hover:text-accent disabled:opacity-40 transition-colors"
+              >
+                <IcChevronLeft size={16} />
+              </button>
+              <div className="flex-1 h-8 flex items-center justify-center rounded-lg bg-paper text-[12px] text-ink font-medium tabular-nums">
+                {preview ? `${previewIndex! + 1} / ${dataset.rows.length}` : "칩 보기"}
+              </div>
               <button
                 onClick={() =>
-                  setPreviewIndex(
-                    previewIndex === null ? 0 : Math.min(dataset.rows.length - 1, previewIndex + 1)
-                  )
+                  setPreviewIndex(preview ? Math.min(dataset.rows.length - 1, previewIndex! + 1) : 0)
                 }
-                className="w-7 h-7 rounded border border-slate-200 text-slate-500 hover:border-blue-400"
+                disabled={!preview || previewIndex === dataset.rows.length - 1}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-line text-inksoft hover:border-accent hover:text-accent disabled:opacity-40 transition-colors"
               >
-                ›
-              </button>
-              <button
-                onClick={() => setPreviewIndex(previewIndex === null ? 0 : null)}
-                className="ml-auto text-[11px] text-blue-600 hover:underline"
-              >
-                {previewIndex === null ? "값 보기" : "칩 보기"}
+                <IcChevronRight size={16} />
               </button>
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
-            <p className="text-[11px] font-semibold text-slate-400 tracking-wide">일괄 생성</p>
+          <div className="border-t border-line pt-3.5 flex flex-col gap-2">
+            <p className="text-[11px] font-semibold text-inkfaint tracking-wide">
+              일괄 생성 · {dataset.rows.length}건
+            </p>
             <button
               onClick={generateZip}
               disabled={busy || bound.length === 0}
-              className="rounded-lg bg-blue-600 text-white text-[12px] font-medium py-2 hover:bg-blue-700 disabled:opacity-40"
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-accent text-white text-[12.5px] font-semibold py-2.5 hover:bg-accenthover active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100 shadow-[0_1px_2px_rgba(43,92,230,0.25)]"
             >
-              {busy ? "생성 중…" : `개별 파일 ${dataset.rows.length}개 (ZIP)`}
+              {busy ? (
+                "생성 중…"
+              ) : (
+                <>
+                  <IcDownload size={15} /> 개별 파일 {dataset.rows.length}개 (ZIP)
+                </>
+              )}
             </button>
             <button
               onClick={generateSingle}
               disabled={busy || bound.length === 0}
-              className="rounded-lg border border-blue-200 text-blue-700 text-[12px] font-medium py-2 hover:bg-blue-50 disabled:opacity-40"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-accentline text-accent text-[12.5px] font-semibold py-2.5 hover:bg-accentsoft transition-colors disabled:opacity-40"
             >
-              한 파일 {dataset.rows.length}쪽 (HWPX)
+              <IcDownload size={15} /> 한 파일 {dataset.rows.length}쪽 (HWPX)
             </button>
             {bound.length === 0 && (
-              <p className="text-[11px] text-slate-400">알약을 문서에 놓으면 생성할 수 있어요.</p>
+              <p className="flex items-center gap-1.5 text-[11px] text-inkfaint">
+                <IcSparkles size={13} /> 알약을 문서에 놓으면 생성할 수 있어요.
+              </p>
             )}
           </div>
         </>
@@ -256,8 +304,8 @@ export function LeftPanel() {
   const hasDataset = useMergeStore((s) => s.dataset !== null);
 
   return (
-    <aside className="w-56 shrink-0 border-r border-slate-200 bg-white flex flex-col">
-      <div className="flex border-b border-slate-100">
+    <aside className="w-60 shrink-0 border-r border-line bg-white flex flex-col">
+      <div className="flex px-2 pt-2 gap-1">
         {(
           [
             ["blocks", "블록"],
@@ -267,15 +315,18 @@ export function LeftPanel() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 py-2 text-[12px] font-medium ${
-              tab === key ? "text-blue-600 border-b-2 border-blue-500" : "text-slate-400 hover:text-slate-600"
+            className={`flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12.5px] font-semibold transition-colors ${
+              tab === key ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper"
             }`}
           >
             {label}
-            {key === "data" && hasDataset && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-blue-500 align-middle" />}
+            {key === "data" && hasDataset && (
+              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+            )}
           </button>
         ))}
       </div>
+      <div className="h-px bg-line mt-2" />
       {tab === "blocks" ? <BlocksTab /> : <DataTab />}
     </aside>
   );

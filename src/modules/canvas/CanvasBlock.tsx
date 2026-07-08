@@ -10,6 +10,7 @@ import { mmToPx } from "./geometry";
 import { useCanvasStore } from "./store";
 import { useMergeStore } from "../merge/store";
 import { TOKEN_RE, resolveTokens } from "../merge/resolve";
+import { IcGrip } from "../../ui/icons";
 
 export function CanvasBlock({ block }: { block: Block }) {
   const selectedId = useCanvasStore((s) => s.selectedId);
@@ -42,10 +43,17 @@ export function CanvasBlock({ block }: { block: Block }) {
         cursor: "grab",
         touchAction: "none",
       }}
-      className={`rounded-[3px] bg-white overflow-hidden select-none ${
-        selected ? "outline outline-2 outline-blue-500" : "outline outline-1 outline-slate-300"
-      } ${isDragging ? "opacity-90 shadow-lg" : ""}`}
+      className={`group/blk rounded-[3px] bg-white overflow-hidden select-none transition-shadow ${
+        selected
+          ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(43,92,230,0.18)]"
+          : "outline outline-1 outline-line hover:outline-accentline"
+      } ${isDragging ? "opacity-95 shadow-[0_8px_24px_rgba(26,34,51,0.18)]" : ""}`}
     >
+      {selected && (
+        <span className="absolute -top-2 -left-2 z-30 flex items-center justify-center w-5 h-5 rounded-md bg-accent text-white shadow-sm">
+          <IcGrip size={12} />
+        </span>
+      )}
       {block.type === "text" ? (
         <TextContent block={block} />
       ) : block.type === "table" ? (
