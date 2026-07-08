@@ -1,0 +1,6 @@
+/* Tailwind v4 — utilities만 로드하고 preflight(전역 리셋)는 제외한다.
+   기존 앱(DocumentStudio, table-king)은 인라인 스타일·기본 마진/목록 스타일에
+   의존하므로, preflight가 들어오면 목록 불릿이 사라지는 등 회귀가 난다.
+   새 /studio 셸은 Tailwind 유틸리티 클래스를 쓰고, 기존 앱은 영향받지 않는다. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
