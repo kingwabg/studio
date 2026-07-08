@@ -43,14 +43,19 @@ const BLOCK_DEFAULTS: Record<BlockType, Partial<Block>> = {
   image: { w: 60, h: 45 },
 };
 
-let seq = 0;
-// id 생성 — 결정적 카운터(세션 내 유일). Math.random을 피해 SSR/테스트에서도 안정적.
-const nextId = () => `blk_${++seq}`;
+// id 생성 — 전역 고유(UUID). 영속화에 필수: 세션 카운터는 새로고침 후 재사용돼
+// 문서/블록 id가 충돌한다(기존 것을 덮어씀). crypto.randomUUID는 브라우저·Node18+ 지원.
+const uid = (prefix: string): string => {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return `${prefix}_${c.randomUUID()}`;
+  // 폴백(구형 환경): 시간+난수 조합
+  return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+};
 
 export function createBlock(type: BlockType, x: number, y: number): Block {
   const d = BLOCK_DEFAULTS[type];
   return {
-    id: nextId(),
+    id: uid("blk"),
     type,
     x: Math.round(x),
     y: Math.round(y),
@@ -62,5 +67,5 @@ export function createBlock(type: BlockType, x: number, y: number): Block {
 }
 
 export function createDoc(title = "제목 없는 문서"): CanvasDoc {
-  return { id: `doc_${++seq}`, title, page: { ...A4 }, blocks: [] };
+  return { id: uid("doc"), title, page: { ...A4 }, blocks: [] };
 }

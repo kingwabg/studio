@@ -12,7 +12,7 @@ import "./tailwind.css";
 const router = createBrowserRouter([
   { path: "/", element: <DocumentStudio /> },
   { path: "/studio", element: <StudioHome /> },
-  { path: "/studio/editor", element: <StudioEditor /> },
+  { path: "/studio/editor/:id", element: <StudioEditor /> },
 ]);
 
 createRoot(document.getElementById("root")).render(

@@ -16,6 +16,7 @@ interface CanvasState {
   removeBlock: (id: string) => void;
   select: (id: string | null) => void;
   setTitle: (title: string) => void;
+  loadDoc: (doc: CanvasDoc) => void; // 저장소에서 불러온 문서로 교체
   reset: (title?: string) => void;
 }
 
@@ -52,6 +53,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
 
   select: (id) => set({ selectedId: id }),
   setTitle: (title) => set((s) => ({ doc: { ...s.doc, title } })),
+  loadDoc: (doc) => set({ doc, selectedId: null }),
   reset: (title) => set({ doc: createDoc(title), selectedId: null }),
 }));
 
