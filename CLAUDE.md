@@ -49,6 +49,12 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 - 다중 페이지: 요소에 `page`(0부터)와 페이지 로컬 y를 부여 → 페이지마다 앵커 문단 1개,
   2페이지부터 `<hp:p pageBreak="1">`. rhwp·한글은 존중하지만 **kordoc 렌더러는 미지원**
   (페이지 수 게이트는 verify ⑤ rhwp 단계가 담당).
+- ⚠ 한글/HWP 조판은 한글 글자를 **전각(1em) 고정폭**으로 계산한다 (rhwp 실측: 선언
+  폰트와 무관하게 advance=1em). 화면 줄바꿈을 일치시키려면 지면 폰트도 전각이어야 함 —
+  맑은 고딕이 정확히 1em (Pretendard 0.86em, Noto Sans KR 0.92em은 어긋남).
+  새 캔버스 지면(.canvas-dots)은 맑은 고딕, 내보내기도 "맑은 고딕" 선언. 캔버스 텍스트
+  패딩(px-2/py-1)은 내보내기에서 좌표/셀여백(cellMarginU)으로 보정 — 검증: 240자
+  반복문에서 캔버스 44자/줄·6줄 = rhwp 44자/줄·6줄 정확 일치.
 - 흐름 본문(flowText): 캔버스의 flow 텍스트 블록은 절대배치 개체가 아니라 진짜 hp:p
   문단으로 — 배치는 문단 마진(좌=x, 우=종이폭−x−폭, 첫 앞간격=y−6mm).
   ⚠ 문단 여백(hh:margin) 값은 렌더러가 반단위로 해석 → **HWPUNIT ×2로 기록** (rhwp 실측).

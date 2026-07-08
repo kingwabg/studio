@@ -13,10 +13,14 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* A4 지면 뒤 은은한 점 격자 — 캔바식 캔버스 느낌 */
+/* A4 지면 뒤 은은한 점 격자 — 캔바식 캔버스 느낌.
+   지면 안 텍스트는 "문서 폰트"(맑은 고딕) — 한글/HWP 조판은 한글 글자를 전각(1em)으로
+   계산하는데, 맑은 고딕이 정확히 1em이라 화면 줄바꿈 = 한글 줄바꿈이 된다.
+   (Pretendard는 0.86em이라 화면이 더 들어가 미리보기와 어긋남. UI 셸은 Pretendard 유지) */
 .canvas-dots {
   background-image: radial-gradient(circle, #cbd2de 1px, transparent 1px);
   background-size: 22px 22px;
+  font-family: "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
 }
 .thumb-grad {
   background-image: linear-gradient(to bottom, #f6f7fa, #edf0f5);
@@ -188,33 +192,45 @@
   pointer-events: none;
 }
 
-.studio-root .table-history-tools,
-.studio-root .table-mini-toolbar {
+.studio-root .table-mini-toolbar.table-ribbon {
   position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
   z-index: 80;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 30px;
-  padding: 3px;
+  gap: 5px;
+  height: 32px;
+  padding: 3px 5px;
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #d7deeb;
-  border-radius: 9px;
+  border-radius: 10px;
   box-shadow: 0 10px 28px rgba(26, 34, 51, 0.16);
   backdrop-filter: blur(8px);
 }
 
-.studio-root .table-history-tools {
-  left: 0;
-  bottom: calc(100% + 10px);
+.studio-root .table-ribbon-group,
+.studio-root .table-mini-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding-right: 5px;
+  border-right: 1px solid #e4e8ef;
 }
 
-.studio-root .table-mini-toolbar {
-  left: 66px;
-  bottom: calc(100% + 10px);
+.studio-root .table-mini-swatches {
+  padding-right: 0;
+  border-right: 0;
 }
 
-.studio-root .table-history-tools button,
+
+.studio-root .table-ribbon-label {
+  color: #5b6577;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
 .studio-root .table-mini-toolbar button,
 .studio-root .table-context-menu button {
   appearance: none;
@@ -224,37 +240,30 @@
   font: inherit;
 }
 
-.studio-root .table-history-tools button {
+.studio-root .table-ribbon-group button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  min-width: 24px;
   height: 24px;
+  padding: 0 7px;
   border-radius: 7px;
   color: #5b6577;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  gap: 4px;
 }
 
-.studio-root .table-history-tools button:hover,
-.studio-root .table-mini-toolbar button:hover {
+.studio-root .table-ribbon-group button:hover:not(:disabled) {
   color: #2b5ce6;
   background: #edf2fe;
 }
 
-.studio-root .table-mini-toolbar > button {
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 7px;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.studio-root .table-mini-swatches {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding-left: 4px;
-  border-left: 1px solid #e4e8ef;
+.studio-root .table-ribbon-group button:disabled {
+  color: #a7b0bf;
+  cursor: default;
+  opacity: 0.62;
 }
 
 .studio-root .table-mini-swatches button,
@@ -271,7 +280,6 @@
   border-color: #2b5ce6;
   transform: translateY(-1px);
 }
-
 .studio-root .table-context-menu {
   position: fixed;
   z-index: 1000;

@@ -185,7 +185,8 @@ export function makeStyleRegistry(baseHeaderXml) {
 }
 
 // ── 셀 하나 (병합 스팬 확장) ──
-// refs: { charRef, paraRef, vertAlign, fill } — 스타일 레지스트리가 발급한 참조. 없으면 기본값.
+// refs: { charRef, paraRef, vertAlign, fill, cm } — 스타일 레지스트리가 발급한 참조. 없으면 기본값.
+// cm: { lr, tb } HWPUNIT — 셀 안쪽 여백 오버라이드 (텍스트 상자를 화면 패딩과 정합할 때)
 const cellXml = (text, r, c, wU, hU, borderFill, colSpan = 1, rowSpan = 1, refs = {}) =>
   `<hp:tc name="" header="0" hasMargin="0" protect="0" editable="1" dirty="0" borderFillIDRef="${refs.fill ?? borderFill}">` +
   `<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="${refs.vertAlign ?? "CENTER"}" ` +
@@ -194,7 +195,7 @@ const cellXml = (text, r, c, wU, hU, borderFill, colSpan = 1, rowSpan = 1, refs 
   `</hp:subList>` +
   `<hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="${colSpan}" rowSpan="${rowSpan}"/>` +
   `<hp:cellSz width="${wU}" height="${hU}"/>` +
-  `<hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>`;
+  `<hp:cellMargin left="${refs.cm?.lr ?? 141}" right="${refs.cm?.lr ?? 141}" top="${refs.cm?.tb ?? 141}" bottom="${refs.cm?.tb ?? 141}"/></hp:tc>`;
 
 let idSeq = 2000;
 
@@ -214,14 +215,16 @@ function tableXml(el, reg, borderFill = "2") {
   const mergeAt = (r, c) => merges.find((m) => m.r === r && m.c === c);
 
   // 셀 스타일 → 레지스트리 참조. cellStyles가 없으면(구형 캔버스) 전부 기본값.
+  const cm = el.cellMarginU; // 셀 안쪽 여백 오버라이드 (텍스트 상자 정합용)
   const refsAt = (r, c) => {
     const s = cellStyles?.[r]?.[c];
-    if (!s || !reg) return {};
+    if (!s || !reg) return { cm };
     return {
       charRef: reg.charId(s),
       paraRef: reg.paraId({ align: s.hAlign ?? "center", lineSpacing: s.lineSpacing }),
       vertAlign: V_ALIGN[s.vAlign] ?? "CENTER",
       fill: s.backgroundColor ? reg.fillId(s.backgroundColor) : undefined,
+      cm,
     };
   };
 
