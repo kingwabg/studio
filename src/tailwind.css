@@ -58,3 +58,4 @@
 .focus\:border-accent:focus { border-color: #2b5ce6; }
 .focus\:border-accentline:focus { border-color: #c4d4f9; }
 .focus\:ring-accentsoft:focus { --tw-ring-color: #edf2fe; box-shadow: 0 0 0 2px #edf2fe; }
+.ring-accent { --tw-ring-color: #2b5ce6; }

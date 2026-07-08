@@ -8,6 +8,8 @@
 
 export type BlockType = "text" | "table" | "image";
 
+export type TextAlign = "left" | "center" | "right";
+
 export interface Block {
   id: string;
   type: BlockType;
@@ -18,7 +20,21 @@ export interface Block {
   text?: string; // text 블록
   rows?: string[][]; // table 블록 (Phase 1은 정적 표본)
   src?: string; // image 블록 (Phase 2 Storage)
+  // 텍스트 스타일 (text 블록) — 없으면 기본값. 내보내기(exportHwpx)도 이 값을 쓴다.
+  fontSize?: number; // pt
+  bold?: boolean;
+  italic?: boolean;
+  align?: TextAlign;
+  color?: string; // hex
 }
+
+export const TEXT_DEFAULTS = {
+  fontSize: 10.5,
+  bold: false,
+  italic: false,
+  align: "left" as TextAlign,
+  color: "#1A2233",
+};
 
 export interface CanvasDoc {
   id: string;

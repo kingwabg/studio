@@ -4,10 +4,7 @@
 // 이미 mm 좌표(진실)라 DOM 없이 순수 변환으로 끝난다 — Node/워커에서도 돌 수 있다.
 // 병합(다중 레코드)을 위해 문서 배열을 페이지별로 싣는 변형도 제공한다.
 import { buildHwpx } from "../../hwpx/exportCore.js";
-import { type Block, type CanvasDoc } from "./model";
-
-// 새 캔버스의 화면 글자 크기와 맞춘 기본 pt (CanvasBlock: 텍스트 13px, 셀 11px)
-const TEXT_PT = 9.8;
+import { type Block, type CanvasDoc, TEXT_DEFAULTS } from "./model";
 
 function elementOf(b: Block, page: number) {
   if (b.type === "text")
@@ -19,7 +16,15 @@ function elementOf(b: Block, page: number) {
       w: b.w,
       h: b.h,
       text: b.text ?? "",
-      style: { pt: TEXT_PT, align: "left", lineSpacing: 140 },
+      // 화면 스타일을 그대로 내보내기 코어로 (pt·굵기·기울임·정렬·색)
+      style: {
+        pt: b.fontSize ?? TEXT_DEFAULTS.fontSize,
+        bold: b.bold ?? TEXT_DEFAULTS.bold,
+        italic: b.italic ?? TEXT_DEFAULTS.italic,
+        align: b.align ?? TEXT_DEFAULTS.align,
+        color: b.color ?? TEXT_DEFAULTS.color,
+        lineSpacing: 140,
+      },
     };
   if (b.type === "table")
     return { type: "table", page, x: b.x, y: b.y, w: b.w, h: b.h, rows: b.rows ?? [[""]] };

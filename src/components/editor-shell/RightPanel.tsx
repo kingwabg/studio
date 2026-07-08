@@ -1,7 +1,10 @@
-// RightPanel.tsx — 선택한 블록의 속성 편집(위치·크기·내용).
-// Phase 1은 순수 상태 편집. 값은 mm(모델 단위) 그대로 노출한다.
+// RightPanel.tsx — 선택한 블록의 속성 편집(내용·글자 스타일·위치·크기).
+import { type ReactNode } from "react";
 import { useCanvasStore } from "../../modules/canvas/store";
+import { type Block, type TextAlign, TEXT_DEFAULTS } from "../../modules/document/model";
 import { IcText, IcTable, IcImage, IcTrash } from "../../ui/icons";
+
+const TEXT_COLORS = ["#1A2233", "#5B6577", "#2B5CE6", "#DC2626", "#16A34A", "#B45309"];
 
 function NumberField({
   label,
@@ -19,9 +22,108 @@ function NumberField({
         type="number"
         value={Math.round(value)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-8 px-2.5 rounded-lg border border-line text-ink text-[12.5px] text-right outline-none focus:border-accent focus:ring-2 focus:ring-accentsoft transition-all bg-white"
+        className="h-8 px-2.5 rounded-lg border border-line text-ink text-[12.5px] text-right outline-none focus:border-accent focus:ring-accentsoft transition-all bg-white"
       />
     </label>
+  );
+}
+
+function SegBtn({
+  active,
+  onClick,
+  children,
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={`flex-1 h-8 flex items-center justify-center rounded-md text-[13px] transition-colors ${
+        active ? "bg-white text-accent shadow-sm font-semibold" : "text-inksoft hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TextStyleControls({ block }: { block: Block }) {
+  const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const patch = (p: Partial<Block>) => updateBlock(block.id, p);
+  const align = block.align ?? TEXT_DEFAULTS.align;
+  const aligns: { v: TextAlign; label: string }[] = [
+    { v: "left", label: "좌" },
+    { v: "center", label: "중" },
+    { v: "right", label: "우" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
+        <NumberField
+          label="글자 크기 (pt)"
+          value={block.fontSize ?? TEXT_DEFAULTS.fontSize}
+          onChange={(v) => patch({ fontSize: Math.max(6, v) })}
+        />
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] text-inkfaint">스타일</span>
+          <div className="flex gap-1.5 h-8">
+            <button
+              onClick={() => patch({ bold: !block.bold })}
+              className={`flex-1 rounded-lg border text-[13px] font-bold transition-colors ${
+                block.bold ? "border-accent bg-accentsoft text-accent" : "border-line text-inksoft hover:border-accentline"
+              }`}
+            >
+              B
+            </button>
+            <button
+              onClick={() => patch({ italic: !block.italic })}
+              className={`flex-1 rounded-lg border text-[13px] italic transition-colors ${
+                block.italic ? "border-accent bg-accentsoft text-accent" : "border-line text-inksoft hover:border-accentline"
+              }`}
+            >
+              I
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] text-inkfaint">정렬</span>
+        <div className="flex gap-1 p-1 rounded-lg bg-paper">
+          {aligns.map((a) => (
+            <SegBtn key={a.v} active={align === a.v} onClick={() => patch({ align: a.v })} title={`${a.label} 정렬`}>
+              {a.label}
+            </SegBtn>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[11px] text-inkfaint">글자색</span>
+        <div className="flex gap-2">
+          {TEXT_COLORS.map((c) => {
+            const on = (block.color ?? TEXT_DEFAULTS.color).toUpperCase() === c.toUpperCase();
+            return (
+              <button
+                key={c}
+                onClick={() => patch({ color: c })}
+                aria-label={`색 ${c}`}
+                className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                  on ? "ring-2 ring-accent border-white" : "border-line"
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -38,7 +140,7 @@ export function RightPanel() {
         : { label: "이미지", icon: <IcImage size={15} /> };
 
   return (
-    <aside className="w-64 shrink-0 border-l border-line bg-white flex flex-col">
+    <aside className="w-64 shrink-0 border-l border-line bg-white flex flex-col overflow-auto">
       {!block ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-2">
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-paper text-inkfaint">
@@ -52,7 +154,7 @@ export function RightPanel() {
         </div>
       ) : (
         <div className="flex flex-col">
-          <div className="flex items-center gap-2 px-4 h-12 border-b border-line">
+          <div className="flex items-center gap-2 px-4 h-12 border-b border-line sticky top-0 bg-white">
             <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-accentsoft text-accent">
               {kind.icon}
             </span>
@@ -68,15 +170,20 @@ export function RightPanel() {
 
           <div className="px-4 py-4 flex flex-col gap-4">
             {block.type === "text" && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] text-inkfaint">내용</span>
-                <textarea
-                  value={block.text ?? ""}
-                  onChange={(e) => updateBlock(block.id, { text: e.target.value })}
-                  rows={3}
-                  className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accent focus:ring-2 focus:ring-accentsoft transition-all resize-none leading-relaxed bg-white"
-                />
-              </div>
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-inkfaint">내용</span>
+                  <textarea
+                    value={block.text ?? ""}
+                    onChange={(e) => updateBlock(block.id, { text: e.target.value })}
+                    rows={2}
+                    placeholder="더블클릭으로 지면에서 바로 편집할 수도 있어요"
+                    className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accent focus:ring-accentsoft transition-all resize-none leading-relaxed bg-white"
+                  />
+                </div>
+                <TextStyleControls block={block} />
+                <div className="h-px bg-line" />
+              </>
             )}
 
             <div>
