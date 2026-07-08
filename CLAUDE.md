@@ -15,6 +15,11 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 - **신규(자유배치 캔버스)**: 블록이 mm 좌표(x/y/w/h) 직접 소유. TS + Zustand + dnd-kit.
   `src/modules/document/model.ts`(타입) · `src/modules/canvas/`(store·Stage·Block·geometry) ·
   `src/components/editor-shell/`(L/C/R) · `src/routes/`(StudioHome/StudioEditor).
+- **데이터 병합**(`src/modules/merge/`): 하이브리드 전략 — 저장·엔진의 진실은 {{열이름}}
+  토큰(정규식), 화면은 칩. 좌측 데이터 탭에서 엑셀/CSV 업로드(CSV는 UTF-8→EUC-KR 폴백
+  디코딩 필수 — SheetJS에 바이트로 주면 한글 깨짐) → 열 알약을 텍스트/셀에 드롭 →
+  레코드 미리보기 → 일괄 생성(개별 ZIP / 한 파일 N쪽=el.page).
+  `exportHwpx.ts`: CanvasDoc은 모델이 곧 mm라 실측 없이 exportCore로 직변환.
 - Tailwind는 **utilities만**(preflight 제외, tailwind.css 주석 참고) — 기존 앱 스타일 보호.
 - TS는 `allowJs`+`checkJs:false` — 기존 JS와 공존, table-king·hwpx는 JS 유지(불가침).
 

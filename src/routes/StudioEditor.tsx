@@ -5,8 +5,10 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   DndContext,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { type BlockType } from "../modules/document/model";
@@ -16,6 +18,15 @@ import { CanvasStage } from "../modules/canvas/CanvasStage";
 import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
 import { getRepository } from "../modules/document/repository";
+import { buildHwpxBytes, downloadBytes } from "../modules/document/exportHwpx";
+
+// 중첩 드롭 대상(지면 안의 텍스트/셀) 우선 — 포인터가 안쪽 대상 위면 그걸 고른다.
+// 지면(stage)은 안쪽 대상이 없을 때의 폴백 (팔레트로 새 블록 만들 때).
+const preferInner: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  const inner = within.filter((c) => c.id !== "stage");
+  return inner.length ? inner : within;
+};
 
 const repo = getRepository();
 type SaveStatus = "idle" | "saving" | "saved";
@@ -32,6 +43,8 @@ export default function StudioEditor() {
   const loadDoc = useCanvasStore((s) => s.loadDoc);
   const addBlock = useCanvasStore((s) => s.addBlock);
   const moveBlock = useCanvasStore((s) => s.moveBlock);
+  const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const setCell = useCanvasStore((s) => s.setCell);
   const doc = useCanvasStore((s) => s.doc);
 
   // 로드: :id의 문서를 저장소에서 불러온다. 없으면 홈으로.
@@ -75,7 +88,29 @@ export default function StudioEditor() {
       if (b) moveBlock(b.id, b.x + pxToMm(delta.x), b.y + pxToMm(delta.y));
       return;
     }
-    if (kind === "palette" && over?.id === "stage") {
+
+    // 데이터 알약 → 텍스트 블록/표 셀에 {{열이름}} 토큰 삽입 (엔진은 토큰, 화면은 칩)
+    if (kind === "field") {
+      const column = active.data.current?.column as string;
+      const target = over?.data.current;
+      if (!column || !target) return;
+      const token = `{{${column}}}`;
+      const blocks = useCanvasStore.getState().doc.blocks;
+      if (target.kind === "textblock") {
+        const b = blocks.find((x) => x.id === target.blockId);
+        if (!b) return;
+        // 시드 문구는 통째로 교체, 이미 내용이 있으면 뒤에 덧붙임
+        const base = !b.text || b.text === "텍스트를 입력하세요" ? "" : b.text + " ";
+        updateBlock(b.id, { text: base + token });
+      } else if (target.kind === "cell") {
+        const b = blocks.find((x) => x.id === target.blockId);
+        const cur = b?.rows?.[target.r]?.[target.c] ?? "";
+        setCell(target.blockId, target.r, target.c, cur ? cur + token : token);
+      }
+      return;
+    }
+
+    if (kind === "palette" && over) {
       const type = active.data.current?.type as BlockType;
       const stage = stageRef.current;
       const dropped = active.rect.current.translated;
@@ -100,13 +135,19 @@ export default function StudioEditor() {
           <span className="text-[11px] text-slate-400">
             {status === "saving" ? "저장 중…" : status === "saved" ? "저장됨" : ""}
           </span>
+          <button
+            onClick={() => downloadBytes(buildHwpxBytes(doc), `${title || "문서"}.hwpx`)}
+            className="rounded-lg bg-blue-600 text-white text-[12px] font-medium px-3 py-1.5 hover:bg-blue-700"
+          >
+            HWPX 내보내기
+          </button>
           <Link to="/" className="text-[12px] text-blue-600 hover:underline">
             기존 편집기 →
           </Link>
         </div>
       </header>
 
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={preferInner} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex min-h-0">
           <LeftPanel />
           <CanvasStage ref={stageRef} />

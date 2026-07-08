@@ -13,6 +13,7 @@ interface CanvasState {
   addBlock: (type: BlockType, x: number, y: number) => void;
   moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동
   updateBlock: (id: string, patch: Partial<Block>) => void;
+  setCell: (id: string, r: number, c: number, text: string) => void; // 표 셀 하나 수정
   removeBlock: (id: string) => void;
   select: (id: string | null) => void;
   setTitle: (title: string) => void;
@@ -43,6 +44,18 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   updateBlock: (id, patch) =>
     set((s) => ({
       doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) },
+    })),
+
+  setCell: (id, r, c, text) =>
+    set((s) => ({
+      doc: {
+        ...s.doc,
+        blocks: s.doc.blocks.map((b) =>
+          b.id === id && b.rows
+            ? { ...b, rows: b.rows.map((row, ri) => (ri === r ? row.map((cell, ci) => (ci === c ? text : cell)) : row)) }
+            : b
+        ),
+      },
     })),
 
   removeBlock: (id) =>
