@@ -21,9 +21,10 @@ import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
 import { getRepository } from "../modules/document/repository";
 import { buildHwpxBytes, downloadBytes } from "../modules/document/exportHwpx";
+import { flattenDoc } from "../modules/document/flatten";
 import { HanPreviewModal } from "../components/editor-shell/HanPreviewModal";
 import { EditorToolbar } from "../components/editor-shell/EditorToolbar";
-import { IcBack, IcDownload, IcEye, IcLogo } from "../ui/icons";
+import { IcBack, IcDownload, IcEye, IcLogo, IcSparkles } from "../ui/icons";
 
 // 중첩 드롭 대상(지면 안의 텍스트/셀) 우선 — 포인터가 안쪽 대상 위면 그걸 고른다.
 // 지면(stage)은 안쪽 대상이 없을 때의 폴백 (팔레트로 새 블록 만들 때).
@@ -250,6 +251,18 @@ export default function StudioEditor() {
         </span>
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={async () => {
+              // 마인드맵 → 공문서: 트리를 개요 번호 문서로 펴서 "새 문서"로 저장·이동 (원본 보존)
+              const flat = flattenDoc(useCanvasStore.getState().doc);
+              await repo.save(flat);
+              navigate(`/studio/editor/${flat.id}`);
+            }}
+            title="트리 구조를 개요 번호(Ⅰ/1/가)가 매겨진 공문서로 펴서 새 문서로 만듭니다"
+            className="flex items-center gap-1.5 rounded-lg border border-line text-inksoft text-[12.5px] font-semibold px-3 h-[34px] hover:border-accentline hover:text-accent transition-colors"
+          >
+            <IcSparkles size={15} /> 공문서로 펴기
+          </button>
           <button
             onClick={() => setPreviewing(true)}
             className="flex items-center gap-1.5 rounded-lg border border-accentline bg-accentsoft text-accent text-[12.5px] font-semibold px-3 h-[34px] hover:bg-accent hover:text-white transition-colors"

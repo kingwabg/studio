@@ -5,7 +5,7 @@
 // 눈금자: 한글(HWP) 편집 화면처럼 지면 위·왼쪽에 밀착. 1mm/5mm/10mm 틱 + cm 숫자.
 // SCALE = CSS mm(3.7795px)라 눈금 px가 곧 실제 mm — 공공기관 규격(여백 15/20mm 등)을
 // 실무자가 눈으로 검증할 수 있다. 지면에 붙어 함께 스크롤된다.
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SCALE, mmToPx } from "./geometry";
 import { useCanvasStore } from "./store";
@@ -61,6 +61,24 @@ const TICK_MINOR = "#e5eaf2";
 const TICK_MID = "#cfd7e4";
 const TICK_MAJOR = "#8d98aa";
 const LABEL = "#6f7a8d";
+const SAFE_MARGIN_MM = 20;
+const PROJECTION_FILL = "rgba(43, 92, 230, 0.18)";
+const PROJECTION_STROKE = "rgba(43, 92, 230, 0.78)";
+const PROJECTION_ALERT_FILL = "rgba(239, 68, 68, 0.2)";
+const PROJECTION_ALERT_STROKE = "rgba(220, 38, 38, 0.82)";
+
+type RulerProjection = {
+  start: number;
+  size: number;
+  alert: boolean;
+};
+
+type MeasuredBlockBox = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
 
 const rulerSurface = {
   display: "block",
@@ -68,8 +86,33 @@ const rulerSurface = {
   pointerEvents: "none",
 } as const;
 
+function ProjectionBand({ axis, projection }: { axis: "x" | "y"; projection?: RulerProjection }) {
+  if (!projection || projection.size <= 0) return null;
+  const start = mmToPx(projection.start);
+  const size = mmToPx(projection.size);
+  const fill = projection.alert ? PROJECTION_ALERT_FILL : PROJECTION_FILL;
+  const stroke = projection.alert ? PROJECTION_ALERT_STROKE : PROJECTION_STROKE;
+
+  if (axis === "x")
+    return (
+      <>
+        <rect x={start} y={0} width={size} height={RULER} fill={fill} />
+        <line x1={start} x2={start} y1={0} y2={RULER} stroke={stroke} strokeWidth={1.4} />
+        <line x1={start + size} x2={start + size} y1={0} y2={RULER} stroke={stroke} strokeWidth={1.4} />
+      </>
+    );
+
+  return (
+    <>
+      <rect x={0} y={start} width={RULER} height={size} fill={fill} />
+      <line x1={0} x2={RULER} y1={start} y2={start} stroke={stroke} strokeWidth={1.4} />
+      <line x1={0} x2={RULER} y1={start + size} y2={start + size} stroke={stroke} strokeWidth={1.4} />
+    </>
+  );
+}
+
 // 수평 눈금자 — 1mm/5mm/10mm 위계를 나누고 cm 숫자는 큰 눈금 중앙에 둔다.
-function RulerH({ mm }: { mm: number }) {
+function RulerH({ mm, projection }: { mm: number; projection?: RulerProjection }) {
   const w = mmToPx(mm);
   const ticks = useMemo(() => {
     const t: React.ReactNode[] = [];
@@ -115,13 +158,14 @@ function RulerH({ mm }: { mm: number }) {
       aria-hidden="true"
     >
       <rect x="0" y="0" width={w} height={RULER} fill={RULER_BG} />
+      <ProjectionBand axis="x" projection={projection} />
       {ticks}
     </svg>
   );
 }
 
 // 수직 눈금자
-function RulerV({ mm }: { mm: number }) {
+function RulerV({ mm, projection }: { mm: number; projection?: RulerProjection }) {
   const h = mmToPx(mm);
   const ticks = useMemo(() => {
     const t: React.ReactNode[] = [];
@@ -167,6 +211,7 @@ function RulerV({ mm }: { mm: number }) {
       aria-hidden="true"
     >
       <rect x="0" y="0" width={RULER} height={h} fill={RULER_BG} />
+      <ProjectionBand axis="y" projection={projection} />
       {ticks}
     </svg>
   );
@@ -174,11 +219,60 @@ function RulerV({ mm }: { mm: number }) {
 
 export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_props, ref) {
   const doc = useCanvasStore((s) => s.doc);
+  const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
   const { setNodeRef } = useDroppable({ id: "stage" });
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const [measuredBlockBox, setMeasuredBlockBox] = useState<MeasuredBlockBox | null>(null);
 
   const pageW = mmToPx(doc.page.w);
   const pageH = mmToPx(doc.page.h);
+  const selectedBlock = doc.blocks.find((block) => block.id === selectedId);
+
+  useLayoutEffect(() => {
+    const pageNode = pageRef.current;
+    if (!pageNode || !selectedId) {
+      setMeasuredBlockBox(null);
+      return;
+    }
+
+    const safeId = selectedId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const blockNode = pageNode.querySelector<HTMLElement>(`[data-block-id="${safeId}"]`);
+    if (!blockNode) {
+      setMeasuredBlockBox(null);
+      return;
+    }
+
+    const measure = () => {
+      const pageRect = pageNode.getBoundingClientRect();
+      const blockRect = blockNode.getBoundingClientRect();
+      setMeasuredBlockBox({
+        x: (blockRect.left - pageRect.left) / SCALE,
+        y: (blockRect.top - pageRect.top) / SCALE,
+        w: blockRect.width / SCALE,
+        h: blockRect.height / SCALE,
+      });
+    };
+
+    measure();
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(blockNode);
+    window.addEventListener("resize", measure);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [selectedId, doc.blocks]);
+
+  const projectionBox = measuredBlockBox ?? selectedBlock;
+  const projectionAlert = projectionBox
+    ? projectionBox.x < SAFE_MARGIN_MM ||
+      projectionBox.y < SAFE_MARGIN_MM ||
+      projectionBox.x + projectionBox.w > doc.page.w - SAFE_MARGIN_MM ||
+      projectionBox.y + projectionBox.h > doc.page.h - SAFE_MARGIN_MM
+    : false;
+  const projectionX = projectionBox ? { start: projectionBox.x, size: projectionBox.w, alert: projectionAlert } : undefined;
+  const projectionY = projectionBox ? { start: projectionBox.y, size: projectionBox.h, alert: projectionAlert } : undefined;
 
   return (
     <div className="flex-1 overflow-auto canvas-dots bg-canvas">
@@ -202,16 +296,17 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
         />
         {/* 상단 눈금자 */}
         <div style={{ position: "absolute", top: 0, left: RULER }}>
-          <RulerH mm={doc.page.w} />
+          <RulerH mm={doc.page.w} projection={projectionX} />
         </div>
         {/* 좌측 눈금자 */}
         <div style={{ position: "absolute", top: RULER, left: 0 }}>
-          <RulerV mm={doc.page.h} />
+          <RulerV mm={doc.page.h} projection={projectionY} />
         </div>
 
         {/* A4 지면 */}
         <div
           ref={(node) => {
+            pageRef.current = node;
             setNodeRef(node); // dnd-kit 드롭 대상
             if (typeof ref === "function") ref(node);
             else if (ref) ref.current = node; // onDragEnd 좌표 환산용

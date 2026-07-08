@@ -118,6 +118,7 @@ export function CanvasBlock({ block }: { block: Block }) {
   return (
     <div
       ref={setNodeRef}
+      data-block-id={block.id}
       {...attributes}
       onPointerDown={(e) => {
         if (editing) return;
