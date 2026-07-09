@@ -232,6 +232,7 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
   const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
   const selectMany = useCanvasStore((s) => s.selectMany);
+  const insertTextAt = useCanvasStore((s) => s.insertTextAt);
   const { setNodeRef } = useDroppable({ id: "stage" });
   const pageRef = useRef<HTMLDivElement | null>(null);
   const [measuredBlockBox, setMeasuredBlockBox] = useState<MeasuredBlockBox | null>(null);
@@ -398,6 +399,13 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
           }}
           onPointerDown={(e) => {
             if (e.target === e.currentTarget) startMarquee(e); // 빈 지면 드래그 → 마퀴 선택
+          }}
+          onDoubleClick={(e) => {
+            // 텍스트 도구 — 빈 지면 더블클릭이면 그 자리에 텍스트를 만들고 바로 편집.
+            // (블록 위 더블클릭은 그 블록이 처리하므로 target===지면일 때만)
+            if (e.target !== e.currentTarget) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            insertTextAt((e.clientX - rect.left) / SCALE, (e.clientY - rect.top) / SCALE);
           }}
           style={{ width: pageW, height: pageH, boxShadow: "var(--sh-page)" }}
           className="relative bg-white shrink-0"

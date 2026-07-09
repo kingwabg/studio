@@ -48,10 +48,14 @@ interface CanvasState {
   // 다중 선택 — selectedIds가 진실, selectedId는 앵커(마지막 클릭, 우측 패널·서식바용).
   selectedIds: string[];
   selectedId: string | null;
+  // 텍스트 도구로 방금 만든 블록 — CanvasBlock이 마운트하며 바로 편집 모드로 들어간다.
+  autoEditId: string | null;
   past: CanvasDoc[]; // 실행취소 스택 (오래된 것 → 최신)
   future: CanvasDoc[]; // 다시실행 스택
 
   addBlock: (type: BlockType, x: number, y: number, extra?: Partial<Block>) => void;
+  insertTextAt: (x: number, y: number) => void; // 텍스트 도구 — 좌표에 새 텍스트 + 바로 편집
+  clearAutoEdit: () => void;
   duplicateBlock: (id: string) => void; // 선택 블록 복제 (+5mm 오프셋)
   moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동 (자손·그룹 동반)
   nudgeMany: (ids: string[], dx: number, dy: number) => void; // 여러 블록 델타 이동
@@ -97,6 +101,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   doc: createDoc(),
   selectedIds: [],
   selectedId: null,
+  autoEditId: null,
   past: [],
   future: [],
 
@@ -119,6 +124,22 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         selectedId: block.id,
       };
     }),
+
+  // 텍스트 도구 — 지면 클릭 좌표에 순수 텍스트 블록을 만들고 바로 편집으로.
+  // 시드 텍스트는 빈 문자열: 커서만 깜빡이다 아무 것도 안 쓰면 blur에서 스스로 사라진다.
+  insertTextAt: (x, y) =>
+    set((s) => {
+      const block = createBlock("text", Math.max(0, Math.round(x)), Math.max(0, Math.round(y)));
+      block.text = "";
+      return {
+        ...record(s),
+        doc: { ...s.doc, blocks: [...s.doc.blocks, block] },
+        selectedIds: [block.id],
+        selectedId: block.id,
+        autoEditId: block.id,
+      };
+    }),
+  clearAutoEdit: () => set((s) => (s.autoEditId === null ? {} : { autoEditId: null })),
 
   duplicateBlock: (id) =>
     set((s) => {
@@ -410,11 +431,11 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   setTitle: (title) => set((s) => ({ ...record(s, "title"), doc: { ...s.doc, title } })),
   loadDoc: (doc) => {
     lastKey = null;
-    set({ doc, selectedIds: [], selectedId: null, past: [], future: [] });
+    set({ doc, selectedIds: [], selectedId: null, autoEditId: null, past: [], future: [] });
   },
   reset: (title) => {
     lastKey = null;
-    set({ doc: createDoc(title), selectedIds: [], selectedId: null, past: [], future: [] });
+    set({ doc: createDoc(title), selectedIds: [], selectedId: null, autoEditId: null, past: [], future: [] });
   },
 }));
 

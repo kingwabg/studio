@@ -51,12 +51,30 @@ export function CanvasBlock({ block }: { block: Block }) {
   const duplicateBlock = useCanvasStore((s) => s.duplicateBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
   const setLocked = useCanvasStore((s) => s.setLocked);
+  const clearAutoEdit = useCanvasStore((s) => s.clearAutoEdit);
+  const autoEdit = useCanvasStore((s) => s.autoEditId === block.id);
   // 다중 선택 — 원시값 셀렉터(무한 리렌더 방지): 이 블록이 선택됐나 / 유일 선택인가
   const selected = useCanvasStore((s) => s.selectedIds.includes(block.id));
   const soleSelected = useCanvasStore((s) => s.selectedIds.length === 1 && s.selectedIds[0] === block.id);
   const [editing, setEditing] = useState(false);
   const isTable = block.type === "table";
+  const isText = block.type === "text";
   const locked = !!block.locked;
+
+  // 텍스트 도구로 방금 생성 → 바로 편집 모드 진입 (커서 깜빡)
+  useEffect(() => {
+    if (autoEdit) {
+      setEditing(true);
+      clearAutoEdit();
+    }
+  }, [autoEdit, clearAutoEdit]);
+
+  // 편집 종료 — 내용이 비면(공백뿐이면) 블록을 지운다. 더블클릭 오발/빈 텍스트 정리.
+  const finishEditing = () => {
+    setEditing(false);
+    const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
+    if (cur && cur.type === "text" && !(cur.text ?? "").trim()) removeBlock(block.id);
+  };
   // 라벨 칩 표기 (시안 1b) — 표는 R×C
   const typeLabel =
     block.type === "text"
@@ -163,10 +181,14 @@ export function CanvasBlock({ block }: { block: Block }) {
         cursor: editing ? "text" : locked ? "default" : "grab",
         touchAction: "none",
       }}
-      className={`group/blk rounded-[3px] bg-white overflow-visible select-none transition-[outline-color,box-shadow] ${
+      className={`group/blk rounded-[3px] overflow-visible select-none transition-[outline-color,box-shadow] ${
+        isText ? "" : "bg-white"
+      } ${
         selected
           ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(43,92,230,0.18)]"
-          : "outline outline-1 outline-line hover:outline-2 hover:outline-accent"
+          : isText
+            ? "outline-none hover:outline hover:outline-2 hover:outline-accent" // 텍스트 우선: 평소엔 순수 텍스트, 올려야 테두리
+            : "outline outline-1 outline-line hover:outline-2 hover:outline-accent"
       } ${isDragging ? "opacity-95 shadow-[0_8px_24px_rgba(26,34,51,0.18)]" : ""}`}
     >
       <div
@@ -178,7 +200,7 @@ export function CanvasBlock({ block }: { block: Block }) {
         }}
       >
         {block.type === "text" ? (
-          <TextContent block={block} editing={editing} onDoneEditing={() => setEditing(false)} />
+          <TextContent block={block} editing={editing} onDoneEditing={finishEditing} />
         ) : isTable ? (
           <TableKingContent block={block} active={selected} />
         ) : (
