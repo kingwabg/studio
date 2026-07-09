@@ -144,8 +144,8 @@ export function computeSnap(
   const snapX = bestSnap(linesX, xMm, [0, w / 2, w]);
   const snapY = bestSnap(linesY, yMm, [0, h / 2, h]);
 
-  const sx = snapX ? xMm + snapX.delta : xMm;
-  const sy = snapY ? yMm + snapY.delta : yMm;
+  let sx = snapX ? xMm + snapX.delta : xMm;
+  let sy = snapY ? yMm + snapY.delta : yMm;
   const M = { x: sx, y: sy, w, h }; // 스냅 적용된 이동 블록 상자
 
   const guides: SnapGuide[] = [];
@@ -182,10 +182,92 @@ export function computeSnap(
     }
   }
 
+  // ── 분포(등간격) 스냅 — 엣지/중앙 스냅이 없는 축에서만. 두 이웃 사이 가운데(좌=우)
+  //    또는 인접 gap과 같게(시리즈 연장) 놓이면 하드 스냅 + 등간격 배지 2개. ──
+  if (!snapX) {
+    const band = others
+      .filter((b) => b.y < M.y + h && b.y + b.h > M.y) // 교차축(세로)이 겹치는 것만 = 한 줄
+      .map((b) => [b.x, b.x + b.w] as [number, number]);
+    const d = distribute(band, xMm, xMm + w);
+    if (d) {
+      sx = d.lo;
+      for (const mid of d.mids) badges.push({ cx: mid, cy: M.y + h / 2, mm: Math.round(d.gap), axis: "h" });
+    }
+  }
+  if (!snapY) {
+    const band = others
+      .filter((b) => b.x < sx + w && b.x + b.w > sx) // 교차축(가로)이 겹치는 것만 = 한 열
+      .map((b) => [b.y, b.y + b.h] as [number, number]);
+    const d = distribute(band, yMm, yMm + h);
+    if (d) {
+      sy = d.lo;
+      for (const mid of d.mids) badges.push({ cx: sx + w / 2, cy: mid, mm: Math.round(d.gap), axis: "v" });
+    }
+  }
+
   return { x: sx, y: sy, guides, badges };
 }
 
 const near = (a: number, b: number) => Math.abs(a - b) <= EPS;
+
+// 한 축 등간격 후보 — items: 같은 줄(교차축 겹침) 이웃들의 [시작,끝](primary축).
+// mLo~mHi: 이동 블록 구간. 가운데(좌1·우1) / 오른쪽 연장(좌2) / 왼쪽 연장(우2) 중
+// 이동 위치(mLo)에 ±SNAP_MM 이내로 가장 가까운 후보를 고른다. mids = 배지 중점 2개.
+function distribute(items: [number, number][], mLo: number, mHi: number): { lo: number; gap: number; mids: number[] } | null {
+  const size = mHi - mLo;
+  const cands: { lo: number; gap: number; mids: number[] }[] = [];
+  const left = items.filter((it) => it[1] <= mLo + SNAP_MM).sort((a, b) => b[1] - a[1]); // M 왼쪽, 가까운 순
+  const right = items.filter((it) => it[0] >= mHi - SNAP_MM).sort((a, b) => a[0] - b[0]); // M 오른쪽
+  // 가운데: 좌1·우1 사이 정중앙 (gap 좌=우)
+  if (left[0] && right[0]) {
+    const Le = left[0][1];
+    const Rs = right[0][0];
+    const gap = (Rs - Le - size) / 2;
+    if (gap > 0.5) cands.push({ lo: Le + gap, gap, mids: [Le + gap / 2, Rs - gap / 2] });
+  }
+  // 오른쪽 연장: 왼쪽 두 블록 사이 gap과 같게 M을 L1 오른쪽에
+  if (left[0] && left[1]) {
+    const g = left[0][0] - left[1][1];
+    if (g > 0.5) {
+      const lo = left[0][1] + g;
+      cands.push({ lo, gap: g, mids: [(left[1][1] + left[0][0]) / 2, (left[0][1] + lo) / 2] });
+    }
+  }
+  // 왼쪽 연장: 오른쪽 두 블록 사이 gap과 같게 M을 R1 왼쪽에
+  if (right[0] && right[1]) {
+    const g = right[1][0] - right[0][1];
+    if (g > 0.5) {
+      const lo = right[0][0] - g - size;
+      cands.push({ lo, gap: g, mids: [(lo + size + right[0][0]) / 2, (right[0][1] + right[1][0]) / 2] });
+    }
+  }
+  let best: { lo: number; gap: number; mids: number[] } | null = null;
+  for (const c of cands)
+    if (Math.abs(c.lo - mLo) <= SNAP_MM && (best === null || Math.abs(c.lo - mLo) < Math.abs(best.lo - mLo))) best = c;
+  return best;
+}
+
+// 선택 블록의 상하좌우 가장 가까운 이웃까지의 거리 배지 (키보드 넛지 실시간 표시용).
+// 교차축이 겹치는 이웃만 대상 — 실제로 그 방향에 마주 보는 블록과의 간격을 잰다.
+export function neighborBadges(doc: CanvasDoc, id: string): { guides: SnapGuide[]; badges: SnapBadge[] } {
+  const M = doc.blocks.find((b) => b.id === id);
+  if (!M) return { guides: [], badges: [] };
+  const others = doc.blocks.filter((b) => b.id !== id);
+  const badges: SnapBadge[] = [];
+  const oX = (b: Block) => b.x < M.x + M.w && b.x + b.w > M.x; // 세로 이웃(위/아래)
+  const oY = (b: Block) => b.y < M.y + M.h && b.y + b.h > M.y; // 가로 이웃(좌/우)
+  const cx = M.x + M.w / 2;
+  const cy = M.y + M.h / 2;
+  const up = others.filter((b) => oX(b) && b.y + b.h <= M.y).sort((a, b) => b.y + b.h - (a.y + a.h))[0];
+  if (up) badges.push({ cx, cy: (up.y + up.h + M.y) / 2, mm: Math.round(M.y - (up.y + up.h)), axis: "v" });
+  const dn = others.filter((b) => oX(b) && b.y >= M.y + M.h).sort((a, b) => a.y - b.y)[0];
+  if (dn) badges.push({ cx, cy: (M.y + M.h + dn.y) / 2, mm: Math.round(dn.y - (M.y + M.h)), axis: "v" });
+  const lf = others.filter((b) => oY(b) && b.x + b.w <= M.x).sort((a, b) => b.x + b.w - (a.x + a.w))[0];
+  if (lf) badges.push({ cx: (lf.x + lf.w + M.x) / 2, cy, mm: Math.round(M.x - (lf.x + lf.w)), axis: "h" });
+  const rt = others.filter((b) => oY(b) && b.x >= M.x + M.w).sort((a, b) => a.x - b.x)[0];
+  if (rt) badges.push({ cx: (M.x + M.w + rt.x) / 2, cy, mm: Math.round(rt.x - (M.x + M.w)), axis: "h" });
+  return { guides: [], badges };
+}
 
 // 정렬된 이웃들 중, 이동 블록(lo~hi 구간)과 가장 가까운 이웃과의 빈 간격(gap)과
 // 그 중점을 구한다. 겹치면(gap<=0) 배지 생략(null). span은 이웃의 [시작,끝].

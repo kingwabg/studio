@@ -15,7 +15,7 @@ import {
 import { type BlockType, descendantIds, moveSetIds } from "../modules/document/model";
 import { mmToPx, pxToMm } from "../modules/canvas/geometry";
 import { useCanvasStore } from "../modules/canvas/store";
-import { computeSnap, isAltPressed, setAltPressed, useFollowStore, useGuideStore } from "../modules/canvas/snap";
+import { computeSnap, isAltPressed, neighborBadges, setAltPressed, useFollowStore, useGuideStore } from "../modules/canvas/snap";
 import { CanvasStage } from "../modules/canvas/CanvasStage";
 import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
@@ -58,6 +58,9 @@ const snapModifier: Modifier = ({ active, transform }) => {
 
 const repo = getRepository();
 type SaveStatus = "idle" | "saving" | "saved";
+
+// 키보드 넛지 후 거리 배지를 잠깐 보였다 지우는 타이머 (연속 넛지면 갱신)
+let nudgeClearTimer: ReturnType<typeof setTimeout> | null = null;
 
 export default function StudioEditor() {
   const { id } = useParams();
@@ -147,6 +150,21 @@ export default function StudioEditor() {
       } else if (mod && e.shiftKey && e.key.toLowerCase() === "g") {
         e.preventDefault();
         st.ungroupSelection(); // ⌘⇧G 그룹 해제
+      } else if (e.key.startsWith("Arrow") && st.selectedIds.length) {
+        // 키보드 마이크로 넛지 — 방향키 1mm, Shift+방향키 10mm. 이동 후 이웃까지의
+        // 거리 배지를 잠깐 띄워 "완벽 마감"을 눈으로 확인 (마우스로 잡고 키보드로 마감).
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        st.nudgeMany(st.selectedIds, dx, dy);
+        const anchor = useCanvasStore.getState().selectedId;
+        if (anchor) {
+          const nb = neighborBadges(useCanvasStore.getState().doc, anchor);
+          useGuideStore.getState().setGuides(nb.guides, nb.badges);
+          if (nudgeClearTimer) clearTimeout(nudgeClearTimer);
+          nudgeClearTimer = setTimeout(() => useGuideStore.getState().clear(), 1000);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
