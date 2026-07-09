@@ -8,7 +8,7 @@
 import { forwardRef, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SCALE, mmToPx } from "./geometry";
-import { collapsedHiddenIds } from "../document/model";
+import { collapsedHiddenIds, descendantIds } from "../document/model";
 import { useCanvasStore } from "./store";
 import { useGuideStore } from "./snap";
 import { CanvasBlock } from "./CanvasBlock";
@@ -247,6 +247,21 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
     return hidden.size ? doc.blocks.filter((b) => !hidden.has(b.id)) : doc.blocks;
   }, [doc.blocks]);
 
+  // 그룹 선택 테두리 (시안 1b) — 자식 있는 블록 선택 시 자신+자손을 감싸는 점선 박스.
+  // 자석 그룹의 범위를 눈으로 보여준다 (부모를 끌면 이만큼이 함께 움직인다).
+  const groupBox = useMemo(() => {
+    if (!selectedBlock) return null;
+    const kids = descendantIds(doc.blocks, selectedBlock.id);
+    if (!kids.size) return null;
+    const members = doc.blocks.filter((b) => b.id === selectedBlock.id || kids.has(b.id));
+    const x1 = Math.min(...members.map((b) => b.x));
+    const y1 = Math.min(...members.map((b) => b.y));
+    const x2 = Math.max(...members.map((b) => b.x + b.w));
+    const y2 = Math.max(...members.map((b) => b.y + b.h));
+    const label = (selectedBlock.text ?? "그룹").slice(0, 18);
+    return { x1, y1, x2, y2, label, count: kids.size };
+  }, [selectedBlock, doc.blocks]);
+
   useLayoutEffect(() => {
     const pageNode = pageRef.current;
     if (!pageNode || !selectedId) {
@@ -356,6 +371,28 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
           {visibleBlocks.map((block) => (
             <CanvasBlock key={block.id} block={block} />
           ))}
+          {/* 그룹 선택 점선 테두리 — 자석 그룹 범위 (시안: #7C9AF0 점선 + 칩) */}
+          {groupBox && (
+            <div
+              className="absolute pointer-events-none z-[9]"
+              style={{
+                left: mmToPx(groupBox.x1) - 6,
+                top: mmToPx(groupBox.y1) - 6,
+                width: mmToPx(groupBox.x2 - groupBox.x1) + 12,
+                height: mmToPx(groupBox.y2 - groupBox.y1) + 12,
+                border: "1.5px dashed var(--groupline)",
+                borderRadius: 7,
+                background: "rgba(43,92,230,.02)",
+              }}
+            >
+              <span
+                className="absolute -top-[11px] right-2.5 bg-surface border border-accentline text-accent text-[10px] font-bold rounded-[5px] px-2 py-0.5 whitespace-nowrap"
+                style={{ boxShadow: "var(--sh-card)" }}
+              >
+                그룹 · {groupBox.label} (하위 {groupBox.count})
+              </span>
+            </div>
+          )}
           <SnapGuides />
           {doc.blocks.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">

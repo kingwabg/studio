@@ -22,7 +22,7 @@ import { useCanvasStore } from "./store";
 import { useFollowStore } from "./snap";
 import { useMergeStore } from "../merge/store";
 import { TOKEN_RE, resolveTokens } from "../merge/resolve";
-import { IcGrip } from "../../ui/icons";
+import { IcGrip, IcCopy, IcTrash } from "../../ui/icons";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
 import "../../table-king/table-king.css";
 
@@ -46,9 +46,20 @@ export function CanvasBlock({ block }: { block: Block }) {
   const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
   const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const duplicateBlock = useCanvasStore((s) => s.duplicateBlock);
+  const removeBlock = useCanvasStore((s) => s.removeBlock);
   const selected = selectedId === block.id;
   const [editing, setEditing] = useState(false);
   const isTable = block.type === "table";
+  // 라벨 칩 표기 (시안 1b) — 표는 R×C
+  const typeLabel =
+    block.type === "text"
+      ? block.flow
+        ? "본문"
+        : "텍스트"
+      : block.type === "table"
+        ? `표 · ${(block.data as TableKingData | undefined)?.cells?.length ?? 0}×${(block.data as TableKingData | undefined)?.cells?.[0]?.length ?? 0}`
+        : "이미지";
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: block.id,
@@ -167,24 +178,51 @@ export function CanvasBlock({ block }: { block: Block }) {
       )}
       {selected && !editing && (
         <>
-          {/* 이동 그립 — 표는 이것만이 이동 수단, 텍스트는 장식(전체가 드래그됨) */}
-          <span
-            {...(isTable ? listeners : {})}
-            onPointerDown={
-              isTable
-                ? (e) => {
-                    select(block.id);
-                    listeners?.onPointerDown?.(e);
-                  }
-                : undefined
-            }
-            className={`absolute -top-2.5 -left-2.5 z-30 flex items-center justify-center w-5 h-5 rounded-md bg-accent text-white shadow-sm ${
-              isTable ? "cursor-grab" : "pointer-events-none"
-            }`}
-            style={{ touchAction: "none" }}
+          {/* 표: 이동 그립만 (table-king 리본·우측 패널이 복제·삭제·서식 담당 — 툴바 중복 방지) */}
+          {isTable && (
+            <span
+              {...listeners}
+              onPointerDown={(e) => {
+                select(block.id);
+                listeners?.onPointerDown?.(e);
+              }}
+              title="이동"
+              className="absolute -top-2.5 -left-2.5 z-40 flex items-center justify-center w-6 h-6 rounded-lg bg-accent text-white cursor-grab"
+              style={{ touchAction: "none", boxShadow: "var(--sh-card)" }}
+            >
+              <IcGrip size={13} />
+            </span>
+          )}
+
+          {/* 텍스트/이미지: 플로팅 액션 바 (시안 1b) — 복제·삭제 실동작, 잠금·회전 준비 중 */}
+          {!isTable && (
+            <div
+              className="absolute -top-[46px] left-1/2 -translate-x-1/2 z-40 flex items-center gap-px p-[3px] rounded-[11px] bg-surface border border-line"
+              style={{ boxShadow: "var(--sh-pop)" }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <BarBtn title="잠금 (준비 중)" soon d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z" />
+              <button onClick={() => duplicateBlock(block.id)} title="복제" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-inksoft hover:bg-paper hover:text-ink transition-colors">
+                <IcCopy size={14} />
+              </button>
+              <button onClick={() => removeBlock(block.id)} title="삭제" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-inksoft hover:bg-[color:var(--cat-red-soft)] hover:text-[color:var(--cat-red)] transition-colors">
+                <IcTrash size={14} />
+              </button>
+              <span className="w-px h-4 bg-line mx-0.5" />
+              <BarBtn title="더보기 (준비 중)" soon dots />
+            </div>
+          )}
+
+          {/* 라벨 칩 (시안) — 종류·크기 */}
+          <div
+            className="absolute -top-[22px] left-0 z-30 flex items-center gap-1.5 px-2 py-0.5 rounded-[6px_6px_6px_0] bg-surface border border-accentline pointer-events-none whitespace-nowrap"
+            style={{ boxShadow: "var(--sh-card)" }}
           >
-            <IcGrip size={12} />
-          </span>
+            <span className="w-[5px] h-[5px] rounded-full bg-accent" />
+            <span className="text-[10px] font-bold text-ink">{typeLabel}</span>
+          </div>
+
+          {/* 리사이즈 코너 핸들 (시안: 8px 흰 사각 + 파란 테두리) */}
           {!isTable &&
             RESIZE_HANDLES.filter((h) =>
               // 텍스트는 높이가 내용에서 파생되므로 좌우(폭)만 조절
@@ -193,7 +231,7 @@ export function CanvasBlock({ block }: { block: Block }) {
               <div
                 key={hdl.dir}
                 onPointerDown={(e) => startResize(e, hdl.dir)}
-                className="absolute z-30 bg-white border border-accent rounded-[2px]"
+                className="absolute z-30 bg-white border-[1.5px] border-accent rounded-[2px]"
                 style={hdl.style}
               />
             ))}
@@ -203,7 +241,29 @@ export function CanvasBlock({ block }: { block: Block }) {
   );
 }
 
-const HANDLE = 9;
+// 플로팅 액션 바의 준비 중(soon) 버튼 — 잠금/더보기
+function BarBtn({ title, soon, d, dots }: { title: string; soon?: boolean; d?: string; dots?: boolean }) {
+  return (
+    <button
+      title={title}
+      className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center ${soon ? "text-inkfaint/70 cursor-default" : "text-inksoft hover:bg-paper"}`}
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        {dots ? (
+          <>
+            <circle cx="2" cy="7" r="1.3" fill="currentColor" />
+            <circle cx="7" cy="7" r="1.3" fill="currentColor" />
+            <circle cx="12" cy="7" r="1.3" fill="currentColor" />
+          </>
+        ) : (
+          <path d={d} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        )}
+      </svg>
+    </button>
+  );
+}
+
+const HANDLE = 8;
 const off = -HANDLE / 2;
 const RESIZE_HANDLES: { dir: string; style: React.CSSProperties }[] = [
   { dir: "nw", style: { top: off, left: off, width: HANDLE, height: HANDLE, cursor: "nwse-resize" } },
