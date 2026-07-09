@@ -263,6 +263,58 @@ function PaddingSection({ block }: { block: Block }) {
   );
 }
 
+// 온/오프 스위치 (시안 토큰 — 켜짐=accent)
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className={`relative w-[38px] h-[22px] rounded-full transition-colors shrink-0 ${on ? "bg-accent" : "bg-linestrong"}`}
+    >
+      <span
+        className={`absolute top-[3px] w-4 h-4 rounded-full bg-white transition-transform ${on ? "translate-x-[19px]" : "translate-x-[3px]"}`}
+        style={{ boxShadow: "0 1px 2px rgba(16,24,40,.2)" }}
+      />
+    </button>
+  );
+}
+
+// 안내문(폼 placeholder) — 토글 + 안내문 입력칸. 켤 때 본문에 글자가 있으면 그걸 안내문으로
+// 옮기고 본문을 비운다(템플릿 "[…입력하세요]"가 자연스럽게 placeholder로 전환).
+function HintSection({ block }: { block: Block }) {
+  const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const on = !!block.hintOn;
+  const toggle = (next: boolean) => {
+    if (next && !block.hint && (block.text ?? "").trim())
+      updateBlock(block.id, { hintOn: true, hint: block.text, text: "", runs: undefined });
+    else updateBlock(block.id, { hintOn: next });
+  };
+  return (
+    <Section label="안내문">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] text-inksoft">채우기 안내문 (placeholder)</span>
+        <Toggle on={on} onChange={toggle} />
+      </div>
+      {on && (
+        <>
+          <textarea
+            value={block.hint ?? ""}
+            onChange={(e) => updateBlock(block.id, { hint: e.target.value })}
+            rows={2}
+            placeholder="예: [문서 제목을 입력하세요]"
+            className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accentline transition-colors resize-none leading-relaxed bg-surface"
+          />
+          <p className="text-[11px] text-inkfaint leading-relaxed">
+            비어있을 때 회색으로 표시되고, 지면에서 실제 글자를 입력하면 사라집니다. 내보내기(HWPX)엔 포함되지 않아요.
+          </p>
+        </>
+      )}
+    </Section>
+  );
+}
+
 // 표 크기 "R×C" — 스냅샷 셀 배열에서
 function tableDims(block: Block): string {
   const d = block.data as TableKingData | undefined;
@@ -351,18 +403,8 @@ export function RightPanel() {
           </div>
 
           <div className="px-4">
-            {/* 내용 (텍스트) */}
-            {block.type === "text" && (
-              <Section label="내용">
-                <textarea
-                  value={block.text ?? ""}
-                  onChange={(e) => updateBlock(block.id, { text: e.target.value })}
-                  rows={2}
-                  placeholder="더블클릭으로 지면에서 바로 편집할 수도 있어요"
-                  className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accentline transition-colors resize-none leading-relaxed bg-surface"
-                />
-              </Section>
-            )}
+            {/* 안내문 (폼 placeholder) — 비어있을 때 회색 안내문, 입력하면 사라짐. 내보내기 제외. */}
+            {block.type === "text" && <HintSection block={block} />}
 
             {/* 글자 서식 (텍스트) */}
             {block.type === "text" && (

@@ -18,6 +18,118 @@ export interface TableKingData {
 
 export type TextAlign = "left" | "center" | "right";
 
+// 인라인 리치 텍스트 — 한 텍스트 블록 안의 "런"(같은 서식이 연속되는 글자 구간).
+// 런이 없으면(runs 미지정) 블록 전체가 균일 서식(기존 동작 100% 보존). 런이 있으면
+// 그게 진실이고, block.text는 런 텍스트를 이어붙인 평문 미러다(토큰 칩·사이저·미리보기·
+// 병합이 계속 block.text를 읽으므로 항상 동기 유지). 런이 지정하지 않은 속성은 블록
+// 기본값을 상속한다(예: run.color 없으면 block.color). 줄바꿈은 run.text 안의 "\n".
+export interface TextRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  color?: string; // hex
+  fontSize?: number; // pt — 없으면 블록 크기 상속
+  font?: string; // 폰트 레지스트리 key — 없으면 블록 글꼴 상속
+}
+
+// 런의 서식이 동일한가 (텍스트는 무시) — normalizeRuns가 인접 런 병합 판정에 쓴다.
+// ⚠ bold/italic은 3-상태다: undefined=블록 상속, true=강제 굵게, false=강제 보통.
+// 블록이 굵을 때 일부만 보통으로(false) 만드는 게 의미 있으므로 false≠undefined로 구분한다
+// (둘을 같게 보면 병합돼 서식이 블록 전체로 번진다).
+export function runStyleEq(a: TextRun, b: TextRun): boolean {
+  return (
+    (a.bold ?? null) === (b.bold ?? null) &&
+    (a.italic ?? null) === (b.italic ?? null) &&
+    (a.color ?? null) === (b.color ?? null) &&
+    (a.fontSize ?? null) === (b.fontSize ?? null) &&
+    (a.font ?? null) === (b.font ?? null)
+  );
+}
+
+// 빈 런 제거 + 인접 동일서식 런 병합 (편집 후 항상 정규형 유지). 전부 비면 [{text:""}].
+export function normalizeRuns(runs: TextRun[]): TextRun[] {
+  const out: TextRun[] = [];
+  for (const r of runs) {
+    if (r.text === "") continue;
+    const last = out[out.length - 1];
+    if (last && runStyleEq(last, r)) last.text += r.text;
+    else out.push({ ...r });
+  }
+  return out.length ? out : [{ text: "" }];
+}
+
+// 블록의 런 목록 (없으면 블록 전체를 하나의 무서식 런으로 — 블록 기본값 상속)
+export function blockRuns(block: Block): TextRun[] {
+  return block.runs?.length ? block.runs : [{ text: block.text ?? "" }];
+}
+
+export const runsToText = (runs: TextRun[]): string => runs.map((r) => r.text).join("");
+
+// 블록에 실제 내용이 없는가 (안내문 표시 판정용) — 공백뿐이면 비었다고 본다
+export const blockIsEmpty = (block: Block): boolean => !(block.text ?? "").trim();
+
+// 지금 안내문(placeholder)을 보여줘야 하는가 — 토글 켜짐 + 안내문 있음 + 본문 비었음
+export const showingHint = (block: Block): boolean =>
+  !!block.hintOn && !!block.hint && blockIsEmpty(block);
+
+// 오프셋(평문 문자 위치)에 런 경계가 생기도록 분할 — 걸친 런을 두 조각으로 쪼갠다
+function splitRunsAt(runs: TextRun[], offset: number): TextRun[] {
+  const out: TextRun[] = [];
+  let pos = 0;
+  for (const r of runs) {
+    const len = r.text.length;
+    if (offset > pos && offset < pos + len) {
+      const cut = offset - pos;
+      out.push({ ...r, text: r.text.slice(0, cut) });
+      out.push({ ...r, text: r.text.slice(cut) });
+    } else {
+      out.push({ ...r });
+    }
+    pos += len;
+  }
+  return out;
+}
+
+// [start,end) 구간의 런에만 서식 패치 적용 (값이 undefined면 그 속성 제거 = 블록 상속으로).
+// 경계에서 런을 쪼갠 뒤 완전히 구간 안에 든 런만 패치하고 정규화한다.
+export function applyRunStyle(
+  runs: TextRun[],
+  start: number,
+  end: number,
+  patch: Partial<Omit<TextRun, "text">>
+): TextRun[] {
+  if (start >= end) return runs;
+  const split = splitRunsAt(splitRunsAt(runs, start), end);
+  let pos = 0;
+  const next = split.map((r) => {
+    const rEnd = pos + r.text.length;
+    const within = pos >= start && rEnd <= end;
+    pos = rEnd;
+    if (!within) return r;
+    const merged = { ...r } as Record<string, unknown>;
+    for (const k of Object.keys(patch)) {
+      const v = (patch as Record<string, unknown>)[k];
+      if (v === undefined || v === null) delete merged[k];
+      else merged[k] = v;
+    }
+    return merged as unknown as TextRun;
+  });
+  return normalizeRuns(next);
+}
+
+// [start,end) 구간에 실제로 걸린 런들 (선택 서식바의 활성 상태 판정용)
+export function rangeRuns(runs: TextRun[], start: number, end: number): TextRun[] {
+  const split = splitRunsAt(splitRunsAt(runs, start), end);
+  const out: TextRun[] = [];
+  let pos = 0;
+  for (const r of split) {
+    const rEnd = pos + r.text.length;
+    if (pos >= start && rEnd <= end && r.text.length) out.push(r);
+    pos = rEnd;
+  }
+  return out;
+}
+
 export interface Block {
   id: string;
   type: BlockType;
@@ -39,7 +151,13 @@ export interface Block {
   y: number; // mm
   w: number; // mm
   h: number; // mm
-  text?: string; // text 블록
+  text?: string; // text 블록 — runs가 있으면 그 평문 미러(항상 동기)
+  // 인라인 리치 텍스트 런 — 있으면 진실(블록 균일서식 대신 구간별 서식). 없으면 균일.
+  runs?: TextRun[];
+  // 안내문(폼 placeholder) — 블록이 비어있고 hintOn이면 지면에 회색으로 표시,
+  // 실제 글자를 입력하면 사라진다. 내보내기(HWPX)엔 절대 안 나감(별도 필드라 본문과 무관).
+  hint?: string; // 안내문 텍스트 (토글 꺼도 보존 — 다시 켜면 재사용)
+  hintOn?: boolean; // 안내문 켜기/끄기 토글
   // 본문(흐름) 플래그 — true면 hwpx로 나갈 때 절대배치 개체가 아니라 "진짜 문단"으로
   // 내보낸다: 한글에서 커서가 흐르고, 이어 쓰면 밀리고, 길면 페이지를 넘는다.
   flow?: boolean;

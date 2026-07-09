@@ -13,12 +13,15 @@ import {
   type BlockType,
   type CanvasDoc,
   type TableKingData,
+  type TextRun,
   createBlock,
   createDoc,
   descendantIds,
   groupMemberIds,
   isSelfOrDescendant,
   moveSetIds,
+  normalizeRuns,
+  runsToText,
 } from "../document/model";
 // 표는 기존 앱에서 검증된 table-king 엔진을 그대로 이관해 쓴다 (Strangler Fig 기능 이관)
 import { makeTableKingData } from "../../table-king/TableKingBlock.jsx";
@@ -60,6 +63,7 @@ interface CanvasState {
   moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동 (자손·그룹 동반)
   nudgeMany: (ids: string[], dx: number, dy: number) => void; // 여러 블록 델타 이동
   updateBlock: (id: string, patch: Partial<Block>) => void;
+  setRichText: (id: string, runs: TextRun[]) => void; // 인라인 리치 텍스트 갱신 (text 미러 동기)
   setTableData: (id: string, data: TableKingData) => void; // 표 스냅샷 교체 + w/h 동기화
   setCell: (id: string, r: number, c: number, text: string) => void; // 표 셀 하나 수정 (구형 rows용)
   setParent: (id: string, parentId: string | null) => void; // 트리 연결/해제 (순환 방지)
@@ -263,6 +267,31 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       const derivedOnly = keys.every((k) => k === "h" || k === "collapsed");
       return {
         ...(derivedOnly ? {} : record(s, `upd:${id}:${keys.join(",")}`)),
+        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) },
+      };
+    }),
+
+  // 인라인 리치 텍스트 — 런 배열을 정규화해 저장하고 text 평문 미러를 동기화한다.
+  // 서식이 하나도 없는 단일 런이면 runs를 비워(undefined) 균일 텍스트로 되돌린다
+  // → 저장/내보내기가 기존 단순 경로를 타고, 옛 문서와도 동일하게 남는다.
+  setRichText: (id, runs) =>
+    set((s) => {
+      const norm = normalizeRuns(runs);
+      const text = runsToText(norm);
+      // 서식 키가 하나도 없는(전부 undefined) 단일 런 = 균일 텍스트로 되돌린다.
+      // bold:false 등 명시값이 있으면 리치로 유지 (블록 기본을 덮는 의미가 있으므로).
+      const r0 = norm[0];
+      const plain =
+        norm.length <= 1 &&
+        !!r0 &&
+        r0.bold === undefined &&
+        r0.italic === undefined &&
+        r0.color === undefined &&
+        r0.fontSize === undefined &&
+        r0.font === undefined;
+      const patch: Partial<Block> = plain ? { text, runs: undefined } : { text, runs: norm };
+      return {
+        ...record(s, `rich:${id}`),
         doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) },
       };
     }),

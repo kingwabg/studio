@@ -5,7 +5,7 @@
 // 병합(다중 레코드)을 위해 문서 배열을 페이지별로 싣는 변형도 제공한다.
 import { buildHwpx } from "../../hwpx/exportCore.js";
 import { tableDataToRows } from "../../table-king/TableKingBlock.jsx";
-import { type Block, type CanvasDoc, type TableKingData, TEXT_DEFAULTS, padOf } from "./model";
+import { type Block, type CanvasDoc, type TableKingData, type TextRun, TEXT_DEFAULTS, padOf } from "./model";
 import { DEFAULT_FONT, fontByKey } from "./fonts";
 import { SCALE } from "../canvas/geometry";
 
@@ -22,21 +22,50 @@ function effectiveFont(): string {
   return fontByKey(DEFAULT_FONT).hwpxName;
 }
 
+// 인라인 리치 텍스트 런 → 내보내기 세그먼트 줄 배열. 각 세그먼트 스타일은 블록 기본
+// 스타일(base) 위에 런이 지정한 속성만 덮어쓴다(화면 runCssObj와 같은 상속 규칙).
+// 줄바꿈(\n)은 새 줄로 쪼갠다 → 한 줄 = 세그먼트 배열, 각 세그먼트 = {text, style}.
+function richLinesOf(runs: TextRun[], base: ReturnType<typeof baseStyle>) {
+  const lines: { text: string; style: typeof base }[][] = [[]];
+  for (const run of runs) {
+    const style = {
+      ...base,
+      pt: run.fontSize ?? base.pt,
+      bold: run.bold ?? base.bold,
+      italic: run.italic ?? base.italic,
+      color: run.color ?? base.color,
+      font: run.font ? fontByKey(run.font).hwpxName : base.font,
+    };
+    const parts = run.text.split("\n");
+    parts.forEach((part, i) => {
+      if (i > 0) lines.push([]);
+      if (part) lines[lines.length - 1].push({ text: part, style });
+    });
+  }
+  return lines;
+}
+
+function baseStyle(b: Block) {
+  return {
+    pt: b.fontSize ?? TEXT_DEFAULTS.fontSize,
+    bold: b.bold ?? TEXT_DEFAULTS.bold,
+    italic: b.italic ?? TEXT_DEFAULTS.italic,
+    align: b.align ?? TEXT_DEFAULTS.align,
+    color: b.color ?? TEXT_DEFAULTS.color,
+    lineSpacing: LINE_SPACING,
+    // 요소별 글꼴 — 레지스트리 hwpxName을 charPr fontRef로 선언 (없으면 문서 기본)
+    font: b.font ? fontByKey(b.font).hwpxName : undefined,
+    // 모양 배경색 — 채우기 있으면 셀 채우기로 (없으면 무배경)
+    backgroundColor: b.fill || undefined,
+  };
+}
+
 function elementOf(b: Block, page: number) {
   if (b.type === "text") {
     const pad = padOf(b); // 요소별 안쪽 여백(mm) — 화면 CSS 패딩과 같은 값
-    const style = {
-      pt: b.fontSize ?? TEXT_DEFAULTS.fontSize,
-      bold: b.bold ?? TEXT_DEFAULTS.bold,
-      italic: b.italic ?? TEXT_DEFAULTS.italic,
-      align: b.align ?? TEXT_DEFAULTS.align,
-      color: b.color ?? TEXT_DEFAULTS.color,
-      lineSpacing: LINE_SPACING,
-      // 요소별 글꼴 — 레지스트리 hwpxName을 charPr fontRef로 선언 (없으면 문서 기본)
-      font: b.font ? fontByKey(b.font).hwpxName : undefined,
-      // 모양 배경색 — 채우기 있으면 셀 채우기로 (없으면 무배경)
-      backgroundColor: b.fill || undefined,
-    };
+    const style = baseStyle(b);
+    // 런이 있으면 구간별 서식을 richLines로 (없으면 균일 — 기존 단순 경로 그대로)
+    const richLines = b.runs?.length ? richLinesOf(b.runs, style) : undefined;
     // flow(본문)는 절대배치 개체가 아니라 진짜 문단으로 — 한글에서 이어 쓸 수 있고
     // 길면 페이지를 넘는다. 좌표는 화면의 "글 시작점"(패딩 안쪽)으로 보정해
     // 접히는 폭이 캔버스와 같아지게 한다.
@@ -50,6 +79,7 @@ function elementOf(b: Block, page: number) {
         h: b.h,
         text: b.text ?? "",
         style,
+        richLines,
       };
     return {
       type: "text",
@@ -60,6 +90,7 @@ function elementOf(b: Block, page: number) {
       h: b.h,
       text: b.text ?? "",
       style,
+      richLines,
       // 상자 안쪽 여백을 화면 패딩과 일치 (HWPUNIT) — 접히는 폭 정합
       cellMarginU: {
         lr: Math.round(pad.x * HWPUNIT_PER_MM),

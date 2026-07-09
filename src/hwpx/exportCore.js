@@ -39,6 +39,22 @@ const paras = (text, charRef = "0", paraRef = "0") =>
     )
     .join("");
 
+// 인라인 리치 텍스트 — 한 문단(줄) 안에 런마다 <hp:run>. lines = [[{text, charRef}]]
+// (charRef는 refsAt이 세그먼트 스타일마다 미리 발급). 빈 줄도 문단 하나로 유지한다.
+const richParasFromRefs = (lines, paraRef = "0") =>
+  lines
+    .map(
+      (segs) =>
+        `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0">` +
+        (segs.length
+          ? segs
+              .map((s) => `<hp:run charPrIDRef="${s.charRef}"><hp:t>${esc(s.text)}</hp:t></hp:run>`)
+              .join("")
+          : `<hp:run charPrIDRef="0"><hp:t></hp:t></hp:run>`) +
+        `</hp:p>`
+    )
+    .join("");
+
 // ═════════════════ 스타일 레지스트리 ═════════════════
 // 화면에서 실측한 스타일(크기·굵기·기울임·색·정렬·줄간격·셀 배경·글꼴)을
 // hwpx의 charPr/paraPr/borderFill 항목으로 바꿔 id를 발급한다. 같은 스타일은
@@ -208,7 +224,9 @@ const cellXml = (text, r, c, wU, hU, borderFill, colSpan = 1, rowSpan = 1, refs 
   `<hp:tc name="" header="0" hasMargin="0" protect="0" editable="1" dirty="0" borderFillIDRef="${refs.fill ?? borderFill}">` +
   `<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="${refs.vertAlign ?? "CENTER"}" ` +
   `linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">` +
-  paras(text, refs.charRef ?? "0", refs.paraRef ?? "0") +
+  (refs.richRefs
+    ? richParasFromRefs(refs.richRefs, refs.paraRef ?? "0")
+    : paras(text, refs.charRef ?? "0", refs.paraRef ?? "0")) +
   `</hp:subList>` +
   `<hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="${colSpan}" rowSpan="${rowSpan}"/>` +
   `<hp:cellSz width="${wU}" height="${hU}"/>` +
@@ -234,14 +252,21 @@ function tableXml(el, reg, borderFill = "2") {
   // 셀 스타일 → 레지스트리 참조. cellStyles가 없으면(구형 캔버스) 전부 기본값.
   const cm = el.cellMarginU; // 셀 안쪽 여백 오버라이드 (텍스트 상자 정합용)
   const refsAt = (r, c) => {
+    // 인라인 리치 텍스트: 세그먼트 스타일마다 charPr 발급 (줄 안에 여러 런)
+    const rich = grid.cellRich?.[r]?.[c];
+    const richRefs =
+      rich && reg
+        ? rich.map((line) => line.map((seg) => ({ text: seg.text, charRef: reg.charId(seg.style) })))
+        : undefined;
     const s = cellStyles?.[r]?.[c];
-    if (!s || !reg) return { cm };
+    if (!s || !reg) return { cm, richRefs };
     return {
       charRef: reg.charId(s),
       paraRef: reg.paraId({ align: s.hAlign ?? "center", lineSpacing: s.lineSpacing }),
       vertAlign: V_ALIGN[s.vAlign] ?? "CENTER",
       fill: s.backgroundColor ? reg.fillId(s.backgroundColor) : undefined,
       cm,
+      richRefs,
     };
   };
 
@@ -291,6 +316,8 @@ function gridFromRows(el) {
 const textXml = (el, reg) => {
   const grid = gridFromRows({ ...el, rows: [[el.text]] });
   if (el.style) grid.cellStyles = [[{ ...el.style, hAlign: el.style.align, vAlign: "center" }]];
+  // 인라인 리치 텍스트: 런 세그먼트 줄을 1×1 셀에 실어 richParas로 내보낸다
+  if (el.richLines) grid.cellRich = [[el.richLines]];
   return tableXml({ ...el, grid }, reg, "1");
 };
 
@@ -350,11 +377,15 @@ function buildSection(refSectionXml, canvas, reg) {
     const HOST_LINE_MM = 6;
     let cursorY = HOST_LINE_MM; // 흐름 커서 추정치(mm) — 다음 본문 블록과의 간격 계산용
     for (const f of flows) {
-      const charRef = reg.charId(f.style);
       const gap = Math.max(0, (f.y ?? 0) - cursorY);
-      const lines = String(f.text ?? "").split("\n");
-      const paraXml = lines
-        .map((line, i) => {
+      // 리치 텍스트면 세그먼트 줄(각 줄 = [{text, style}]), 아니면 균일 텍스트를 줄 단위로.
+      const richLines =
+        f.richLines ??
+        String(f.text ?? "")
+          .split("\n")
+          .map((line) => (line ? [{ text: line, style: f.style }] : []));
+      const paraXml = richLines
+        .map((segs, i) => {
           const paraRef = reg.paraId({
             align: f.style?.align ?? "left",
             lineSpacing: f.style?.lineSpacing ?? 160,
@@ -362,7 +393,12 @@ function buildSection(refSectionXml, canvas, reg) {
             marginRightMm: Math.max(0, pageW - (f.x ?? 0) - (f.w ?? pageW)),
             marginPrevMm: i === 0 ? gap : 0,
           });
-          return `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0"><hp:run charPrIDRef="${charRef}"><hp:t>${esc(line)}</hp:t></hp:run></hp:p>`;
+          const runsXml = segs.length
+            ? segs
+                .map((s) => `<hp:run charPrIDRef="${reg.charId(s.style)}"><hp:t>${esc(s.text)}</hp:t></hp:run>`)
+                .join("")
+            : `<hp:run charPrIDRef="${reg.charId(f.style)}"><hp:t></hp:t></hp:run>`;
+          return `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0">${runsXml}</hp:p>`;
         })
         .join("");
       hosts.push(paraXml);

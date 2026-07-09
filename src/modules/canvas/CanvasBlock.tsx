@@ -14,10 +14,23 @@ import {
   type MouseEvent as RMouseEvent,
   type PointerEvent as RPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { type Block, type TableKingData, TEXT_DEFAULTS, padOf } from "../document/model";
-import { ensureFont, fontByKey, fontCss, useFontStore } from "../document/fonts";
+import {
+  type Block,
+  type TableKingData,
+  type TextRun,
+  TEXT_DEFAULTS,
+  padOf,
+  blockRuns,
+  applyRunStyle,
+  rangeRuns,
+  normalizeRuns,
+  runsToText,
+  showingHint,
+} from "../document/model";
+import { CATEGORY_LABEL, FONTS, ensureFont, fontByKey, fontCss, useFontStore } from "../document/fonts";
 import { SCALE, mmToPx, pxToMm } from "./geometry";
 import { useCanvasStore } from "./store";
 import { useFollowStore } from "./snap";
@@ -70,10 +83,12 @@ export function CanvasBlock({ block }: { block: Block }) {
   }, [autoEdit, clearAutoEdit]);
 
   // 편집 종료 — 내용이 비면(공백뿐이면) 블록을 지운다. 더블클릭 오발/빈 텍스트 정리.
+  // 단, 안내문(placeholder)이 켜진 블록은 "비어있는 게 정상"이므로 지우지 않는다.
   const finishEditing = () => {
     setEditing(false);
     const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
-    if (cur && cur.type === "text" && !(cur.text ?? "").trim()) removeBlock(block.id);
+    if (cur && cur.type === "text" && !(cur.text ?? "").trim() && !(cur.hintOn && cur.hint))
+      removeBlock(block.id);
   };
   // 라벨 칩 표기 (시안 1b) — 표는 R×C
   const typeLabel =
@@ -332,6 +347,48 @@ function textStyle(block: Block): React.CSSProperties {
 }
 const ptToPx = (pt: number) => `${pt * (96 / 72)}px`;
 
+// 런(run) 하나의 화면 스타일 — 블록 기본값 위에 런이 지정한 속성만 덮어쓴다.
+// 굵기·기울임·색은 항상 명시(런 없으면 블록값), 크기·글꼴은 런이 지정할 때만 덮어써
+// 나머지는 컨테이너(textStyle) 상속을 그대로 받게 한다 → 전각 보정·크기 정합 유지.
+function runCssObj(block: Block, run: TextRun): React.CSSProperties {
+  return {
+    fontWeight: (run.bold ?? block.bold ?? TEXT_DEFAULTS.bold) ? 700 : 400,
+    fontStyle: (run.italic ?? block.italic ?? TEXT_DEFAULTS.italic) ? "italic" : "normal",
+    color: run.color ?? block.color ?? TEXT_DEFAULTS.color,
+    ...(run.fontSize != null ? { fontSize: ptToPx(run.fontSize) } : {}),
+    ...(run.font ? fontCss(run.font) : {}),
+  };
+}
+
+// 읽기 모드: 런을 스타일 span으로, 각 span 안에서 {{토큰}}은 칩으로 렌더
+function RichRead({ block }: { block: Block }) {
+  const runs = blockRuns(block);
+  return (
+    <>
+      {runs.map((run, i) => (
+        <span key={i} style={runCssObj(block, run)}>
+          <TokenText text={run.text} />
+        </span>
+      ))}
+    </>
+  );
+}
+
+// 폭 측정용(auto-width): 런을 스타일 span으로, 토큰화 없이 평문 — 가장 긴 줄의 자연 폭.
+// 런별 크기가 다르면 폭도 달라지므로 여기서도 런 스타일을 반영해야 정확하다.
+function RichPlain({ block }: { block: Block }) {
+  const runs = blockRuns(block);
+  return (
+    <>
+      {runs.map((run, i) => (
+        <span key={i} style={runCssObj(block, run)}>
+          {run.text || " "}
+        </span>
+      ))}
+    </>
+  );
+}
+
 // {{토큰}}을 칩으로, 미리보기 중이면 실제 값(강조)으로 렌더
 function TokenText({ text }: { text: string }) {
   const dataset = useMergeStore((s) => s.dataset);
@@ -364,6 +421,166 @@ function TokenText({ text }: { text: string }) {
   );
 }
 
+// ═════════════════ 인라인 리치 텍스트: contentEditable 직렬화 ═════════════════
+// 편집 표면은 contentEditable(런=span). 진실은 스토어의 runs다. 타이핑 중에는 DOM을
+// 다시 그리지 않고(한글 IME·커서 보존), input에서 DOM→runs로 읽어 스토어에 반영한다.
+// 서식 적용(선택 구간)만 DOM을 다시 그리고 오프셋으로 커서를 복원한다.
+
+// 런 → span 엘리먼트. dataset이 직렬화의 진실(readRunStyle이 이것만 읽는다).
+// inline style은 보이기용 — 브라우저가 span을 쪼개도 dataset이 함께 복제돼 서식이 산다.
+function runToSpanEl(block: Block, run: TextRun): HTMLSpanElement {
+  const span = document.createElement("span");
+  // bold/italic은 3-상태 — 명시값(true/false)만 dataset에 기록(undefined=상속은 미기록).
+  if (run.bold !== undefined) span.dataset.b = run.bold ? "1" : "0";
+  if (run.italic !== undefined) span.dataset.i = run.italic ? "1" : "0";
+  if (run.color) span.dataset.color = run.color;
+  if (run.fontSize != null) span.dataset.size = String(run.fontSize);
+  if (run.font) span.dataset.font = run.font;
+  Object.assign(span.style, runCssObj(block, run) as Record<string, string>);
+  span.textContent = run.text;
+  return span;
+}
+
+// contentEditable을 현재 런으로 채운다 (편집 진입·서식 적용 시). 빈 텍스트면 비운다.
+function seedEditable(el: HTMLElement, block: Block, runs: TextRun[]) {
+  if (runs.length <= 1 && !(runs[0]?.text ?? "")) {
+    el.replaceChildren();
+    return;
+  }
+  el.replaceChildren(...runs.map((r) => runToSpanEl(block, r)));
+}
+
+function readRunStyle(el: HTMLElement): Partial<TextRun> {
+  const d = el.dataset;
+  const st: Partial<TextRun> = {};
+  if (d.b !== undefined) st.bold = d.b === "1"; // "0"=강제 보통도 보존
+  if (d.i !== undefined) st.italic = d.i === "1";
+  if (d.color) st.color = d.color;
+  if (d.size) st.fontSize = Number(d.size);
+  if (d.font) st.font = d.font;
+  return st;
+}
+
+// DOM(편집 중 자유 변형된 상태) → 정규화된 런 배열. 줄바꿈은 \n 텍스트·BR·블록경계 모두 흡수.
+function domToRuns(root: HTMLElement): TextRun[] {
+  const runs: TextRun[] = [];
+  const push = (text: string, style: Partial<TextRun>) => {
+    if (text) runs.push({ text, ...style });
+  };
+  const walk = (node: Node, style: Partial<TextRun>) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        push((child as Text).data, style);
+      } else if (child.nodeName === "BR") {
+        push("\n", style);
+      } else if (child instanceof HTMLElement) {
+        const isBlock = /^(DIV|P)$/.test(child.nodeName);
+        // 엔터로 생긴 블록 요소 앞에는 줄바꿈 (이미 \n로 끝났으면 생략 — 중복 방지)
+        if (isBlock && runs.length && !runsToText(runs).endsWith("\n")) push("\n", style);
+        walk(child, { ...style, ...readRunStyle(child) });
+      }
+    });
+  };
+  walk(root, {});
+  return normalizeRuns(runs);
+}
+
+// 선택 지점(node,offset)의 root 기준 평문 오프셋 — BR은 1글자, 텍스트는 그 길이로 계산
+function textOffsetOf(root: HTMLElement, node: Node, offset: number): number {
+  let count = 0;
+  let done = false;
+  const walk = (n: Node): void => {
+    if (done) return;
+    if (n === node) {
+      if (n.nodeType === Node.TEXT_NODE) count += offset;
+      else for (let i = 0; i < offset; i++) count += (n.childNodes[i]?.textContent?.length ?? 0);
+      done = true;
+      return;
+    }
+    if (n.nodeType === Node.TEXT_NODE) {
+      count += (n as Text).data.length;
+    } else if (n.nodeName === "BR") {
+      count += 1;
+    } else {
+      n.childNodes.forEach(walk);
+    }
+  };
+  walk(root);
+  return count;
+}
+
+// 현재 선택의 [start,end] 오프셋 (root 안이고 접혀있지 않을 때만)
+function selectionOffsets(root: HTMLElement): [number, number] | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
+  const a = textOffsetOf(root, range.startContainer, range.startOffset);
+  const b = textOffsetOf(root, range.endContainer, range.endOffset);
+  return a <= b ? [a, b] : [b, a];
+}
+
+// 평문 오프셋 → DOM 위치 (커서 복원용)
+function locateOffset(root: HTMLElement, target: number): { node: Node; offset: number } {
+  let count = 0;
+  let result: { node: Node; offset: number } | null = null;
+  const walk = (n: Node): void => {
+    if (result) return;
+    if (n.nodeType === Node.TEXT_NODE) {
+      const len = (n as Text).data.length;
+      if (target <= count + len) {
+        result = { node: n, offset: target - count };
+        return;
+      }
+      count += len;
+    } else if (n.nodeName === "BR") {
+      count += 1;
+    } else {
+      n.childNodes.forEach(walk);
+    }
+  };
+  walk(root);
+  return result ?? { node: root, offset: root.childNodes.length };
+}
+
+function setSelectionRange(root: HTMLElement, start: number, end: number) {
+  const s = locateOffset(root, start);
+  const e = locateOffset(root, end);
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  range.setStart(s.node, s.offset);
+  range.setEnd(e.node, e.offset);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function placeCaretEnd(root: HTMLElement) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// 캐럿 자리에 평문 삽입 (엔터=\n·붙여넣기 정규화용) — pre-wrap이라 \n이 줄바꿈으로 보인다
+function insertTextAtCaret(text: string) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const tn = document.createTextNode(text);
+  range.insertNode(tn);
+  range.setStartAfter(tn);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+type InlineSel = { rect: DOMRect; bold: boolean; italic: boolean; color?: string; fontSize?: number; font?: string };
+
 function TextContent({
   block,
   editing,
@@ -374,35 +591,118 @@ function TextContent({
   onDoneEditing: () => void;
 }) {
   const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const setRichText = useCanvasStore((s) => s.setRichText);
   const pageW = useCanvasStore((s) => s.doc.page.w);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  const sizerRef = useRef<HTMLDivElement>(null);
-  const wSizerRef = useRef<HTMLDivElement>(null);
-  // 안쪽 여백(mm→px) — 화면 CSS 패딩. 내보내기 cellMargin과 같은 값이라 줄바꿈 정합.
+  const editRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const composingRef = useRef(false);
+  // 마지막 유효 선택 오프셋 — 서식바(폰트 드롭다운 등)로 포커스가 옮겨가 선택이 사라져도
+  // 이 값으로 구간을 되찾아 서식을 적용한다.
+  const selRef = useRef<[number, number] | null>(null);
+  const [sel, setSel] = useState<InlineSel | null>(null);
   const pad = padOf(block);
   const padXpx = mmToPx(pad.x);
   const padYpx = mmToPx(pad.y);
   const padStyle = { paddingLeft: padXpx, paddingRight: padXpx, paddingTop: padYpx, paddingBottom: padYpx };
-  useEffect(() => {
-    if (editing) taRef.current?.focus();
-  }, [editing]);
 
-  // 폰트 준비(지연 로딩 + 전각 캘리브레이션) — 완료 시 spacing 구독으로 리렌더되어
-  // letter-spacing이 실측값으로 정밀화된다 (auto-height 사이저도 함께 갱신).
   const fontKey = fontByKey(block.font).key;
   useFontStore((s) => s.spacing[fontKey]); // 캘리브레이션 완료 리렌더 트리거
   useEffect(() => {
     void ensureFont(fontKey);
   }, [fontKey]);
 
-  // auto-height: 내용의 자연 높이(사이저)를 관찰해 block.h(mm)로 동기화.
-  // "한글에서 열었더니 마지막 줄이 잘림"을 원천 차단 — 내보내는 상자가 항상 내용을 담는다.
-  // 사이저 높이는 block.h와 무관(자연 높이)하므로 되먹임 루프가 없다.
+  // 편집 중 높이 동기화 — contentEditable 자연 높이(패딩 포함)를 block.h로
+  const syncEditH = () => {
+    const el = editRef.current;
+    if (!el) return;
+    const needMm = Math.max(8, Math.ceil(el.offsetHeight / SCALE) + 1);
+    const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
+    if (cur && Math.abs((cur.h ?? 0) - needMm) >= 1) updateBlock(block.id, { h: needMm });
+  };
+
+  // 편집 진입 — 현재 런으로 contentEditable을 채우고 커서를 끝에 둔다 (1회, editing 토글에만)
   useEffect(() => {
+    if (!editing) {
+      setSel(null);
+      selRef.current = null;
+      return;
+    }
+    const el = editRef.current;
+    if (!el) return;
+    seedEditable(el, block, blockRuns(block));
+    el.focus();
+    placeCaretEnd(el);
+    syncEditH();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  // 편집 중 선택 변화 → 서식바 위치·활성 상태 갱신 (구간 선택일 때만 표시)
+  useEffect(() => {
+    if (!editing) return;
+    const onSelChange = () => {
+      const el = editRef.current;
+      if (!el) return;
+      // 서식바 컨트롤에 포커스가 있으면(폰트 드롭다운 등) 유지 — 선택이 사라져도 숨기지 않음
+      if (toolbarRef.current?.contains(document.activeElement)) return;
+      const offs = selectionOffsets(el);
+      if (!offs || offs[0] === offs[1]) {
+        setSel(null);
+        return;
+      }
+      selRef.current = offs;
+      const range = window.getSelection()!.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const rr = rangeRuns(domToRuns(el), offs[0], offs[1]);
+      const all = (pred: (r: TextRun) => boolean) => rr.length > 0 && rr.every(pred);
+      const same = <T,>(get: (r: TextRun) => T): T | undefined => {
+        if (!rr.length) return undefined;
+        const first = get(rr[0]);
+        return rr.every((r) => get(r) === first) ? first : undefined;
+      };
+      setSel({
+        rect,
+        bold: all((r) => (r.bold ?? block.bold ?? false) === true),
+        italic: all((r) => (r.italic ?? block.italic ?? false) === true),
+        color: same((r) => r.color ?? block.color ?? TEXT_DEFAULTS.color),
+        fontSize: same((r) => r.fontSize ?? block.fontSize ?? TEXT_DEFAULTS.fontSize),
+        font: same((r) => r.font ?? block.font),
+      });
+    };
+    document.addEventListener("selectionchange", onSelChange);
+    return () => document.removeEventListener("selectionchange", onSelChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, block]);
+
+  // DOM→runs 반영 (타이핑·삭제·붙여넣기). IME 조합 중엔 건너뛰고 compositionend에서 처리.
+  const flushRuns = () => {
+    const el = editRef.current;
+    if (!el || composingRef.current) return;
+    setRichText(block.id, domToRuns(el));
+    syncEditH();
+  };
+
+  // 선택 구간에 서식 패치 적용 — DOM을 다시 그리고 커서를 복원한다
+  const applyStyle = (patch: Partial<Omit<TextRun, "text">>) => {
+    const el = editRef.current;
+    const offs = selRef.current;
+    if (!el || !offs || offs[0] === offs[1]) return;
+    const next = applyRunStyle(domToRuns(el), offs[0], offs[1], patch);
+    seedEditable(el, block, next);
+    setRichText(block.id, next);
+    el.focus();
+    setSelectionRange(el, offs[0], offs[1]);
+    syncEditH();
+  };
+
+  // auto-height (읽기 모드) — 내용 자연 높이를 관찰해 block.h로. 편집 중엔 syncEditH가 담당.
+  const sizerRef = useRef<HTMLDivElement>(null);
+  const wSizerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editing) return;
     const el = sizerRef.current;
     if (!el) return;
     const sync = () => {
-      const needMm = Math.max(8, Math.ceil((el.offsetHeight + padYpx * 2) / SCALE) + 1); // 내용 + 상하 패딩 + 여유 1mm
+      const needMm = Math.max(8, Math.ceil((el.offsetHeight + padYpx * 2) / SCALE) + 1);
       const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
       if (cur && Math.abs((cur.h ?? 0) - needMm) >= 1) updateBlock(block.id, { h: needMm });
     };
@@ -410,16 +710,11 @@ function TextContent({
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     return () => ro.disconnect();
-    // deps는 "시그니처 문자열" 하나로 고정 — RO가 놓치는 갱신(내용/폭/폰트 교체)에도
-    // 재실행되면서, 배열 길이가 항상 2라 HMR 중 deps 크기 변화 경고가 안 난다. sync는 멱등.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [block.id, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padY}`]);
+  }, [block.id, editing, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padY}|${(block.runs ?? []).length}|${block.hint}|${block.hintOn}`]);
 
-  // auto-width: 수동 조절(manualW) 전까지 박스 폭을 글자에 맞춘다(캔바식 Auto width).
-  // 숨긴 사이저(white-space:pre — 줄바꿈 없이 가장 긴 줄의 자연 폭)를 관찰해 block.w로.
-  // 지면 밖으로는 못 나가게 (page.w − x) 상한. manualW가 되면 이 효과는 멈춘다.
   useEffect(() => {
-    if (block.manualW) return;
+    if (editing || block.manualW) return;
     const el = wSizerRef.current;
     if (!el) return;
     const sync = () => {
@@ -432,7 +727,7 @@ function TextContent({
     ro.observe(el);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [block.id, block.manualW, block.x, pageW, `${block.text}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padX}`]);
+  }, [block.id, block.manualW, block.x, pageW, editing, `${block.text}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padX}|${(block.runs ?? []).length}|${block.hint}|${block.hintOn}`]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `textdrop:${block.id}`,
@@ -441,24 +736,69 @@ function TextContent({
 
   if (editing)
     return (
-      <textarea
-        ref={taRef}
-        value={block.text ?? ""}
-        onChange={(e) => {
-          updateBlock(block.id, { text: e.target.value });
-          // 타이핑 중 즉시 늘어나게 (정확한 동기화는 blur 후 사이저가 담당)
-          const ta = taRef.current;
-          if (ta && ta.scrollHeight > ta.clientHeight)
-            updateBlock(block.id, { h: Math.ceil((ta.scrollHeight + padYpx * 2) / SCALE) + 1 });
-        }}
-        onBlur={onDoneEditing}
-        onKeyDown={(e) => e.key === "Escape" && onDoneEditing()}
-        onPointerDown={(e) => e.stopPropagation()}
-        style={{ ...textStyle(block), ...padStyle, height: mmToPx(block.h) }}
-        className="w-full leading-snug bg-white outline-none resize-none border-0"
-      />
+      <>
+        <div
+          ref={editRef}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          onInput={flushRuns}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            composingRef.current = false;
+            flushRuns();
+          }}
+          onPaste={(e) => {
+            // 붙여넣기는 평문으로 — 외부 서식 HTML 유입을 막아 직렬화를 단순하게 유지
+            e.preventDefault();
+            insertTextAtCaret(e.clipboardData.getData("text/plain"));
+            flushRuns();
+          }}
+          onBlur={(e) => {
+            // 서식바로 포커스가 옮겨간 blur는 편집 종료가 아님 (폰트 드롭다운 등)
+            if (toolbarRef.current?.contains(e.relatedTarget as Node | null)) return;
+            onDoneEditing();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onDoneEditing();
+              return;
+            }
+            // 엔터=\n (pre-wrap이 줄바꿈으로 렌더). 브라우저 기본(div/br)을 막아 직렬화 단순화.
+            // IME 조합 확정 엔터는 통과(isComposing) — 줄바꿈이 아니라 글자 확정이어야 한다.
+            if (e.key === "Enter" && !e.shiftKey && !composingRef.current && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              insertTextAtCaret("\n");
+              flushRuns();
+            }
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ ...textStyle(block), ...padStyle, whiteSpace: "pre-wrap", minHeight: mmToPx(8) }}
+          className="w-full leading-snug bg-white outline-none border-0 cursor-text"
+        />
+        {sel &&
+          createPortal(
+            <InlineToolbar
+              sel={sel}
+              toolbarRef={toolbarRef}
+              onApply={applyStyle}
+              defaults={{
+                bold: block.bold ?? TEXT_DEFAULTS.bold,
+                italic: block.italic ?? TEXT_DEFAULTS.italic,
+              }}
+            />,
+            document.body
+          )}
+      </>
     );
 
+  // 안내문(placeholder) 표시 여부 — 비었고 토글 켜졌을 때 회색 안내문을 내용 대신 렌더.
+  // 사이저도 안내문 기준으로 재므로 빈 블록이 안내문 크기만큼 자리를 차지한다.
+  const hinting = showingHint(block);
   return (
     <div
       ref={setNodeRef}
@@ -467,10 +807,10 @@ function TextContent({
         isOver ? "bg-accentsoft outline outline-2 outline-accent -outline-offset-2" : ""
       }`}
     >
-      <div ref={sizerRef}>
-        <TokenText text={block.text ?? ""} />
+      <div ref={sizerRef} style={{ whiteSpace: "pre-wrap" }}>
+        {hinting ? <span style={{ color: "var(--inkfaint)" }}>{block.hint}</span> : <RichRead block={block} />}
       </div>
-      {/* auto-width 측정용 숨은 사이저 — 줄바꿈 없이 가장 긴 줄의 자연 폭(패딩 포함) */}
+      {/* auto-width 측정용 숨은 사이저 — 줄바꿈 없이 가장 긴 줄의 자연 폭(런 스타일/안내문 반영) */}
       {!block.manualW && (
         <div
           ref={wSizerRef}
@@ -478,9 +818,115 @@ function TextContent({
           className="leading-snug"
           style={{ ...textStyle(block), ...padStyle, position: "absolute", top: 0, left: 0, visibility: "hidden", whiteSpace: "pre", pointerEvents: "none" }}
         >
-          {block.text || " "}
+          {hinting ? <span>{block.hint || " "}</span> : <RichPlain block={block} />}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── 선택 위 플로팅 서식바 (굵게·기울임·색·크기·글꼴) ──
+const INLINE_COLORS = ["#1A2233", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
+
+function InlineToolbar({
+  sel,
+  toolbarRef,
+  onApply,
+  defaults,
+}: {
+  sel: InlineSel;
+  toolbarRef: React.RefObject<HTMLDivElement | null>;
+  onApply: (patch: Partial<Omit<TextRun, "text">>) => void;
+  defaults: { bold: boolean; italic: boolean };
+}) {
+  // 토글 끄기 값 — 블록 기본이 이미 보통이면 상속(undefined)으로 되돌리고, 블록이 굵으면
+  // 명시적 false로 덮는다(그래야 인접 상속 런과 병합되지 않고 그 구간만 보통이 된다).
+  const offBold = defaults.bold ? false : undefined;
+  const offItalic = defaults.italic ? false : undefined;
+  const [fontOpen, setFontOpen] = useState(false);
+  // 서식바 위치 — 선택 사각 위쪽 중앙. 화면 밖으로 나가지 않게 좌우 클램프.
+  const top = Math.max(8, sel.rect.top - 46);
+  const left = Math.min(Math.max(8, sel.rect.left + sel.rect.width / 2), window.innerWidth - 8);
+  const size = sel.fontSize ?? TEXT_DEFAULTS.fontSize;
+  // 굵게/기울임 토글: 켜져 있으면 끄기(false로 명시 — 블록 기본이 굵을 수도 있으므로)
+  const btn = "w-[28px] h-[28px] rounded-[7px] flex items-center justify-center text-inksoft hover:bg-paper transition-colors";
+  const btnOn = "bg-accentsoft text-accent";
+
+  return (
+    <div
+      ref={toolbarRef}
+      // 포인터다운 기본 차단 → contentEditable 선택 유지(포커스·하이라이트 안 뺏김)
+      onPointerDown={(e) => e.preventDefault()}
+      style={{ position: "fixed", top, left, transform: "translateX(-50%)", zIndex: 70, boxShadow: "var(--sh-pop)" }}
+      className="flex items-center gap-px p-[3px] rounded-[11px] bg-surface border border-line"
+    >
+      <button className={`${btn} ${sel.bold ? btnOn : ""} font-extrabold text-[13px]`} title="굵게 (선택 구간)" onClick={() => onApply({ bold: sel.bold ? offBold : true })}>
+        가
+      </button>
+      <button className={`${btn} ${sel.italic ? btnOn : ""} italic text-[13px]`} title="기울임 (선택 구간)" onClick={() => onApply({ italic: sel.italic ? offItalic : true })}>
+        가
+      </button>
+      <span className="w-px h-5 bg-line mx-0.5" />
+      {/* 크기 스테퍼 */}
+      <button className={`${btn} text-[15px]`} title="작게" onClick={() => onApply({ fontSize: Math.max(6, Math.round((size - 0.5) * 2) / 2) })}>
+        −
+      </button>
+      <span className="text-[11px] font-semibold text-ink tabular-nums w-8 text-center">{size}</span>
+      <button className={`${btn} text-[15px]`} title="크게" onClick={() => onApply({ fontSize: Math.round((size + 0.5) * 2) / 2 })}>
+        ＋
+      </button>
+      <span className="w-px h-5 bg-line mx-0.5" />
+      {/* 색 */}
+      {INLINE_COLORS.map((c) => (
+        <button
+          key={c}
+          title={`색 ${c}`}
+          onClick={() => onApply({ color: c })}
+          className="w-[18px] h-[18px] rounded-full mx-[1px] transition-transform hover:scale-[1.15] shrink-0"
+          style={{ backgroundColor: c, border: `2px solid ${(sel.color ?? "").toUpperCase() === c.toUpperCase() ? "var(--accent)" : "var(--surface)"}`, boxShadow: "0 0 0 1px rgba(16,24,40,.1)" }}
+        />
+      ))}
+      <span className="w-px h-5 bg-line mx-0.5" />
+      {/* 글꼴 — 커스텀 팝오버(네이티브 select는 blur로 선택 잃음) */}
+      <div className="relative">
+        <button
+          className="h-[28px] px-2 rounded-[7px] text-[11.5px] text-ink hover:bg-paper transition-colors flex items-center gap-1 whitespace-nowrap max-w-[92px]"
+          title="글꼴 (선택 구간)"
+          onClick={() => setFontOpen((v) => !v)}
+        >
+          <span className="truncate">{fontByKey(sel.font).label}</span>
+          <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+        {fontOpen && (
+          <div
+            className="absolute left-0 top-[32px] w-[168px] max-h-[240px] overflow-auto rounded-[9px] bg-surface border border-line py-1 z-10"
+            style={{ boxShadow: "var(--sh-pop)" }}
+          >
+            {(["gothic", "myeongjo", "display", "hand", "safe", "compat"] as const).map((cat) => {
+              const inCat = FONTS.filter((f) => f.category === cat);
+              if (!inCat.length) return null;
+              return (
+                <div key={cat}>
+                  <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold text-inkfaint tracking-[.06em]">{CATEGORY_LABEL[cat]}</div>
+                  {inCat.map((f) => (
+                    <button
+                      key={f.key}
+                      className={`w-full text-left px-2.5 py-1 text-[12px] hover:bg-paper transition-colors ${sel.font === f.key ? "text-accent font-bold" : "text-ink"}`}
+                      onClick={() => {
+                        void ensureFont(f.key);
+                        onApply({ font: f.key });
+                        setFontOpen(false);
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

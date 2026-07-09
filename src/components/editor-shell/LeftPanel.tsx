@@ -86,7 +86,12 @@ function FieldPill({ column }: { column: string }) {
 const iconFor = (t: BlockType) =>
   t === "text" ? <IcText size={14} /> : t === "table" ? <IcTable size={14} /> : <IcImage size={14} />;
 const labelFor = (b: Block) =>
-  b.type === "text" ? (b.text?.trim() || "빈 텍스트") : b.type === "table" ? "표" : "이미지";
+  b.type === "text"
+    ? // 본문이 비면 안내문(placeholder)을 라벨로 (안내문 블록이 목록에서 blank로 안 보이게)
+      b.text?.trim() || b.hint?.trim() || "빈 텍스트"
+    : b.type === "table"
+      ? "표"
+      : "이미지";
 
 // 레이어 행 — 드래그(kind:layer)해서 다른 행에 놓으면 그 블록의 자식이 된다.
 // 자식이 있으면 ▾/▸ 토글로 가지를 접는다(캔버스·패널 모두 숨김, 보기 전용).
