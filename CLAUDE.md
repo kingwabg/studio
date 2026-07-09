@@ -60,9 +60,14 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   다중 fontface를 기존 fontCnt에 연속 id로 등록). 맑은 고딕(MS 상용·윈도우 전용)은 폴백만.
   캔버스 텍스트 패딩(px-2/py-1)은 내보내기에서 좌표/셀여백(cellMarginU)으로 보정 —
   검증: 240자 반복문에서 캔버스 44자/줄·6줄 = rhwp 44자/줄·6줄 정확 일치.
-  (Pretendard 0.86em은 UI 셸 전용. 문체부·저작권위 안심글꼴(KCC자은체 등)은 수동 woff2
-  반입으로 레지스트리에 추가 가능. 호환 폰트 전략: hwpxName만 상용 원명(휴먼명조)으로 두고
-  webFamily는 닮은꼴 — 이름 선언은 합법, 관공서 한글에선 정품 렌더, 둘 다 1em이라 정합 유지)
+  (Pretendard 0.86em은 UI 셸 전용.)
+  - **안심글꼴**(category:"safe"): KoPub 바탕/돋움·나눔스퀘어/라운드 등 상업·웹 무료 폰트를
+    `public/fonts/*.woff2`로 self-host, FontDef.localSrc로 @font-face 런타임 주입
+    (ensureFont). 추가 방법은 `public/fonts/README.md`. KoPub는 전 글리프(본문용),
+    나눔스퀘어는 웹 서브셋(제목용).
+  - **호환 폰트**(category:"compat", compat:true): webFamily(닮은꼴 OFL)와 hwpxName(상용
+    원명, 예 휴먼명조·HY견고딕·윤고딕)을 분리. 화면은 안전한 닮은꼴, 파일엔 원명 선언 →
+    관공서 한글에서 정품 렌더. 이름 선언은 폰트 파일 배포가 아니라 합법. 둘 다 1em이라 정합 유지.
 - 흐름 본문(flowText): 캔버스의 flow 텍스트 블록은 절대배치 개체가 아니라 진짜 hp:p
   문단으로 — 배치는 문단 마진(좌=x, 우=종이폭−x−폭, 첫 앞간격=y−6mm).
   ⚠ 문단 여백(hh:margin) 값은 렌더러가 반단위로 해석 → **HWPUNIT ×2로 기록** (rhwp 실측).

@@ -13,17 +13,22 @@
 // 정품으로 렌더된다. 둘 다 한글 1em이라 줄바꿈도 일치.
 import { create } from "zustand";
 
-export type FontCategory = "gothic" | "myeongjo" | "display" | "hand";
+export type FontCategory = "gothic" | "myeongjo" | "display" | "hand" | "compat" | "safe";
 
 export interface FontDef {
   key: string;
   label: string; // UI 표기
   category: FontCategory;
-  webFamily: string; // CSS font-family (self-host)
-  hwpxName: string; // hwpx charPr에 선언할 이름
+  webFamily: string; // CSS font-family (화면 렌더 — self-host)
+  hwpxName: string; // hwpx charPr에 선언할 이름 (관공서 한글에서 열 때의 폰트)
   weights: number[]; // 지원 굵기 (700 없으면 브라우저 합성 굵기)
-  // 지연 로딩 thunk — Vite가 정적 분석할 수 있게 리터럴 import 유지
+  // 지연 로딩 thunk — Vite가 정적 분석할 수 있게 리터럴 import 유지 (fontsource 폰트)
   load?: () => Promise<unknown[]>;
+  // 로컬 반입 폰트(public/fonts/*.woff2) — @font-face를 런타임 주입 (안심글꼴 수동 반입용)
+  localSrc?: { url: string; weight: number }[];
+  // 호환 폰트 — webFamily(닮은꼴)와 hwpxName(상용 원명)이 다름. 화면은 안전한 닮은꼴,
+  // 파일엔 원명 선언 → 관공서 정품 렌더. 이름 선언은 폰트 파일 배포가 아니라 합법.
+  compat?: boolean;
 }
 
 export const FONTS: FontDef[] = [
@@ -91,6 +96,91 @@ export const FONTS: FontDef[] = [
     webFamily: "Nanum Pen Script", hwpxName: "나눔손글씨 펜", weights: [400],
     load: () => Promise.all([import("@fontsource/nanum-pen-script/400.css")]),
   },
+
+  // ── 호환 폰트 (실무 관행 대응) ──
+  // 화면은 라이선스 안전한 닮은꼴 OFL 폰트로 렌더하고, hwpx 파일엔 상용 폰트 원명을 선언한다.
+  // 관공서 PC에는 그 상용 폰트(휴먼명조·HY·윤 등)가 정품으로 깔려 있어 열면 정품으로 조판되고,
+  // 우리 서버·웹에는 상용 폰트 파일을 올리지 않으므로 저작권 안전(이름 선언 ≠ 파일 배포).
+  // 둘 다 한글 전각(1em)이라 줄바꿈 정합도 유지된다.
+  {
+    key: "compat-humanmyeongjo", label: "휴먼명조 (호환)", category: "compat", compat: true,
+    webFamily: "Nanum Myeongjo", hwpxName: "휴먼명조", weights: [400, 700],
+    load: () => Promise.all([import("@fontsource/nanum-myeongjo/400.css"), import("@fontsource/nanum-myeongjo/700.css")]),
+  },
+  {
+    key: "compat-hyshingothic", label: "HY신명조 (호환)", category: "compat", compat: true,
+    webFamily: "Nanum Myeongjo", hwpxName: "HY신명조", weights: [400, 700],
+    load: () => Promise.all([import("@fontsource/nanum-myeongjo/400.css"), import("@fontsource/nanum-myeongjo/700.css")]),
+  },
+  {
+    key: "compat-hygungso", label: "HY궁서 (호환)", category: "compat", compat: true,
+    webFamily: "Gowun Batang", hwpxName: "HY궁서B", weights: [400, 700],
+    load: () => Promise.all([import("@fontsource/gowun-batang/400.css"), import("@fontsource/gowun-batang/700.css")]),
+  },
+  {
+    key: "compat-hygothic", label: "HY견고딕 (호환)", category: "compat", compat: true,
+    webFamily: "Black Han Sans", hwpxName: "HY견고딕", weights: [400],
+    load: () => Promise.all([import("@fontsource/black-han-sans/400.css")]),
+  },
+  {
+    key: "compat-yoongothic", label: "윤고딕 (호환)", category: "compat", compat: true,
+    webFamily: "Noto Sans KR", hwpxName: "윤고딕140", weights: [400, 700],
+    load: () => Promise.all([import("@fontsource/noto-sans-kr/400.css"), import("@fontsource/noto-sans-kr/700.css")]),
+  },
+  {
+    key: "compat-junggothic", label: "중고딕 (호환)", category: "compat", compat: true,
+    webFamily: "Noto Sans KR", hwpxName: "중고딕", weights: [400, 700],
+    load: () => Promise.all([import("@fontsource/noto-sans-kr/400.css"), import("@fontsource/noto-sans-kr/700.css")]),
+  },
+  {
+    key: "compat-hamchorombatang", label: "함초롬바탕 (호환)", category: "compat", compat: true,
+    webFamily: "Nanum Myeongjo", hwpxName: "함초롬바탕", weights: [400, 700],
+    load: () => Promise.all([import("@fontsource/nanum-myeongjo/400.css"), import("@fontsource/nanum-myeongjo/700.css")]),
+  },
+  {
+    key: "compat-hamchoromdotum", label: "함초롬돋움 (호환)", category: "compat", compat: true,
+    webFamily: "Nanum Gothic", hwpxName: "함초롬돋움", weights: [400, 700, 800],
+    // 나눔고딕은 기본 정적 로드라 load 불필요
+  },
+
+  // ── 안심글꼴 (상업·웹 100% 무료, public/fonts self-host) ──
+  // KoPubWorld: 한국출판인회의(KOPUS) 배포, 상업·웹 임베딩 무료. 전 글리프 포함(대용량).
+  //   출처: github.com/adrinerDP/font-kopubworld · kopus.org. 공문서 본문에 적합.
+  {
+    key: "kopub-batang", label: "KoPub 바탕", category: "safe",
+    webFamily: "KoPubWorld Batang", hwpxName: "KoPubWorld바탕체_Pro Light", weights: [400, 700],
+    localSrc: [
+      { url: "/fonts/KoPubWorld-Batang-Medium.woff2", weight: 400 },
+      { url: "/fonts/KoPubWorld-Batang-Bold.woff2", weight: 700 },
+    ],
+  },
+  {
+    key: "kopub-dotum", label: "KoPub 돋움", category: "safe",
+    webFamily: "KoPubWorld Dotum", hwpxName: "KoPubWorld돋움체_Pro Light", weights: [400, 700],
+    localSrc: [
+      { url: "/fonts/KoPubWorld-Dotum-Medium.woff2", weight: 400 },
+      { url: "/fonts/KoPubWorld-Dotum-Bold.woff2", weight: 700 },
+    ],
+  },
+  // 나눔스퀘어(네이버, 나눔글꼴 자유 라이선스) — 제목·표지용 고딕. 웹 서브셋이라 본문보다 제목에.
+  {
+    key: "nanum-square", label: "나눔스퀘어", category: "safe",
+    webFamily: "NanumSquare", hwpxName: "나눔스퀘어", weights: [400, 700, 800],
+    localSrc: [
+      { url: "/fonts/NanumSquareR.woff2", weight: 400 },
+      { url: "/fonts/NanumSquareB.woff2", weight: 700 },
+      { url: "/fonts/NanumSquareEB.woff2", weight: 800 },
+    ],
+  },
+  {
+    key: "nanum-square-round", label: "나눔스퀘어라운드", category: "safe",
+    webFamily: "NanumSquareRound", hwpxName: "나눔스퀘어라운드", weights: [400, 700, 800],
+    localSrc: [
+      { url: "/fonts/NanumSquareRoundR.woff2", weight: 400 },
+      { url: "/fonts/NanumSquareRoundB.woff2", weight: 700 },
+      { url: "/fonts/NanumSquareRoundEB.woff2", weight: 800 },
+    ],
+  },
 ];
 
 export const DEFAULT_FONT = "nanum-gothic";
@@ -102,6 +192,8 @@ export const CATEGORY_LABEL: Record<FontCategory, string> = {
   myeongjo: "명조·바탕",
   display: "제목",
   hand: "손글씨",
+  safe: "안심글꼴",
+  compat: "호환 (실무 폰트)",
 };
 
 // ── 로딩 + 전각(1em) 캘리브레이션 ──
@@ -132,17 +224,33 @@ function measureSpacingEm(family: string): number {
   return Math.round(em * 1000) / 1000;
 }
 
+// 로컬 반입 폰트(public/fonts/*.woff2) — @font-face를 <head>에 1회 주입.
+const injectedLocal = new Set<string>();
+function injectLocalFace(def: FontDef): void {
+  if (!def.localSrc || injectedLocal.has(def.key) || typeof document === "undefined") return;
+  injectedLocal.add(def.key);
+  const css = def.localSrc
+    .map(
+      (s) =>
+        `@font-face{font-family:"${def.webFamily}";font-style:normal;font-display:swap;` +
+        `font-weight:${s.weight};src:url("${s.url}") format("woff2");}`
+    )
+    .join("");
+  const el = document.createElement("style");
+  el.dataset.font = def.key;
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+
 // 폰트 준비(로드 + 캘리브레이션). 여러 번 불러도 안전(멱등).
 export async function ensureFont(key: string): Promise<void> {
   const def = fontByKey(key);
   const st = useFontStore.getState();
-  if (st.spacing[def.key] !== undefined && !def.load) {
-    // 기본 폰트 — 로드는 정적, 실측만 갱신
-  }
   if (st.loading[def.key]) return;
   st.setLoading(def.key, true);
   try {
-    await def.load?.();
+    injectLocalFace(def); // 로컬 반입 폰트면 @font-face 주입
+    await def.load?.(); // fontsource 폰트면 CSS 지연 로딩
     if (typeof document !== "undefined" && document.fonts?.load) {
       await document.fonts.load(`16px "${def.webFamily}"`, SAMPLE);
       if (def.weights.includes(700)) await document.fonts.load(`700 16px "${def.webFamily}"`, SAMPLE);
