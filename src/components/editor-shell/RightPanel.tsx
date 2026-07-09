@@ -24,7 +24,7 @@ function NumberField({
         type="number"
         value={Math.round(value)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-8 px-2.5 rounded-lg border border-line text-ink text-[12.5px] text-right outline-none focus:border-accent focus:ring-accentsoft transition-all bg-white"
+        className="h-8 px-2.5 rounded-lg border border-line text-ink text-[12.5px] text-right outline-none focus:border-accent focus:ring-accentsoft transition-all bg-surface"
       />
     </label>
   );
@@ -46,7 +46,7 @@ function SegBtn({
       title={title}
       onClick={onClick}
       className={`flex-1 h-8 flex items-center justify-center rounded-md text-[13px] transition-colors ${
-        active ? "bg-white text-accent shadow-sm font-semibold" : "text-inksoft hover:text-ink"
+        active ? "bg-surface text-accent shadow-sm font-semibold" : "text-inksoft hover:text-ink"
       }`}
     >
       {children}
@@ -146,7 +146,7 @@ export function RightPanel() {
         : { label: "이미지", icon: <IcImage size={15} /> };
 
   return (
-    <aside className={`${tab === "ai" ? "w-80" : "w-64"} shrink-0 border-l border-line bg-white flex flex-col overflow-auto transition-all`}>
+    <aside className={`${tab === "ai" ? "w-80" : "w-64"} shrink-0 border-l border-line bg-surface flex flex-col overflow-auto transition-all`}>
       {/* 탭: 속성 | AI */}
       <div className="flex px-2 pt-2 gap-1 shrink-0">
         {(
@@ -184,7 +184,7 @@ export function RightPanel() {
         </div>
       ) : (
         <div className="flex flex-col">
-          <div className="flex items-center gap-2 px-4 h-12 border-b border-line sticky top-0 bg-white">
+          <div className="flex items-center gap-2 px-4 h-12 border-b border-line sticky top-0 bg-surface">
             <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-accentsoft text-accent">
               {kind.icon}
             </span>
@@ -208,7 +208,7 @@ export function RightPanel() {
                     onChange={(e) => updateBlock(block.id, { text: e.target.value })}
                     rows={2}
                     placeholder="더블클릭으로 지면에서 바로 편집할 수도 있어요"
-                    className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accent focus:ring-accentsoft transition-all resize-none leading-relaxed bg-white"
+                    className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accent focus:ring-accentsoft transition-all resize-none leading-relaxed bg-surface"
                   />
                 </div>
                 <TextStyleControls block={block} />

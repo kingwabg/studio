@@ -212,7 +212,7 @@ export function AiPanel() {
             if (e.key === "Enter") send();
           }}
           placeholder={busy ? "작성 중…" : "예: 분기 보고서 만들어줘"}
-          className="flex-1 h-9 rounded-lg border border-line px-2.5 text-[12px] text-ink outline-none focus:border-accent transition-colors bg-white disabled:bg-paper"
+          className="flex-1 h-9 rounded-lg border border-line px-2.5 text-[12px] text-ink outline-none focus:border-accent transition-colors bg-surface disabled:bg-paper"
         />
         <button
           onClick={() => send()}
