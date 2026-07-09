@@ -5,6 +5,11 @@ import DocumentStudio from "./DocumentStudio.jsx";
 import StudioHome from "./routes/StudioHome.tsx";
 import StudioEditor from "./routes/StudioEditor.tsx";
 import { StudioTheme } from "./routes/StudioTheme.tsx";
+// 지면(문서) 폰트 — 나눔고딕 OFL 웹폰트 self-host (저작권 안전 + 전 OS 동일 렌더).
+// 맑은 고딕(MS 상용·윈도우 전용)을 대체: 한글 전각(1em)이라 줄바꿈 정합 유지, 웹 배포 합법.
+import "@fontsource/nanum-gothic/korean-400.css";
+import "@fontsource/nanum-gothic/korean-700.css";
+import "@fontsource/nanum-gothic/korean-800.css";
 import "./styles.css";
 import "./tailwind.css";
 

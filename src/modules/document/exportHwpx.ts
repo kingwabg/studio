@@ -16,12 +16,13 @@ const PAD_Y_MM = 4 / SCALE; // ≈1.06mm
 const LINE_SPACING = 138;
 
 // 문서 폰트 — 캔버스 지면(.canvas-dots)과 같은 스택의 첫 가용 폰트를 hwpx에 선언한다.
-// 한글/HWP 조판은 한글을 전각(1em)으로 계산하므로, 지면도 전각 폰트(맑은 고딕)를 쓰고
-// 같은 폰트를 선언해야 화면 줄바꿈 = 한글 줄바꿈이 된다.
+// 한글/HWP 조판은 한글을 전각(1em)으로 계산하므로, 지면도 전각 폰트를 쓰고 같은 폰트를
+// 선언해야 화면 줄바꿈 = 한글 줄바꿈이 된다.
+// 기본은 나눔고딕(OFL 웹폰트 self-host) — 저작권 안전 + 전 OS 동일. 맑은 고딕은 폴백.
 function effectiveFont(): string | undefined {
-  if (typeof document === "undefined" || !document.fonts?.check) return undefined;
+  if (typeof document === "undefined" || !document.fonts?.check) return "나눔고딕";
+  if (document.fonts.check(`12px "Nanum Gothic"`)) return "나눔고딕";
   if (document.fonts.check(`12px "Malgun Gothic"`)) return "맑은 고딕";
-  if (document.fonts.check(`12px "Noto Sans KR"`)) return "Noto Sans KR";
   return "함초롬돋움"; // 한글 기본 고딕 폴백
 }
 

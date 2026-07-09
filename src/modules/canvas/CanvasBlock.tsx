@@ -283,6 +283,9 @@ function textStyle(block: Block): React.CSSProperties {
     fontStyle: (block.italic ?? TEXT_DEFAULTS.italic) ? "italic" : "normal",
     textAlign: block.align ?? TEXT_DEFAULTS.align,
     color: block.color ?? TEXT_DEFAULTS.color,
+    // 전각(1em) 보정 — 나눔고딕 한글 advance 0.94em → +0.06em = 1em (한글/HWP 조판과 일치).
+    // em이라 이 요소의 fontSize 기준으로 스케일되어 크기가 달라도 정확하다.
+    letterSpacing: "0.06em",
   };
 }
 const ptToPx = (pt: number) => `${pt * (96 / 72)}px`;

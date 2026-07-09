@@ -36,7 +36,11 @@
 .canvas-dots {
   background-image: radial-gradient(circle, var(--dot, #d5dae3) 1px, transparent 1px);
   background-size: 24px 24px;
-  font-family: "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
+  /* 지면 폰트 = 나눔고딕(OFL 웹폰트, self-host). 맑은 고딕은 윈도우 전용·MS 상용이라 폴백.
+     ⚠ 전각(1em) 보정은 letter-spacing으로 하되, 컨테이너(em)에 두면 자식 폰트 크기에 안 맞는
+     절대 px로 상속되므로, 문서 텍스트 요소마다 자기 fontSize 기준 0.06em을 적용한다
+     (CanvasBlock textStyle의 letterSpacing). 나눔고딕 한글 0.94em → +0.06em = 1em. */
+  font-family: "Nanum Gothic", "나눔고딕", "Malgun Gothic", "맑은 고딕", sans-serif;
 }
 .thumb-grad {
   background-image: linear-gradient(to bottom, #f6f7fa, #edf0f5);
