@@ -10,10 +10,47 @@ import { useDroppable } from "@dnd-kit/core";
 import { SCALE, mmToPx } from "./geometry";
 import { collapsedHiddenIds, descendantIds } from "../document/model";
 import { useCanvasStore } from "./store";
+import { useFollowStore } from "./snap";
 import { CanvasBlock } from "./CanvasBlock";
 import { MultiSelectOverlay } from "./MultiSelectOverlay";
 import { SnapGuides } from "./SnapGuides";
 import { IcText } from "../../ui/icons";
+
+// 그룹 멤버를 개별로 끄는 동안, 그 요소가 속한 공간 그룹의 경계 박스를 띄워
+// "이 요소는 이 그룹 소속"임을 보여준다 (피그마식 그룹 컨텍스트).
+function DraggingGroupBox() {
+  const activeId = useFollowStore((s) => s.activeId);
+  const blocks = useCanvasStore((s) => s.doc.blocks);
+  const active = activeId ? blocks.find((b) => b.id === activeId) : null;
+  if (!active?.groupId) return null;
+  const members = blocks.filter((b) => b.groupId === active.groupId);
+  if (members.length < 2) return null;
+  const x1 = Math.min(...members.map((b) => b.x));
+  const y1 = Math.min(...members.map((b) => b.y));
+  const x2 = Math.max(...members.map((b) => b.x + b.w));
+  const y2 = Math.max(...members.map((b) => b.y + b.h));
+  return (
+    <div
+      className="absolute pointer-events-none z-[8]"
+      style={{
+        left: mmToPx(x1) - 6,
+        top: mmToPx(y1) - 6,
+        width: mmToPx(x2 - x1) + 12,
+        height: mmToPx(y2 - y1) + 12,
+        border: "1.5px dashed var(--groupline)",
+        borderRadius: 8,
+        background: "rgba(124,154,240,.05)",
+      }}
+    >
+      <span
+        className="absolute -top-[10px] left-3 px-1.5 leading-[15px] text-[10px] font-bold rounded-sm text-white"
+        style={{ background: "var(--groupline)" }}
+      >
+        그룹
+      </span>
+    </div>
+  );
+}
 
 const RULER = 26; // 눈금자 두께(px) — 시안 1b
 // 토큰 기반 (다크 모드 대응) — SVG 속성도 CSS 변수 문자열을 받는다
@@ -406,6 +443,7 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
               </span>
             </div>
           )}
+          <DraggingGroupBox />
           <SnapGuides />
           {doc.blocks.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">

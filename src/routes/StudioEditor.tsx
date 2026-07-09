@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
   type Modifier,
 } from "@dnd-kit/core";
-import { type BlockType, moveSetIds } from "../modules/document/model";
+import { type BlockType, descendantIds, moveSetIds } from "../modules/document/model";
 import { mmToPx, pxToMm } from "../modules/canvas/geometry";
 import { useCanvasStore } from "../modules/canvas/store";
 import { computeSnap, isAltPressed, setAltPressed, useFollowStore, useGuideStore } from "../modules/canvas/snap";
@@ -331,10 +331,12 @@ export default function StudioEditor() {
           const st = useCanvasStore.getState();
           const b = st.doc.blocks.find((x) => x.id === a.id);
           if (!b) return;
-          // 함께 움직일 집합 — 다중 선택이면 선택 전체, 아니면 이 블록 하나에서
-          // moveSetIds로 트리 자손·그룹 멤버까지 확장 (드래그당 1회).
-          const seed = st.selectedIds.length > 1 && st.selectedIds.includes(b.id) ? st.selectedIds : [b.id];
-          const members = moveSetIds(st.doc.blocks, seed);
+          // 함께 움직일 집합 (드래그당 1회) — 그룹 전체 선택이면 moveSetIds로 그룹·자손
+          // 모두, 단일 드래그면 트리 자손만(그룹 멤버는 독립 이동 — 피그마식).
+          const wholeGroup = st.selectedIds.length > 1 && st.selectedIds.includes(b.id);
+          const members = wholeGroup
+            ? moveSetIds(st.doc.blocks, st.selectedIds)
+            : new Set<string>([b.id, ...descendantIds(st.doc.blocks, b.id)]);
           const candX = b.x + pxToMm(e.delta.x);
           const candY = b.y + pxToMm(e.delta.y);
           if (isAltPressed()) {

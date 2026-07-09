@@ -32,6 +32,9 @@ export interface Block {
   groupId?: string;
   // 잠금 — true면 이동·리사이즈 차단(실수 방지). 선택은 됨.
   locked?: boolean;
+  // 텍스트 폭 수동 지정 — 없으면 내용에 맞춰 auto-width(박스가 글자를 감쌈).
+  // 사용자가 핸들로 폭을 조절하면 true가 되어 폭 고정 + 줄바꿈(캔바식 Auto→Fixed).
+  manualW?: boolean;
   x: number; // mm, 지면 좌상단 기준
   y: number; // mm
   w: number; // mm

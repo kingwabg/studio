@@ -152,9 +152,10 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       const ny = clamp(y, s.doc.page.h - target.h);
       const dx = nx - target.x;
       const dy = ny - target.y;
-      // 함께 이동 — 트리 자손(자석) + 그룹 멤버 (moveSetIds 단일 규칙). 잠금 멤버는 제외.
-      const together = moveSetIds(s.doc.blocks, [id]);
-      together.delete(id);
+      // 단일 드래그: 트리 자손(자석)만 동반한다. 공간 그룹 멤버는 따라오지 않는다 —
+      // 그룹 안에서 개별 요소를 독립 이동(피그마식). 그룹 통째 이동은 그룹 전체 선택
+      // (opt-in) → nudgeMany 경로(moveSetIds)가 담당. 잠금 멤버는 제외.
+      const together = descendantIds(s.doc.blocks, id);
       return {
         ...record(s, `move:${id}`),
         doc: {

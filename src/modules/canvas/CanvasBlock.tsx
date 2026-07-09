@@ -109,12 +109,18 @@ export function CanvasBlock({ block }: { block: Block }) {
         if (dir.includes("n")) y = s.y + (s.h - MIN_H);
         h = MIN_H;
       }
-      updateBlock(block.id, {
-        x: Math.max(0, Math.round(x)),
-        y: Math.max(0, Math.round(y)),
-        w: Math.round(w),
-        h: Math.round(h),
-      });
+      if (block.type === "text") {
+        // 텍스트: 폭만 조절(높이는 auto). manualW로 auto-width 해제 → 이 폭에서 줄바꿈.
+        // 글자 크기는 절대 건드리지 않는다 (박스만 커지고 폰트는 그대로).
+        updateBlock(block.id, { x: Math.max(0, Math.round(x)), w: Math.round(w), manualW: true });
+      } else {
+        updateBlock(block.id, {
+          x: Math.max(0, Math.round(x)),
+          y: Math.max(0, Math.round(y)),
+          w: Math.round(w),
+          h: Math.round(h),
+        });
+      }
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
@@ -157,10 +163,10 @@ export function CanvasBlock({ block }: { block: Block }) {
         cursor: editing ? "text" : locked ? "default" : "grab",
         touchAction: "none",
       }}
-      className={`group/blk rounded-[3px] bg-white overflow-visible select-none transition-shadow ${
+      className={`group/blk rounded-[3px] bg-white overflow-visible select-none transition-[outline-color,box-shadow] ${
         selected
           ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(43,92,230,0.18)]"
-          : "outline outline-1 outline-line hover:outline-accentline"
+          : "outline outline-1 outline-line hover:outline-2 hover:outline-accent"
       } ${isDragging ? "opacity-95 shadow-[0_8px_24px_rgba(26,34,51,0.18)]" : ""}`}
     >
       <div className={`w-full h-full rounded-[2px] ${isTable ? "overflow-visible" : "overflow-hidden"}`}>
@@ -180,11 +186,23 @@ export function CanvasBlock({ block }: { block: Block }) {
           본문
         </span>
       )}
-      {/* 잠금 배지 */}
+      {/* 고정 배지 — 클릭하면 해제(그룹이면 그룹 전체). 잠긴 요소는 플로팅바가 없어
+          이 배지가 유일한 해제 통로다. */}
       {locked && selected && (
-        <span className="absolute -top-2 -left-2 z-30 w-5 h-5 rounded-md bg-inksoft text-white flex items-center justify-center" style={{ boxShadow: "var(--sh-card)" }}>
+        <button
+          title={block.groupId ? "그룹 고정 해제" : "고정 해제"}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            const all = useCanvasStore.getState().doc.blocks;
+            const ids = block.groupId ? all.filter((b) => b.groupId === block.groupId).map((b) => b.id) : [block.id];
+            setLocked(ids, false);
+          }}
+          className="absolute -top-2 -left-2 z-40 w-5 h-5 rounded-md bg-inksoft text-white flex items-center justify-center hover:bg-ink transition-colors"
+          style={{ boxShadow: "var(--sh-card)" }}
+        >
           <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </span>
+        </button>
       )}
       {/* 단일 선택 + 미잠금일 때만 편집 어포던스(그립·플로팅 바·핸들). 다중은 outline만 */}
       {soleSelected && !editing && !locked && (
@@ -242,8 +260,8 @@ export function CanvasBlock({ block }: { block: Block }) {
           {/* 리사이즈 코너 핸들 (시안: 8px 흰 사각 + 파란 테두리) */}
           {!isTable &&
             RESIZE_HANDLES.filter((h) =>
-              // 텍스트는 높이가 내용에서 파생되므로 좌우(폭)만 조절
-              block.type === "text" ? h.dir === "e" || h.dir === "w" : true
+              // 텍스트: 모서리 4점 + 좌우 — 전부 폭만 조절(높이 auto). 순수 상하(n/s)는 제외.
+              block.type === "text" ? h.dir !== "n" && h.dir !== "s" : true
             ).map((hdl) => (
               <div
                 key={hdl.dir}
@@ -327,8 +345,10 @@ function TextContent({
   onDoneEditing: () => void;
 }) {
   const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const pageW = useCanvasStore((s) => s.doc.page.w);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const sizerRef = useRef<HTMLDivElement>(null);
+  const wSizerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (editing) taRef.current?.focus();
   }, [editing]);
@@ -360,6 +380,25 @@ function TextContent({
     // 재실행되면서, 배열 길이가 항상 2라 HMR 중 deps 크기 변화 경고가 안 난다. sync는 멱등.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [block.id, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}`]);
+
+  // auto-width: 수동 조절(manualW) 전까지 박스 폭을 글자에 맞춘다(캔바식 Auto width).
+  // 숨긴 사이저(white-space:pre — 줄바꿈 없이 가장 긴 줄의 자연 폭)를 관찰해 block.w로.
+  // 지면 밖으로는 못 나가게 (page.w − x) 상한. manualW가 되면 이 효과는 멈춘다.
+  useEffect(() => {
+    if (block.manualW) return;
+    const el = wSizerRef.current;
+    if (!el) return;
+    const sync = () => {
+      const needMm = Math.min(pageW - block.x, Math.max(20, Math.ceil(el.offsetWidth / SCALE) + 1));
+      const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
+      if (cur && Math.abs((cur.w ?? 0) - needMm) >= 1) updateBlock(block.id, { w: needMm });
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [block.id, block.manualW, block.x, pageW, `${block.text}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}`]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `textdrop:${block.id}`,
@@ -397,6 +436,17 @@ function TextContent({
       <div ref={sizerRef}>
         <TokenText text={block.text ?? ""} />
       </div>
+      {/* auto-width 측정용 숨은 사이저 — 줄바꿈 없이 가장 긴 줄의 자연 폭(패딩 포함) */}
+      {!block.manualW && (
+        <div
+          ref={wSizerRef}
+          aria-hidden
+          className="px-2 py-1 leading-snug"
+          style={{ ...textStyle(block), position: "absolute", top: 0, left: 0, visibility: "hidden", whiteSpace: "pre", pointerEvents: "none" }}
+        >
+          {block.text || " "}
+        </div>
+      )}
     </div>
   );
 }

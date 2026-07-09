@@ -87,11 +87,27 @@ export function MultiSelectOverlay() {
         <IconBtn title="위 정렬" onClick={() => align("top")}><GlyphAlign d="M2 2h10M4 4.5v7M8 4.5v4" /></IconBtn>
         <IconBtn title="아래 정렬" onClick={() => align("bottom")}><GlyphAlign d="M2 12h10M4 2.5v7M8 5.5v4" /></IconBtn>
         <span className="w-px h-4 bg-line mx-0.5" />
-        <IconBtn title={anyLocked ? "잠금 해제" : "잠금"} onClick={() => setLocked(selectedIds, !anyLocked)}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d={anyLocked ? "M4.6 6V4.4a2.4 2.4 0 0 1 4.4-1.3M2.6 6h8.8v6H2.6z" : "M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z"} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </IconBtn>
+        {isGroup ? (
+          // 그룹 고정 — 멤버 전부 잠가 절대배치로 못 움직이게 핀. 해제는 고정 배지·이 버튼.
+          <button
+            onClick={() => setLocked(selectedIds, !anyLocked)}
+            title={anyLocked ? "그룹 고정 해제" : "그룹 고정 (절대배치로 잠금)"}
+            className={`h-8 px-2.5 rounded-lg text-[12px] font-bold flex items-center gap-1.5 transition-colors ${
+              anyLocked ? "bg-ink text-white hover:bg-inksoft" : "text-inksoft hover:bg-paper hover:text-ink"
+            }`}
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <path d={anyLocked ? "M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z" : "M4.6 6V4.4a2.4 2.4 0 0 1 4.4-1.3M2.6 6h8.8v6H2.6z"} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {anyLocked ? "고정됨" : "고정"}
+          </button>
+        ) : (
+          <IconBtn title={anyLocked ? "잠금 해제" : "잠금"} onClick={() => setLocked(selectedIds, !anyLocked)}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d={anyLocked ? "M4.6 6V4.4a2.4 2.4 0 0 1 4.4-1.3M2.6 6h8.8v6H2.6z" : "M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z"} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </IconBtn>
+        )}
         <IconBtn title="선택 삭제" onClick={removeSelection} danger>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.4 3.8h9.2M5.4 3.8V2.6a.8.8 0 0 1 .8-.8h1.6a.8.8 0 0 1 .8.8v1.2M3.6 3.8l.5 7.2a1.2 1.2 0 0 0 1.2 1.2h3.4a1.2 1.2 0 0 0 1.2-1.2l.5-7.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </IconBtn>
