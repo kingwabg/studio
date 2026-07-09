@@ -344,7 +344,7 @@ export default function StudioEditor() {
             return;
           }
           const snap = computeSnap(st.doc, b.id, candX, candY, b.w, b.h);
-          useGuideStore.getState().setGuides(snap.guidesV, snap.guidesH);
+          useGuideStore.getState().setGuides(snap.guides, snap.badges);
           // 자손이 따라올 시각 델타 = 스냅 반영된 최종 델타 (부모의 실제 화면 이동량)
           useFollowStore.getState().setFollow(String(a.id), mmToPx(snap.x - b.x), mmToPx(snap.y - b.y), members);
         }}

@@ -10,51 +10,10 @@ import { useDroppable } from "@dnd-kit/core";
 import { SCALE, mmToPx } from "./geometry";
 import { collapsedHiddenIds, descendantIds } from "../document/model";
 import { useCanvasStore } from "./store";
-import { useGuideStore } from "./snap";
 import { CanvasBlock } from "./CanvasBlock";
 import { MultiSelectOverlay } from "./MultiSelectOverlay";
+import { SnapGuides } from "./SnapGuides";
 import { IcText } from "../../ui/icons";
-
-// 드래그 중 정렬 가이드 (캔바식 마젠타 점선) — 스냅이 걸린 선을 지면 전체로 그린다
-function SnapGuides() {
-  const v = useGuideStore((s) => s.v);
-  const h = useGuideStore((s) => s.h);
-  if (!v.length && !h.length) return null;
-  return (
-    <>
-      {v.map((x) => (
-        <div
-          key={`v${x}`}
-          style={{
-            position: "absolute",
-            left: mmToPx(x),
-            top: 0,
-            bottom: 0,
-            width: 0,
-            borderLeft: "1px dashed var(--guide)",
-            zIndex: 50,
-            pointerEvents: "none",
-          }}
-        />
-      ))}
-      {h.map((y) => (
-        <div
-          key={`h${y}`}
-          style={{
-            position: "absolute",
-            top: mmToPx(y),
-            left: 0,
-            right: 0,
-            height: 0,
-            borderTop: "1px dashed var(--guide)",
-            zIndex: 50,
-            pointerEvents: "none",
-          }}
-        />
-      ))}
-    </>
-  );
-}
 
 const RULER = 26; // 눈금자 두께(px) — 시안 1b
 // 토큰 기반 (다크 모드 대응) — SVG 속성도 CSS 변수 문자열을 받는다

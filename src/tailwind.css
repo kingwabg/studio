@@ -85,7 +85,8 @@
   /* 상태 */
   --success: #4caf7d;
   --successsoft: #edf8f1;
-  --guide: #e5484d; /* 스냅 가이드 */
+  --guide: #7c5cfc; /* 스냅 가이드 (보라색 — 캔바/피그마식 정렬선) */
+  --guidesoft: #efeafe; /* 거리 배지 배경 */
   --groupline: #7c9af0; /* 그룹 선택 점선 */
   /* 카테고리 틴트 (홈·팔레트) */
   --cat-orange: #c77a28; --cat-orange-soft: #fbf3e7;
