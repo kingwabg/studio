@@ -224,7 +224,8 @@ export default function StudioEditor() {
   }
 
   return (
-    <div className="studio-root h-screen flex flex-col bg-canvas text-ink">
+    // .studio-root는 StudioTheme 래퍼가 제공 — 여기서 또 붙이면 다크 변수를 라이트로 되덮는다
+    <div className="h-screen flex flex-col bg-canvas text-ink">
       <header className="h-[52px] shrink-0 flex items-center gap-2 px-3 border-b border-line bg-white">
         <Link
           to="/studio"

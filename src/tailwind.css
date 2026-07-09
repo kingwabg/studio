@@ -18,8 +18,8 @@
    계산하는데, 맑은 고딕이 정확히 1em이라 화면 줄바꿈 = 한글 줄바꿈이 된다.
    (Pretendard는 0.86em이라 화면이 더 들어가 미리보기와 어긋남. UI 셸은 Pretendard 유지) */
 .canvas-dots {
-  background-image: radial-gradient(circle, #cbd2de 1px, transparent 1px);
-  background-size: 22px 22px;
+  background-image: radial-gradient(circle, var(--dot, #d5dae3) 1px, transparent 1px);
+  background-size: 24px 24px;
   font-family: "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
 }
 .thumb-grad {
@@ -39,43 +39,128 @@
   box-shadow: 0 2px 8px rgba(26, 34, 51, 0.06), 0 12px 28px rgba(26, 34, 51, 0.1);
 }
 
-/* ── 브랜드 색 유틸리티 (기존 앱 디자인 토큰 T와 동일 값) ──
+/* ── 디자인 토큰 (docs/design/README.md — 업무24 리디자인) ──
+   라이트/다크를 CSS 변수 한 벌로 통일한다. 유틸리티 클래스 이름은 유지하고
+   값만 변수를 가리키게 해서, 기존 마크업이 다크 모드를 공짜로 얻는다.
+   ⚠ A4 지면은 다크에서도 흰색(조판 정합) — 지면은 var를 쓰지 않는 리터럴 bg-white 유지. */
+.studio-root {
+  /* 잉크 */
+  --ink: #1a2233;
+  --inksoft: #5b6577;
+  --inkfaint: #98a2b3;
+  /* 액센트 (문서 블루) */
+  --accent: #2b5ce6;
+  --accenthover: #1f49c4;
+  --accentsoft: #edf2fe;
+  --accentline: #c4d4f9;
+  --accenttext: #2b5ce6; /* 다크에선 밝은 파랑 텍스트용 별도 값 */
+  --on-accent: #ffffff; /* 액센트 배경 위 글자 */
+  /* 표면·경계 */
+  --surface: #ffffff; /* 크롬(툴바·패널·카드) 표면 */
+  --paper: #f6f7fa;
+  --canvas: #edf0f5;
+  --line: #e4e8ef;
+  --linestrong: #cbd2de;
+  --dot: #d5dae3; /* 캔버스 도트 그리드 */
+  /* 상태 */
+  --success: #4caf7d;
+  --successsoft: #edf8f1;
+  --guide: #e5484d; /* 스냅 가이드 */
+  --groupline: #7c9af0; /* 그룹 선택 점선 */
+  /* 카테고리 틴트 (홈·팔레트) */
+  --cat-orange: #c77a28; --cat-orange-soft: #fbf3e7;
+  --cat-green: #3b9b6b; --cat-green-soft: #eaf6ef;
+  --cat-purple: #8a5fc8; --cat-purple-soft: #f3eefb;
+  --cat-red: #d64550; --cat-red-soft: #fdeef0;
+  --hero: #fbf8f2; --heroline: #f0e9dc;
+  /* 그림자 */
+  --sh-card: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --sh-card-hover: 0 2px 4px rgba(16, 24, 40, 0.06), 0 12px 24px -8px rgba(16, 24, 40, 0.14);
+  --sh-page: 0 1px 2px rgba(16, 24, 40, 0.08), 0 10px 28px rgba(16, 24, 40, 0.1),
+    0 32px 64px -24px rgba(26, 34, 51, 0.2);
+  --sh-pop: 0 4px 10px rgba(16, 24, 40, 0.08), 0 20px 44px -12px rgba(16, 24, 40, 0.24);
+}
+
+/* 다크 — 크롬만 어둡게, 지면은 흰색 유지 (시안 1c) */
+.studio-root.dark {
+  --ink: #e7eaf0;
+  --inksoft: #9aa3b2;
+  --inkfaint: #6b7484;
+  --accent: #5b84f0;
+  --accenthover: #6f94f4;
+  --accentsoft: rgba(91, 132, 240, 0.15);
+  --accentline: rgba(91, 132, 240, 0.42);
+  --accenttext: #8fadf6;
+  --on-accent: #0c0f14;
+  --surface: #171b23;
+  --paper: #12151c;
+  --canvas: #0c0f14;
+  --line: rgba(255, 255, 255, 0.08);
+  --linestrong: rgba(255, 255, 255, 0.14);
+  --dot: #1c212b;
+  --successsoft: rgba(76, 175, 125, 0.14);
+  --hero: #171b23; --heroline: rgba(255, 255, 255, 0.08);
+  --cat-orange-soft: rgba(199, 122, 40, 0.14);
+  --cat-green-soft: rgba(59, 155, 107, 0.14);
+  --cat-purple-soft: rgba(138, 95, 200, 0.14);
+  --cat-red-soft: rgba(214, 69, 80, 0.16);
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 24px -8px rgba(0, 0, 0, 0.5);
+  --sh-page: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.45),
+    0 32px 64px -24px rgba(0, 0, 0, 0.6);
+  --sh-pop: 0 4px 10px rgba(0, 0, 0, 0.4), 0 20px 44px -12px rgba(0, 0, 0, 0.65);
+  color-scheme: dark;
+}
+
+/* ── 브랜드 색 유틸리티 — 변수를 가리킨다 ──
    @tailwindcss/vite의 @theme가 분리 임포트에서 안 먹어 직접 정의한다.
    레이어 밖 규칙이라 레이어된 기본 유틸리티보다 항상 우선한다. */
-.text-ink { color: #1a2233; }
-.text-inksoft { color: #5b6577; }
-.text-inkfaint { color: #98a2b3; }
-.text-inkfaint\/70 { color: color-mix(in srgb, #98a2b3 70%, transparent); }
-.text-accent { color: #2b5ce6; }
+.text-ink { color: var(--ink, #1a2233); }
+.text-inksoft { color: var(--inksoft, #5b6577); }
+.text-inkfaint { color: var(--inkfaint, #98a2b3); }
+.text-inkfaint\/70 { color: color-mix(in srgb, var(--inkfaint, #98a2b3) 70%, transparent); }
+.text-accent { color: var(--accenttext, #2b5ce6); }
+.text-onaccent { color: var(--on-accent, #ffffff); }
+.text-success { color: var(--success, #4caf7d); }
 
-.bg-ink { background-color: #1a2233; }
-.bg-line { background-color: #e4e8ef; }
-.bg-paper { background-color: #f6f7fa; }
-.bg-canvas { background-color: #edf0f5; }
-.bg-accent { background-color: #2b5ce6; }
-.bg-accentsoft { background-color: #edf2fe; }
+.bg-ink { background-color: var(--ink, #1a2233); }
+.bg-line { background-color: var(--line, #e4e8ef); }
+.bg-paper { background-color: var(--paper, #f6f7fa); }
+.bg-canvas { background-color: var(--canvas, #edf0f5); }
+.bg-accent { background-color: var(--accent, #2b5ce6); }
+.bg-accentsoft { background-color: var(--accentsoft, #edf2fe); }
+.bg-surface { background-color: var(--surface, #ffffff); }
+.bg-hero { background-color: var(--hero, #fbf8f2); }
+.bg-successsoft { background-color: var(--successsoft, #edf8f1); }
 
-.border-line { border-color: #e4e8ef; }
-.border-linestrong { border-color: #cbd2de; }
-.border-accentline { border-color: #c4d4f9; }
+.border-line { border-color: var(--line, #e4e8ef); }
+.border-linestrong { border-color: var(--linestrong, #cbd2de); }
+.border-accentline { border-color: var(--accentline, #c4d4f9); }
+.border-hero { border-color: var(--heroline, #f0e9dc); }
+
+/* 그림자 유틸리티 (시안 공통 그림자 3종) */
+.sh-card { box-shadow: var(--sh-card); }
+.sh-pop { box-shadow: var(--sh-pop); }
 
 /* 상태 변형 — 실제 사용한 조합만 손으로 정의 */
-.hover\:bg-accent:hover { background-color: #2b5ce6; }
-.hover\:bg-accenthover:hover { background-color: #1f49c4; }
-.hover\:bg-paper:hover { background-color: #f6f7fa; }
-.hover\:bg-accentsoft:hover { background-color: #edf2fe; }
-.hover\:bg-accentsoft\/40:hover { background-color: color-mix(in srgb, #edf2fe 40%, transparent); }
-.hover\:bg-accentsoft\/30:hover { background-color: color-mix(in srgb, #edf2fe 30%, transparent); }
-.hover\:text-accent:hover { color: #2b5ce6; }
-.hover\:text-ink:hover { color: #1a2233; }
-.hover\:border-line:hover { border-color: #e4e8ef; }
-.hover\:border-accent:hover { border-color: #2b5ce6; }
-.hover\:border-accentline:hover { border-color: #c4d4f9; }
+.hover\:bg-accent:hover { background-color: var(--accent, #2b5ce6); }
+.hover\:bg-accenthover:hover { background-color: var(--accenthover, #1f49c4); }
+.hover\:bg-paper:hover { background-color: var(--paper, #f6f7fa); }
+.hover\:bg-accentsoft:hover { background-color: var(--accentsoft, #edf2fe); }
+.hover\:bg-accentsoft\/40:hover { background-color: color-mix(in srgb, var(--accentsoft, #edf2fe) 40%, transparent); }
+.hover\:bg-accentsoft\/30:hover { background-color: color-mix(in srgb, var(--accentsoft, #edf2fe) 30%, transparent); }
+.hover\:text-accent:hover { color: var(--accenttext, #2b5ce6); }
+.hover\:text-onaccent:hover { color: var(--on-accent, #ffffff); }
+.hover\:text-ink:hover { color: var(--ink, #1a2233); }
+.hover\:border-line:hover { border-color: var(--line, #e4e8ef); }
+.hover\:border-accent:hover { border-color: var(--accent, #2b5ce6); }
+.hover\:border-accentline:hover { border-color: var(--accentline, #c4d4f9); }
+.hover\:border-linestrong:hover { border-color: var(--linestrong, #cbd2de); }
 
-.focus\:border-accent:focus { border-color: #2b5ce6; }
-.focus\:border-accentline:focus { border-color: #c4d4f9; }
-.focus\:ring-accentsoft:focus { --tw-ring-color: #edf2fe; box-shadow: 0 0 0 2px #edf2fe; }
-.ring-accent { --tw-ring-color: #2b5ce6; }
+.focus\:border-accent:focus { border-color: var(--accent, #2b5ce6); }
+.focus\:border-accentline:focus { border-color: var(--accentline, #c4d4f9); }
+.focus\:ring-accentsoft:focus { --tw-ring-color: var(--accentsoft, #edf2fe); box-shadow: 0 0 0 2px var(--accentsoft, #edf2fe); }
+.ring-accent { --tw-ring-color: var(--accent, #2b5ce6); }
 
 /* ── table-king을 자유배치 캔버스에 띄울 때의 배치 보정 ──
    원본은 문서 흐름 안에서 툴바가 표 위에 "쌓이는" 구조인데, 캔버스 블록은 크기가

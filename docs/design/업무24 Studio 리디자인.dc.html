@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    body { margin:0; background:#E9ECF2; font-family:'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif; -webkit-font-smoothing:antialiased; }
+    a { color:#2B5CE6; text-decoration:none; }
+    a:hover { color:#1F49C4; }
+    ::selection { background:#C4D4F9; }
+  </style>
+</helmet>
+
+<section style="padding:56px 64px; display:flex; flex-direction:column; gap:56px;">
+
+  <!-- ============ 1a 홈 대시보드 ============ -->
+  <div id="1a" data-screen-label="홈 대시보드" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="#1a" style="display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:24px; border-radius:7px; background:#1A2233; color:#fff; font-size:12px; font-weight:700; letter-spacing:.02em;">1a</a>
+      <span style="font-size:14px; font-weight:600; color:#1A2233;">홈 대시보드 — /studio (라이트 · 캔바식 따뜻함 + 절제)</span>
+    </div>
+    <div style="width:1440px; height:960px; background:#F9FAFC; border-radius:14px; overflow:hidden; border:1px solid #DDE2EA; box-shadow:0 2px 6px rgba(16,24,40,.05), 0 24px 48px -20px rgba(16,24,40,.18); display:flex; flex-direction:column;">
+
+      <!-- 상단 네비 -->
+      <div style="height:60px; background:#FFFFFF; border-bottom:1px solid #E4E8EF; display:flex; align-items:center; padding:0 28px; gap:28px; flex:none;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:28px; height:28px; border-radius:8px; background:#2B5CE6; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; letter-spacing:-.03em;">24</div>
+          <div style="font-size:16px; font-weight:800; color:#1A2233; letter-spacing:-.01em;">업무24</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <div style="padding:7px 14px; border-radius:8px; background:#EDF2FE; color:#2B5CE6; font-size:13.5px; font-weight:600;">홈</div>
+          <div style="padding:7px 14px; border-radius:8px; color:#5B6577; font-size:13.5px; font-weight:500;" style-hover="background:#F6F7FA; color:#1A2233;">템플릿</div>
+          <div style="padding:7px 14px; border-radius:8px; color:#5B6577; font-size:13.5px; font-weight:500;" style-hover="background:#F6F7FA; color:#1A2233;">내 문서</div>
+        </div>
+        <div style="flex:1; display:flex; justify-content:center;">
+          <div style="width:420px; height:36px; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:10px; display:flex; align-items:center; gap:9px; padding:0 12px;" style-hover="border-color:#CBD2DE; background:#fff;">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="4.6" stroke="#98A2B3" stroke-width="1.5"/><path d="M10 10l3 3" stroke="#98A2B3" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span style="font-size:13px; color:#98A2B3;">문서·템플릿 검색</span>
+            <span style="margin-left:auto; font-size:11px; color:#98A2B3; border:1px solid #E4E8EF; border-radius:5px; padding:1px 6px; background:#fff;">⌘K</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="padding:7px 14px; border-radius:9px; border:1px solid #C4D4F9; background:#EDF2FE; color:#2B5CE6; font-size:13px; font-weight:700;" style-hover="background:#E0E9FD;">업그레이드</div>
+          <div style="width:32px; height:32px; border-radius:50%; background:#1A2233; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">김</div>
+        </div>
+      </div>
+
+      <div style="flex:1; overflow:hidden; padding:36px 48px 0; display:flex; flex-direction:column; gap:36px;">
+
+        <!-- 히어로: 새 문서 시작 -->
+        <div style="background:#FBF8F2; border:1px solid #F0E9DC; border-radius:16px; padding:32px 36px 30px; display:flex; flex-direction:column; gap:22px;">
+          <div style="display:flex; align-items:baseline; justify-content:space-between;">
+            <div style="font-size:24px; font-weight:800; color:#1A2233; letter-spacing:-.02em;">오늘은 어떤 문서를 만들까요?</div>
+            <a href="#1a" style="font-size:13px; font-weight:600;">템플릿 전체 보기 →</a>
+          </div>
+          <div style="display:flex; gap:14px;">
+            <sc-for list="{{ starters }}" as="s" hint-placeholder-count="6">
+              <div style="width:128px; display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer;">
+                <div style="width:128px; height:96px; background:#fff; border:1px solid #E9E2D4; border-radius:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 2px rgba(16,24,40,.04); transition:all .15s ease;" style-hover="transform:translateY(-2px); box-shadow:0 2px 4px rgba(16,24,40,.06), 0 12px 24px -8px rgba(16,24,40,.14); border-color:#C4D4F9;">
+                  <div style="width:52px; height:70px; background:#fff; border:1px solid #E4E8EF; border-radius:3px; box-shadow:0 1px 3px rgba(16,24,40,.10); padding:8px 7px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="height:5px; width:70%; border-radius:2px; background:{{ s.tone }};"></div>
+                    <div style="height:3px; width:100%; border-radius:2px; background:#E4E8EF;"></div>
+                    <div style="height:3px; width:88%; border-radius:2px; background:#E4E8EF;"></div>
+                    <div style="height:3px; width:94%; border-radius:2px; background:#EDF0F5;"></div>
+                    <div style="height:3px; width:60%; border-radius:2px; background:#EDF0F5;"></div>
+                  </div>
+                </div>
+                <div style="font-size:13px; font-weight:600; color:#1A2233;">{{ s.name }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- 인기 템플릿 -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div style="display:flex; align-items:baseline; gap:10px;">
+            <div style="font-size:17px; font-weight:700; color:#1A2233;">인기 템플릿</div>
+            <div style="font-size:12.5px; color:#98A2B3;">HWPX 내보내기 검증 완료</div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:16px;">
+            <sc-for list="{{ templates }}" as="t" hint-placeholder-count="4">
+              <div style="background:#fff; border:1px solid #E4E8EF; border-radius:14px; overflow:hidden; cursor:pointer; transition:all .15s ease;" style-hover="transform:translateY(-2px); box-shadow:0 2px 4px rgba(16,24,40,.06), 0 16px 32px -12px rgba(16,24,40,.16); border-color:#CBD2DE;">
+                <div style="height:150px; background:{{ t.bg }}; display:flex; align-items:flex-end; justify-content:center; overflow:hidden;">
+                  <div style="width:120px; height:126px; background:#fff; border:1px solid rgba(16,24,40,.08); border-radius:4px 4px 0 0; box-shadow:0 -2px 12px rgba(16,24,40,.10); padding:14px 13px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="height:7px; width:64%; margin:0 auto; border-radius:2px; background:#1A2233;"></div>
+                    <div style="height:4px; width:40%; border-radius:2px; background:{{ t.tone }}; margin-top:5px;"></div>
+                    <div style="height:3.5px; width:100%; border-radius:2px; background:#E4E8EF;"></div>
+                    <div style="height:3.5px; width:92%; border-radius:2px; background:#E4E8EF;"></div>
+                    <div style="height:4px; width:40%; border-radius:2px; background:{{ t.tone }}; margin-top:5px;"></div>
+                    <div style="height:3.5px; width:100%; border-radius:2px; background:#E4E8EF;"></div>
+                    <div style="height:3.5px; width:84%; border-radius:2px; background:#E4E8EF;"></div>
+                  </div>
+                </div>
+                <div style="padding:13px 16px 14px; display:flex; align-items:center; gap:8px;">
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:13.5px; font-weight:700; color:#1A2233;">{{ t.name }}</div>
+                    <div style="font-size:12px; color:#98A2B3; margin-top:2px;">{{ t.meta }}</div>
+                  </div>
+                  <div style="font-size:11px; font-weight:700; color:{{ t.tone }}; background:{{ t.bg }}; border-radius:20px; padding:3px 9px;">{{ t.tag }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- 최근 문서 -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div style="display:flex; align-items:baseline; justify-content:space-between;">
+            <div style="font-size:17px; font-weight:700; color:#1A2233;">최근 문서</div>
+            <a href="#1a" style="font-size:13px; font-weight:600;">모두 보기 →</a>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:14px;">
+            <sc-for list="{{ recents }}" as="d" hint-placeholder-count="5">
+              <div style="background:#fff; border:1px solid #E4E8EF; border-radius:12px; overflow:hidden; cursor:pointer; transition:all .15s ease;" style-hover="transform:translateY(-2px); box-shadow:0 2px 4px rgba(16,24,40,.06), 0 12px 24px -8px rgba(16,24,40,.14);">
+                <div style="height:118px; background:#F6F7FA; border-bottom:1px solid #EDF0F5; display:flex; align-items:center; justify-content:center;">
+                  <div style="width:78px; height:100px; background:#fff; border:1px solid #E4E8EF; border-radius:3px; box-shadow:0 1px 4px rgba(16,24,40,.08); padding:10px 9px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="height:5px; width:66%; margin:0 auto; border-radius:2px; background:#1A2233;"></div>
+                    <div style="height:3px; width:100%; border-radius:2px; background:#E4E8EF; margin-top:4px;"></div>
+                    <div style="height:3px; width:90%; border-radius:2px; background:#E4E8EF;"></div>
+                    <div style="height:3px; width:96%; border-radius:2px; background:#EDF0F5;"></div>
+                    <div style="height:14px; width:100%; border:1px solid #E4E8EF; border-radius:2px; margin-top:3px;"></div>
+                    <div style="height:3px; width:70%; border-radius:2px; background:#EDF0F5;"></div>
+                  </div>
+                </div>
+                <div style="padding:11px 14px 12px;">
+                  <div style="font-size:13px; font-weight:600; color:#1A2233; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ d.name }}</div>
+                  <div style="font-size:11.5px; color:#98A2B3; margin-top:3px;">{{ d.time }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 1b 에디터 셸 (라이트) ============ -->
+  <div id="1b" data-screen-label="에디터 셸 라이트" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="#1b" style="display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:24px; border-radius:7px; background:#1A2233; color:#fff; font-size:12px; font-weight:700;">1b</a>
+      <span style="font-size:14px; font-weight:600; color:#1A2233;">에디터 셸 (라이트) — 좌: 블록·구조 / 우: 속성 패널 / 지면이 주인공</span>
+    </div>
+    <div style="width:1560px; height:980px; background:#EDF0F5; border-radius:14px; overflow:hidden; border:1px solid #DDE2EA; box-shadow:0 2px 6px rgba(16,24,40,.05), 0 24px 48px -20px rgba(16,24,40,.18); display:flex; flex-direction:column;">
+
+      <!-- 상단 액션 바 -->
+      <div style="height:52px; background:#FFFFFF; border-bottom:1px solid #E4E8EF; display:flex; align-items:center; padding:0 16px; gap:14px; flex:none; box-shadow:0 1px 2px rgba(16,24,40,.03); position:relative; z-index:3;">
+        <div style="display:flex; align-items:center; gap:6px; padding:6px 10px 6px 6px; border-radius:8px; color:#5B6577; font-size:13px; font-weight:500; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          내 문서
+        </div>
+        <div style="width:1px; height:20px; background:#E4E8EF;"></div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:22px; height:22px; border-radius:6px; background:#2B5CE6; display:flex; align-items:center; justify-content:center; color:#fff; font-size:9px; font-weight:800;">24</div>
+          <div style="font-size:14.5px; font-weight:700; color:#1A2233; letter-spacing:-.01em; padding:4px 8px; border-radius:7px; border:1px solid transparent;" style-hover="border-color:#E4E8EF; background:#F6F7FA;">2026 사업계획서</div>
+          <div style="display:flex; align-items:center; gap:5px; font-size:12px; color:#98A2B3;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5L5 9l4.5-5.5" stroke="#4CAF7D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            저장됨
+          </div>
+        </div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:7px; padding:7px 13px; border-radius:9px; color:#5B6577; font-size:13px; font-weight:600; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 5.5h5M4.5 8.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            공문서로 펴기
+          </div>
+          <div style="display:flex; align-items:center; gap:7px; padding:7px 13px; border-radius:9px; border:1px solid #E4E8EF; background:#fff; color:#1A2233; font-size:13px; font-weight:600; cursor:pointer;" style-hover="border-color:#CBD2DE; background:#F6F7FA;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.8 7s1.9-3.6 5.2-3.6S12.2 7 12.2 7 10.3 10.6 7 10.6 1.8 7 1.8 7Z" stroke="currentColor" stroke-width="1.4"/><circle cx="7" cy="7" r="1.6" stroke="currentColor" stroke-width="1.4"/></svg>
+            한글 미리보기
+          </div>
+          <div style="display:flex; align-items:center; gap:7px; padding:7px 15px; border-radius:9px; background:#2B5CE6; color:#fff; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(43,92,230,.35);" style-hover="background:#1F49C4;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v7M4 6.5L7 9.5l3-3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5h9" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>
+            HWPX 내보내기
+          </div>
+        </div>
+      </div>
+
+      <!-- 서식 툴바 -->
+      <div style="height:44px; background:#FFFFFF; border-bottom:1px solid #E4E8EF; display:flex; align-items:center; padding:0 16px; gap:8px; flex:none; position:relative; z-index:2;">
+        <div style="display:flex; align-items:center; gap:8px; height:30px; padding:0 10px; border:1px solid #E4E8EF; border-radius:8px; background:#fff; font-size:12.5px; color:#1A2233; min-width:100px;" style-hover="border-color:#CBD2DE;">
+          맑은 고딕
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="margin-left:auto;"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="#98A2B3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div style="display:flex; align-items:center; height:30px; border:1px solid #E4E8EF; border-radius:8px; overflow:hidden;">
+          <div style="width:22px; height:100%; display:flex; align-items:center; justify-content:center; color:#5B6577; font-size:14px; cursor:pointer;" style-hover="background:#F6F7FA;">−</div>
+          <div style="width:36px; text-align:center; font-size:12.5px; font-weight:600; color:#1A2233; border-left:1px solid #E4E8EF; border-right:1px solid #E4E8EF; height:100%; display:flex; align-items:center; justify-content:center;">10pt</div>
+          <div style="width:22px; height:100%; display:flex; align-items:center; justify-content:center; color:#5B6577; font-size:14px; cursor:pointer;" style-hover="background:#F6F7FA;">＋</div>
+        </div>
+        <div style="width:1px; height:20px; background:#E4E8EF;"></div>
+        <div style="display:flex; align-items:center; gap:2px;">
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#2B5CE6; background:#EDF2FE;">가</div>
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; font-style:italic; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">가</div>
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; text-decoration:underline; text-underline-offset:2px; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">가</div>
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; text-decoration:line-through; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">가</div>
+        </div>
+        <div style="width:1px; height:20px; background:#E4E8EF;"></div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <sc-for list="{{ swatches }}" as="c" hint-placeholder-count="6">
+            <div style="width:17px; height:17px; border-radius:50%; background:{{ c.hex }}; border:2px solid {{ c.ring }}; box-shadow:0 0 0 1px rgba(16,24,40,.06); cursor:pointer;" style-hover="transform:scale(1.15);"></div>
+          </sc-for>
+        </div>
+        <div style="width:1px; height:20px; background:#E4E8EF;"></div>
+        <div style="display:flex; height:30px; border:1px solid #E4E8EF; border-radius:8px; overflow:hidden; background:#F6F7FA;">
+          <div style="width:32px; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:inset 0 0 0 1px #C4D4F9; border-radius:7px; margin:1px;">
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M1 1.5h12M1 5h8M1 8.5h12M1 12h8" stroke="#2B5CE6" stroke-width="1.5" stroke-linecap="round" transform="translate(0,-0.8)"/></svg>
+          </div>
+          <div style="width:32px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:#EDF0F5;">
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M1 .7h12M3 4.2h8M1 7.7h12M3 11.2h8" stroke="#98A2B3" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div style="width:32px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:#EDF0F5;">
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M1 .7h12M5 4.2h8M1 7.7h12M5 11.2h8" stroke="#98A2B3" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div style="width:32px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:#EDF0F5;">
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M1 .7h12M1 4.2h12M1 7.7h12M1 11.2h8" stroke="#98A2B3" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <!-- 줄 간격 -->
+        <div style="display:flex; align-items:center; gap:7px; height:30px; padding:0 9px; border:1px solid #E4E8EF; border-radius:8px; font-size:12.5px; font-weight:600; color:#1A2233; cursor:pointer;" style-hover="border-color:#CBD2DE; background:#F6F7FA;">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6 2.2h6M6 6.5h6M6 10.8h6" stroke="#5B6577" stroke-width="1.4" stroke-linecap="round"/><path d="M2.4 2.4v8.2M1 4l1.4-1.6L3.8 4M1 9l1.4 1.6L3.8 9" stroke="#5B6577" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          160%
+          <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="#98A2B3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <!-- 목록 (개조식·번호) -->
+        <div style="display:flex; align-items:center; gap:2px;">
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:#F6F7FA;">
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><rect x="1" y="1" width="2.4" height="2.4" stroke="#5B6577" stroke-width="1.1"/><rect x="1" y="8.4" width="2.4" height="2.4" stroke="#5B6577" stroke-width="1.1"/><path d="M6 2.2h7M6 9.6h7" stroke="#5B6577" stroke-width="1.4" stroke-linecap="round"/></svg>
+          </div>
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#5B6577; cursor:pointer; letter-spacing:-.05em;" style-hover="background:#F6F7FA; color:#1A2233;">1.</div>
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">가.</div>
+        </div>
+        <div style="width:1px; height:20px; background:#E4E8EF;"></div>
+        <!-- 표 도구 -->
+        <div style="position:relative; display:flex; align-items:center; gap:2px;">
+          <!-- 표 테두리 (열린 상태) -->
+          <div style="display:flex; align-items:center; gap:6px; height:30px; padding:0 9px; border-radius:8px; background:#EDF2FE; box-shadow:inset 0 0 0 1px #C4D4F9; font-size:12.5px; font-weight:600; color:#2B5CE6; cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.4" y="1.4" width="11.2" height="11.2" stroke="#2B5CE6" stroke-width="1.5"/><path d="M1.4 7h11.2M7 1.4v11.2" stroke="#2B5CE6" stroke-width="1.1" stroke-dasharray="1.8 1.6"/></svg>
+            테두리
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="#2B5CE6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <!-- 셀 배경 -->
+          <div style="width:30px; height:28px; border-radius:7px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer;" style-hover="background:#F6F7FA;">
+            <svg width="13" height="11" viewBox="0 0 13 11" fill="none"><path d="M4.2 1.2l5.4 5.2-4.1 3.8a1.2 1.2 0 0 1-1.7 0L1.5 8a1.2 1.2 0 0 1 0-1.7L4.2 1.2Z" stroke="#5B6577" stroke-width="1.3" stroke-linejoin="round"/><path d="M11.4 7.6s1 1.3 1 2a1 1 0 0 1-2 0c0-.7 1-2 1-2Z" fill="#5B6577"/></svg>
+            <div style="width:14px; height:3px; border-radius:1.5px; background:#F2F2F2; border:1px solid #CBD2DE;"></div>
+          </div>
+          <!-- 셀 합치기 -->
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:#F6F7FA;">
+            <svg width="14" height="13" viewBox="0 0 14 13" fill="none"><rect x="1.2" y="1.6" width="11.6" height="9.8" rx="1" stroke="#5B6577" stroke-width="1.3"/><path d="M4.6 6.5h4.8M7.9 4.9l1.5 1.6-1.5 1.6M6.1 4.9L4.6 6.5l1.5 1.6" stroke="#5B6577" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <!-- 행/열 추가 -->
+          <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:#F6F7FA;">
+            <svg width="14" height="13" viewBox="0 0 14 13" fill="none"><rect x="1.2" y="1.6" width="8" height="9.8" rx="1" stroke="#5B6577" stroke-width="1.3"/><path d="M1.2 6.5h8M5.2 1.6v9.8" stroke="#5B6577" stroke-width="1.1"/><path d="M12 4.5v4M10 6.5h4" stroke="#2B5CE6" stroke-width="1.4" stroke-linecap="round"/></svg>
+          </div>
+
+          <!-- 테두리 팝오버 -->
+          <div style="position:absolute; top:36px; left:0; width:276px; background:#fff; border:1px solid #E4E8EF; border-radius:13px; box-shadow:0 4px 10px rgba(16,24,40,.08), 0 20px 44px -12px rgba(16,24,40,.24); padding:14px; z-index:6; display:flex; flex-direction:column; gap:12px;">
+            <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em;">표 테두리</div>
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;">
+              <sc-for list="{{ borderPresets }}" as="b" hint-placeholder-count="12">
+                <div style="border:1px solid {{ b.frame }}; background:{{ b.bg }}; border-radius:8px; padding:7px 0 5px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer;" style-hover="border-color:#C4D4F9; background:#F8FAFF;">
+                  <div style="width:18px; height:18px; border-style:solid; border-width:1.4px; border-color:{{ b.bc }}; position:relative;">
+                    <div style="position:absolute; left:0; right:0; top:50%; margin-top:-0.7px; height:1.4px; background:{{ b.h }};"></div>
+                    <div style="position:absolute; top:0; bottom:0; left:50%; margin-left:-0.7px; width:1.4px; background:{{ b.v }};"></div>
+                  </div>
+                  <div style="font-size:10px; font-weight:600; color:{{ b.labelColor }};">{{ b.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:7px;">
+              <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em;">선 종류</div>
+              <div style="display:flex; gap:6px;">
+                <div style="flex:1; height:28px; border-radius:7px; background:#EDF2FE; box-shadow:inset 0 0 0 1px #C4D4F9; display:flex; align-items:center; justify-content:center;"><div style="width:22px; border-top:1.5px solid #1A2233;"></div></div>
+                <div style="flex:1; height:28px; border-radius:7px; border:1px solid #E4E8EF; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="border-color:#CBD2DE;"><div style="width:22px; border-top:1.5px dashed #1A2233;"></div></div>
+                <div style="flex:1; height:28px; border-radius:7px; border:1px solid #E4E8EF; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="border-color:#CBD2DE;"><div style="width:22px; border-top:1.5px dotted #1A2233;"></div></div>
+                <div style="flex:1; height:28px; border-radius:7px; border:1px solid #E4E8EF; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="border-color:#CBD2DE;"><div style="width:22px; border-top:3px double #1A2233;"></div></div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em; flex:1;">굵기</div>
+              <div style="display:flex; align-items:center; height:28px; border:1px solid #E4E8EF; border-radius:7px; overflow:hidden;">
+                <div style="width:22px; height:100%; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA;">−</div>
+                <div style="width:52px; text-align:center; font-size:12px; font-weight:600; color:#1A2233; border-left:1px solid #E4E8EF; border-right:1px solid #E4E8EF; height:100%; display:flex; align-items:center; justify-content:center; font-variant-numeric:tabular-nums;">0.4mm</div>
+                <div style="width:22px; height:100%; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA;">＋</div>
+              </div>
+            </div>
+            <div style="border-top:1px solid #EDF0F5; padding-top:10px; display:flex; align-items:center; justify-content:space-between;">
+              <div style="font-size:12px; color:#5B6577;">선택한 셀에만 적용</div>
+              <div style="width:32px; height:18px; border-radius:10px; background:#2B5CE6; position:relative; cursor:pointer;"><div style="position:absolute; top:2px; right:2px; width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(16,24,40,.2);"></div></div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;"></div>
+        <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+          <svg width="14" height="4" viewBox="0 0 14 4" fill="none"><circle cx="2" cy="2" r="1.4" fill="currentColor"/><circle cx="7" cy="2" r="1.4" fill="currentColor"/><circle cx="12" cy="2" r="1.4" fill="currentColor"/></svg>
+        </div>
+      </div>
+
+      <!-- 본체 3분할 -->
+      <div style="flex:1; display:flex; overflow:hidden;">
+
+        <!-- 좌측: 아이콘 레일 + 콘텐츠 패널 (캔바식 2단) -->
+        <div style="display:flex; flex:none;">
+          <!-- 레일 -->
+          <div style="width:66px; background:#FFFFFF; border-right:1px solid #EDF0F5; display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:3px;">
+            <div style="width:56px; padding:8px 0 7px; border-radius:11px; background:#EDF2FE; display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer;">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><rect x="1.8" y="1.8" width="5.6" height="5.6" rx="1.5" stroke="#2B5CE6" stroke-width="1.5"/><rect x="9.6" y="1.8" width="5.6" height="5.6" rx="1.5" stroke="#2B5CE6" stroke-width="1.5"/><rect x="1.8" y="9.6" width="5.6" height="5.6" rx="1.5" stroke="#2B5CE6" stroke-width="1.5"/><rect x="9.6" y="9.6" width="5.6" height="5.6" rx="1.5" stroke="#2B5CE6" stroke-width="1.5"/></svg>
+              <span style="font-size:10.5px; font-weight:700; color:#2B5CE6;">블록</span>
+            </div>
+            <div style="width:56px; padding:8px 0 7px; border-radius:11px; display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer;" style-hover="background:#F6F7FA;">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><rect x="3.2" y="1.8" width="10.6" height="13.4" rx="1.8" stroke="#5B6577" stroke-width="1.5"/><path d="M5.8 5.4h5.4M5.8 8.2h5.4M5.8 11h3.4" stroke="#5B6577" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <span style="font-size:10.5px; font-weight:600; color:#5B6577;">템플릿</span>
+            </div>
+            <div style="width:56px; padding:8px 0 7px; border-radius:11px; display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer;" style-hover="background:#F6F7FA;">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><rect x="2" y="2.2" width="13" height="4" rx="1.4" stroke="#5B6577" stroke-width="1.5"/><rect x="2" y="10.8" width="13" height="4" rx="1.4" stroke="#5B6577" stroke-width="1.5"/><path d="M8.5 6.2v4.6" stroke="#5B6577" stroke-width="1.4"/></svg>
+              <span style="font-size:10.5px; font-weight:600; color:#5B6577;">데이터</span>
+            </div>
+            <div style="width:56px; padding:8px 0 7px; border-radius:11px; display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer;" style-hover="background:#F6F7FA;">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M8.5 10.5V2.8M5.4 5.6l3.1-3 3.1 3" stroke="#5B6577" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1.6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-1.6" stroke="#5B6577" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span style="font-size:10.5px; font-weight:600; color:#5B6577;">업로드</span>
+            </div>
+            <div style="width:56px; padding:8px 0 7px; border-radius:11px; display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer;" style-hover="background:#F6F7FA;">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M8.5 1.8l1.7 4.3 4.5 1.4-4.5 1.4-1.7 4.3-1.7-4.3-4.5-1.4 4.5-1.4 1.7-4.3Z" stroke="#5B6577" stroke-width="1.4" stroke-linejoin="round"/><path d="M13.4 11.6l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" stroke="#5B6577" stroke-width="1.2" stroke-linejoin="round"/></svg>
+              <span style="font-size:10.5px; font-weight:600; color:#5B6577;">AI</span>
+            </div>
+          </div>
+
+          <!-- 콘텐츠 패널: 블록 -->
+          <div style="width:250px; background:#FFFFFF; border-right:1px solid #E4E8EF; display:flex; flex-direction:column; overflow:hidden;">
+            <div style="padding:12px 12px 0;">
+              <div style="height:36px; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:10px; display:flex; align-items:center; gap:8px; padding:0 11px;" style-hover="border-color:#CBD2DE; background:#fff;">
+                <svg width="14" height="14" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="4.6" stroke="#98A2B3" stroke-width="1.5"/><path d="M10 10l3 3" stroke="#98A2B3" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span style="font-size:12.5px; color:#98A2B3;">블록·서식 검색</span>
+              </div>
+            </div>
+            <div style="padding:14px 12px 0; display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:baseline; justify-content:space-between;">
+                <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em;">자주 사용함</div>
+                <a href="#1b" style="font-size:11px; font-weight:600;">모두 보기</a>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <div style="padding:5px 10px; border-radius:20px; border:1px solid #E4E8EF; font-size:11.5px; font-weight:600; color:#5B6577; cursor:pointer;" style-hover="border-color:#C4D4F9; color:#2B5CE6; background:#F8FAFF;">본문 텍스트</div>
+                <div style="padding:5px 10px; border-radius:20px; border:1px solid #E4E8EF; font-size:11.5px; font-weight:600; color:#5B6577; cursor:pointer;" style-hover="border-color:#C4D4F9; color:#2B5CE6; background:#F8FAFF;">3×2 표</div>
+                <div style="padding:5px 10px; border-radius:20px; border:1px solid #E4E8EF; font-size:11.5px; font-weight:600; color:#5B6577; cursor:pointer;" style-hover="border-color:#C4D4F9; color:#2B5CE6; background:#F8FAFF;">결재선</div>
+              </div>
+            </div>
+            <div style="padding:16px 12px 0; display:flex; flex-direction:column; gap:8px;">
+              <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em;">카테고리 둘러보기</div>
+              <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px 6px;">
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#EDF2FE; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(43,92,230,.30);"><span style="font-size:16px; font-weight:700; color:#2B5CE6; font-family:serif;">T</span></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">텍스트</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#FBF3E7; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(199,122,40,.30);"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="3" y="1.8" width="10" height="12.4" rx="1.6" stroke="#C77A28" stroke-width="1.4"/><path d="M5.5 5.4h5M5.5 8h5M5.5 10.6h3" stroke="#C77A28" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">본문</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#EAF6EF; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(59,155,107,.30);"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.6" stroke="#3B9B6B" stroke-width="1.4"/><path d="M1.8 6.4h12.4M6.2 6.4v7" stroke="#3B9B6B" stroke-width="1.4"/></svg></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">표</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#F3EEFB; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(138,95,200,.30);"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.6" stroke="#8A5FC8" stroke-width="1.4"/><circle cx="5.4" cy="6" r="1.2" stroke="#8A5FC8" stroke-width="1.2"/><path d="M2.5 11.5l3.4-3 2.6 2.2 2.4-2 3 2.8" stroke="#8A5FC8" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">이미지</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#FDEEF0; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(214,69,80,.30);"><svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect x="1.2" y="1.5" width="15.6" height="11" rx="1.4" stroke="#D64550" stroke-width="1.3"/><path d="M6.4 1.5v11M11.6 1.5v11M1.2 5.2h15.6" stroke="#D64550" stroke-width="1.2"/></svg></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">결재선</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#EDF2FE; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(43,92,230,.30);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10.8 2.2l3 3-7.6 7.6-3.6.6.6-3.6 7.6-7.6Z" stroke="#2B5CE6" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">서명</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#EAF6EF; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(59,155,107,.30);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.8" y="2.8" width="12.4" height="11" rx="1.6" stroke="#3B9B6B" stroke-width="1.4"/><path d="M1.8 6.4h12.4M5 1.4v2.6M11 1.4v2.6" stroke="#3B9B6B" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">날짜</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#FBF3E7; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(199,122,40,.30);"><span style="font-size:14px; font-weight:700; color:#C77A28;">#</span></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">쪽 번호</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px; cursor:grab;">
+                  <div style="width:100%; height:46px; border-radius:11px; background:#F3EEFB; display:flex; align-items:center; justify-content:center; transition:all .12s ease;" style-hover="transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(138,95,200,.30);"><svg width="15" height="16" viewBox="0 0 15 16" fill="none"><path d="M10.6 4.2v6.6a3.4 3.4 0 0 1-6.8 0V3.6a2.2 2.2 0 0 1 4.4 0v6.8a1 1 0 0 1-2 0V4.6" stroke="#8A5FC8" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+                  <span style="font-size:11px; font-weight:600; color:#1A2233;">붙임</span>
+                </div>
+              </div>
+            </div>
+            <div style="height:1px; background:#EDF0F5; margin:14px 12px 0;"></div>
+            <div style="padding:12px; display:flex; flex-direction:column; gap:8px; flex:1; overflow:hidden;">
+              <div style="display:flex; align-items:baseline; gap:6px;">
+                <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em;">구조</div>
+                <div style="font-size:11px; color:#CBD2DE; font-weight:600;">8</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <sc-for list="{{ tree }}" as="n" hint-placeholder-count="8">
+                  <div style="display:flex; align-items:center; gap:8px; height:30px; padding:0 8px 0 {{ n.pad }}px; border-radius:8px; background:{{ n.bg }}; border:1px solid {{ n.border }}; cursor:pointer; position:relative;" style-hover="background:#F6F7FA;">
+                    <sc-if value="{{ n.child }}">
+                      <div style="position:absolute; left:14px; top:0; bottom:0; width:1px; background:#E4E8EF;"></div>
+                    </sc-if>
+                    <sc-if value="{{ n.isTable }}" hint-placeholder-val="{{ false }}">
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="flex:none;"><rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.6" stroke="#98A2B3" stroke-width="1.5"/><path d="M1.8 6.4h12.4M6.2 6.4v7" stroke="#98A2B3" stroke-width="1.5"/></svg>
+                    </sc-if>
+                    <sc-if value="{{ n.isText }}" hint-placeholder-val="{{ true }}">
+                      <span style="font-size:11px; font-weight:700; color:{{ n.iconColor }}; font-family:serif; flex:none;">T</span>
+                    </sc-if>
+                    <span style="font-size:12px; font-weight:{{ n.weight }}; color:{{ n.color }}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ n.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="margin-top:4px; border:1.5px dashed #CBD2DE; border-radius:9px; padding:7px 0; text-align:center; font-size:11.5px; color:#98A2B3;" style-hover="border-color:#C4D4F9; color:#2B5CE6; background:#F8FAFF;">여기로 끌면 최상위로</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 중앙 캔버스 -->
+        <div style="flex:1; position:relative; overflow:hidden; background:#EDF0F5; background-image:radial-gradient(circle, #D5DAE3 1px, transparent 1px); background-size:24px 24px;">
+          <!-- 가로 눈금자 -->
+          <div style="position:absolute; top:0; left:26px; right:0; height:26px; background:rgba(255,255,255,.85); backdrop-filter:blur(4px); border-bottom:1px solid #E4E8EF; display:flex; align-items:flex-end; padding-left:118px;">
+            <sc-for list="{{ hmarks }}" as="m" hint-placeholder-count="18">
+              <div style="width:30px; flex:none; position:relative; height:100%;">
+                <div style="position:absolute; bottom:0; left:0; width:1px; height:7px; background:#CBD2DE;"></div>
+                <div style="position:absolute; bottom:9px; left:-8px; width:16px; text-align:center; font-size:9px; color:#98A2B3; font-variant-numeric:tabular-nums;">{{ m }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <!-- 세로 눈금자 -->
+          <div style="position:absolute; top:26px; left:0; bottom:0; width:26px; background:rgba(255,255,255,.85); backdrop-filter:blur(4px); border-right:1px solid #E4E8EF; display:flex; flex-direction:column; padding-top:34px;">
+            <sc-for list="{{ vmarks }}" as="m" hint-placeholder-count="18">
+              <div style="height:30px; flex:none; position:relative; width:100%;">
+                <div style="position:absolute; top:0; right:0; height:1px; width:7px; background:#CBD2DE;"></div>
+                <div style="position:absolute; top:-5px; right:10px; font-size:9px; color:#98A2B3; font-variant-numeric:tabular-nums;">{{ m }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- A4 지면 -->
+          <div style="position:absolute; top:60px; left:50%; transform:translateX(-50%); width:594px; height:840px; background:#fff; border-radius:2px; box-shadow:0 1px 2px rgba(16,24,40,.08), 0 10px 28px rgba(16,24,40,.10), 0 32px 64px -24px rgba(26,34,51,.20); font-family:'Malgun Gothic','맑은 고딕',sans-serif; color:#111;">
+            <div style="position:absolute; inset:56px 48px; ">
+              <!-- 트리 그룹 선택 테두리 (Ⅱ. 세부 계획 + 하위 2개) -->
+              <div style="position:absolute; left:-14px; right:-14px; top:152px; height:182px; border:1.5px dashed #7C9AF0; border-radius:7px; background:rgba(43,92,230,.02); pointer-events:none;">
+                <div style="position:absolute; top:-11px; right:10px; background:#fff; border:1px solid #C4D4F9; color:#2B5CE6; font-size:10px; font-weight:700; font-family:'Pretendard Variable', Pretendard, sans-serif; border-radius:5px; padding:2px 8px; white-space:nowrap;">그룹 · Ⅱ. 세부 계획 (하위 2)</div>
+              </div>
+              <div style="border:1.2px solid #333; text-align:center; padding:12px 0; font-size:21px; font-weight:700; letter-spacing:.02em;">2026 사업계획서</div>
+              <div style="margin-top:30px; font-size:15px; font-weight:700;">Ⅰ. 추진 배경</div>
+              <div style="margin-top:12px; margin-left:14px; font-size:12.5px;">지역 수요 증가에 따라 신규 사업을 추진하고자 함.</div>
+
+              <div style="margin-top:26px; font-size:15px; font-weight:700;">Ⅱ. 세부 계획</div>
+              <!-- 선택된 블록 -->
+              <div style="margin-top:12px; margin-left:14px; font-size:12.5px;">주요 과업은 아래 표와 같음.</div>
+
+              <!-- 선택된 표: 플로팅 액션 바 + 그립 + 간격 표시 -->
+              <div style="margin-top:26px; margin-left:14px; width:88%; position:relative;">
+                <!-- 간격 표시 (위/아래) -->
+                <div style="position:absolute; top:-26px; right:48px; width:1px; height:26px; background:#2B5CE6; font-family:'Pretendard Variable', Pretendard, sans-serif;">
+                  <div style="position:absolute; top:50%; left:6px; transform:translateY(-50%); background:#2B5CE6; color:#fff; font-size:9.5px; font-weight:700; border-radius:4px; padding:1px 5px; font-variant-numeric:tabular-nums; white-space:nowrap;">8mm</div>
+                  <div style="position:absolute; top:-1px; left:-3px; width:7px; height:1px; background:#2B5CE6;"></div>
+                  <div style="position:absolute; bottom:0; left:-3px; width:7px; height:1px; background:#2B5CE6;"></div>
+                </div>
+                <div style="position:absolute; bottom:-28px; right:48px; width:1px; height:28px; background:#2B5CE6; font-family:'Pretendard Variable', Pretendard, sans-serif;">
+                  <div style="position:absolute; top:50%; left:6px; transform:translateY(-50%); background:#2B5CE6; color:#fff; font-size:9.5px; font-weight:700; border-radius:4px; padding:1px 5px; font-variant-numeric:tabular-nums; white-space:nowrap;">10mm</div>
+                  <div style="position:absolute; top:0; left:-3px; width:7px; height:1px; background:#2B5CE6;"></div>
+                  <div style="position:absolute; bottom:-1px; left:-3px; width:7px; height:1px; background:#2B5CE6;"></div>
+                </div>
+
+                <!-- 플로팅 액션 바 -->
+                <div style="position:absolute; top:-52px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:1px; background:#fff; border:1px solid #E4E8EF; border-radius:11px; box-shadow:0 4px 10px rgba(16,24,40,.10), 0 14px 30px -10px rgba(16,24,40,.24); padding:3px; font-family:'Pretendard Variable', Pretendard, sans-serif; z-index:2;">
+                  <div style="width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M11.8 7A4.8 4.8 0 1 1 9 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M9 .8l.3 2 -2 .4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div style="width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.6" y="6" width="8.8" height="6" rx="1.4" stroke="currentColor" stroke-width="1.4"/><path d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6" stroke="currentColor" stroke-width="1.4"/></svg>
+                  </div>
+                  <div style="width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.4" y="4.4" width="8" height="8" rx="1.6" stroke="currentColor" stroke-width="1.4"/><path d="M9.6 2H3.4A1.4 1.4 0 0 0 2 3.4v6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M8.4 6.6v3.6M6.6 8.4h3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                  </div>
+                  <div style="width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#FDEEF0; color:#D64550;">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.4 3.8h9.2M5.4 3.8V2.6a.8.8 0 0 1 .8-.8h1.6a.8.8 0 0 1 .8.8v1.2M3.6 3.8l.5 7.2a1.2 1.2 0 0 0 1.2 1.2h3.4a1.2 1.2 0 0 0 1.2-1.2l.5-7.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div style="width:1px; height:16px; background:#E4E8EF; margin:0 2px;"></div>
+                  <div style="width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+                    <svg width="14" height="4" viewBox="0 0 14 4" fill="none"><circle cx="2" cy="2" r="1.3" fill="currentColor"/><circle cx="7" cy="2" r="1.3" fill="currentColor"/><circle cx="12" cy="2" r="1.3" fill="currentColor"/></svg>
+                  </div>
+                </div>
+
+                <!-- 라벨 칩 -->
+                <div style="position:absolute; top:-20px; left:-1px; display:flex; align-items:center; gap:6px; background:#fff; border:1px solid #C4D4F9; border-radius:6px 6px 6px 0; padding:2px 8px; font-family:'Pretendard Variable', Pretendard, sans-serif; box-shadow:0 2px 6px rgba(16,24,40,.08); white-space:nowrap;">
+                  <div style="width:5px; height:5px; border-radius:50%; background:#2B5CE6;"></div>
+                  <span style="font-size:10px; font-weight:700; color:#1A2233;">표 · 3×3</span>
+                  <div style="width:1px; height:9px; background:#E4E8EF;"></div>
+                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5L5 9l4.5-5.5" stroke="#2B5CE6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span style="font-size:10px; font-weight:700; color:#2B5CE6;">모두 변경</span>
+                </div>
+
+                <!-- 선택 테두리 + 핸들 + 그립 -->
+                <div style="position:absolute; inset:-5px; outline:1.5px solid #2B5CE6; border-radius:2px; pointer-events:none; z-index:1;">
+                  <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #2B5CE6; border-radius:2px; top:-4.5px; left:-4.5px;"></div>
+                  <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #2B5CE6; border-radius:2px; top:-4.5px; right:-4.5px;"></div>
+                  <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #2B5CE6; border-radius:2px; bottom:-4.5px; left:-4.5px;"></div>
+                  <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #2B5CE6; border-radius:2px; bottom:-4.5px; right:-4.5px;"></div>
+                  <!-- 열 그립 (경계 위) -->
+                  <div style="position:absolute; top:-2.5px; left:20%; transform:translateX(-50%); width:16px; height:5px; border-radius:3px; background:#2B5CE6; box-shadow:0 1px 3px rgba(16,24,40,.25); pointer-events:auto; cursor:col-resize;"></div>
+                  <div style="position:absolute; top:-2.5px; left:78%; transform:translateX(-50%); width:16px; height:5px; border-radius:3px; background:#2B5CE6; box-shadow:0 1px 3px rgba(16,24,40,.25); pointer-events:auto; cursor:col-resize;"></div>
+                  <!-- 행 그립 (경계 좌) -->
+                  <div style="position:absolute; left:-2.5px; top:33%; transform:translateY(-50%); width:5px; height:16px; border-radius:3px; background:#2B5CE6; box-shadow:0 1px 3px rgba(16,24,40,.25); pointer-events:auto; cursor:row-resize;"></div>
+                  <div style="position:absolute; left:-2.5px; top:66%; transform:translateY(-50%); width:5px; height:16px; border-radius:3px; background:#2B5CE6; box-shadow:0 1px 3px rgba(16,24,40,.25); pointer-events:auto; cursor:row-resize;"></div>
+                  <!-- 열/행 추가 -->
+                  <div style="position:absolute; right:-15px; top:50%; transform:translateY(-50%); width:22px; height:22px; border-radius:50%; background:#fff; border:1px solid #E4E8EF; box-shadow:0 2px 6px rgba(16,24,40,.16); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;" style-hover="border-color:#C4D4F9; background:#F8FAFF;">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1.5v7M1.5 5h7" stroke="#2B5CE6" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <div style="position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); width:22px; height:22px; border-radius:50%; background:#fff; border:1px solid #E4E8EF; box-shadow:0 2px 6px rgba(16,24,40,.16); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;" style-hover="border-color:#C4D4F9; background:#F8FAFF;">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1.5v7M1.5 5h7" stroke="#2B5CE6" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                </div>
+
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                  <thead>
+                    <tr>
+                      <th style="border:1px solid #333; background:#F2F2F2; padding:6px 10px; font-weight:700; text-align:left; width:20%;">구분</th>
+                      <th style="border:1px solid #333; background:#F2F2F2; padding:6px 10px; font-weight:700; text-align:left;">내용</th>
+                      <th style="border:1px solid #333; background:#F2F2F2; padding:6px 10px; font-weight:700; text-align:left; width:22%;">예산</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td style="border:1px solid #333; padding:6px 10px;">1분기</td><td style="border:1px solid #333; padding:6px 10px;">기획·설계</td><td style="border:1px solid #333; padding:6px 10px;">[○○]</td></tr>
+                    <tr><td style="border:1px solid #333; padding:6px 10px;">2분기</td><td style="border:1px solid #333; padding:6px 10px;">개발</td><td style="border:1px solid #333; padding:6px 10px;">[○○]</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style="margin-top:26px; font-size:15px; font-weight:700;">Ⅲ. 기대 효과</div>
+              <div style="margin-top:12px; margin-left:14px; font-size:12.5px;">· 업무 효율 향상&nbsp;&nbsp;· 문서 표준화</div>
+            </div>
+            <!-- 스냅 가이드 -->
+            <div style="position:absolute; top:0; bottom:0; left:62px; width:0; border-left:1px dashed #E5484D; opacity:.85;"></div>
+            <div style="position:absolute; top:8px; left:66px; font-size:9.5px; color:#E5484D; font-family:'Pretendard Variable', Pretendard, sans-serif; background:rgba(255,255,255,.9); border-radius:4px; padding:1px 5px;">여백 22mm</div>
+          </div>
+
+          <!-- 줌 컨트롤 -->
+          <div style="position:absolute; right:18px; bottom:16px; display:flex; align-items:center; gap:2px; background:#fff; border:1px solid #E4E8EF; border-radius:10px; box-shadow:0 2px 8px rgba(16,24,40,.10); padding:3px;">
+            <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA;">−</div>
+            <div style="font-size:12px; font-weight:600; color:#1A2233; width:44px; text-align:center; font-variant-numeric:tabular-nums;">100%</div>
+            <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA;">＋</div>
+          </div>
+          <!-- 페이지 표시 -->
+          <div style="position:absolute; left:44px; bottom:16px; background:#fff; border:1px solid #E4E8EF; border-radius:10px; box-shadow:0 2px 8px rgba(16,24,40,.10); padding:6px 12px; font-size:12px; color:#5B6577; font-variant-numeric:tabular-nums;">1 / 1 페이지 · A4 210×297mm</div>
+        </div>
+
+        <!-- 우측 패널: 속성 -->
+        <div style="width:284px; background:#FFFFFF; border-left:1px solid #E4E8EF; display:flex; flex-direction:column; flex:none; overflow:hidden;">
+          <div style="padding:14px 14px 0;">
+            <div style="display:flex; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:9px; padding:3px; gap:3px;">
+              <div style="flex:1; text-align:center; padding:6px 0; border-radius:7px; background:#fff; box-shadow:0 1px 2px rgba(16,24,40,.08); font-size:13px; font-weight:700; color:#1A2233;">속성</div>
+              <div style="flex:1; text-align:center; padding:6px 0; border-radius:7px; font-size:13px; font-weight:500; color:#5B6577; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;" style-hover="color:#1A2233;">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l1.2 3L10.5 5 7.2 6 6 9 4.8 6 1.5 5l3.3-1L6 1Z" stroke="#5B6577" stroke-width="1.2" stroke-linejoin="round"/></svg>
+                AI
+              </div>
+            </div>
+          </div>
+          <div style="padding:14px 16px 10px; display:flex; align-items:center; gap:9px; border-bottom:1px solid #EDF0F5;">
+            <div style="width:24px; height:24px; border-radius:7px; background:#EDF2FE; display:flex; align-items:center; justify-content:center;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.6" stroke="#2B5CE6" stroke-width="1.5"/><path d="M1.8 6.4h12.4M6.2 6.4v7" stroke="#2B5CE6" stroke-width="1.5"/></svg>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:12.5px; font-weight:700; color:#1A2233;">표 블록 · 3×3</div>
+              <div style="font-size:11px; color:#98A2B3;">Ⅱ. 세부 계획의 하위</div>
+            </div>
+          </div>
+          <div style="padding:10px 16px 14px; display:flex; flex-direction:column; gap:0; overflow:hidden; font-size:12px;">
+
+            <!-- 모양 -->
+            <div style="padding:8px 0 12px; display:flex; flex-direction:column; gap:7px; border-bottom:1px solid #EDF0F5;">
+              <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em; margin-bottom:2px;">모양</div>
+              <div style="display:flex; align-items:center; height:26px;">
+                <span style="flex:1; color:#5B6577;">배경</span>
+                <div style="display:flex; align-items:center; gap:6px; height:26px; padding:0 8px; border:1px solid #E4E8EF; border-radius:7px; cursor:pointer;" style-hover="border-color:#CBD2DE;">
+                  <div style="width:13px; height:13px; border-radius:3px; border:1px solid #CBD2DE; background:repeating-conic-gradient(#E4E8EF 0 25%, #fff 0 50%) 0 0 / 8px 8px;"></div>
+                  <span style="color:#1A2233; font-weight:500;">없음</span>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px;"><span style="color:#5B6577; flex:1; white-space:nowrap;">모서리</span><div style="width:50px; height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:flex-end; padding:0 8px; gap:3px;"><span style="color:#1A2233; font-weight:600; font-variant-numeric:tabular-nums;">0</span><span style="color:#98A2B3; font-size:11px;">px</span></div></div>
+                <div style="display:flex; align-items:center; gap:8px;"><span style="color:#5B6577; flex:1; white-space:nowrap;">넘침</span><div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; padding:0 8px; gap:5px; cursor:pointer;" style-hover="border-color:#CBD2DE;"><span style="color:#1A2233; font-weight:500;">보임</span><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="#98A2B3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px;"><span style="color:#5B6577; flex:1; white-space:nowrap;">불투명도</span><div style="width:50px; height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:flex-end; padding:0 8px; flex:none;"><span style="color:#1A2233; font-weight:600; font-variant-numeric:tabular-nums;">1.00</span></div></div>
+                <div style="display:flex; align-items:center; gap:8px;"><span style="color:#5B6577; flex:1; white-space:nowrap;">Z-순서</span><div style="width:50px; height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:flex-end; padding:0 8px;"><span style="color:#98A2B3;">auto</span></div></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:2px;">
+                <span style="color:#98A2B3; font-size:11px;">추가:</span>
+                <span style="font-size:11px; color:#5B6577; border:1px dashed #CBD2DE; border-radius:20px; padding:2px 8px; cursor:pointer;" style-hover="color:#2B5CE6; border-color:#C4D4F9;">그림자</span>
+                <span style="font-size:11px; color:#5B6577; border:1px dashed #CBD2DE; border-radius:20px; padding:2px 8px; cursor:pointer;" style-hover="color:#2B5CE6; border-color:#C4D4F9;">텍스트 그림자</span>
+                <span style="font-size:11px; color:#5B6577; border:1px dashed #CBD2DE; border-radius:20px; padding:2px 8px; cursor:pointer;" style-hover="color:#2B5CE6; border-color:#C4D4F9;">변형</span>
+                <span style="font-size:11px; color:#5B6577; border:1px dashed #CBD2DE; border-radius:20px; padding:2px 8px; cursor:pointer;" style-hover="color:#2B5CE6; border-color:#C4D4F9;">필터</span>
+              </div>
+            </div>
+
+            <!-- 크기 -->
+            <div style="padding:12px 0; display:flex; flex-direction:column; gap:7px; border-bottom:1px solid #EDF0F5;">
+              <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em; margin-bottom:2px;">크기</div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#5B6577; width:34px;">너비</span>
+                <div style="width:52px; height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; padding:0 8px;"><span style="color:#98A2B3;">auto</span></div>
+                <div style="flex:1; display:flex; height:26px; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:7px; overflow:hidden;">
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:inset 0 0 0 1px #C4D4F9; border-radius:6px; margin:1px; font-size:11px; font-weight:700; color:#2B5CE6;">고정</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">맞춤</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">채움</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#5B6577; width:34px;">높이</span>
+                <div style="width:52px; height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; padding:0 8px;"><span style="color:#98A2B3;">auto</span></div>
+                <div style="flex:1; display:flex; height:26px; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:7px; overflow:hidden;">
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:inset 0 0 0 1px #C4D4F9; border-radius:6px; margin:1px; font-size:11px; font-weight:700; color:#2B5CE6;">고정</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">맞춤</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">채움</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#5B6577; flex:1;">자르기</span>
+                <div style="width:30px; height:16px; border-radius:9px; background:#E4E8EF; position:relative; cursor:pointer;"><div style="position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(16,24,40,.2);"></div></div>
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; padding:0 8px; gap:5px; cursor:pointer;" style-hover="border-color:#CBD2DE;"><span style="color:#98A2B3;">자기 정렬 선택</span><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="#98A2B3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              </div>
+              <div style="color:#98A2B3; font-size:11px;">추가: 최소 너비 · 최대 너비 · 최소 높이 · 최대 높이</div>
+            </div>
+
+            <!-- 위치 -->
+            <div style="padding:12px 0; display:flex; flex-direction:column; gap:7px; border-bottom:1px solid #EDF0F5;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em; flex:1;">위치</span>
+                <div style="display:flex; height:26px; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:7px; overflow:hidden; width:130px;">
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:inset 0 0 0 1px #C4D4F9; border-radius:6px; margin:1px; font-size:11px; font-weight:700; color:#2B5CE6;">인라인</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">절대</div>
+                </div>
+              </div>
+              <div style="color:#98A2B3; font-size:11px;">추가: 오프셋</div>
+            </div>
+
+            <!-- 콘텐츠 레이아웃 -->
+            <div style="padding:12px 0; display:flex; align-items:center; gap:8px; border-bottom:1px solid #EDF0F5;">
+              <span style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em; flex:1;">콘텐츠 레이아웃</span>
+              <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; padding:0 8px; gap:5px; cursor:pointer;" style-hover="border-color:#CBD2DE;">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="1.5" width="9" height="3.4" rx="1" stroke="#5B6577" stroke-width="1.2"/><rect x="1.5" y="7.1" width="9" height="3.4" rx="1" stroke="#5B6577" stroke-width="1.2"/></svg>
+                <span style="color:#1A2233; font-weight:500;">블록</span>
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="#98A2B3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </div>
+
+            <!-- 안쪽/바깥 여백 -->
+            <div style="padding:12px 0; display:flex; flex-direction:column; gap:7px; border-bottom:1px solid #EDF0F5;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#5B6577; flex:1; white-space:nowrap;">안쪽 여백</span>
+                <div style="display:flex; height:24px; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:7px; overflow:hidden; width:132px;">
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">좁게</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:inset 0 0 0 1px #C4D4F9; border-radius:6px; margin:1px; font-size:11px; font-weight:700; color:#2B5CE6;">보통</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">넓게</div>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;">
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">상</span><span style="color:#1A2233; font-weight:600; font-variant-numeric:tabular-nums;">2</span></div>
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">하</span><span style="color:#1A2233; font-weight:600; font-variant-numeric:tabular-nums;">2</span></div>
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">좌</span><span style="color:#1A2233; font-weight:600; font-variant-numeric:tabular-nums;">3</span></div>
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">우</span><span style="color:#1A2233; font-weight:600; font-variant-numeric:tabular-nums;">3</span></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
+                <span style="color:#5B6577; flex:1; white-space:nowrap;">바깥 여백</span>
+                <div style="display:flex; height:24px; background:#F6F7FA; border:1px solid #E4E8EF; border-radius:7px; overflow:hidden; width:132px;">
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:inset 0 0 0 1px #C4D4F9; border-radius:6px; margin:1px; font-size:11px; font-weight:700; color:#2B5CE6;">없음</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">보통</div>
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#5B6577; cursor:pointer;" style-hover="background:#EDF0F5;">넓게</div>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;">
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">상</span><span style="color:#98A2B3; font-variant-numeric:tabular-nums;">0</span></div>
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">하</span><span style="color:#98A2B3; font-variant-numeric:tabular-nums;">0</span></div>
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">좌</span><span style="color:#98A2B3; font-variant-numeric:tabular-nums;">0</span></div>
+                <div style="height:26px; border:1px solid #E4E8EF; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 7px;"><span style="color:#98A2B3; font-size:10px; font-weight:700;">우</span><span style="color:#98A2B3; font-variant-numeric:tabular-nums;">0</span></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
+                <span style="color:#5B6577; flex:1;">테두리</span>
+                <span style="color:#98A2B3; border:1px dashed #CBD2DE; border-radius:7px; padding:3px 9px; font-size:11px; cursor:pointer;" style-hover="color:#2B5CE6; border-color:#C4D4F9;">테두리 추가</span>
+              </div>
+            </div>
+
+            <!-- 접힌 섹션 -->
+            <div style="display:flex; align-items:center; height:34px; border-bottom:1px solid #EDF0F5; cursor:pointer;" style-hover="color:#2B5CE6;">
+              <span style="flex:1; font-weight:600; color:#1A2233;">고급</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2l3 3-3 3" stroke="#98A2B3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div style="display:flex; align-items:center; height:34px; border-bottom:1px solid #EDF0F5; cursor:pointer;">
+              <span style="flex:1; font-weight:600; color:#1A2233;">내보내기 설정</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2l3 3-3 3" stroke="#98A2B3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+
+            <!-- 디버그 -->
+            <div style="padding:12px 0 0; display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:11px; font-weight:700; color:#98A2B3; letter-spacing:.08em;">디버그</div>
+              <div style="background:#F6F7FA; border:1px solid #E4E8EF; border-radius:8px; padding:8px 10px; font-family:ui-monospace, monospace; font-size:10px; line-height:1.6; color:#5B6577; word-break:break-all;">{"id":284,"tag":"div","parent":"sec-2","attrs":{"x":"22mm","y":"118mm"}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 1c 에디터 셸 (다크) ============ -->
+  <div id="1c" data-screen-label="에디터 셸 다크" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="#1c" style="display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:24px; border-radius:7px; background:#1A2233; color:#fff; font-size:12px; font-weight:700;">1c</a>
+      <span style="font-size:14px; font-weight:600; color:#1A2233;">에디터 셸 (다크) — 크롬은 어둡게, 지면은 그대로 · 우측은 AI 탭</span>
+    </div>
+    <div style="width:1560px; height:980px; background:#0C0F14; border-radius:14px; overflow:hidden; border:1px solid #DDE2EA; box-shadow:0 2px 6px rgba(16,24,40,.05), 0 24px 48px -20px rgba(16,24,40,.28); display:flex; flex-direction:column;">
+
+      <!-- 상단 액션 바 -->
+      <div style="height:52px; background:#171B23; border-bottom:1px solid rgba(255,255,255,.07); display:flex; align-items:center; padding:0 16px; gap:14px; flex:none;">
+        <div style="display:flex; align-items:center; gap:6px; padding:6px 10px 6px 6px; border-radius:8px; color:#9AA3B2; font-size:13px; font-weight:500; cursor:pointer;" style-hover="background:rgba(255,255,255,.06); color:#E7EAF0;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          내 문서
+        </div>
+        <div style="width:1px; height:20px; background:rgba(255,255,255,.09);"></div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:22px; height:22px; border-radius:6px; background:#5B84F0; display:flex; align-items:center; justify-content:center; color:#0C0F14; font-size:9px; font-weight:800;">24</div>
+          <div style="font-size:14.5px; font-weight:700; color:#E7EAF0; letter-spacing:-.01em;">2026 사업계획서</div>
+          <div style="display:flex; align-items:center; gap:5px; font-size:12px; color:#6B7484;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5L5 9l4.5-5.5" stroke="#5BBD8B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            저장됨
+          </div>
+        </div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="padding:7px 13px; border-radius:9px; color:#9AA3B2; font-size:13px; font-weight:600; cursor:pointer;" style-hover="background:rgba(255,255,255,.06); color:#E7EAF0;">공문서로 펴기</div>
+          <div style="padding:7px 13px; border-radius:9px; border:1px solid rgba(255,255,255,.12); color:#E7EAF0; font-size:13px; font-weight:600; cursor:pointer;" style-hover="background:rgba(255,255,255,.06);">한글 미리보기</div>
+          <div style="padding:7px 15px; border-radius:9px; background:#5B84F0; color:#0C0F14; font-size:13px; font-weight:700; cursor:pointer;" style-hover="background:#6F94F4;">HWPX 내보내기</div>
+        </div>
+      </div>
+
+      <!-- 서식 툴바 -->
+      <div style="height:44px; background:#171B23; border-bottom:1px solid rgba(255,255,255,.07); display:flex; align-items:center; padding:0 16px; gap:10px; flex:none;">
+        <div style="display:flex; align-items:center; gap:8px; height:30px; padding:0 10px; border:1px solid rgba(255,255,255,.10); border-radius:8px; font-size:12.5px; color:#E7EAF0; min-width:110px;">맑은 고딕<svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="margin-left:auto;"><path d="M2.5 4l2.5 2.5L7.5 4" stroke="#6B7484" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="display:flex; align-items:center; height:30px; border:1px solid rgba(255,255,255,.10); border-radius:8px; overflow:hidden;">
+          <div style="width:24px; height:100%; display:flex; align-items:center; justify-content:center; color:#9AA3B2; cursor:pointer;" style-hover="background:rgba(255,255,255,.06);">−</div>
+          <div style="width:38px; text-align:center; font-size:12.5px; font-weight:600; color:#E7EAF0; border-left:1px solid rgba(255,255,255,.10); border-right:1px solid rgba(255,255,255,.10); height:100%; display:flex; align-items:center; justify-content:center;">10pt</div>
+          <div style="width:24px; height:100%; display:flex; align-items:center; justify-content:center; color:#9AA3B2; cursor:pointer;" style-hover="background:rgba(255,255,255,.06);">＋</div>
+        </div>
+        <div style="width:1px; height:20px; background:rgba(255,255,255,.09);"></div>
+        <div style="display:flex; align-items:center; gap:2px;">
+          <div style="width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#8FADF6; background:rgba(91,132,240,.16);">가</div>
+          <div style="width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; font-style:italic; color:#9AA3B2; cursor:pointer;" style-hover="background:rgba(255,255,255,.06); color:#E7EAF0;">가</div>
+          <div style="width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; text-decoration:underline; text-underline-offset:2px; color:#9AA3B2; cursor:pointer;" style-hover="background:rgba(255,255,255,.06); color:#E7EAF0;">가</div>
+        </div>
+        <div style="width:1px; height:20px; background:rgba(255,255,255,.09);"></div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <sc-for list="{{ swatches }}" as="c" hint-placeholder-count="6">
+            <div style="width:18px; height:18px; border-radius:50%; background:{{ c.hex }}; border:2px solid rgba(255,255,255,.14); cursor:pointer;" style-hover="transform:scale(1.15);"></div>
+          </sc-for>
+        </div>
+        <div style="flex:1;"></div>
+        <div style="font-size:12px; color:#6B7484;">텍스트 블록을 선택하면 서식을 바꿀 수 있어요</div>
+      </div>
+
+      <div style="flex:1; display:flex; overflow:hidden;">
+        <!-- 좌측 패널 (다크, 요약) -->
+        <div style="width:264px; background:#12151C; border-right:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; flex:none; overflow:hidden;">
+          <div style="padding:14px 14px 0;">
+            <div style="display:flex; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:9px; padding:3px; gap:3px;">
+              <div style="flex:1; text-align:center; padding:6px 0; border-radius:7px; background:#232936; font-size:13px; font-weight:700; color:#E7EAF0;">블록</div>
+              <div style="flex:1; text-align:center; padding:6px 0; border-radius:7px; font-size:13px; font-weight:500; color:#9AA3B2; cursor:pointer;" style-hover="color:#E7EAF0;">데이터</div>
+            </div>
+          </div>
+          <div style="padding:18px 14px 14px; display:flex; flex-direction:column; gap:10px;">
+            <div style="font-size:11px; font-weight:700; color:#6B7484; letter-spacing:.08em;">블록 추가</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <sc-for list="{{ palette }}" as="p" hint-placeholder-count="4">
+                <div style="height:66px; border:1px solid rgba(255,255,255,.08); border-radius:11px; background:rgba(255,255,255,.03); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; cursor:grab;" style-hover="border-color:rgba(91,132,240,.5); background:rgba(91,132,240,.08);">
+                  <div style="font-size:14px; font-weight:700; color:#8FADF6; font-family:serif;">{{ p.glyph }}</div>
+                  <div style="font-size:12px; font-weight:600; color:#E7EAF0;">{{ p.name }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="height:1px; background:rgba(255,255,255,.06); margin:0 14px;"></div>
+          <div style="padding:14px; display:flex; flex-direction:column; gap:8px; flex:1; overflow:hidden;">
+            <div style="font-size:11px; font-weight:700; color:#6B7484; letter-spacing:.08em;">구조 · 8</div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <sc-for list="{{ tree }}" as="n" hint-placeholder-count="8">
+                <div style="display:flex; align-items:center; gap:8px; height:32px; padding:0 8px 0 {{ n.pad }}px; border-radius:8px; background:{{ n.bgDark }}; cursor:pointer;" style-hover="background:rgba(255,255,255,.05);">
+                  <span style="font-size:11px; font-weight:700; color:{{ n.iconColorDark }}; font-family:serif; flex:none;">{{ n.glyph }}</span>
+                  <span style="font-size:12.5px; font-weight:{{ n.weight }}; color:{{ n.colorDark }}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ n.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <!-- 중앙 캔버스 (다크) -->
+        <div style="flex:1; position:relative; overflow:hidden; background:#0C0F14; background-image:radial-gradient(circle, #1C212B 1px, transparent 1px); background-size:24px 24px;">
+          <div style="position:absolute; top:36px; left:50%; transform:translateX(-50%); width:560px; height:900px; background:#fff; border-radius:2px; box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 16px 48px rgba(0,0,0,.55); font-family:'Malgun Gothic','맑은 고딕',sans-serif; color:#111;">
+            <div style="position:absolute; inset:52px 46px;">
+              <div style="border:1.2px solid #333; text-align:center; padding:11px 0; font-size:20px; font-weight:700;">2026 사업계획서</div>
+              <div style="margin-top:28px; font-size:14px; font-weight:700;">Ⅰ. 추진 배경</div>
+              <div style="margin-top:11px; margin-left:13px; font-size:12px;">지역 수요 증가에 따라 신규 사업을 추진하고자 함.</div>
+              <div style="margin-top:24px; font-size:14px; font-weight:700;">Ⅱ. 세부 계획</div>
+              <div style="margin-top:11px; margin-left:13px; font-size:12px; position:relative; padding:4px 7px; outline:1.5px solid #5B84F0; border-radius:1px; background:rgba(91,132,240,.05);">
+                주요 과업은 아래 표와 같음.
+                <div style="position:absolute; top:50%; transform:translateY(-50%); right:-100px; background:#5B84F0; color:#0C0F14; font-size:10px; font-weight:700; font-family:'Pretendard Variable', Pretendard, sans-serif; border-radius:5px; padding:3px 8px; white-space:nowrap;">본문 · 텍스트</div>
+                <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #5B84F0; border-radius:2px; top:-4.5px; left:-4.5px;"></div>
+                <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #5B84F0; border-radius:2px; top:-4.5px; right:-4.5px;"></div>
+                <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #5B84F0; border-radius:2px; bottom:-4.5px; left:-4.5px;"></div>
+                <div style="position:absolute; width:8px; height:8px; background:#fff; border:1.5px solid #5B84F0; border-radius:2px; bottom:-4.5px; right:-4.5px;"></div>
+              </div>
+              <table style="margin-top:20px; margin-left:13px; width:88%; border-collapse:collapse; font-size:11.5px;">
+                <thead><tr><th style="border:1px solid #333; background:#F2F2F2; padding:5px 9px; font-weight:700; text-align:left; width:20%;">구분</th><th style="border:1px solid #333; background:#F2F2F2; padding:5px 9px; font-weight:700; text-align:left;">내용</th><th style="border:1px solid #333; background:#F2F2F2; padding:5px 9px; font-weight:700; text-align:left; width:22%;">예산</th></tr></thead>
+                <tbody>
+                  <tr><td style="border:1px solid #333; padding:5px 9px;">1분기</td><td style="border:1px solid #333; padding:5px 9px;">기획·설계</td><td style="border:1px solid #333; padding:5px 9px;">[○○]</td></tr>
+                  <tr><td style="border:1px solid #333; padding:5px 9px;">2분기</td><td style="border:1px solid #333; padding:5px 9px;">개발</td><td style="border:1px solid #333; padding:5px 9px;">[○○]</td></tr>
+                </tbody>
+              </table>
+              <div style="margin-top:24px; font-size:14px; font-weight:700;">Ⅲ. 기대 효과</div>
+              <div style="margin-top:11px; margin-left:13px; font-size:12px;">· 업무 효율 향상&nbsp;&nbsp;· 문서 표준화</div>
+            </div>
+          </div>
+          <div style="position:absolute; right:18px; bottom:16px; display:flex; align-items:center; gap:2px; background:#171B23; border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:3px;">
+            <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#9AA3B2; cursor:pointer;" style-hover="background:rgba(255,255,255,.06);">−</div>
+            <div style="font-size:12px; font-weight:600; color:#E7EAF0; width:44px; text-align:center; font-variant-numeric:tabular-nums;">100%</div>
+            <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#9AA3B2; cursor:pointer;" style-hover="background:rgba(255,255,255,.06);">＋</div>
+          </div>
+        </div>
+
+        <!-- 우측 패널: AI 탭 -->
+        <div style="width:284px; background:#12151C; border-left:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; flex:none; overflow:hidden;">
+          <div style="padding:14px 14px 0;">
+            <div style="display:flex; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:9px; padding:3px; gap:3px;">
+              <div style="flex:1; text-align:center; padding:6px 0; border-radius:7px; font-size:13px; font-weight:500; color:#9AA3B2; cursor:pointer;" style-hover="color:#E7EAF0;">속성</div>
+              <div style="flex:1; text-align:center; padding:6px 0; border-radius:7px; background:#232936; font-size:13px; font-weight:700; color:#E7EAF0; display:flex; align-items:center; justify-content:center; gap:5px;">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l1.2 3L10.5 5 7.2 6 6 9 4.8 6 1.5 5l3.3-1L6 1Z" stroke="#8FADF6" stroke-width="1.2" stroke-linejoin="round"/></svg>
+                AI
+              </div>
+            </div>
+          </div>
+          <div style="flex:1; padding:16px 14px; display:flex; flex-direction:column; gap:12px; overflow:hidden;">
+            <div style="align-self:flex-end; max-width:86%; background:#5B84F0; color:#0C0F14; font-size:12.5px; line-height:1.55; font-weight:500; border-radius:14px 14px 4px 14px; padding:10px 13px;">기대 효과 항목을 3가지로 늘려서 문장으로 풀어줘</div>
+            <div style="align-self:flex-start; max-width:92%; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); color:#E7EAF0; font-size:12.5px; line-height:1.6; border-radius:14px 14px 14px 4px; padding:11px 13px;">
+              Ⅲ. 기대 효과를 아래 3개 문장으로 바꿨어요.
+              <div style="margin-top:9px; background:#0C0F14; border:1px solid rgba(255,255,255,.08); border-radius:9px; padding:9px 11px; font-size:11.5px; line-height:1.7; color:#B9C0CC; font-family:'Malgun Gothic','맑은 고딕',sans-serif;">1. 반복 업무 자동화로 문서 작성 시간 단축<br>2. 기관 표준 서식 준수율 향상<br>3. HWPX 호환으로 결재 흐름 단절 제거</div>
+              <div style="display:flex; gap:6px; margin-top:9px;">
+                <div style="padding:5px 11px; border-radius:7px; background:#5B84F0; color:#0C0F14; font-size:11.5px; font-weight:700; cursor:pointer;" style-hover="background:#6F94F4;">지면에 적용</div>
+                <div style="padding:5px 11px; border-radius:7px; border:1px solid rgba(255,255,255,.12); color:#9AA3B2; font-size:11.5px; font-weight:600; cursor:pointer;" style-hover="color:#E7EAF0;">다시 쓰기</div>
+              </div>
+            </div>
+            <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <div style="padding:5px 10px; border-radius:20px; border:1px solid rgba(255,255,255,.10); color:#9AA3B2; font-size:11.5px; cursor:pointer;" style-hover="border-color:rgba(91,132,240,.5); color:#8FADF6;">더 공손하게</div>
+                <div style="padding:5px 10px; border-radius:20px; border:1px solid rgba(255,255,255,.10); color:#9AA3B2; font-size:11.5px; cursor:pointer;" style-hover="border-color:rgba(91,132,240,.5); color:#8FADF6;">개조식으로</div>
+                <div style="padding:5px 10px; border-radius:20px; border:1px solid rgba(255,255,255,.10); color:#9AA3B2; font-size:11.5px; cursor:pointer;" style-hover="border-color:rgba(91,132,240,.5); color:#8FADF6;">표로 정리</div>
+              </div>
+              <div style="height:42px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); border-radius:11px; display:flex; align-items:center; padding:0 8px 0 13px; gap:8px;" style-hover="border-color:rgba(91,132,240,.5);">
+                <span style="font-size:12.5px; color:#6B7484; flex:1;">이 문서에 대해 요청하기…</span>
+                <div style="width:28px; height:28px; border-radius:8px; background:#5B84F0; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:#6F94F4;">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 10.5v-8M3 6l3.5-3.5L10 6" stroke="#0C0F14" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 1d 한글 미리보기 모달 ============ -->
+  <div id="1d" data-screen-label="한글 미리보기 모달" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="#1d" style="display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:24px; border-radius:7px; background:#1A2233; color:#fff; font-size:12px; font-weight:700;">1d</a>
+      <span style="font-size:14px; font-weight:600; color:#1A2233;">한글 미리보기 모달 — 조판 정합 확인이 목적이라 지면 프레임을 크게</span>
+    </div>
+    <div style="width:1440px; height:900px; border-radius:14px; overflow:hidden; border:1px solid #DDE2EA; box-shadow:0 2px 6px rgba(16,24,40,.05), 0 24px 48px -20px rgba(16,24,40,.18); position:relative; background:#EDF0F5;">
+      <!-- 뒤 에디터 (흐림) -->
+      <div style="position:absolute; inset:0; filter:blur(3px); opacity:.7;">
+        <div style="height:52px; background:#fff; border-bottom:1px solid #E4E8EF;"></div>
+        <div style="height:44px; background:#fff; border-bottom:1px solid #E4E8EF;"></div>
+        <div style="position:absolute; top:96px; left:0; bottom:0; width:264px; background:#fff; border-right:1px solid #E4E8EF;"></div>
+        <div style="position:absolute; top:96px; right:0; bottom:0; width:284px; background:#fff; border-left:1px solid #E4E8EF;"></div>
+        <div style="position:absolute; top:140px; left:50%; transform:translateX(-50%); width:500px; height:707px; background:#fff; box-shadow:0 10px 28px rgba(16,24,40,.12);"></div>
+      </div>
+      <div style="position:absolute; inset:0; background:rgba(16,22,35,.46);"></div>
+
+      <!-- 모달 -->
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:880px; height:800px; background:#fff; border-radius:18px; box-shadow:0 8px 24px rgba(10,14,24,.24), 0 40px 90px -20px rgba(10,14,24,.45); display:flex; flex-direction:column; overflow:hidden;">
+        <div style="height:58px; border-bottom:1px solid #E4E8EF; display:flex; align-items:center; padding:0 20px; gap:12px; flex:none;">
+          <div style="width:30px; height:30px; border-radius:9px; background:#EDF2FE; display:flex; align-items:center; justify-content:center;">
+            <svg width="15" height="15" viewBox="0 0 14 14" fill="none"><path d="M1.8 7s1.9-3.6 5.2-3.6S12.2 7 12.2 7 10.3 10.6 7 10.6 1.8 7 1.8 7Z" stroke="#2B5CE6" stroke-width="1.4"/><circle cx="7" cy="7" r="1.6" stroke="#2B5CE6" stroke-width="1.4"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14.5px; font-weight:700; color:#1A2233;">한글 미리보기</div>
+            <div style="font-size:11.5px; color:#98A2B3;">한글(HWP) 화면과 동일한 조판으로 렌더링됩니다</div>
+          </div>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#4CAF7D; font-weight:600; background:#EDF8F1; border-radius:20px; padding:4px 11px;">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5L5 9l4.5-5.5" stroke="#4CAF7D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              줄바꿈 정합 일치
+            </div>
+            <div style="width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:#5B6577; cursor:pointer;" style-hover="background:#F6F7FA; color:#1A2233;">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 3l7 7M10 3l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1; background:#F0F2F6; overflow:hidden; display:flex; align-items:flex-start; justify-content:center; padding-top:26px;">
+          <div style="width:460px; height:650px; background:#fff; box-shadow:0 1px 2px rgba(16,24,40,.08), 0 12px 32px rgba(16,24,40,.14); font-family:'Malgun Gothic','맑은 고딕',sans-serif; color:#111; position:relative;">
+            <div style="position:absolute; inset:44px 38px;">
+              <div style="border:1px solid #333; text-align:center; padding:9px 0; font-size:17px; font-weight:700;">2026 사업계획서</div>
+              <div style="margin-top:22px; font-size:12.5px; font-weight:700;">Ⅰ. 추진 배경</div>
+              <div style="margin-top:9px; margin-left:11px; font-size:10.5px;">지역 수요 증가에 따라 신규 사업을 추진하고자 함.</div>
+              <div style="margin-top:19px; font-size:12.5px; font-weight:700;">Ⅱ. 세부 계획</div>
+              <div style="margin-top:9px; margin-left:11px; font-size:10.5px;">주요 과업은 아래 표와 같음.</div>
+              <table style="margin-top:12px; margin-left:11px; width:88%; border-collapse:collapse; font-size:10px;">
+                <thead><tr><th style="border:1px solid #333; background:#F2F2F2; padding:4px 8px; font-weight:700; text-align:left; width:20%;">구분</th><th style="border:1px solid #333; background:#F2F2F2; padding:4px 8px; font-weight:700; text-align:left;">내용</th><th style="border:1px solid #333; background:#F2F2F2; padding:4px 8px; font-weight:700; text-align:left; width:22%;">예산</th></tr></thead>
+                <tbody>
+                  <tr><td style="border:1px solid #333; padding:4px 8px;">1분기</td><td style="border:1px solid #333; padding:4px 8px;">기획·설계</td><td style="border:1px solid #333; padding:4px 8px;">[○○]</td></tr>
+                  <tr><td style="border:1px solid #333; padding:4px 8px;">2분기</td><td style="border:1px solid #333; padding:4px 8px;">개발</td><td style="border:1px solid #333; padding:4px 8px;">[○○]</td></tr>
+                </tbody>
+              </table>
+              <div style="margin-top:19px; font-size:12.5px; font-weight:700;">Ⅲ. 기대 효과</div>
+              <div style="margin-top:9px; margin-left:11px; font-size:10.5px;">· 업무 효율 향상&nbsp;&nbsp;· 문서 표준화</div>
+            </div>
+          </div>
+        </div>
+        <div style="height:60px; border-top:1px solid #E4E8EF; display:flex; align-items:center; padding:0 20px; gap:10px; flex:none; background:#fff;">
+          <div style="display:flex; align-items:center; gap:2px; border:1px solid #E4E8EF; border-radius:9px; padding:2px;">
+            <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#98A2B3;">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div style="font-size:12.5px; font-weight:600; color:#1A2233; padding:0 8px; font-variant-numeric:tabular-nums;">1 / 1</div>
+            <div style="width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#98A2B3;">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M5.5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+          <div style="font-size:12px; color:#98A2B3;">맑은 고딕 · A4 210×297mm</div>
+          <div style="margin-left:auto; display:flex; gap:8px;">
+            <div style="padding:8px 15px; border-radius:9px; border:1px solid #E4E8EF; color:#1A2233; font-size:13px; font-weight:600; cursor:pointer;" style-hover="background:#F6F7FA;">닫기</div>
+            <div style="padding:8px 16px; border-radius:9px; background:#2B5CE6; color:#fff; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(43,92,230,.35);" style-hover="background:#1F49C4;">HWPX 내보내기</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const treeBase = [
+      { label: '2026 사업계획서', kind: 'text', depth: 0, weight: 700 },
+      { label: 'Ⅰ. 추진 배경', kind: 'text', depth: 0, weight: 600 },
+      { label: '지역 수요 증가에 따라…', kind: 'text', depth: 1 },
+      { label: 'Ⅱ. 세부 계획', kind: 'text', depth: 0, weight: 600, group: true },
+      { label: '주요 과업은 아래 표…', kind: 'text', depth: 1, group: true },
+      { label: '표', kind: 'table', depth: 1, active: true, group: true },
+      { label: 'Ⅲ. 기대 효과', kind: 'text', depth: 0, weight: 600 },
+      { label: '· 업무 효율 향상 · …', kind: 'text', depth: 1 },
+    ];
+    const tree = treeBase.map(n => ({
+      label: n.label,
+      pad: 8 + n.depth * 18,
+      child: n.depth > 0,
+      isTable: n.kind === 'table',
+      isText: n.kind !== 'table',
+      glyph: n.kind === 'table' ? '▦' : 'T',
+      weight: n.weight || 500,
+      color: n.active ? '#2B5CE6' : '#1A2233',
+      iconColor: n.active ? '#2B5CE6' : '#98A2B3',
+      bg: n.active ? '#EDF2FE' : (n.group ? 'rgba(43,92,230,.06)' : 'transparent'),
+      border: n.active ? '#C4D4F9' : 'transparent',
+      colorDark: n.active ? '#8FADF6' : '#E7EAF0',
+      iconColorDark: n.active ? '#8FADF6' : '#6B7484',
+      bgDark: n.active ? 'rgba(91,132,240,.14)' : 'transparent',
+    }));
+
+    return {
+      starters: [
+        { name: '빈 문서', tone: '#98A2B3' },
+        { name: '공문서', tone: '#2B5CE6' },
+        { name: '사업계획서', tone: '#E58B3A' },
+        { name: '보고서', tone: '#4CAF7D' },
+        { name: '회의록', tone: '#9A6FD4' },
+        { name: '품의서', tone: '#D46F8C' },
+      ],
+      templates: [
+        { name: '대외 공문서', meta: '기관 표준 서식', tag: '인기', tone: '#2B5CE6', bg: '#EDF2FE' },
+        { name: '사업계획서', meta: '표·개조식 구성', tag: '인기', tone: '#C77A28', bg: '#FBF3E7' },
+        { name: '주간 업무보고', meta: '반복 서식 자동화', tag: 'NEW', tone: '#3B9B6B', bg: '#EAF6EF' },
+        { name: '회의록', meta: '참석자·안건 블록', tag: '무료', tone: '#8A5FC8', bg: '#F3EEFB' },
+      ],
+      recents: [
+        { name: '2026 사업계획서', time: '10분 전 편집' },
+        { name: '3분기 주간보고_최종', time: '어제' },
+        { name: '협조 공문(시설과)', time: '2일 전' },
+        { name: '월간 회의록 6월', time: '지난주' },
+        { name: '예산 품의서 v2', time: '지난주' },
+      ],
+      palette: [
+        { name: '텍스트', isText: true, glyph: 'T' },
+        { name: '본문', isDoc: true, glyph: '¶' },
+        { name: '표', isTable: true, glyph: '▦' },
+        { name: '이미지', isImage: true, glyph: '▣' },
+      ],
+      tree,
+      borderPresets: (() => {
+        const S = '#1A2233', F = '#DFE4EC';
+        const mk = (label, bc, h, v, active) => ({
+          label, bc, h, v,
+          frame: active ? '#C4D4F9' : '#E4E8EF',
+          bg: active ? '#F8FAFF' : '#fff',
+          labelColor: active ? '#2B5CE6' : '#5B6577',
+        });
+        return [
+          mk('모두', `${S} ${S} ${S} ${S}`, S, S, true),
+          mk('바깥', `${S} ${S} ${S} ${S}`, F, F),
+          mk('안쪽', `${F} ${F} ${F} ${F}`, S, S),
+          mk('없음', `${F} ${F} ${F} ${F}`, F, F),
+          mk('위', `${S} ${F} ${F} ${F}`, F, F),
+          mk('아래', `${F} ${F} ${S} ${F}`, F, F),
+          mk('왼쪽', `${F} ${F} ${F} ${S}`, F, F),
+          mk('오른쪽', `${F} ${S} ${F} ${F}`, F, F),
+          mk('위아래', `${S} ${F} ${S} ${F}`, F, F),
+          mk('좌우', `${F} ${S} ${F} ${S}`, F, F),
+          mk('가로선', `${F} ${F} ${F} ${F}`, S, F),
+          mk('세로선', `${F} ${F} ${F} ${F}`, F, S),
+        ];
+      })(),
+      swatches: [
+        { hex: '#1A2233', ring: '#C4D4F9' },
+        { hex: '#5B6577', ring: 'transparent' },
+        { hex: '#2B5CE6', ring: 'transparent' },
+        { hex: '#D64550', ring: 'transparent' },
+        { hex: '#3B9B6B', ring: 'transparent' },
+        { hex: '#C77A28', ring: 'transparent' },
+      ],
+      hmarks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+      vmarks: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26],
+    };
+  }
+}
+</script>
+</body>
+</html>
