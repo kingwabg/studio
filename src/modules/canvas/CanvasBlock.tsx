@@ -16,7 +16,7 @@ import {
 } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { type Block, type TableKingData, TEXT_DEFAULTS } from "../document/model";
+import { type Block, type TableKingData, TEXT_DEFAULTS, padOf } from "../document/model";
 import { ensureFont, fontByKey, fontCss, useFontStore } from "../document/fonts";
 import { SCALE, mmToPx, pxToMm } from "./geometry";
 import { useCanvasStore } from "./store";
@@ -169,7 +169,14 @@ export function CanvasBlock({ block }: { block: Block }) {
           : "outline outline-1 outline-line hover:outline-2 hover:outline-accent"
       } ${isDragging ? "opacity-95 shadow-[0_8px_24px_rgba(26,34,51,0.18)]" : ""}`}
     >
-      <div className={`w-full h-full rounded-[2px] ${isTable ? "overflow-visible" : "overflow-hidden"}`}>
+      <div
+        className={`w-full h-full ${isTable ? "overflow-visible" : "overflow-hidden"}`}
+        style={{
+          borderRadius: block.radius ?? 2,
+          background: block.fill || undefined,
+          border: block.borderWidth ? `${block.borderWidth}px solid ${block.borderColor || "#1A2233"}` : undefined,
+        }}
+      >
         {block.type === "text" ? (
           <TextContent block={block} editing={editing} onDoneEditing={() => setEditing(false)} />
         ) : isTable ? (
@@ -349,6 +356,11 @@ function TextContent({
   const taRef = useRef<HTMLTextAreaElement>(null);
   const sizerRef = useRef<HTMLDivElement>(null);
   const wSizerRef = useRef<HTMLDivElement>(null);
+  // 안쪽 여백(mm→px) — 화면 CSS 패딩. 내보내기 cellMargin과 같은 값이라 줄바꿈 정합.
+  const pad = padOf(block);
+  const padXpx = mmToPx(pad.x);
+  const padYpx = mmToPx(pad.y);
+  const padStyle = { paddingLeft: padXpx, paddingRight: padXpx, paddingTop: padYpx, paddingBottom: padYpx };
   useEffect(() => {
     if (editing) taRef.current?.focus();
   }, [editing]);
@@ -368,7 +380,7 @@ function TextContent({
     const el = sizerRef.current;
     if (!el) return;
     const sync = () => {
-      const needMm = Math.max(8, Math.ceil((el.offsetHeight + 8) / SCALE) + 1); // 패딩+여유 1mm
+      const needMm = Math.max(8, Math.ceil((el.offsetHeight + padYpx * 2) / SCALE) + 1); // 내용 + 상하 패딩 + 여유 1mm
       const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
       if (cur && Math.abs((cur.h ?? 0) - needMm) >= 1) updateBlock(block.id, { h: needMm });
     };
@@ -379,7 +391,7 @@ function TextContent({
     // deps는 "시그니처 문자열" 하나로 고정 — RO가 놓치는 갱신(내용/폭/폰트 교체)에도
     // 재실행되면서, 배열 길이가 항상 2라 HMR 중 deps 크기 변화 경고가 안 난다. sync는 멱등.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [block.id, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}`]);
+  }, [block.id, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padY}`]);
 
   // auto-width: 수동 조절(manualW) 전까지 박스 폭을 글자에 맞춘다(캔바식 Auto width).
   // 숨긴 사이저(white-space:pre — 줄바꿈 없이 가장 긴 줄의 자연 폭)를 관찰해 block.w로.
@@ -398,7 +410,7 @@ function TextContent({
     ro.observe(el);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [block.id, block.manualW, block.x, pageW, `${block.text}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}`]);
+  }, [block.id, block.manualW, block.x, pageW, `${block.text}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padX}`]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `textdrop:${block.id}`,
@@ -415,21 +427,21 @@ function TextContent({
           // 타이핑 중 즉시 늘어나게 (정확한 동기화는 blur 후 사이저가 담당)
           const ta = taRef.current;
           if (ta && ta.scrollHeight > ta.clientHeight)
-            updateBlock(block.id, { h: Math.ceil((ta.scrollHeight + 8) / SCALE) + 1 });
+            updateBlock(block.id, { h: Math.ceil((ta.scrollHeight + padYpx * 2) / SCALE) + 1 });
         }}
         onBlur={onDoneEditing}
         onKeyDown={(e) => e.key === "Escape" && onDoneEditing()}
         onPointerDown={(e) => e.stopPropagation()}
-        style={{ ...textStyle(block), height: mmToPx(block.h) }}
-        className="w-full px-2 py-1 leading-snug bg-white outline-none resize-none border-0"
+        style={{ ...textStyle(block), ...padStyle, height: mmToPx(block.h) }}
+        className="w-full leading-snug bg-white outline-none resize-none border-0"
       />
     );
 
   return (
     <div
       ref={setNodeRef}
-      style={textStyle(block)}
-      className={`w-full px-2 py-1 leading-snug ${
+      style={{ ...textStyle(block), ...padStyle }}
+      className={`w-full leading-snug ${
         isOver ? "bg-accentsoft outline outline-2 outline-accent -outline-offset-2" : ""
       }`}
     >
@@ -441,8 +453,8 @@ function TextContent({
         <div
           ref={wSizerRef}
           aria-hidden
-          className="px-2 py-1 leading-snug"
-          style={{ ...textStyle(block), position: "absolute", top: 0, left: 0, visibility: "hidden", whiteSpace: "pre", pointerEvents: "none" }}
+          className="leading-snug"
+          style={{ ...textStyle(block), ...padStyle, position: "absolute", top: 0, left: 0, visibility: "hidden", whiteSpace: "pre", pointerEvents: "none" }}
         >
           {block.text || " "}
         </div>

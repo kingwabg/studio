@@ -5,7 +5,7 @@
 import { type ReactNode } from "react";
 import { useRightTabStore, usePanelStore } from "../../modules/ui/theme";
 import { useCanvasStore } from "../../modules/canvas/store";
-import { type Block, type TableKingData, type TextAlign, TEXT_DEFAULTS } from "../../modules/document/model";
+import { type Block, type TableKingData, type TextAlign, TEXT_DEFAULTS, DEFAULT_TEXT_PAD, padOf } from "../../modules/document/model";
 import { AiPanel } from "./AiPanel";
 import { FontSelect } from "./FontSelect";
 import { IcText, IcTable, IcImage, IcTrash, IcSparkles, IcCopy } from "../../ui/icons";
@@ -170,6 +170,99 @@ function TextFormat({ block }: { block: Block }) {
   );
 }
 
+// 모양 — 배경 채우기·모서리·테두리 (실동작)
+const FILL_SWATCHES = ["", "#FFFFFF", "#F6F7FA", "#EDF2FE", "#FDEEF0", "#EAF6EF", "#FEF9E7"];
+const BORDER_COLORS = ["#1A2233", "#5B6577", "#CBD2DE", "#2B5CE6", "#D64550", "#3B9B6B"];
+
+function ShapeSection({ block }: { block: Block }) {
+  const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const patch = (p: Partial<Block>) => updateBlock(block.id, p);
+  const bw = block.borderWidth ?? 0;
+  return (
+    <Section label="모양">
+      <Row label="배경">
+        <div className="flex items-center gap-1.5 flex-1">
+          {FILL_SWATCHES.map((c) => {
+            const on = (block.fill ?? "") === c;
+            return (
+              <button
+                key={c || "none"}
+                onClick={() => patch({ fill: c || undefined })}
+                title={c || "없음"}
+                className="w-[18px] h-[18px] rounded-[5px] transition-transform hover:scale-[1.15] flex items-center justify-center shrink-0"
+                style={{ background: c || "var(--surface)", border: `2px solid ${on ? "var(--accent)" : "var(--line)"}`, boxShadow: "0 0 0 1px rgba(16,24,40,.06)" }}
+              >
+                {!c && <span className="text-[9px] text-inkfaint leading-none">✕</span>}
+              </button>
+            );
+          })}
+        </div>
+      </Row>
+      <div className="grid grid-cols-2 gap-2">
+        <Row label="모서리">
+          <NumField value={block.radius ?? 0} onChange={(v) => patch({ radius: Math.max(0, Math.min(40, v)) })} suffix="px" />
+        </Row>
+        <Row label="테두리">
+          <Segment
+            options={[{ v: "0", label: "없음" }, { v: "1", label: "1" }, { v: "2", label: "2" }]}
+            value={String(bw)}
+            onChange={(v) => patch({ borderWidth: Number(v), borderColor: block.borderColor ?? "#CBD2DE" })}
+          />
+        </Row>
+      </div>
+      {bw > 0 && (
+        <Row label="선색">
+          <div className="flex items-center gap-1.5 flex-1">
+            {BORDER_COLORS.map((c) => {
+              const on = (block.borderColor ?? "#CBD2DE").toUpperCase() === c.toUpperCase();
+              return (
+                <button
+                  key={c}
+                  onClick={() => patch({ borderColor: c })}
+                  aria-label={`선색 ${c}`}
+                  className="w-[18px] h-[18px] rounded-full transition-transform hover:scale-[1.15] shrink-0"
+                  style={{ backgroundColor: c, border: `2px solid ${on ? "var(--accent)" : "var(--surface)"}`, boxShadow: "0 0 0 1px rgba(16,24,40,.08)" }}
+                />
+              );
+            })}
+          </div>
+        </Row>
+      )}
+      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+        <span className="text-[11px] text-inkfaint">추가:</span>
+        <SoonPill>그림자</SoonPill>
+        <SoonPill>불투명도</SoonPill>
+        <SoonPill>필터</SoonPill>
+      </div>
+    </Section>
+  );
+}
+
+// 여백 — 상자 안쪽 패딩(mm). 화면 CSS = 내보내기 cellMargin 같은 값 → 줄바꿈 정합.
+function PaddingSection({ block }: { block: Block }) {
+  const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const patch = (p: Partial<Block>) => updateBlock(block.id, p);
+  const pad = padOf(block);
+  const level = pad.x < 1.5 ? "s" : pad.x > 3.5 ? "l" : "m";
+  return (
+    <Section label="여백">
+      <Row label="안쪽">
+        <Segment
+          options={[{ v: "s", label: "좁게" }, { v: "m", label: "보통" }, { v: "l", label: "넓게" }]}
+          value={level}
+          onChange={(v) =>
+            patch(v === "s" ? { padX: 1, padY: 0.6 } : v === "l" ? { padX: 5, padY: 3 } : { padX: DEFAULT_TEXT_PAD.x, padY: DEFAULT_TEXT_PAD.y })
+          }
+        />
+      </Row>
+      <div className="grid grid-cols-2 gap-2">
+        <Row label="좌우"><NumField value={pad.x} onChange={(v) => patch({ padX: Math.max(0, v) })} suffix="mm" /></Row>
+        <Row label="상하"><NumField value={pad.y} onChange={(v) => patch({ padY: Math.max(0, v) })} suffix="mm" /></Row>
+      </div>
+    </Section>
+  );
+}
+
 // 표 크기 "R×C" — 스냅샷 셀 배열에서
 function tableDims(block: Block): string {
   const d = block.data as TableKingData | undefined;
@@ -324,43 +417,14 @@ export function RightPanel() {
               </Section>
             )}
 
-            {/* 모양 (준비 중) — 시안 시각, 비활성 */}
+            {/* 모양 — 배경·모서리·테두리 (실동작) */}
+            <ShapeSection block={block} />
+
+            {/* 여백 — 안쪽 패딩 (텍스트 실동작) */}
+            {block.type === "text" && <PaddingSection block={block} />}
+
+            {/* 접힌 섹션 (준비 중) */}
             <div className="opacity-55 pointer-events-none select-none">
-              <Section label="모양">
-                <Row label="배경">
-                  <div className="h-[26px] border border-line rounded-[7px] flex items-center gap-1.5 px-2 flex-1">
-                    <span className="w-3.5 h-3.5 rounded-[3px] border border-linestrong" style={{ background: "repeating-conic-gradient(var(--line) 0 25%, var(--surface) 0 50%) 0 0 / 8px 8px" }} />
-                    <span className="text-[12px] text-ink">없음</span>
-                  </div>
-                </Row>
-                <div className="grid grid-cols-2 gap-2">
-                  <Row label="모서리"><ReadCell>0px</ReadCell></Row>
-                  <Row label="넘침"><ReadCell>보임</ReadCell></Row>
-                </div>
-                <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                  <span className="text-[11px] text-inkfaint">추가:</span>
-                  <SoonPill>그림자</SoonPill>
-                  <SoonPill>불투명도</SoonPill>
-                  <SoonPill>필터</SoonPill>
-                </div>
-              </Section>
-
-              {/* 여백 (준비 중) */}
-              <Section label="여백">
-                <Row label="안쪽">
-                  <Segment options={[{ v: "s", label: "좁게" }, { v: "m", label: "보통" }, { v: "l", label: "넓게" }]} value="m" disabled />
-                </Row>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(["상", "하", "좌", "우"] as const).map((s, i) => (
-                    <div key={s} className="h-[26px] border border-line rounded-[7px] flex items-center justify-between px-1.5">
-                      <span className="text-[10px] font-bold text-inkfaint">{s}</span>
-                      <span className="text-[12px] font-semibold text-ink tabular-nums">{[2, 2, 3, 3][i]}</span>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-
-              {/* 접힌 섹션 */}
               {["고급", "내보내기 설정"].map((s) => (
                 <div key={s} className="flex items-center h-[34px] border-b border-line">
                   <span className="flex-1 text-[12px] font-semibold text-ink">{s}</span>

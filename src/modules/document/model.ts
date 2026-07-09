@@ -53,6 +53,15 @@ export interface Block {
   italic?: boolean;
   align?: TextAlign;
   color?: string; // hex
+  // ── 모양(shape) — 요소 상자의 겉모습 ──
+  fill?: string; // 배경색 hex (없으면 투명). 내보내기: 셀 채우기 색으로.
+  radius?: number; // 모서리 반경 px — 화면 전용(HWPX엔 둥근 모서리 개념 없음)
+  borderColor?: string; // 테두리 색
+  borderWidth?: number; // 테두리 두께 px (0/없으면 테두리 없음) — 화면 전용
+  // ── 여백(padding) — 상자 안쪽 여백(mm). 텍스트는 이 값만큼 글이 접히는 폭이 준다.
+  //    화면 CSS 패딩 = 내보내기 cellMargin과 같은 값이어야 줄바꿈이 정합한다. ──
+  padX?: number; // 좌우 안쪽 여백(mm) — 없으면 DEFAULT_TEXT_PAD.x
+  padY?: number; // 상하 안쪽 여백(mm) — 없으면 DEFAULT_TEXT_PAD.y
 }
 
 export const TEXT_DEFAULTS = {
@@ -62,6 +71,15 @@ export const TEXT_DEFAULTS = {
   align: "left" as TextAlign,
   color: "#1A2233",
 };
+
+// 텍스트 상자 기본 안쪽 여백(mm) — 화면의 px-2 py-1(8px/4px)과 같은 값.
+// SCALE=3.7795px/mm → 8/SCALE≈2.12, 4/SCALE≈1.06. 이 값이 화면·내보내기 공통 기준이라
+// 캔버스 줄바꿈 = 한글 줄바꿈 정합이 유지된다(검증된 240자 실측 기준).
+export const DEFAULT_TEXT_PAD = { x: 8 / 3.7795275591, y: 4 / 3.7795275591 };
+export const padOf = (b: Block) => ({
+  x: b.padX ?? DEFAULT_TEXT_PAD.x,
+  y: b.padY ?? DEFAULT_TEXT_PAD.y,
+});
 
 export interface CanvasDoc {
   id: string;

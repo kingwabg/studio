@@ -5,14 +5,11 @@
 // 병합(다중 레코드)을 위해 문서 배열을 페이지별로 싣는 변형도 제공한다.
 import { buildHwpx } from "../../hwpx/exportCore.js";
 import { tableDataToRows } from "../../table-king/TableKingBlock.jsx";
-import { type Block, type CanvasDoc, type TableKingData, TEXT_DEFAULTS } from "./model";
+import { type Block, type CanvasDoc, type TableKingData, TEXT_DEFAULTS, padOf } from "./model";
 import { DEFAULT_FONT, fontByKey } from "./fonts";
 import { SCALE } from "../canvas/geometry";
 
-// 캔버스 텍스트 블록의 안쪽 여백 (CanvasBlock의 px-2 py-1) — 화면과 한글의
-// "글이 접히는 폭"을 같게 하려면 내보내기에서도 이만큼 보정해야 한다.
-const PAD_X_MM = 8 / SCALE; // ≈2.12mm
-const PAD_Y_MM = 4 / SCALE; // ≈1.06mm
+const HWPUNIT_PER_MM = 283.465;
 // 캔버스 leading-snug = 1.375 → 문단 줄간격 %
 const LINE_SPACING = 138;
 
@@ -27,6 +24,7 @@ function effectiveFont(): string {
 
 function elementOf(b: Block, page: number) {
   if (b.type === "text") {
+    const pad = padOf(b); // 요소별 안쪽 여백(mm) — 화면 CSS 패딩과 같은 값
     const style = {
       pt: b.fontSize ?? TEXT_DEFAULTS.fontSize,
       bold: b.bold ?? TEXT_DEFAULTS.bold,
@@ -36,6 +34,8 @@ function elementOf(b: Block, page: number) {
       lineSpacing: LINE_SPACING,
       // 요소별 글꼴 — 레지스트리 hwpxName을 charPr fontRef로 선언 (없으면 문서 기본)
       font: b.font ? fontByKey(b.font).hwpxName : undefined,
+      // 모양 배경색 — 채우기 있으면 셀 채우기로 (없으면 무배경)
+      backgroundColor: b.fill || undefined,
     };
     // flow(본문)는 절대배치 개체가 아니라 진짜 문단으로 — 한글에서 이어 쓸 수 있고
     // 길면 페이지를 넘는다. 좌표는 화면의 "글 시작점"(패딩 안쪽)으로 보정해
@@ -44,9 +44,9 @@ function elementOf(b: Block, page: number) {
       return {
         type: "flowText",
         page,
-        x: b.x + PAD_X_MM,
-        y: b.y + PAD_Y_MM,
-        w: b.w - PAD_X_MM * 2,
+        x: b.x + pad.x,
+        y: b.y + pad.y,
+        w: b.w - pad.x * 2,
         h: b.h,
         text: b.text ?? "",
         style,
@@ -62,8 +62,8 @@ function elementOf(b: Block, page: number) {
       style,
       // 상자 안쪽 여백을 화면 패딩과 일치 (HWPUNIT) — 접히는 폭 정합
       cellMarginU: {
-        lr: Math.round(PAD_X_MM * 283.465),
-        tb: Math.round(PAD_Y_MM * 283.465),
+        lr: Math.round(pad.x * HWPUNIT_PER_MM),
+        tb: Math.round(pad.y * HWPUNIT_PER_MM),
       },
     };
   }
