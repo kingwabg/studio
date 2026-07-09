@@ -1,5 +1,6 @@
 // RightPanel.tsx — [속성] 선택 블록 편집 / [AI] 문서 도우미 탭.
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { useRightTabStore } from "../../modules/ui/theme";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { type Block, type TextAlign, TEXT_DEFAULTS } from "../../modules/document/model";
 import { AiPanel } from "./AiPanel";
@@ -134,7 +135,8 @@ export function RightPanel() {
   const removeBlock = useCanvasStore((s) => s.removeBlock);
   const cascadeStyle = useCanvasStore((s) => s.cascadeStyle);
   const hasKids = useCanvasStore((s) => s.doc.blocks.some((b) => b.parentId === s.selectedId));
-  const [tab, setTab] = useState<"props" | "ai">("props");
+  const tab = useRightTabStore((s) => s.tab);
+  const setTab = useRightTabStore((s) => s.setTab);
 
   const kind =
     block?.type === "text"

@@ -11,6 +11,16 @@ interface ThemeState {
   setDark: (v: boolean) => void;
 }
 
+// 우측 패널 탭 — 좌측 레일(AI)에서도 열 수 있게 전역
+interface RightTabState {
+  tab: "props" | "ai";
+  setTab: (t: "props" | "ai") => void;
+}
+export const useRightTabStore = create<RightTabState>((set) => ({
+  tab: "props",
+  setTab: (tab) => set({ tab }),
+}));
+
 export const useThemeStore = create<ThemeState>((set) => ({
   dark: typeof localStorage !== "undefined" && localStorage.getItem(KEY) === "dark",
   toggle: () =>

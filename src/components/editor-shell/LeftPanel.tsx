@@ -5,6 +5,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { type Block, type BlockType, descendantIds } from "../../modules/document/model";
+import { useRightTabStore } from "../../modules/ui/theme";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { useMergeStore } from "../../modules/merge/store";
 import { parseSheetFile } from "../../modules/merge/parseSheet";
@@ -24,17 +25,20 @@ import {
   IcChevronLeft,
   IcChevronRight,
   IcSparkles,
+  IcSearch,
 } from "../../ui/icons";
 
-const PALETTE: { type: BlockType; label: string; icon: ReactNode; flow?: boolean }[] = [
-  { type: "text", label: "텍스트", icon: <IcText size={17} /> },
+// 카테고리 틴트 타일 팔레트 (시안 1b) — 앞 4종은 드래그 실동작, 뒤 5종은 준비 중
+const PALETTE: { type: BlockType; label: string; icon: ReactNode; flow?: boolean; tint: string; tone: string }[] = [
+  { type: "text", label: "텍스트", icon: <IcText size={16} />, tint: "var(--accentsoft)", tone: "var(--accenttext)" },
   // 본문 = 흐름 텍스트: hwpx로 나갈 때 절대배치 개체가 아니라 진짜 문단이 된다
-  { type: "text", label: "본문", icon: <IcFile size={17} />, flow: true },
-  { type: "table", label: "표", icon: <IcTable size={17} /> },
-  { type: "image", label: "이미지", icon: <IcImage size={17} /> },
+  { type: "text", label: "본문", icon: <IcFile size={16} />, flow: true, tint: "var(--cat-orange-soft)", tone: "var(--cat-orange)" },
+  { type: "table", label: "표", icon: <IcTable size={16} />, tint: "var(--cat-green-soft)", tone: "var(--cat-green)" },
+  { type: "image", label: "이미지", icon: <IcImage size={16} />, tint: "var(--cat-purple-soft)", tone: "var(--cat-purple)" },
 ];
+const PALETTE_SOON = ["결재선", "서명", "날짜", "쪽 번호", "붙임"];
 
-function PaletteItem({ type, label, icon, flow }: { type: BlockType; label: string; icon: ReactNode; flow?: boolean }) {
+function PaletteItem({ type, label, icon, flow, tint, tone }: (typeof PALETTE)[number]) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `palette-${flow ? "flow" : type}`,
     data: { kind: "palette", type, flow },
@@ -45,12 +49,14 @@ function PaletteItem({ type, label, icon, flow }: { type: BlockType; label: stri
       {...listeners}
       {...attributes}
       style={{ transform: CSS.Translate.toString(transform), touchAction: "none" }}
-      className={`flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-xl border border-line bg-white text-inksoft cursor-grab select-none hover:border-accentline hover:text-accent hover:bg-accentsoft/40 transition-all ${
-        isDragging ? "opacity-60 shadow-md scale-95 z-50" : ""
+      className={`flex flex-col items-center gap-1.5 cursor-grab select-none transition-all hover:-translate-y-px ${
+        isDragging ? "opacity-60 scale-95 z-50" : ""
       }`}
     >
-      {icon}
-      <span className="text-[12px] font-medium">{label}</span>
+      <div className="w-full h-[46px] rounded-[10px] flex items-center justify-center" style={{ background: tint, color: tone }}>
+        {icon}
+      </div>
+      <span className="text-[11px] font-medium text-inksoft">{label}</span>
     </div>
   );
 }
@@ -163,12 +169,34 @@ function BlocksTab() {
 
   return (
     <>
-      <div className="px-3.5 py-3.5 border-b border-line">
-        <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2.5">블록 추가</p>
-        <div className="grid grid-cols-2 gap-2">
-          {PALETTE.map((p) => (
-            <PaletteItem key={p.label} type={p.type} label={p.label} icon={p.icon} flow={p.flow} />
-          ))}
+      <div className="px-3.5 py-3.5 border-b border-line flex flex-col gap-3">
+        {/* 블록 검색 (준비 중) */}
+        <div title="준비 중" className="h-9 bg-paper border border-line rounded-[9px] flex items-center gap-2 px-2.5">
+          <span className="text-inkfaint"><IcSearch size={14} /></span>
+          <span className="text-[12px] text-inkfaint">블록·서식 검색</span>
+        </div>
+        <div>
+          <p className="text-[11px] font-bold text-inkfaint tracking-[.08em] mb-2">카테고리 둘러보기</p>
+          <div className="grid grid-cols-3 gap-2">
+            {PALETTE.map((p) => (
+              <PaletteItem key={p.label} {...p} />
+            ))}
+            {/* 준비 중 타일 — 로드맵(결재선·서명·날짜·쪽 번호·붙임) 자리 */}
+            {PALETTE_SOON.map((label, i) => (
+              <div key={label} title={`${label} (준비 중)`} className="flex flex-col items-center gap-1.5 select-none opacity-55">
+                <div
+                  className="w-full h-[46px] rounded-[10px] flex items-center justify-center text-[13px] font-bold"
+                  style={{
+                    background: ["var(--cat-red-soft)", "var(--accentsoft)", "var(--cat-orange-soft)", "var(--cat-green-soft)", "var(--cat-purple-soft)"][i],
+                    color: ["var(--cat-red)", "var(--accenttext)", "var(--cat-orange)", "var(--cat-green)", "var(--cat-purple)"][i],
+                  }}
+                >
+                  {label.slice(0, 1)}
+                </div>
+                <span className="text-[11px] font-medium text-inkfaint">{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       <div className="px-3.5 py-3.5 flex-1 overflow-auto flex flex-col">
@@ -381,35 +409,61 @@ function DataTab() {
   );
 }
 
+// 캔바식 2단: 아이콘 레일 66px + 콘텐츠 패널 250px (시안 1b)
+type RailKey = "blocks" | "templates" | "data" | "upload";
+
 export function LeftPanel() {
-  const [tab, setTab] = useState<"blocks" | "data">("blocks");
+  const [tab, setTab] = useState<RailKey>("blocks");
   const hasDataset = useMergeStore((s) => s.dataset !== null);
+  const openAi = useRightTabStore((s) => s.setTab);
+
+  const rail: { key: RailKey | "ai"; label: string; icon: ReactNode; soon?: boolean }[] = [
+    { key: "blocks", label: "블록", icon: <IcText size={17} /> },
+    { key: "templates", label: "템플릿", icon: <IcFile size={17} />, soon: true },
+    { key: "data", label: "데이터", icon: <IcTable size={17} /> },
+    { key: "upload", label: "업로드", icon: <IcUpload size={17} />, soon: true },
+    { key: "ai", label: "AI", icon: <IcSparkles size={17} /> },
+  ];
 
   return (
-    <aside className="w-60 shrink-0 border-r border-line bg-white flex flex-col">
-      <div className="flex px-2 pt-2 gap-1">
-        {(
-          [
-            ["blocks", "블록"],
-            ["data", "데이터"],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12.5px] font-semibold transition-colors ${
-              tab === key ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper"
-            }`}
-          >
-            {label}
-            {key === "data" && hasDataset && (
-              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-            )}
-          </button>
-        ))}
+    <aside className="shrink-0 border-r border-line bg-surface flex">
+      {/* 아이콘 레일 */}
+      <div className="w-[66px] shrink-0 border-r border-line flex flex-col items-center gap-1 py-2">
+        {rail.map((r) => {
+          const active = r.key === tab;
+          return (
+            <button
+              key={r.key}
+              title={r.soon ? `${r.label} (준비 중)` : r.label}
+              onClick={() => (r.key === "ai" ? openAi("ai") : setTab(r.key as RailKey))}
+              className={`w-14 py-2 rounded-[10px] flex flex-col items-center gap-1 transition-colors ${
+                active ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper hover:text-ink"
+              }`}
+            >
+              {r.icon}
+              <span className={`text-[10.5px] ${active ? "font-bold" : "font-medium"}`}>{r.label}</span>
+            </button>
+          );
+        })}
+        {hasDataset && <span className="w-1.5 h-1.5 rounded-full bg-accent -mt-9 ml-9" />}
       </div>
-      <div className="h-px bg-line mt-2" />
-      {tab === "blocks" ? <BlocksTab /> : <DataTab />}
+      {/* 콘텐츠 패널 */}
+      <div className="w-[250px] flex flex-col min-h-0">
+        {tab === "blocks" ? (
+          <BlocksTab />
+        ) : tab === "data" ? (
+          <DataTab />
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-paper text-inkfaint">
+              {tab === "templates" ? <IcFile size={18} /> : <IcUpload size={18} />}
+            </span>
+            <p className="text-[12px] text-inkfaint leading-relaxed">
+              {tab === "templates" ? "템플릿 라이브러리는 준비 중이에요" : "이미지 업로드는 준비 중이에요"}
+            </p>
+          </div>
+        )}
+      </div>
     </aside>
   );
 }
