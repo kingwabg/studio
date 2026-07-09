@@ -62,7 +62,13 @@ export function makeStyleRegistry(baseHeaderXml) {
   const chars = new Map();
   const parasReg = new Map();
   const fills = new Map();
-  let fontIdx = null; // patchHeader에서 실효 글꼴을 추가하면 그 id (HANGUL/LATIN 동일 인덱스)
+  // 글꼴 레지스트리 — 문서 기본 + 요소별 글꼴을 모두 fontface로 등록하고 id를 배분한다.
+  // (id는 봉투 기존 fontCnt에 연속으로 이어 붙임 — IDRef=배열 인덱스 해석 리더 호환)
+  const fontIds = new Map(); // 글꼴 이름 → id (patchHeader에서 확정)
+  const wantFont = (name) => {
+    if (name && !fontIds.has(name)) fontIds.set(name, null);
+  };
+  let fontIdx = null; // 문서 기본 글꼴 id (미지정 charPr가 참조)
 
   const charId = (s) => {
     if (!s) return "0";
@@ -70,8 +76,10 @@ export function makeStyleRegistry(baseHeaderXml) {
     const bold = !!s.bold;
     const italic = !!s.italic;
     const color = s.color ?? "#000000";
-    const key = `${pt}|${bold}|${italic}|${color}`;
-    if (!chars.has(key)) chars.set(key, { id: charBase + chars.size, pt, bold, italic, color });
+    const font = s.font ?? null; // 요소별 글꼴 이름 (없으면 문서 기본)
+    wantFont(font);
+    const key = `${pt}|${bold}|${italic}|${color}|${font ?? ""}`;
+    if (!chars.has(key)) chars.set(key, { id: charBase + chars.size, pt, bold, italic, color, font });
     return String(chars.get(key).id);
   };
   const paraId = (s) => {
@@ -99,19 +107,28 @@ export function makeStyleRegistry(baseHeaderXml) {
   const patchHeader = (headerXml, fontName) => {
     let xml = headerXml;
 
-    if (fontName) {
-      // HANGUL/LATIN 두 목록에 같은 인덱스로 추가 → charPr fontRef가 한 값으로 참조
+    // 등록할 글꼴 목록: 문서 기본(첫 번째) + 요소별 글꼴들 — 전부 fontface로 추가.
+    // HANGUL/LATIN 두 목록에 같은 인덱스로 추가 → charPr fontRef가 한 값으로 참조.
+    const names = [...new Set([...(fontName ? [fontName] : []), ...fontIds.keys()])];
+    if (names.length) {
       for (const lang of ["HANGUL", "LATIN"]) {
         const re = new RegExp(`(<hh:fontface lang="${lang}" fontCnt=")(\\d+)(">)([\\s\\S]*?)(</hh:fontface>)`);
         xml = xml.replace(re, (m, p1, cnt, p3, body, close) => {
-          fontIdx = Number(cnt); // 다음 id = 기존 개수
-          const font =
-            `<hh:font id="${fontIdx}" face="${esc(fontName)}" type="TTF" isEmbedded="0">` +
-            `<hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>` +
-            `</hh:font>`;
-          return `${p1}${Number(cnt) + 1}${p3}${body}${font}${close}`;
+          const base = Number(cnt); // 다음 id = 기존 개수 (연속 배분 — 배열 인덱스 해석 호환)
+          const added = names
+            .map((name, i) => {
+              fontIds.set(name, base + i);
+              return (
+                `<hh:font id="${base + i}" face="${esc(name)}" type="TTF" isEmbedded="0">` +
+                `<hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>` +
+                `</hh:font>`
+              );
+            })
+            .join("");
+          return `${p1}${base + names.length}${p3}${body}${added}${close}`;
         });
       }
+      if (fontName) fontIdx = fontIds.get(fontName);
     }
     const fh = fontIdx ?? 0; // 글꼴 미지정 시 봉투 기본(함초롬바탕)
 
@@ -122,7 +139,7 @@ export function makeStyleRegistry(baseHeaderXml) {
             // 굵게/기울임은 OWPML 표준상 "빈 자식 요소"(<hh:bold/>)다. kordoc 계열은 속성도
             // 읽으므로 둘 다 기록 — 어떤 리더에서도 같은 결과가 나오게 한다.
             `<hh:charPr id="${c.id}" height="${Math.round(c.pt * 100)}" textColor="${c.color}" shadeColor="none" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="1"${c.bold ? ` bold="1"` : ""}${c.italic ? ` italic="1"` : ""}>` +
-            `<hh:fontRef hangul="${fh}" latin="${fh}" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
+            `<hh:fontRef hangul="${c.font != null ? fontIds.get(c.font) ?? fh : fh}" latin="${c.font != null ? fontIds.get(c.font) ?? fh : fh}" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
             `<hh:ratio hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100"/>` +
             `<hh:spacing hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
             `<hh:relSz hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100"/>` +

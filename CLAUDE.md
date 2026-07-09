@@ -51,15 +51,18 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   (페이지 수 게이트는 verify ⑤ rhwp 단계가 담당).
 - ⚠ 한글/HWP 조판은 한글 글자를 **전각(1em) 고정폭**으로 계산한다 (rhwp 실측: 선언
   폰트와 무관하게 advance=1em). 화면 줄바꿈을 일치시키려면 지면 폰트도 전각이어야 함.
-  ⚠ **지면 폰트 = 나눔고딕**(OFL 웹폰트 self-host, `@fontsource/nanum-gothic` 한글 서브셋).
-  맑은 고딕(MS 상용·윈도우 전용)을 대체 — 저작권 안전 + 전 OS 동일 렌더. 단 나눔고딕 한글
-  advance는 0.94em(맑은고딕 1.0em)이라, **문서 텍스트 요소마다 `letter-spacing:0.06em`**
-  (CanvasBlock textStyle — em이라 fontSize별로 정확히 스케일)을 더해 화면도 1em/글자로 만든다
-  (실측: 모든 pt에서 ratio 1.000). 이 보정으로 맑은고딕과 동일한 1em 동작이 되어 기존
-  캘리브레이션이 그대로 유지된다. 내보내기도 "나눔고딕" 선언(effectiveFont). 캔버스 텍스트
-  패딩(px-2/py-1)은 내보내기에서 좌표/셀여백(cellMarginU)으로 보정 — 검증: 240자
-  반복문에서 캔버스 44자/줄·6줄 = rhwp 44자/줄·6줄 정확 일치.
-  (Pretendard 0.86em·Noto Sans KR 0.92em은 전각이 아니라 지면 폰트 부적합 — UI 셸 전용)
+  ⚠ **폰트 시스템 = 레지스트리**(`src/modules/document/fonts.ts`): OFL 12종(나눔고딕/명조·
+  본고딕/명조·고운·고딕A1·IBM플렉스·도현·검은고딕·송명·나눔펜) 전부 npm self-host —
+  저작권 100% 안전(폰트 저작권 시비 방어). 기본 폰트(나눔고딕)만 정적 로드, 나머지는
+  선택 시 지연 로딩. **전각 보정은 폰트별 런타임 실측**(canvas measureText → letter-spacing
+  em 계산, useFontStore 캐시)이라 어떤 폰트든 1em/글자가 되어 줄바꿈 정합이 유지된다.
+  Block.font(레지스트리 key) → 화면 fontCss() / 내보내기 charPr fontRef(exportCore가
+  다중 fontface를 기존 fontCnt에 연속 id로 등록). 맑은 고딕(MS 상용·윈도우 전용)은 폴백만.
+  캔버스 텍스트 패딩(px-2/py-1)은 내보내기에서 좌표/셀여백(cellMarginU)으로 보정 —
+  검증: 240자 반복문에서 캔버스 44자/줄·6줄 = rhwp 44자/줄·6줄 정확 일치.
+  (Pretendard 0.86em은 UI 셸 전용. 문체부·저작권위 안심글꼴(KCC자은체 등)은 수동 woff2
+  반입으로 레지스트리에 추가 가능. 호환 폰트 전략: hwpxName만 상용 원명(휴먼명조)으로 두고
+  webFamily는 닮은꼴 — 이름 선언은 합법, 관공서 한글에선 정품 렌더, 둘 다 1em이라 정합 유지)
 - 흐름 본문(flowText): 캔버스의 flow 텍스트 블록은 절대배치 개체가 아니라 진짜 hp:p
   문단으로 — 배치는 문단 마진(좌=x, 우=종이폭−x−폭, 첫 앞간격=y−6mm).
   ⚠ 문단 여백(hh:margin) 값은 렌더러가 반단위로 해석 → **HWPUNIT ×2로 기록** (rhwp 실측).

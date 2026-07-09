@@ -39,6 +39,7 @@ export interface Block {
   data?: TableKingData; // table 블록 — table-king 엔진 스냅샷 (진실)
   src?: string; // image 블록 (Phase 2 Storage)
   // 텍스트 스타일 (text 블록) — 없으면 기본값. 내보내기(exportHwpx)도 이 값을 쓴다.
+  font?: string; // 폰트 레지스트리 key (fonts.ts) — 없으면 문서 기본(나눔고딕)
   fontSize?: number; // pt
   bold?: boolean;
   italic?: boolean;

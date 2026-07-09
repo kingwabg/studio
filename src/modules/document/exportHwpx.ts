@@ -6,6 +6,7 @@
 import { buildHwpx } from "../../hwpx/exportCore.js";
 import { tableDataToRows } from "../../table-king/TableKingBlock.jsx";
 import { type Block, type CanvasDoc, type TableKingData, TEXT_DEFAULTS } from "./model";
+import { DEFAULT_FONT, fontByKey } from "./fonts";
 import { SCALE } from "../canvas/geometry";
 
 // 캔버스 텍스트 블록의 안쪽 여백 (CanvasBlock의 px-2 py-1) — 화면과 한글의
@@ -18,12 +19,10 @@ const LINE_SPACING = 138;
 // 문서 폰트 — 캔버스 지면(.canvas-dots)과 같은 스택의 첫 가용 폰트를 hwpx에 선언한다.
 // 한글/HWP 조판은 한글을 전각(1em)으로 계산하므로, 지면도 전각 폰트를 쓰고 같은 폰트를
 // 선언해야 화면 줄바꿈 = 한글 줄바꿈이 된다.
-// 기본은 나눔고딕(OFL 웹폰트 self-host) — 저작권 안전 + 전 OS 동일. 맑은 고딕은 폴백.
-function effectiveFont(): string | undefined {
-  if (typeof document === "undefined" || !document.fonts?.check) return "나눔고딕";
-  if (document.fonts.check(`12px "Nanum Gothic"`)) return "나눔고딕";
-  if (document.fonts.check(`12px "Malgun Gothic"`)) return "맑은 고딕";
-  return "함초롬돋움"; // 한글 기본 고딕 폴백
+// 기본은 나눔고딕(OFL 웹폰트 self-host) — 저작권 안전 + 전 OS 동일. 요소별 글꼴은
+// elementOf가 style.font로 선언하고, 이 값은 "글꼴 미지정 요소"의 문서 기본이 된다.
+function effectiveFont(): string {
+  return fontByKey(DEFAULT_FONT).hwpxName;
 }
 
 function elementOf(b: Block, page: number) {
@@ -35,6 +34,8 @@ function elementOf(b: Block, page: number) {
       align: b.align ?? TEXT_DEFAULTS.align,
       color: b.color ?? TEXT_DEFAULTS.color,
       lineSpacing: LINE_SPACING,
+      // 요소별 글꼴 — 레지스트리 hwpxName을 charPr fontRef로 선언 (없으면 문서 기본)
+      font: b.font ? fontByKey(b.font).hwpxName : undefined,
     };
     // flow(본문)는 절대배치 개체가 아니라 진짜 문단으로 — 한글에서 이어 쓸 수 있고
     // 길면 페이지를 넘는다. 좌표는 화면의 "글 시작점"(패딩 안쪽)으로 보정해

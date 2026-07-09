@@ -7,6 +7,7 @@ import { useRightTabStore, usePanelStore } from "../../modules/ui/theme";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { type Block, type TableKingData, type TextAlign, TEXT_DEFAULTS } from "../../modules/document/model";
 import { AiPanel } from "./AiPanel";
+import { FontSelect } from "./FontSelect";
 import { IcText, IcTable, IcImage, IcTrash, IcSparkles, IcCopy } from "../../ui/icons";
 
 const TEXT_COLORS = ["#1A2233", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
@@ -112,6 +113,13 @@ function TextFormat({ block }: { block: Block }) {
   ];
   return (
     <>
+      <Row label="글꼴">
+        <FontSelect
+          value={block.font}
+          onChange={(key) => patch({ font: key })}
+          className="h-[26px] px-1.5 rounded-[7px] border border-line bg-surface text-[12px] text-ink flex-1 outline-none hover:border-linestrong focus:border-accentline transition-colors cursor-pointer"
+        />
+      </Row>
       <Row label="크기">
         <div className="flex items-center h-[26px] border border-line rounded-[7px] overflow-hidden flex-1">
           <button onClick={() => patch({ fontSize: Math.max(6, size - 0.5) })} className="w-6 h-full text-inksoft hover:bg-paper text-[13px]">−</button>

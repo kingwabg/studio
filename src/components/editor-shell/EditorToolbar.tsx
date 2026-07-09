@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { type Block, type TextAlign, TEXT_DEFAULTS } from "../../modules/document/model";
+import { FontSelect } from "./FontSelect";
 
 // 시안 스와치 6색 (내보내기는 hex 그대로 — 어떤 색이든 charPr로 나간다)
 const TEXT_COLORS = ["#1A2233", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
@@ -175,16 +176,12 @@ export function EditorToolbar() {
   return (
     <div className="shrink-0 flex items-center gap-2 px-4 h-11 bg-surface border-b border-line relative z-[2]">
       <div className={`flex items-center gap-2 ${textZone}`}>
-        {/* 폰트 (전각 조판 정합을 위해 맑은 고딕 고정) */}
-        <span
-          title="문서 폰트 — 한글 조판(전각)과의 줄바꿈 일치를 위해 맑은 고딕으로 고정"
-          className="h-[30px] px-2.5 flex items-center gap-2 rounded-lg border border-line bg-surface text-[12.5px] text-ink min-w-[100px] hover:border-linestrong transition-colors"
-        >
-          맑은 고딕
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="ml-auto">
-            <path d="M2.5 4l2.5 2.5L7.5 4" stroke="var(--inkfaint)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+        {/* 지면 글꼴 — 폰트 레지스트리(전부 OFL·저작권 안전), 폰트별 전각 보정으로 정합 유지 */}
+        <FontSelect
+          value={block?.font}
+          disabled={!isText}
+          onChange={(key) => patch({ font: key })}
+        />
         {/* 크기 스테퍼 */}
         <div className="flex items-center h-[30px] border border-line rounded-lg overflow-hidden">
           <button onClick={() => patch({ fontSize: Math.max(6, size - 0.5) })} title="작게" className="w-[22px] h-full flex items-center justify-center text-inksoft hover:bg-paper text-[14px]">−</button>

@@ -17,6 +17,7 @@ import {
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { type Block, type TableKingData, TEXT_DEFAULTS } from "../document/model";
+import { ensureFont, fontByKey, fontCss, useFontStore } from "../document/fonts";
 import { SCALE, mmToPx, pxToMm } from "./geometry";
 import { useCanvasStore } from "./store";
 import { useFollowStore } from "./snap";
@@ -283,9 +284,9 @@ function textStyle(block: Block): React.CSSProperties {
     fontStyle: (block.italic ?? TEXT_DEFAULTS.italic) ? "italic" : "normal",
     textAlign: block.align ?? TEXT_DEFAULTS.align,
     color: block.color ?? TEXT_DEFAULTS.color,
-    // 전각(1em) 보정 — 나눔고딕 한글 advance 0.94em → +0.06em = 1em (한글/HWP 조판과 일치).
-    // em이라 이 요소의 fontSize 기준으로 스케일되어 크기가 달라도 정확하다.
-    letterSpacing: "0.06em",
+    // 글꼴 + 전각(1em) 보정 — 폰트 레지스트리가 폰트별 letter-spacing을 실측 캘리브레이션
+    // (한글/HWP 조판은 한글을 1em으로 계산 — em 단위라 fontSize별로 정확히 스케일)
+    ...fontCss(block.font),
   };
 }
 const ptToPx = (pt: number) => `${pt * (96 / 72)}px`;
@@ -338,6 +339,14 @@ function TextContent({
     if (editing) taRef.current?.focus();
   }, [editing]);
 
+  // 폰트 준비(지연 로딩 + 전각 캘리브레이션) — 완료 시 spacing 구독으로 리렌더되어
+  // letter-spacing이 실측값으로 정밀화된다 (auto-height 사이저도 함께 갱신).
+  const fontKey = fontByKey(block.font).key;
+  useFontStore((s) => s.spacing[fontKey]); // 캘리브레이션 완료 리렌더 트리거
+  useEffect(() => {
+    void ensureFont(fontKey);
+  }, [fontKey]);
+
   // auto-height: 내용의 자연 높이(사이저)를 관찰해 block.h(mm)로 동기화.
   // "한글에서 열었더니 마지막 줄이 잘림"을 원천 차단 — 내보내는 상자가 항상 내용을 담는다.
   // 사이저 높이는 block.h와 무관(자연 높이)하므로 되먹임 루프가 없다.
@@ -356,7 +365,7 @@ function TextContent({
     // deps는 "시그니처 문자열" 하나로 고정 — RO가 놓치는 갱신(내용/폭/폰트 교체)에도
     // 재실행되면서, 배열 길이가 항상 2라 HMR 중 deps 크기 변화 경고가 안 난다. sync는 멱등.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [block.id, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}`]);
+  }, [block.id, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}`]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `textdrop:${block.id}`,
