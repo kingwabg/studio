@@ -3,7 +3,7 @@
 // 있는 컨트롤(내용·글자 서식·위치 유형·크기/좌표·서식 유전·디버그)만 진짜로 연결하고
 // 모델에 없는 항목(배경·모서리·불투명도·안쪽 여백 등)은 "준비 중"으로 정직하게 표시한다.
 import { type ReactNode } from "react";
-import { useRightTabStore } from "../../modules/ui/theme";
+import { useRightTabStore, usePanelStore } from "../../modules/ui/theme";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { type Block, type TableKingData, type TextAlign, TEXT_DEFAULTS } from "../../modules/document/model";
 import { AiPanel } from "./AiPanel";
@@ -183,6 +183,9 @@ export function RightPanel() {
   const hasKids = useCanvasStore((s) => s.doc.blocks.some((b) => b.parentId === s.selectedId));
   const tab = useRightTabStore((s) => s.tab);
   const setTab = useRightTabStore((s) => s.setTab);
+  const rightW = usePanelStore((s) => s.rightW);
+  const rightOpen = usePanelStore((s) => s.rightOpen);
+  if (!rightOpen) return null;
 
   const kind =
     block?.type === "text"
@@ -192,7 +195,7 @@ export function RightPanel() {
         : { label: "이미지 블록", icon: <IcImage size={13} /> };
 
   return (
-    <aside className={`${tab === "ai" ? "w-80" : "w-[284px]"} shrink-0 border-l border-line bg-surface flex flex-col overflow-hidden transition-all`}>
+    <aside className="shrink-0 border-l border-line bg-surface flex flex-col overflow-hidden" style={{ width: rightW }}>
       {/* 속성 / AI 세그먼트 (시안 1b) */}
       <div className="px-3.5 pt-3.5 shrink-0">
         <div className="flex bg-paper border border-line rounded-[9px] p-[3px] gap-[3px]">

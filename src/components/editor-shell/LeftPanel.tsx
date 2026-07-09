@@ -5,7 +5,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { type Block, type BlockType, descendantIds } from "../../modules/document/model";
-import { useRightTabStore } from "../../modules/ui/theme";
+import { useRightTabStore, usePanelStore } from "../../modules/ui/theme";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { useMergeStore } from "../../modules/merge/store";
 import { parseSheetFile } from "../../modules/merge/parseSheet";
@@ -416,6 +416,8 @@ export function LeftPanel() {
   const [tab, setTab] = useState<RailKey>("blocks");
   const hasDataset = useMergeStore((s) => s.dataset !== null);
   const openAi = useRightTabStore((s) => s.setTab);
+  const leftW = usePanelStore((s) => s.leftW);
+  const leftOpen = usePanelStore((s) => s.leftOpen);
 
   const rail: { key: RailKey | "ai"; label: string; icon: ReactNode; soon?: boolean }[] = [
     { key: "blocks", label: "블록", icon: <IcText size={17} /> },
@@ -447,8 +449,8 @@ export function LeftPanel() {
         })}
         {hasDataset && <span className="w-1.5 h-1.5 rounded-full bg-accent -mt-9 ml-9" />}
       </div>
-      {/* 콘텐츠 패널 */}
-      <div className="w-[250px] flex flex-col min-h-0">
+      {/* 콘텐츠 패널 — 폭 조절/접힘 (밀고 당기기). 접히면 rail(66px)만 남는다 */}
+      <div className={`flex flex-col min-h-0 ${leftOpen ? "" : "hidden"}`} style={{ width: leftW }}>
         {tab === "blocks" ? (
           <BlocksTab />
         ) : tab === "data" ? (

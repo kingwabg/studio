@@ -24,6 +24,7 @@ import { buildHwpxBytes, downloadBytes } from "../modules/document/exportHwpx";
 import { flattenDoc } from "../modules/document/flatten";
 import { HanPreviewModal } from "../components/editor-shell/HanPreviewModal";
 import { EditorToolbar } from "../components/editor-shell/EditorToolbar";
+import { PanelDivider } from "../components/editor-shell/PanelDivider";
 import { useThemeStore } from "../modules/ui/theme";
 import { IcBack, IcDownload, IcEye, IcMoon, IcSparkles, IcSun } from "../ui/icons";
 
@@ -340,7 +341,9 @@ export default function StudioEditor() {
       >
         <div className="flex-1 flex min-h-0">
           <LeftPanel />
+          <PanelDivider side="left" />
           <CanvasStage ref={stageRef} />
+          <PanelDivider side="right" />
           <RightPanel />
         </div>
       </DndContext>

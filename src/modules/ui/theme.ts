@@ -21,6 +21,62 @@ export const useRightTabStore = create<RightTabState>((set) => ({
   setTab: (tab) => set({ tab }),
 }));
 
+// 사이드바 폭·접힘 (밀고 당기기) — 드래그로 폭 조절, 토글로 접기. localStorage 유지.
+export const LEFT_MIN = 190;
+export const LEFT_MAX = 420;
+export const LEFT_DEFAULT = 250;
+export const RIGHT_MIN = 248;
+export const RIGHT_MAX = 460;
+export const RIGHT_DEFAULT = 284;
+
+const clampW = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
+const num = (key: string, fallback: number) => {
+  const v = typeof localStorage !== "undefined" ? Number(localStorage.getItem(key)) : NaN;
+  return Number.isFinite(v) && v > 0 ? v : fallback;
+};
+const bool = (key: string, fallback: boolean) => {
+  if (typeof localStorage === "undefined") return fallback;
+  const v = localStorage.getItem(key);
+  return v === null ? fallback : v === "1";
+};
+
+interface PanelState {
+  leftW: number;
+  rightW: number;
+  leftOpen: boolean;
+  rightOpen: boolean;
+  setLeftW: (v: number) => void;
+  setRightW: (v: number) => void;
+  toggleLeft: () => void;
+  toggleRight: () => void;
+}
+export const usePanelStore = create<PanelState>((set) => ({
+  leftW: clampW(num("studio:leftW", LEFT_DEFAULT), LEFT_MIN, LEFT_MAX),
+  rightW: clampW(num("studio:rightW", RIGHT_DEFAULT), RIGHT_MIN, RIGHT_MAX),
+  leftOpen: bool("studio:leftOpen", true),
+  rightOpen: bool("studio:rightOpen", true),
+  setLeftW: (v) => {
+    const w = clampW(v, LEFT_MIN, LEFT_MAX);
+    localStorage.setItem("studio:leftW", String(w));
+    set({ leftW: w });
+  },
+  setRightW: (v) => {
+    const w = clampW(v, RIGHT_MIN, RIGHT_MAX);
+    localStorage.setItem("studio:rightW", String(w));
+    set({ rightW: w });
+  },
+  toggleLeft: () =>
+    set((s) => {
+      localStorage.setItem("studio:leftOpen", s.leftOpen ? "0" : "1");
+      return { leftOpen: !s.leftOpen };
+    }),
+  toggleRight: () =>
+    set((s) => {
+      localStorage.setItem("studio:rightOpen", s.rightOpen ? "0" : "1");
+      return { rightOpen: !s.rightOpen };
+    }),
+}));
+
 export const useThemeStore = create<ThemeState>((set) => ({
   dark: typeof localStorage !== "undefined" && localStorage.getItem(KEY) === "dark",
   toggle: () =>
