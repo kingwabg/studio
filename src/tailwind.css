@@ -13,6 +13,22 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* 스튜디오 스코프 버튼 리셋 — preflight를 안 쓰므로(기존 앱 보호) UA 기본
+   테두리·배경이 남는다. .studio-root 안에서만 초기화 — table-king 등 자체 CSS는
+   더 구체적인 선택자라 그대로 이긴다. */
+.studio-root button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+.studio-root button:disabled {
+  cursor: default;
+}
+
 /* A4 지면 뒤 은은한 점 격자 — 캔바식 캔버스 느낌.
    지면 안 텍스트는 "문서 폰트"(맑은 고딕) — 한글/HWP 조판은 한글 글자를 전각(1em)으로
    계산하는데, 맑은 고딕이 정확히 1em이라 화면 줄바꿈 = 한글 줄바꿈이 된다.

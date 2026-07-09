@@ -130,6 +130,23 @@ export const IcClose = (p: P) => (
     <path d="M6 6l12 12M18 6L6 18" />
   </Svg>
 );
+export const IcSearch = (p: P) => (
+  <Svg {...p}>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="M15.5 15.5L20 20" />
+  </Svg>
+);
+export const IcMoon = (p: P) => (
+  <Svg {...p}>
+    <path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5z" />
+  </Svg>
+);
+export const IcSun = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19" />
+  </Svg>
+);
 export const IcSend = (p: P) => (
   <Svg {...p}>
     <path d="M3 12l18-8-4.5 16-4.5-5.5L3 12z" />
