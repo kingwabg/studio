@@ -27,6 +27,11 @@ export interface Block {
   // 아코디언 접기 — true면 이 블록의 자손을 캔버스·레이어에서 숨긴다.
   // 보기 전용 상태: 내보내기(hwpx)·펴기(flatten)는 무시하고 전부 포함한다.
   collapsed?: boolean;
+  // 공간 그룹(캔바식) — 같은 groupId끼리 하나로 이동·잠금. parentId(논리 트리)와 직교:
+  // 개요 번호·펴기에 관여하지 않는다(관계없는 박스도 묶을 수 있음).
+  groupId?: string;
+  // 잠금 — true면 이동·리사이즈 차단(실수 방지). 선택은 됨.
+  locked?: boolean;
   x: number; // mm, 지면 좌상단 기준
   y: number; // mm
   w: number; // mm
@@ -125,6 +130,30 @@ export function descendantIds(blocks: Block[], id: string): Set<string> {
 // candidate가 id 자신이거나 자손인가 — setParent 순환 방지용
 export function isSelfOrDescendant(blocks: Block[], id: string, candidate: string): boolean {
   return id === candidate || descendantIds(blocks, id).has(candidate);
+}
+
+// ── 공간 그룹 헬퍼 (groupId 기반) ──
+
+// 같은 공간 그룹에 속한 블록 id들 (자기 포함). groupId 없으면 [id]만.
+export function groupMemberIds(blocks: Block[], id: string): string[] {
+  const b = blocks.find((x) => x.id === id);
+  if (!b?.groupId) return [id];
+  return blocks.filter((x) => x.groupId === b.groupId).map((x) => x.id);
+}
+
+// "함께 이동하는 집합" — 선택 ∪ 트리 자손(자석) ∪ 그룹 멤버, 고정점까지 확장.
+// moveBlock·nudgeMany·드래그 팔로우가 전부 이 하나를 쓴다(이동 규칙 단일화).
+export function moveSetIds(blocks: Block[], ids: string[]): Set<string> {
+  const out = new Set<string>(ids);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const id of [...out]) {
+      for (const d of descendantIds(blocks, id)) if (!out.has(d)) { out.add(d); grew = true; }
+      for (const g of groupMemberIds(blocks, id)) if (!out.has(g)) { out.add(g); grew = true; }
+    }
+  }
+  return out;
 }
 
 // 접힌(collapsed) 조상을 가진 블록 id 집합 — 캔버스·레이어 패널이 숨길 대상.

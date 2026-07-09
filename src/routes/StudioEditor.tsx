@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
   type Modifier,
 } from "@dnd-kit/core";
-import { type BlockType } from "../modules/document/model";
+import { type BlockType, moveSetIds } from "../modules/document/model";
 import { mmToPx, pxToMm } from "../modules/canvas/geometry";
 import { useCanvasStore } from "../modules/canvas/store";
 import { computeSnap, isAltPressed, setAltPressed, useFollowStore, useGuideStore } from "../modules/canvas/snap";
@@ -138,9 +138,15 @@ export default function StudioEditor() {
       } else if ((mod && e.key.toLowerCase() === "y") || (mod && e.shiftKey && e.key.toLowerCase() === "z")) {
         e.preventDefault();
         st.redo();
-      } else if ((e.key === "Delete" || e.key === "Backspace") && st.selectedId) {
+      } else if ((e.key === "Delete" || e.key === "Backspace") && st.selectedIds.length) {
         e.preventDefault();
-        st.removeBlock(st.selectedId);
+        st.removeSelection();
+      } else if (mod && !e.shiftKey && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        st.groupSelection(); // ⌘G 그룹 묶기
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        st.ungroupSelection(); // ⌘⇧G 그룹 해제
       }
     };
     window.addEventListener("keydown", onKey);
@@ -159,7 +165,12 @@ export default function StudioEditor() {
         const candY = b.y + pxToMm(delta.y);
         // 드래그 중 보여준 것과 같은 스냅을 최종 좌표에도 적용 (Alt면 원시 좌표)
         const pos = isAltPressed() ? { x: candX, y: candY } : computeSnap(st.doc, b.id, candX, candY, b.w, b.h);
-        moveBlock(b.id, pos.x, pos.y);
+        // 다중 선택(임시)이면 선택 전체를 같은 델타로 — 그룹·트리는 nudgeMany가 확장.
+        if (st.selectedIds.length > 1 && st.selectedIds.includes(b.id)) {
+          st.nudgeMany(st.selectedIds, pos.x - b.x, pos.y - b.y);
+        } else {
+          moveBlock(b.id, pos.x, pos.y); // 단일: moveSetIds로 그룹·자손 동반
+        }
       }
       useGuideStore.getState().clear();
       useFollowStore.getState().clear();
@@ -320,18 +331,22 @@ export default function StudioEditor() {
           const st = useCanvasStore.getState();
           const b = st.doc.blocks.find((x) => x.id === a.id);
           if (!b) return;
+          // 함께 움직일 집합 — 다중 선택이면 선택 전체, 아니면 이 블록 하나에서
+          // moveSetIds로 트리 자손·그룹 멤버까지 확장 (드래그당 1회).
+          const seed = st.selectedIds.length > 1 && st.selectedIds.includes(b.id) ? st.selectedIds : [b.id];
+          const members = moveSetIds(st.doc.blocks, seed);
           const candX = b.x + pxToMm(e.delta.x);
           const candY = b.y + pxToMm(e.delta.y);
           if (isAltPressed()) {
             useGuideStore.getState().clear();
             // Alt(스냅 해제)여도 자손 팔로우는 유지
-            useFollowStore.getState().setFollow(String(a.id), e.delta.x, e.delta.y);
+            useFollowStore.getState().setFollow(String(a.id), e.delta.x, e.delta.y, members);
             return;
           }
           const snap = computeSnap(st.doc, b.id, candX, candY, b.w, b.h);
           useGuideStore.getState().setGuides(snap.guidesV, snap.guidesH);
           // 자손이 따라올 시각 델타 = 스냅 반영된 최종 델타 (부모의 실제 화면 이동량)
-          useFollowStore.getState().setFollow(String(a.id), mmToPx(snap.x - b.x), mmToPx(snap.y - b.y));
+          useFollowStore.getState().setFollow(String(a.id), mmToPx(snap.x - b.x), mmToPx(snap.y - b.y), members);
         }}
         onDragEnd={handleDragEnd}
         onDragCancel={() => {

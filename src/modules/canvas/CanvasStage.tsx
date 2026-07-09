@@ -12,6 +12,7 @@ import { collapsedHiddenIds, descendantIds } from "../document/model";
 import { useCanvasStore } from "./store";
 import { useGuideStore } from "./snap";
 import { CanvasBlock } from "./CanvasBlock";
+import { MultiSelectOverlay } from "./MultiSelectOverlay";
 import { IcText } from "../../ui/icons";
 
 // 드래그 중 정렬 가이드 (캔바식 마젠타 점선) — 스냅이 걸린 선을 지면 전체로 그린다
@@ -234,9 +235,46 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
   const doc = useCanvasStore((s) => s.doc);
   const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
+  const selectMany = useCanvasStore((s) => s.selectMany);
   const { setNodeRef } = useDroppable({ id: "stage" });
   const pageRef = useRef<HTMLDivElement | null>(null);
   const [measuredBlockBox, setMeasuredBlockBox] = useState<MeasuredBlockBox | null>(null);
+  // 마퀴(빈 지면 드래그로 사각 범위 선택) — px 좌표(지면 원점 기준)
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+
+  const startMarquee = (e: React.PointerEvent) => {
+    const pageNode = pageRef.current;
+    if (!pageNode) return;
+    const rect = pageNode.getBoundingClientRect();
+    const x0 = e.clientX - rect.left;
+    const y0 = e.clientY - rect.top;
+    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) select(null); // 새 선택
+    let moved = false;
+    const onMove = (ev: PointerEvent) => {
+      moved = true;
+      setMarquee({ x0, y0, x1: ev.clientX - rect.left, y1: ev.clientY - rect.top });
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setMarquee(null);
+      if (!moved) return; // 클릭만 = 선택 해제로 끝
+      const rx0 = Math.min(x0, ev.clientX - rect.left);
+      const ry0 = Math.min(y0, ev.clientY - rect.top);
+      const rx1 = Math.max(x0, ev.clientX - rect.left);
+      const ry1 = Math.max(y0, ev.clientY - rect.top);
+      const hit = useCanvasStore
+        .getState()
+        .doc.blocks.filter((b) => {
+          const bx0 = mmToPx(b.x), by0 = mmToPx(b.y), bx1 = mmToPx(b.x + b.w), by1 = mmToPx(b.y + b.h);
+          return bx0 < rx1 && bx1 > rx0 && by0 < ry1 && by1 > ry0;
+        })
+        .map((b) => b.id);
+      if (hit.length) selectMany(hit);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   const pageW = mmToPx(doc.page.w);
   const pageH = mmToPx(doc.page.h);
@@ -363,7 +401,7 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
             else if (ref) ref.current = node; // onDragEnd 좌표 환산용
           }}
           onPointerDown={(e) => {
-            if (e.target === e.currentTarget) select(null); // 빈 지면 클릭 → 선택 해제
+            if (e.target === e.currentTarget) startMarquee(e); // 빈 지면 드래그 → 마퀴 선택
           }}
           style={{ width: pageW, height: pageH, boxShadow: "var(--sh-page)" }}
           className="relative bg-white shrink-0"
@@ -371,6 +409,22 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
           {visibleBlocks.map((block) => (
             <CanvasBlock key={block.id} block={block} />
           ))}
+          {/* 다중 선택 바운딩 + 그룹 툴바 */}
+          <MultiSelectOverlay />
+          {/* 마퀴(드래그 사각 선택) */}
+          {marquee && (
+            <div
+              className="absolute pointer-events-none z-[12] rounded-[2px]"
+              style={{
+                left: Math.min(marquee.x0, marquee.x1),
+                top: Math.min(marquee.y0, marquee.y1),
+                width: Math.abs(marquee.x1 - marquee.x0),
+                height: Math.abs(marquee.y1 - marquee.y0),
+                border: "1px solid #2B5CE6",
+                background: "rgba(43,92,230,.08)",
+              }}
+            />
+          )}
           {/* 그룹 선택 점선 테두리 — 자석 그룹 범위 (시안: #7C9AF0 점선 + 칩) */}
           {groupBox && (
             <div

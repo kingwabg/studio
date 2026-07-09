@@ -38,26 +38,29 @@ export const useGuideStore = create<GuideState>((set, get) => ({
   },
 }));
 
-// ── 드래그 팔로우 (자석 그룹) — 부모를 끄는 동안 자손이 실시간으로 따라오도록,
-//    스냅 반영된 시각 델타(px)를 공유한다. CanvasBlock의 자손들이 구독. ──
+// ── 드래그 팔로우 — 블록을 끄는 동안 "함께 움직일 집합"(트리 자손 + 그룹 멤버 +
+//    다중 선택)이 실시간으로 따라오도록, 시각 델타(px)와 멤버 집합을 공유한다.
+//    멤버 집합은 드래그당 1회 계산(StudioEditor) — 블록마다 재계산하지 않는다. ──
 interface FollowState {
   activeId: string | null;
   dxPx: number;
   dyPx: number;
-  setFollow: (activeId: string, dxPx: number, dyPx: number) => void;
+  members: Set<string> | null;
+  setFollow: (activeId: string, dxPx: number, dyPx: number, members: Set<string>) => void;
   clear: () => void;
 }
 export const useFollowStore = create<FollowState>((set, get) => ({
   activeId: null,
   dxPx: 0,
   dyPx: 0,
-  setFollow: (activeId, dxPx, dyPx) => {
+  members: null,
+  setFollow: (activeId, dxPx, dyPx, members) => {
     const s = get();
     if (s.activeId === activeId && s.dxPx === dxPx && s.dyPx === dyPx) return;
-    set({ activeId, dxPx, dyPx });
+    set({ activeId, dxPx, dyPx, members });
   },
   clear: () => {
-    if (get().activeId !== null) set({ activeId: null, dxPx: 0, dyPx: 0 });
+    if (get().activeId !== null) set({ activeId: null, dxPx: 0, dyPx: 0, members: null });
   },
 }));
 

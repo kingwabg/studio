@@ -91,12 +91,12 @@ const labelFor = (b: Block) =>
 // 레이어 행 — 드래그(kind:layer)해서 다른 행에 놓으면 그 블록의 자식이 된다.
 // 자식이 있으면 ▾/▸ 토글로 가지를 접는다(캔버스·패널 모두 숨김, 보기 전용).
 function LayerRow({ block, depth, kidCount }: { block: Block; depth: number; kidCount: number }) {
-  const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
+  const toggleSelect = useCanvasStore((s) => s.toggleSelect);
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const drag = useDraggable({ id: `layer-${block.id}`, data: { kind: "layer", blockId: block.id } });
   const drop = useDroppable({ id: `layerdrop-${block.id}`, data: { kind: "layer", blockId: block.id } });
-  const selectedRow = selectedId === block.id;
+  const selectedRow = useCanvasStore((s) => s.selectedIds.includes(block.id));
   return (
     <button
       ref={(n) => {
@@ -105,7 +105,7 @@ function LayerRow({ block, depth, kidCount }: { block: Block; depth: number; kid
       }}
       {...drag.listeners}
       {...drag.attributes}
-      onClick={() => select(block.id)}
+      onClick={(e) => (e.ctrlKey || e.metaKey || e.shiftKey ? toggleSelect(block.id) : select(block.id))}
       style={{
         paddingLeft: 8 + depth * 14,
         transform: CSS.Translate.toString(drag.transform),
@@ -139,6 +139,16 @@ function LayerRow({ block, depth, kidCount }: { block: Block; depth: number; kid
       )}
       <span className={selectedRow ? "text-accent" : "text-inkfaint"}>{iconFor(block.type)}</span>
       <span className="truncate">{labelFor(block)}</span>
+      {block.groupId && (
+        <span title="공간 그룹" className="text-accent/70 shrink-0">
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /><rect x="7.5" y="7.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /><path d="M6.5 4h3.5v3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+        </span>
+      )}
+      {block.locked && (
+        <span title="잠김" className="text-inkfaint shrink-0">
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </span>
+      )}
       {block.collapsed && kidCount > 0 && (
         <span className="ml-auto text-[10px] text-inkfaint bg-paper rounded-full px-1.5 py-0.5 shrink-0">
           +{kidCount}

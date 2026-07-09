@@ -16,7 +16,9 @@ import {
   createBlock,
   createDoc,
   descendantIds,
+  groupMemberIds,
   isSelfOrDescendant,
+  moveSetIds,
 } from "../document/model";
 // 표는 기존 앱에서 검증된 table-king 엔진을 그대로 이관해 쓴다 (Strangler Fig 기능 이관)
 import { makeTableKingData } from "../../table-king/TableKingBlock.jsx";
@@ -43,22 +45,33 @@ export function tableSizePx(data: TableKingData): { wPx: number; hPx: number } {
 
 interface CanvasState {
   doc: CanvasDoc;
+  // 다중 선택 — selectedIds가 진실, selectedId는 앵커(마지막 클릭, 우측 패널·서식바용).
+  selectedIds: string[];
   selectedId: string | null;
   past: CanvasDoc[]; // 실행취소 스택 (오래된 것 → 최신)
   future: CanvasDoc[]; // 다시실행 스택
 
   addBlock: (type: BlockType, x: number, y: number, extra?: Partial<Block>) => void;
   duplicateBlock: (id: string) => void; // 선택 블록 복제 (+5mm 오프셋)
-  moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동
+  moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동 (자손·그룹 동반)
+  nudgeMany: (ids: string[], dx: number, dy: number) => void; // 여러 블록 델타 이동
   updateBlock: (id: string, patch: Partial<Block>) => void;
   setTableData: (id: string, data: TableKingData) => void; // 표 스냅샷 교체 + w/h 동기화
   setCell: (id: string, r: number, c: number, text: string) => void; // 표 셀 하나 수정 (구형 rows용)
   setParent: (id: string, parentId: string | null) => void; // 트리 연결/해제 (순환 방지)
   cascadeStyle: (id: string) => void; // 서식 유전 — 하위 텍스트 크기를 깊이당 −2pt 계단 적용
   removeBlock: (id: string) => void; // 서브트리째 삭제 (실행취소 가능)
+  removeSelection: () => void; // 선택 전체 삭제
+  groupSelection: () => void; // 선택 블록을 공간 그룹으로 묶기
+  ungroupSelection: () => void; // 선택 그룹 해제
+  setLocked: (ids: string[], locked: boolean) => void; // 잠금/해제
+  alignSelection: (edge: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") => void; // 정렬
   undo: () => void;
   redo: () => void;
-  select: (id: string | null) => void;
+  select: (id: string | null) => void; // 단일 선택 — 클릭한 블록 하나만
+  selectGroup: (id: string) => void; // 그룹 전체 선택 (opt-in)
+  toggleSelect: (id: string) => void; // Ctrl+클릭 — 선택 토글
+  selectMany: (ids: string[]) => void; // 마퀴 등 다중 선택
   setTitle: (title: string) => void;
   loadDoc: (doc: CanvasDoc) => void; // 저장소에서 불러온 문서로 교체
   reset: (title?: string) => void;
@@ -82,6 +95,7 @@ function record(s: Pick<CanvasState, "doc" | "past">, key?: string): Partial<Can
 
 export const useCanvasStore = create<CanvasState>((set) => ({
   doc: createDoc(),
+  selectedIds: [],
   selectedId: null,
   past: [],
   future: [],
@@ -101,6 +115,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       return {
         ...record(s),
         doc: { ...s.doc, blocks: [...s.doc.blocks, block] },
+        selectedIds: [block.id],
         selectedId: block.id,
       };
     }),
@@ -124,6 +139,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       return {
         ...record(s),
         doc: { ...s.doc, blocks: [...s.doc.blocks, ...copies] },
+        selectedIds: [idMap.get(id)!],
         selectedId: idMap.get(id)!,
       };
     }),
@@ -131,13 +147,14 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   moveBlock: (id, x, y) =>
     set((s) => {
       const target = s.doc.blocks.find((b) => b.id === id);
-      if (!target) return {};
+      if (!target || target.locked) return {};
       const nx = clamp(x, s.doc.page.w - target.w);
       const ny = clamp(y, s.doc.page.h - target.h);
-      // 자석 그룹: 자손들도 같은 델타로 함께 이동 (탯줄 이동)
       const dx = nx - target.x;
       const dy = ny - target.y;
-      const kids = descendantIds(s.doc.blocks, id);
+      // 함께 이동 — 트리 자손(자석) + 그룹 멤버 (moveSetIds 단일 규칙). 잠금 멤버는 제외.
+      const together = moveSetIds(s.doc.blocks, [id]);
+      together.delete(id);
       return {
         ...record(s, `move:${id}`),
         doc: {
@@ -145,9 +162,28 @@ export const useCanvasStore = create<CanvasState>((set) => ({
           blocks: s.doc.blocks.map((b) =>
             b.id === id
               ? { ...b, x: nx, y: ny }
-              : kids.has(b.id)
+              : together.has(b.id) && !b.locked
                 ? { ...b, x: clamp(b.x + dx, s.doc.page.w - b.w), y: clamp(b.y + dy, s.doc.page.h - b.h) }
                 : b
+          ),
+        },
+      };
+    }),
+
+  nudgeMany: (ids, dx, dy) =>
+    set((s) => {
+      const move = moveSetIds(s.doc.blocks, ids);
+      const dxr = Math.round(dx);
+      const dyr = Math.round(dy);
+      if (!dxr && !dyr) return {};
+      return {
+        ...record(s, `nudge:${[...move].sort().join(",")}`),
+        doc: {
+          ...s.doc,
+          blocks: s.doc.blocks.map((b) =>
+            move.has(b.id) && !b.locked
+              ? { ...b, x: clamp(b.x + dxr, s.doc.page.w - b.w), y: clamp(b.y + dyr, s.doc.page.h - b.h) }
+              : b
           ),
         },
       };
@@ -238,13 +274,88 @@ export const useCanvasStore = create<CanvasState>((set) => ({
 
   removeBlock: (id) =>
     set((s) => {
-      // 서브트리째 삭제 — 그룹 삭제 기대에 부합. 실수는 실행취소가 복구
+      // 서브트리째 삭제. 실수는 실행취소가 복구
       const gone = descendantIds(s.doc.blocks, id);
       gone.add(id);
+      const selectedIds = s.selectedIds.filter((x) => !gone.has(x));
       return {
         ...record(s),
         doc: { ...s.doc, blocks: s.doc.blocks.filter((b) => !gone.has(b.id)) },
-        selectedId: s.selectedId && gone.has(s.selectedId) ? null : s.selectedId,
+        selectedIds,
+        selectedId: selectedIds[selectedIds.length - 1] ?? null,
+      };
+    }),
+
+  removeSelection: () =>
+    set((s) => {
+      if (!s.selectedIds.length) return {};
+      const gone = new Set<string>();
+      for (const id of s.selectedIds) {
+        gone.add(id);
+        for (const d of descendantIds(s.doc.blocks, id)) gone.add(d);
+      }
+      return {
+        ...record(s),
+        doc: { ...s.doc, blocks: s.doc.blocks.filter((b) => !gone.has(b.id)) },
+        selectedIds: [],
+        selectedId: null,
+      };
+    }),
+
+  groupSelection: () =>
+    set((s) => {
+      if (s.selectedIds.length < 2) return {};
+      const gid = `grp_${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+      const inSel = new Set(s.selectedIds);
+      return {
+        ...record(s),
+        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (inSel.has(b.id) ? { ...b, groupId: gid } : b)) },
+      };
+    }),
+
+  ungroupSelection: () =>
+    set((s) => {
+      const gids = new Set(
+        s.selectedIds.map((id) => s.doc.blocks.find((b) => b.id === id)?.groupId).filter(Boolean) as string[]
+      );
+      if (!gids.size) return {};
+      return {
+        ...record(s),
+        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.groupId && gids.has(b.groupId) ? { ...b, groupId: undefined } : b)) },
+      };
+    }),
+
+  setLocked: (ids, locked) =>
+    set((s) => {
+      const target = new Set(ids);
+      return {
+        ...record(s),
+        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (target.has(b.id) ? { ...b, locked } : b)) },
+      };
+    }),
+
+  alignSelection: (edge) =>
+    set((s) => {
+      const sel = s.doc.blocks.filter((b) => s.selectedIds.includes(b.id) && !b.locked);
+      if (sel.length < 2) return {};
+      const minX = Math.min(...sel.map((b) => b.x));
+      const maxX = Math.max(...sel.map((b) => b.x + b.w));
+      const minY = Math.min(...sel.map((b) => b.y));
+      const maxY = Math.max(...sel.map((b) => b.y + b.h));
+      const patch = (b: Block): Partial<Block> => {
+        switch (edge) {
+          case "left": return { x: clamp(minX, s.doc.page.w - b.w) };
+          case "right": return { x: clamp(maxX - b.w, s.doc.page.w - b.w) };
+          case "hcenter": return { x: clamp((minX + maxX) / 2 - b.w / 2, s.doc.page.w - b.w) };
+          case "top": return { y: clamp(minY, s.doc.page.h - b.h) };
+          case "bottom": return { y: clamp(maxY - b.h, s.doc.page.h - b.h) };
+          case "vcenter": return { y: clamp((minY + maxY) / 2 - b.h / 2, s.doc.page.h - b.h) };
+        }
+      };
+      const inSel = new Set(sel.map((b) => b.id));
+      return {
+        ...record(s),
+        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (inSel.has(b.id) ? { ...b, ...patch(b) } : b)) },
       };
     }),
 
@@ -257,6 +368,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         doc: prev,
         past: s.past.slice(0, -1),
         future: [s.doc, ...s.future].slice(0, HISTORY_MAX),
+        selectedIds: [],
         selectedId: null,
       };
     }),
@@ -270,19 +382,38 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         doc: next,
         future: s.future.slice(1),
         past: [...s.past.slice(-(HISTORY_MAX - 1)), s.doc],
+        selectedIds: [],
         selectedId: null,
       };
     }),
 
-  select: (id) => set({ selectedId: id }),
+  // 단일 선택 — 클릭한 블록 하나만. 그룹에 속해도 확장하지 않는다(그룹은 드래그 시 함께 이동).
+  select: (id) => set(() => (id === null ? { selectedIds: [], selectedId: null } : { selectedIds: [id], selectedId: id })),
+
+  // 그룹 전체 선택 (opt-in) — 이걸로만 그룹 툴바(해제·정렬)가 뜬다
+  selectGroup: (id) =>
+    set((s) => {
+      const ids = groupMemberIds(s.doc.blocks, id);
+      return { selectedIds: ids, selectedId: id };
+    }),
+
+  toggleSelect: (id) =>
+    set((s) => {
+      const has = s.selectedIds.includes(id);
+      const selectedIds = has ? s.selectedIds.filter((x) => x !== id) : [...s.selectedIds, id];
+      return { selectedIds, selectedId: has ? selectedIds[selectedIds.length - 1] ?? null : id };
+    }),
+
+  selectMany: (ids) => set(() => ({ selectedIds: [...ids], selectedId: ids[ids.length - 1] ?? null })),
+
   setTitle: (title) => set((s) => ({ ...record(s, "title"), doc: { ...s.doc, title } })),
   loadDoc: (doc) => {
     lastKey = null;
-    set({ doc, selectedId: null, past: [], future: [] });
+    set({ doc, selectedIds: [], selectedId: null, past: [], future: [] });
   },
   reset: (title) => {
     lastKey = null;
-    set({ doc: createDoc(title), selectedId: null, past: [], future: [] });
+    set({ doc: createDoc(title), selectedIds: [], selectedId: null, past: [], future: [] });
   },
 }));
 

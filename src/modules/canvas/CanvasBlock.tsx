@@ -44,14 +44,19 @@ const TK_THEME_VARS = {
 } as React.CSSProperties;
 
 export function CanvasBlock({ block }: { block: Block }) {
-  const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
+  const selectGroup = useCanvasStore((s) => s.selectGroup);
+  const toggleSelect = useCanvasStore((s) => s.toggleSelect);
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const duplicateBlock = useCanvasStore((s) => s.duplicateBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
-  const selected = selectedId === block.id;
+  const setLocked = useCanvasStore((s) => s.setLocked);
+  // 다중 선택 — 원시값 셀렉터(무한 리렌더 방지): 이 블록이 선택됐나 / 유일 선택인가
+  const selected = useCanvasStore((s) => s.selectedIds.includes(block.id));
+  const soleSelected = useCanvasStore((s) => s.selectedIds.length === 1 && s.selectedIds[0] === block.id);
   const [editing, setEditing] = useState(false);
   const isTable = block.type === "table";
+  const locked = !!block.locked;
   // 라벨 칩 표기 (시안 1b) — 표는 R×C
   const typeLabel =
     block.type === "text"
@@ -65,23 +70,15 @@ export function CanvasBlock({ block }: { block: Block }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: block.id,
     data: { kind: "block" },
-    disabled: editing,
+    disabled: editing || locked,
   });
 
-  // 자석 그룹: 조상이 드래그 중이면 같은 시각 델타로 실시간 따라간다 (탯줄 이동).
-  // 최종 좌표는 store.moveBlock이 자손까지 함께 커밋하므로 드롭 후에도 이어진다.
-  // ⚠ zustand 셀렉터는 반드시 원시값 반환 — 객체를 새로 만들면 스냅샷 불안정으로
-  //    useSyncExternalStore가 무한 리렌더(Maximum update depth)에 빠진다.
-  const following = useFollowStore((s) => {
-    if (!s.activeId || s.activeId === block.id) return false;
-    const blocks = useCanvasStore.getState().doc.blocks;
-    let p = block.parentId;
-    while (p) {
-      if (p === s.activeId) return true;
-      p = blocks.find((b) => b.id === p)?.parentId;
-    }
-    return false;
-  });
+  // 드래그 팔로우: 다른 블록이 드래그 중이고 내가 그 이동 집합(트리 자손·그룹 멤버·
+  // 다중 선택)에 속하면 같은 델타로 실시간 따라간다. 집합은 StudioEditor가 1회 계산.
+  // ⚠ zustand 셀렉터는 원시값 반환 (무한 리렌더 방지).
+  const following = useFollowStore(
+    (s) => s.activeId !== null && s.activeId !== block.id && (s.members?.has(block.id) ?? false)
+  );
   const followX = useFollowStore((s) => (following ? s.dxPx : 0));
   const followY = useFollowStore((s) => (following ? s.dyPx : 0));
 
@@ -134,11 +131,17 @@ export function CanvasBlock({ block }: { block: Block }) {
       {...attributes}
       onPointerDown={(e) => {
         if (editing) return;
+        // Ctrl/⌘/Shift+클릭 = 다중 선택 토글, 아니면 단일
+        if (e.ctrlKey || e.metaKey || e.shiftKey) {
+          e.stopPropagation();
+          toggleSelect(block.id);
+          return;
+        }
         select(block.id);
-        // 표 내부 포인터는 셀 선택/경계 드래그 몫 — 블록 이동은 그립 핸들로만
-        if (!isTable) listeners?.onPointerDown?.(e);
+        // 표 내부 포인터는 셀 선택/경계 드래그 몫 — 블록 이동은 그립 핸들로만. 잠금이면 이동 안 함
+        if (!isTable && !locked) listeners?.onPointerDown?.(e);
       }}
-      onDoubleClick={() => block.type === "text" && setEditing(true)}
+      onDoubleClick={() => block.type === "text" && !locked && setEditing(true)}
       style={{
         position: "absolute",
         left: mmToPx(block.x),
@@ -151,7 +154,7 @@ export function CanvasBlock({ block }: { block: Block }) {
           ? `translate3d(${followX}px, ${followY}px, 0)`
           : CSS.Translate.toString(transform),
         zIndex: isDragging ? 20 : following ? 19 : selected ? 10 : 1,
-        cursor: editing ? "text" : isTable ? "default" : "grab",
+        cursor: editing ? "text" : locked ? "default" : "grab",
         touchAction: "none",
       }}
       className={`group/blk rounded-[3px] bg-white overflow-visible select-none transition-shadow ${
@@ -177,7 +180,14 @@ export function CanvasBlock({ block }: { block: Block }) {
           본문
         </span>
       )}
-      {selected && !editing && (
+      {/* 잠금 배지 */}
+      {locked && selected && (
+        <span className="absolute -top-2 -left-2 z-30 w-5 h-5 rounded-md bg-inksoft text-white flex items-center justify-center" style={{ boxShadow: "var(--sh-card)" }}>
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </span>
+      )}
+      {/* 단일 선택 + 미잠금일 때만 편집 어포던스(그립·플로팅 바·핸들). 다중은 outline만 */}
+      {soleSelected && !editing && !locked && (
         <>
           {/* 표: 이동 그립만 (table-king 리본·우측 패널이 복제·삭제·서식 담당 — 툴바 중복 방지) */}
           {isTable && (
@@ -195,22 +205,28 @@ export function CanvasBlock({ block }: { block: Block }) {
             </span>
           )}
 
-          {/* 텍스트/이미지: 플로팅 액션 바 (시안 1b) — 복제·삭제 실동작, 잠금·회전 준비 중 */}
+          {/* 텍스트/이미지: 플로팅 액션 바 — 그룹 선택·잠금·복제·삭제 */}
           {!isTable && (
             <div
               className="absolute -top-[46px] left-1/2 -translate-x-1/2 z-40 flex items-center gap-px p-[3px] rounded-[11px] bg-surface border border-line"
               style={{ boxShadow: "var(--sh-pop)" }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <BarBtn title="잠금 (준비 중)" soon d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z" />
+              {/* 그룹에 속하면: 그룹 전체 선택(opt-in) — 단일 클릭은 이 블록만 잡는다 */}
+              {block.groupId && (
+                <button onClick={() => selectGroup(block.id)} title="그룹 전체 선택" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-inksoft hover:bg-paper hover:text-ink transition-colors">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /><rect x="7.5" y="7.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" /><path d="M6.5 4h3.5v3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+                </button>
+              )}
+              <button onClick={() => setLocked([block.id], true)} title="잠금" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-inksoft hover:bg-paper hover:text-ink transition-colors">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4.6 6V4.4a2.4 2.4 0 0 1 4.8 0V6M2.6 6h8.8v6H2.6z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
               <button onClick={() => duplicateBlock(block.id)} title="복제" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-inksoft hover:bg-paper hover:text-ink transition-colors">
                 <IcCopy size={14} />
               </button>
               <button onClick={() => removeBlock(block.id)} title="삭제" className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-inksoft hover:bg-[color:var(--cat-red-soft)] hover:text-[color:var(--cat-red)] transition-colors">
                 <IcTrash size={14} />
               </button>
-              <span className="w-px h-4 bg-line mx-0.5" />
-              <BarBtn title="더보기 (준비 중)" soon dots />
             </div>
           )}
 
@@ -239,28 +255,6 @@ export function CanvasBlock({ block }: { block: Block }) {
         </>
       )}
     </div>
-  );
-}
-
-// 플로팅 액션 바의 준비 중(soon) 버튼 — 잠금/더보기
-function BarBtn({ title, soon, d, dots }: { title: string; soon?: boolean; d?: string; dots?: boolean }) {
-  return (
-    <button
-      title={title}
-      className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center ${soon ? "text-inkfaint/70 cursor-default" : "text-inksoft hover:bg-paper"}`}
-    >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        {dots ? (
-          <>
-            <circle cx="2" cy="7" r="1.3" fill="currentColor" />
-            <circle cx="7" cy="7" r="1.3" fill="currentColor" />
-            <circle cx="12" cy="7" r="1.3" fill="currentColor" />
-          </>
-        ) : (
-          <path d={d} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        )}
-      </svg>
-    </button>
   );
 }
 
