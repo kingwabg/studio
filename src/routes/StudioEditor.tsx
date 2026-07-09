@@ -15,7 +15,7 @@ import {
 import { type BlockType, descendantIds, moveSetIds } from "../modules/document/model";
 import { mmToPx, pxToMm } from "../modules/canvas/geometry";
 import { useCanvasStore } from "../modules/canvas/store";
-import { computeSnap, isAltPressed, neighborBadges, setAltPressed, useFollowStore, useGuideStore } from "../modules/canvas/snap";
+import { computeSnap, isAltPressed, neighborBadges, setAltPressed, useFollowStore, useGuideStore, useInspectStore } from "../modules/canvas/snap";
 import { CanvasStage } from "../modules/canvas/CanvasStage";
 import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
@@ -71,6 +71,8 @@ export default function StudioEditor() {
   const [previewing, setPreviewing] = useState(false);
   const dark = useThemeStore((s) => s.dark);
   const toggleDark = useThemeStore((s) => s.toggle);
+  const showGuides = useInspectStore((s) => s.showGuides);
+  const toggleGuides = useInspectStore((s) => s.toggle);
 
   const title = useCanvasStore((s) => s.doc.title);
   const setTitle = useCanvasStore((s) => s.setTitle);
@@ -302,6 +304,21 @@ export default function StudioEditor() {
             className="w-8 h-8 rounded-lg text-inksoft hover:bg-paper hover:text-ink flex items-center justify-center transition-colors"
           >
             {dark ? <IcSun size={15} /> : <IcMoon size={15} />}
+          </button>
+          {/* 정렬 점선 항상 표시 — 수정 단계 눈검사용(선택 요소가 맞춰진 정렬선을 계속 표시) */}
+          <button
+            onClick={toggleGuides}
+            aria-pressed={showGuides}
+            title="정렬선 — 선택한 요소가 다른 요소·지면과 맞춰진 정렬 점선을 항상 표시"
+            className={`flex items-center gap-1.5 rounded-[9px] text-[13px] font-semibold px-2.5 h-[34px] transition-colors ${
+              showGuides ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper hover:text-ink"
+            }`}
+            style={showGuides ? { boxShadow: "inset 0 0 0 1px var(--accentline)" } : undefined}
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1v14M1 8h14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeDasharray="2 1.8" />
+            </svg>
+            정렬선
           </button>
           <button
             onClick={async () => {

@@ -27,6 +27,7 @@ export interface SnapGuide {
   from: number; // 구간 시작(반대축 mm)
   to: number; // 구간 끝(반대축 mm)
   page: boolean; // 지면 기준선인가(가장자리·정중앙) — 스타일 구분
+  center?: boolean; // 선택 요소의 "중심선" 정렬인가 — 렌더에서 강조(실선·진하게)
 }
 export interface SnapBadge {
   cx: number; // 배지 중심 x(mm)
@@ -86,6 +87,72 @@ export const useFollowStore = create<FollowState>((set, get) => ({
     if (get().activeId !== null) set({ activeId: null, dxPx: 0, dyPx: 0, members: null });
   },
 }));
+
+// ── 정렬 점선 항상 표시 토글 (수정 단계용) ──
+// 표/블록을 이동할 때 잠깐 뜨는 정렬 가이드(보라 점선)를, 드래그하지 않아도 선택한
+// 요소 기준으로 계속 보이게 하는 뷰 토글. 진실(문서)엔 영향 없는 순수 뷰 상태.
+interface InspectState {
+  showGuides: boolean;
+  toggle: () => void;
+}
+export const useInspectStore = create<InspectState>((set) => ({
+  showGuides: false,
+  toggle: () => set((s) => ({ showGuides: !s.showGuides })),
+}));
+
+// 선택한 요소가 "지금" 다른 요소·지면과 맞춰져 있는 정렬 점선(정지 상태).
+// 드래그 때 computeSnap이 스냅으로 그리는 것과 같은 구간선을, 이동 없이 현재 위치에서
+// 겹치는(정렬된) 모든 축에 대해 그린다. computeSnap은 축당 "가장 가까운 스냅" 하나만
+// 돌려주지만, 여기선 좌·중·우 / 상·중·하 각각 정렬된 곳을 전부 보여준다.
+const ALIGN_EPS = 0.6; // 정렬로 볼 허용 오차(mm) — 정지 상태라 스냅(0.4)보다 살짝 넉넉히
+export function selectionGuides(doc: CanvasDoc, id: string): SnapGuide[] {
+  const M = doc.blocks.find((b) => b.id === id);
+  if (!M) return [];
+  const others = doc.blocks.filter((b) => b.id !== id);
+  const near2 = (a: number, b: number) => Math.abs(a - b) <= ALIGN_EPS;
+  const guides: SnapGuide[] = [];
+  const seen = new Set<string>();
+  const push = (g: SnapGuide) => {
+    const key = `${g.axis}:${g.at.toFixed(1)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      guides.push(g);
+    }
+  };
+
+  // 세로 정렬(x): 이동 블록의 좌·중·우 선이 다른 블록의 좌/중/우 또는 지면 선과 겹치나.
+  // 가운데(center=true)는 렌더에서 강조 — "핵심은 중심선"을 눈에 보이게.
+  for (const { at, center } of [
+    { at: M.x, center: false },
+    { at: M.x + M.w / 2, center: true },
+    { at: M.x + M.w, center: false },
+  ]) {
+    const on = others.filter((b) => near2(b.x, at) || near2(b.x + b.w / 2, at) || near2(b.x + b.w, at));
+    if (on.length) {
+      const tops = [M.y, ...on.map((b) => b.y)];
+      const bots = [M.y + M.h, ...on.map((b) => b.y + b.h)];
+      push({ axis: "v", at, from: Math.min(...tops), to: Math.max(...bots), page: false, center });
+    } else if (near2(at, 0) || near2(at, doc.page.w / 2) || near2(at, doc.page.w)) {
+      push({ axis: "v", at, from: 0, to: doc.page.h, page: true, center });
+    }
+  }
+  // 가로 정렬(y): 상·중·하
+  for (const { at, center } of [
+    { at: M.y, center: false },
+    { at: M.y + M.h / 2, center: true },
+    { at: M.y + M.h, center: false },
+  ]) {
+    const on = others.filter((b) => near2(b.y, at) || near2(b.y + b.h / 2, at) || near2(b.y + b.h, at));
+    if (on.length) {
+      const lefts = [M.x, ...on.map((b) => b.x)];
+      const rights = [M.x + M.w, ...on.map((b) => b.x + b.w)];
+      push({ axis: "h", at, from: Math.min(...lefts), to: Math.max(...rights), page: false, center });
+    } else if (near2(at, 0) || near2(at, doc.page.h / 2) || near2(at, doc.page.h)) {
+      push({ axis: "h", at, from: 0, to: doc.page.w, page: true, center });
+    }
+  }
+  return guides;
+}
 
 // ── 스냅 계산 ──
 export interface SnapResult {

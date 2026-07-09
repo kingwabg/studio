@@ -13,7 +13,7 @@ import { useCanvasStore } from "./store";
 import { useFollowStore } from "./snap";
 import { CanvasBlock } from "./CanvasBlock";
 import { MultiSelectOverlay } from "./MultiSelectOverlay";
-import { SnapGuides } from "./SnapGuides";
+import { SnapGuides, SelectionGuides } from "./SnapGuides";
 import { IcText } from "../../ui/icons";
 
 // 그룹 멤버를 개별로 끄는 동안, 그 요소가 속한 공간 그룹의 경계 박스를 띄워
@@ -452,6 +452,7 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
             </div>
           )}
           <DraggingGroupBox />
+          <SelectionGuides />
           <SnapGuides />
           {doc.blocks.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
