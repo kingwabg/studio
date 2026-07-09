@@ -9,19 +9,10 @@
 //  - 표·이미지는 들여쓰기 위치에 절대배치로 끼워 넣음
 //  - 트리 관계(parentId)는 새 문서에도 유지 — 자석 그룹·재펴기 가능
 import { type Block, type CanvasDoc, createBlock, createDoc } from "./model";
+import { standardMarker } from "../lint/adminLint";
 
-const ROMANS = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ", "Ⅶ", "Ⅷ", "Ⅸ", "Ⅹ", "Ⅺ", "Ⅻ"];
-const HANGULS = "가나다라마바사아자차카타파하";
-
-// 공문서 개요 번호 — aiToCanvas(AI 생성 문서)도 같은 규칙을 쓴다
-export const numberFor = (depth: number, idx: number): string =>
-  depth === 0
-    ? `${ROMANS[idx] ?? idx + 1}.`
-    : depth === 1
-      ? `${idx + 1}.`
-      : depth === 2
-        ? `${HANGULS[idx] ?? idx + 1}.`
-        : `${idx + 1})`;
+// 공문서 개요 번호 — 행정 표준(1.→가.→1)→가)…). aiToCanvas·린터와 규칙을 공유한다.
+export const numberFor = standardMarker;
 
 const MARGIN = 20; // mm — 공문서 기본 여백
 const INDENT = 8; // mm — 깊이당 들여쓰기
