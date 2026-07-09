@@ -90,16 +90,6 @@ export function CanvasBlock({ block }: { block: Block }) {
     if (cur && cur.type === "text" && !(cur.text ?? "").trim() && !(cur.hintOn && cur.hint))
       removeBlock(block.id);
   };
-  // 라벨 칩 표기 (시안 1b) — 표는 R×C
-  const typeLabel =
-    block.type === "text"
-      ? block.flow
-        ? "본문"
-        : "텍스트"
-      : block.type === "table"
-        ? `표 · ${(block.data as TableKingData | undefined)?.cells?.length ?? 0}×${(block.data as TableKingData | undefined)?.cells?.[0]?.length ?? 0}`
-        : "이미지";
-
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: block.id,
     data: { kind: "block" },
@@ -225,11 +215,6 @@ export function CanvasBlock({ block }: { block: Block }) {
         )}
       </div>
 
-      {block.flow && (
-        <span className="absolute -top-2 right-1.5 z-20 rounded-full bg-emerald-600 text-white text-[10px] font-semibold px-1.5 leading-4 pointer-events-none shadow-sm">
-          본문
-        </span>
-      )}
       {/* 고정 배지 — 클릭하면 해제(그룹이면 그룹 전체). 잠긴 요소는 플로팅바가 없어
           이 배지가 유일한 해제 통로다. */}
       {locked && selected && (
@@ -291,15 +276,6 @@ export function CanvasBlock({ block }: { block: Block }) {
               </button>
             </div>
           )}
-
-          {/* 라벨 칩 (시안) — 종류·크기 */}
-          <div
-            className="absolute -top-[22px] left-0 z-30 flex items-center gap-1.5 px-2 py-0.5 rounded-[6px_6px_6px_0] bg-surface border border-accentline pointer-events-none whitespace-nowrap"
-            style={{ boxShadow: "var(--sh-card)" }}
-          >
-            <span className="w-[5px] h-[5px] rounded-full bg-accent" />
-            <span className="text-[10px] font-bold text-ink">{typeLabel}</span>
-          </div>
 
           {/* 리사이즈 코너 핸들 (시안: 8px 흰 사각 + 파란 테두리) */}
           {!isTable &&
@@ -374,19 +350,52 @@ function RichRead({ block }: { block: Block }) {
   );
 }
 
-// 폭 측정용(auto-width): 런을 스타일 span으로, 토큰화 없이 평문 — 가장 긴 줄의 자연 폭.
-// 런별 크기가 다르면 폭도 달라지므로 여기서도 런 스타일을 반영해야 정확하다.
-function RichPlain({ block }: { block: Block }) {
-  const runs = blockRuns(block);
-  return (
-    <>
-      {runs.map((run, i) => (
-        <span key={i} style={runCssObj(block, run)}>
-          {run.text || " "}
-        </span>
-      ))}
-    </>
-  );
+// ── auto-width 측정 (canvas) ──
+// 예전엔 visibility:hidden 사이저를 하나 더 그려 폭을 쟀지만, DOM에 텍스트가 두 번
+// 생겨 검사기에서 헷갈렸다 → 제거. 이제 텍스트는 화면 사이저 "하나"뿐이고, 폭은
+// canvas.measureText로 잰다(런별 폰트·크기·굵기·기울임 + 전각 보정 letter-spacing 반영).
+let _measureCtx: CanvasRenderingContext2D | null = null;
+function getMeasureCtx(): CanvasRenderingContext2D | null {
+  if (!_measureCtx) _measureCtx = document.createElement("canvas").getContext("2d");
+  return _measureCtx;
+}
+
+// 런들을 \n 기준으로 줄 배열로 쪼갠다 (각 줄 = 런 배열, 서식 유지)
+function splitRunsIntoLines(runs: TextRun[]): TextRun[][] {
+  const lines: TextRun[][] = [[]];
+  for (const run of runs) {
+    const parts = run.text.split("\n");
+    parts.forEach((part, i) => {
+      if (i > 0) lines.push([]);
+      if (part) lines[lines.length - 1].push({ ...run, text: part });
+    });
+  }
+  return lines;
+}
+
+// 줄바꿈 없는 "가장 긴 줄"의 자연 폭(px) — auto-width가 이 값 + 좌우 패딩으로 박스를 맞춘다.
+// letter-spacing은 브라우저가 글자마다 뒤에 붙이므로 em×px×글자수로 근사(±1mm 허용).
+function measureNaturalWidthPx(block: Block, spacing: Record<string, number>): number {
+  const ctx = getMeasureCtx();
+  if (!ctx) return 0;
+  const lines = showingHint(block)
+    ? (block.hint ?? "").split("\n").map((l) => [{ text: l } as TextRun])
+    : splitRunsIntoLines(blockRuns(block));
+  let max = 0;
+  for (const line of lines) {
+    let w = 0;
+    for (const run of line) {
+      const def = fontByKey(run.font ?? block.font);
+      const sizePx = (run.fontSize ?? block.fontSize ?? TEXT_DEFAULTS.fontSize) * (96 / 72);
+      const weight = (run.bold ?? block.bold ?? TEXT_DEFAULTS.bold) ? 700 : 400;
+      const italic = (run.italic ?? block.italic ?? TEXT_DEFAULTS.italic) ? "italic " : "";
+      ctx.font = `${italic}${weight} ${sizePx}px "${def.webFamily}", "Malgun Gothic", sans-serif`;
+      const em = spacing[def.key] ?? 0.06;
+      w += ctx.measureText(run.text).width + em * sizePx * run.text.length;
+    }
+    if (w > max) max = w;
+  }
+  return max;
 }
 
 // {{토큰}}을 칩으로, 미리보기 중이면 실제 값(강조)으로 렌더
@@ -696,7 +705,8 @@ function TextContent({
 
   // auto-height (읽기 모드) — 내용 자연 높이를 관찰해 block.h로. 편집 중엔 syncEditH가 담당.
   const sizerRef = useRef<HTMLDivElement>(null);
-  const wSizerRef = useRef<HTMLDivElement>(null);
+  // 전각 보정 spacing 맵 — 폰트 캘리브레이션 완료 시 갱신돼 폭 재측정 트리거
+  const spacing = useFontStore((s) => s.spacing);
   useEffect(() => {
     if (editing) return;
     const el = sizerRef.current;
@@ -713,21 +723,16 @@ function TextContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [block.id, editing, `${block.text}|${block.w}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padY}|${(block.runs ?? []).length}|${block.hint}|${block.hintOn}`]);
 
+  // auto-width — canvas로 잰 자연 폭 + 좌우 패딩으로 박스 폭을 글자에 맞춘다(캔바식).
+  // 숨은 DOM 사이저가 없어졌으므로 ResizeObserver 대신 canvas 측정. 지면 밖으로는 못 나감.
   useEffect(() => {
     if (editing || block.manualW) return;
-    const el = wSizerRef.current;
-    if (!el) return;
-    const sync = () => {
-      const needMm = Math.min(pageW - block.x, Math.max(20, Math.ceil(el.offsetWidth / SCALE) + 1));
-      const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
-      if (cur && Math.abs((cur.w ?? 0) - needMm) >= 1) updateBlock(block.id, { w: needMm });
-    };
-    sync();
-    const ro = new ResizeObserver(sync);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const naturalPx = measureNaturalWidthPx(block, spacing);
+    const needMm = Math.min(pageW - block.x, Math.max(20, Math.ceil((naturalPx + padXpx * 2) / SCALE) + 1));
+    const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
+    if (cur && Math.abs((cur.w ?? 0) - needMm) >= 1) updateBlock(block.id, { w: needMm });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [block.id, block.manualW, block.x, pageW, editing, `${block.text}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${block.padX}|${(block.runs ?? []).length}|${block.hint}|${block.hintOn}`]);
+  }, [block.id, block.manualW, block.x, pageW, editing, spacing, padXpx, `${block.text}|${block.fontSize}|${block.bold}|${block.italic}|${block.font}|${(block.runs ?? []).length}|${block.hint}|${block.hintOn}`]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `textdrop:${block.id}`,
@@ -738,6 +743,7 @@ function TextContent({
     return (
       <>
         <div
+          key="editor"
           ref={editRef}
           contentEditable
           suppressContentEditableWarning
@@ -801,26 +807,17 @@ function TextContent({
   const hinting = showingHint(block);
   return (
     <div
+      key="reader"
       ref={setNodeRef}
       style={{ ...textStyle(block), ...padStyle }}
       className={`w-full leading-snug ${
         isOver ? "bg-accentsoft outline outline-2 outline-accent -outline-offset-2" : ""
       }`}
     >
+      {/* 텍스트는 이 사이저 하나뿐 — 폭은 canvas로 재므로 숨은 복사본이 없다(DOM에 텍스트 1개) */}
       <div ref={sizerRef} style={{ whiteSpace: "pre-wrap" }}>
         {hinting ? <span style={{ color: "var(--inkfaint)" }}>{block.hint}</span> : <RichRead block={block} />}
       </div>
-      {/* auto-width 측정용 숨은 사이저 — 줄바꿈 없이 가장 긴 줄의 자연 폭(런 스타일/안내문 반영) */}
-      {!block.manualW && (
-        <div
-          ref={wSizerRef}
-          aria-hidden
-          className="leading-snug"
-          style={{ ...textStyle(block), ...padStyle, position: "absolute", top: 0, left: 0, visibility: "hidden", whiteSpace: "pre", pointerEvents: "none" }}
-        >
-          {hinting ? <span>{block.hint || " "}</span> : <RichPlain block={block} />}
-        </div>
-      )}
     </div>
   );
 }
