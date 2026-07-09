@@ -30,7 +30,7 @@ function SnapGuides() {
             top: 0,
             bottom: 0,
             width: 0,
-            borderLeft: "1px dashed #EC4899",
+            borderLeft: "1px dashed var(--guide)",
             zIndex: 50,
             pointerEvents: "none",
           }}
@@ -45,7 +45,7 @@ function SnapGuides() {
             left: 0,
             right: 0,
             height: 0,
-            borderTop: "1px dashed #EC4899",
+            borderTop: "1px dashed var(--guide)",
             zIndex: 50,
             pointerEvents: "none",
           }}
@@ -55,13 +55,14 @@ function SnapGuides() {
   );
 }
 
-const RULER = 28; // 눈금자 두께(px)
-const RULER_BG = "#f8fafc";
-const RULER_BORDER = "#dbe2ec";
-const TICK_MINOR = "#e5eaf2";
-const TICK_MID = "#cfd7e4";
-const TICK_MAJOR = "#8d98aa";
-const LABEL = "#6f7a8d";
+const RULER = 26; // 눈금자 두께(px) — 시안 1b
+// 토큰 기반 (다크 모드 대응) — SVG 속성도 CSS 변수 문자열을 받는다
+const RULER_BG = "var(--surface)";
+const RULER_BORDER = "var(--line)";
+const TICK_MINOR = "var(--line)";
+const TICK_MID = "var(--linestrong)";
+const TICK_MAJOR = "var(--inkfaint)";
+const LABEL = "var(--inkfaint)";
 const SAFE_MARGIN_MM = 20;
 const PROJECTION_FILL = "rgba(43, 92, 230, 0.18)";
 const PROJECTION_STROKE = "rgba(43, 92, 230, 0.78)";
@@ -309,7 +310,8 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
   const projectionY = projectionBox ? { start: projectionBox.y, size: projectionBox.h, alert: projectionAlert } : undefined;
 
   return (
-    <div className="flex-1 overflow-auto canvas-dots bg-canvas">
+    <div className="flex-1 relative min-w-0">
+    <div className="absolute inset-0 overflow-auto canvas-dots bg-canvas">
       {/* 지면 + 눈금자 묶음 — 가운데 정렬, 함께 스크롤 */}
       <div className="w-max mx-auto my-8" style={{ position: "relative", paddingLeft: RULER, paddingTop: RULER }}>
         {/* 모서리 상자 */}
@@ -348,8 +350,8 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
           onPointerDown={(e) => {
             if (e.target === e.currentTarget) select(null); // 빈 지면 클릭 → 선택 해제
           }}
-          style={{ width: pageW, height: pageH }}
-          className="relative bg-white shrink-0 ring-1 ring-black/5 shadow-[0_1px_3px_rgba(26,34,51,0.08),0_20px_50px_-12px_rgba(26,34,51,0.18)]"
+          style={{ width: pageW, height: pageH, boxShadow: "var(--sh-page)" }}
+          className="relative bg-white shrink-0"
         >
           {visibleBlocks.map((block) => (
             <CanvasBlock key={block.id} block={block} />
@@ -365,6 +367,17 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
           )}
         </div>
       </div>
+    </div>
+
+    {/* 좌하단 페이지 pill · 우하단 줌 컨트롤 (시안 1b — 줌은 준비 중) */}
+    <div className="absolute left-3 bottom-3 h-8 px-3 rounded-full bg-surface border border-line flex items-center text-[11.5px] font-medium text-inksoft pointer-events-none" style={{ boxShadow: "var(--sh-card)" }}>
+      1/1 페이지 · A4 210×297mm
+    </div>
+    <div className="absolute right-3 bottom-3 h-8 rounded-full bg-surface border border-line flex items-center overflow-hidden" style={{ boxShadow: "var(--sh-card)" }}>
+      <button title="축소 (준비 중)" className="w-8 h-full flex items-center justify-center text-inkfaint cursor-default">−</button>
+      <span className="text-[11.5px] font-semibold text-inksoft px-1">100%</span>
+      <button title="확대 (준비 중)" className="w-8 h-full flex items-center justify-center text-inkfaint cursor-default">＋</button>
+    </div>
     </div>
   );
 });
