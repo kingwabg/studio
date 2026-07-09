@@ -24,7 +24,8 @@ import { buildHwpxBytes, downloadBytes } from "../modules/document/exportHwpx";
 import { flattenDoc } from "../modules/document/flatten";
 import { HanPreviewModal } from "../components/editor-shell/HanPreviewModal";
 import { EditorToolbar } from "../components/editor-shell/EditorToolbar";
-import { IcBack, IcDownload, IcEye, IcLogo, IcSparkles } from "../ui/icons";
+import { useThemeStore } from "../modules/ui/theme";
+import { IcBack, IcDownload, IcEye, IcMoon, IcSparkles, IcSun } from "../ui/icons";
 
 // 중첩 드롭 대상(지면 안의 텍스트/셀) 우선 — 포인터가 안쪽 대상 위면 그걸 고른다.
 // 지면(stage)은 안쪽 대상이 없을 때의 폴백 (팔레트로 새 블록 만들 때).
@@ -64,6 +65,8 @@ export default function StudioEditor() {
   const hydratedRef = useRef(false); // 로드 완료 전에는 오토세이브 금지(빈 문서로 덮어쓰기 방지)
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [previewing, setPreviewing] = useState(false);
+  const dark = useThemeStore((s) => s.dark);
+  const toggleDark = useThemeStore((s) => s.toggle);
 
   const title = useCanvasStore((s) => s.doc.title);
   const setTitle = useCanvasStore((s) => s.setTitle);
@@ -226,32 +229,50 @@ export default function StudioEditor() {
   return (
     // .studio-root는 StudioTheme 래퍼가 제공 — 여기서 또 붙이면 다크 변수를 라이트로 되덮는다
     <div className="h-screen flex flex-col bg-canvas text-ink">
-      <header className="h-[52px] shrink-0 flex items-center gap-2 px-3 border-b border-line bg-white">
+      {/* 상단 액션 바 52px (시안 1b) — 좌: 복귀·로고·제목·저장 / 우: 3단 위계 버튼 + 다크 */}
+      <header
+        className="h-[52px] shrink-0 flex items-center gap-3 px-4 border-b border-line bg-surface relative z-[3]"
+        style={{ boxShadow: "0 1px 2px rgba(16,24,40,.03)" }}
+      >
         <Link
           to="/studio"
-          className="flex items-center gap-1 h-8 pl-2 pr-3 rounded-lg text-inksoft hover:bg-paper hover:text-ink transition-colors text-[13px] font-medium"
+          className="flex items-center gap-1.5 h-8 pl-1.5 pr-2.5 rounded-lg text-inksoft hover:bg-paper hover:text-ink transition-colors text-[13px] font-medium"
         >
-          <IcBack size={16} /> 내 문서
+          <IcBack size={14} /> 내 문서
         </Link>
-        <span className="w-px h-5 bg-line mx-1" />
-        <span className="text-accent">
-          <IcLogo size={16} />
-        </span>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="제목 없는 문서"
-          className="text-[14px] font-semibold text-ink outline-none border border-transparent hover:border-line focus:border-accentline rounded-md px-2 py-1 -ml-0.5 min-w-40 transition-colors"
-        />
-        <span
-          className={`text-[11.5px] transition-colors ${
-            status === "saving" ? "text-inkfaint" : status === "saved" ? "text-inksoft" : "text-transparent"
-          }`}
-        >
-          {status === "saving" ? "저장 중…" : "저장됨"}
-        </span>
+        <span className="w-px h-5 bg-line" />
+        <div className="flex items-center gap-2">
+          <div className="w-[22px] h-[22px] rounded-md bg-accent text-onaccent flex items-center justify-center text-[9px] font-extrabold">
+            24
+          </div>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="제목 없는 문서"
+            className="text-[14.5px] font-bold text-ink tracking-tight outline-none border border-transparent hover:border-line hover:bg-paper focus:border-accentline rounded-[7px] px-2 py-1 min-w-40 transition-colors bg-transparent"
+          />
+          <span
+            className={`flex items-center gap-1 text-[12px] transition-colors ${
+              status === "saving" ? "text-inkfaint" : status === "saved" ? "text-inkfaint" : "text-transparent"
+            }`}
+          >
+            {status === "saved" && (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2.5 6.5L5 9l4.5-5.5" stroke="var(--success)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+            {status === "saving" ? "저장 중…" : "저장됨"}
+          </span>
+        </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={toggleDark}
+            aria-label={dark ? "라이트 모드" : "다크 모드"}
+            className="w-8 h-8 rounded-lg text-inksoft hover:bg-paper hover:text-ink flex items-center justify-center transition-colors"
+          >
+            {dark ? <IcSun size={15} /> : <IcMoon size={15} />}
+          </button>
           <button
             onClick={async () => {
               // 마인드맵 → 공문서: 트리를 개요 번호 문서로 펴서 "새 문서"로 저장·이동 (원본 보존)
@@ -260,21 +281,22 @@ export default function StudioEditor() {
               navigate(`/studio/editor/${flat.id}`);
             }}
             title="트리 구조를 개요 번호(Ⅰ/1/가)가 매겨진 공문서로 펴서 새 문서로 만듭니다"
-            className="flex items-center gap-1.5 rounded-lg border border-line text-inksoft text-[12.5px] font-semibold px-3 h-[34px] hover:border-accentline hover:text-accent transition-colors"
+            className="flex items-center gap-1.5 rounded-[9px] text-inksoft text-[13px] font-semibold px-3 h-[34px] hover:bg-paper hover:text-ink transition-colors"
           >
-            <IcSparkles size={15} /> 공문서로 펴기
+            <IcSparkles size={14} /> 공문서로 펴기
           </button>
           <button
             onClick={() => setPreviewing(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-accentline bg-accentsoft text-accent text-[12.5px] font-semibold px-3 h-[34px] hover:bg-accent hover:text-white transition-colors"
+            className="flex items-center gap-1.5 rounded-[9px] border border-line bg-surface text-ink text-[13px] font-semibold px-3 h-[34px] hover:border-linestrong hover:bg-paper transition-colors"
           >
-            <IcEye size={15} /> 한글 미리보기
+            <IcEye size={14} /> 한글 미리보기
           </button>
           <button
             onClick={() => downloadBytes(buildHwpxBytes(doc), `${title || "문서"}.hwpx`)}
-            className="flex items-center gap-1.5 rounded-lg bg-accent text-white text-[12.5px] font-semibold px-3.5 h-[34px] hover:bg-accenthover active:scale-[0.98] transition-all shadow-[0_1px_2px_rgba(43,92,230,0.25)]"
+            className="flex items-center gap-1.5 rounded-[9px] bg-accent text-onaccent text-[13px] font-bold px-3.5 h-[34px] hover:bg-accenthover active:scale-[0.98] transition-all"
+            style={{ boxShadow: "0 1px 2px rgba(43,92,230,.35)" }}
           >
-            <IcDownload size={15} /> HWPX 내보내기
+            <IcDownload size={14} /> HWPX 내보내기
           </button>
         </div>
       </header>
