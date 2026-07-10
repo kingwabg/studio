@@ -1,0 +1,3 @@
+#!/bin/sh
+# 코드 성장 게이트 — scripts/check-size.mjs (CLAUDE.md "코드 성장 규칙")
+node scripts/check-size.mjs --staged --msg-file "$1"
