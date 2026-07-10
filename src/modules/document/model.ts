@@ -31,6 +31,7 @@ export interface TextRun {
   underline?: boolean; // 밑줄 — bold와 같은 3-상태(undefined=블록 상속)
   strike?: boolean; // 취소선
   color?: string; // hex
+  href?: string; // 하이퍼링크 URL — 내보내기: hp:fieldBegin/End(HYPERLINK). 런 전용(상속 없음)
   bg?: string; // 형광펜(글자 배경) hex — 내보내기: charPr shadeColor. 블록 상속 없음(런 전용)
   fontSize?: number; // pt — 없으면 블록 크기 상속
   font?: string; // 폰트 레지스트리 key — 없으면 블록 글꼴 상속
@@ -47,6 +48,7 @@ export function runStyleEq(a: TextRun, b: TextRun): boolean {
     (a.underline ?? null) === (b.underline ?? null) &&
     (a.strike ?? null) === (b.strike ?? null) &&
     (a.color ?? null) === (b.color ?? null) &&
+    (a.href ?? null) === (b.href ?? null) &&
     (a.bg ?? null) === (b.bg ?? null) &&
     (a.fontSize ?? null) === (b.fontSize ?? null) &&
     (a.font ?? null) === (b.font ?? null)

@@ -11,6 +11,7 @@ import { extOfMime, getAsset } from "./assets";
 import { SCALE } from "../canvas/geometry";
 
 const HWPUNIT_PER_MM = 283.465;
+const LINK_COLOR = "#1A5FD6"; // 하이퍼링크 표시색 (CanvasBlock LINK_COLOR와 일치)
 // 캔버스 leading-snug = 1.375 → 문단 줄간격 %
 const LINE_SPACING = 138;
 const PT_TO_MM = 0.352778;
@@ -28,23 +29,25 @@ function effectiveFont(): string {
 // 스타일(base) 위에 런이 지정한 속성만 덮어쓴다(화면 runCssObj와 같은 상속 규칙).
 // 줄바꿈(\n)은 새 줄로 쪼갠다 → 한 줄 = 세그먼트 배열, 각 세그먼트 = {text, style}.
 function richLinesOf(runs: TextRun[], base: ReturnType<typeof baseStyle>) {
-  const lines: { text: string; style: typeof base }[][] = [[]];
+  const lines: { text: string; style: typeof base; href?: string }[][] = [[]];
   for (const run of runs) {
+    // 하이퍼링크 런은 밑줄+링크색을 강제(화면 runCssObj와 동일 규칙) — 한글에서도 링크로 보이게
+    const isLink = !!run.href;
     const style = {
       ...base,
       pt: run.fontSize ?? base.pt,
       bold: run.bold ?? base.bold,
       italic: run.italic ?? base.italic,
-      underline: run.underline ?? base.underline,
+      underline: run.underline ?? (isLink ? true : base.underline),
       strike: run.strike ?? base.strike,
-      color: run.color ?? base.color,
+      color: run.color ?? (isLink ? LINK_COLOR : base.color),
       shade: run.bg, // 형광펜 → charPr shadeColor (런 전용)
       font: run.font ? fontByKey(run.font).hwpxName : base.font,
     };
     const parts = run.text.split("\n");
     parts.forEach((part, i) => {
       if (i > 0) lines.push([]);
-      if (part) lines[lines.length - 1].push({ text: part, style });
+      if (part) lines[lines.length - 1].push({ text: part, style, href: run.href });
     });
   }
   return lines;

@@ -565,18 +565,32 @@ function runCssObj(block: Block, run: TextRun): React.CSSProperties {
   // ⚠ 밑줄/취소선은 컨테이너가 아니라 "런 span"에만 건다 — CSS text-decoration은 부모에
   // 걸면 자식이 못 지우므로(전파 규칙), 블록 기본이 밑줄이어도 일부 런만 보통(false)이
   // 되려면 span 단위 적용이 유일한 경로다.
-  const underline = run.underline ?? block.underline ?? TEXT_DEFAULTS.underline;
+  // 하이퍼링크는 밑줄 + 링크색(파랑)을 얹는다 — 사용자가 색을 명시했으면 그 색 존중.
+  const isLink = !!run.href;
+  const underline = run.underline ?? block.underline ?? isLink ?? TEXT_DEFAULTS.underline;
   const strike = run.strike ?? block.strike ?? TEXT_DEFAULTS.strike;
   const deco = [underline ? "underline" : "", strike ? "line-through" : ""].filter(Boolean).join(" ");
   return {
     fontWeight: (run.bold ?? block.bold ?? TEXT_DEFAULTS.bold) ? 700 : 400,
     fontStyle: (run.italic ?? block.italic ?? TEXT_DEFAULTS.italic) ? "italic" : "normal",
     textDecoration: deco || "none",
-    color: normalizeTextColor(run.color ?? block.color),
+    color: normalizeTextColor(run.color ?? (isLink ? LINK_COLOR : block.color)),
     ...(run.bg ? { backgroundColor: run.bg } : {}), // 형광펜 — 런 전용(블록 상속 없음)
     ...(run.fontSize != null ? { fontSize: ptToPx(run.fontSize) } : {}),
     ...(run.font ? fontCss(run.font) : {}),
   };
+}
+
+// 하이퍼링크 표시색 — 화면·내보내기 charPr 공통(한글에서도 링크로 보이게)
+const LINK_COLOR = "#1A5FD6";
+
+// URL 정규화 — 스킴 없으면 https:// 붙임. 빈 값은 undefined(링크 제거).
+function normalizeUrl(raw: string): string | undefined {
+  const s = raw.trim();
+  if (!s) return undefined;
+  if (/^(https?:|mailto:|tel:|ftp:)/i.test(s)) return s;
+  if (/^[\w.-]+@[\w.-]+\.\w+$/.test(s)) return `mailto:${s}`;
+  return `https://${s}`;
 }
 
 // 읽기 모드: 런을 스타일 span으로, 각 span 안에서 {{토큰}}은 칩으로 렌더.
@@ -605,15 +619,7 @@ export function RichRead({ block }: { block: Block }) {
               {marker && (
                 <span style={{ display: "inline-block", minWidth: "1.3em", userSelect: "none" }}>{marker}</span>
               )}
-              {paraRuns.length ? (
-                paraRuns.map((run, i) => (
-                  <span key={i} style={runCssObj(block, run)}>
-                    <TokenText text={run.text} />
-                  </span>
-                ))
-              ) : (
-                <br />
-              )}
+              {paraRuns.length ? paraRuns.map((run, i) => <RunSpan key={i} block={block} run={run} />) : <br />}
             </div>
           );
         })}
@@ -623,11 +629,33 @@ export function RichRead({ block }: { block: Block }) {
   return (
     <>
       {runs.map((run, i) => (
-        <span key={i} style={runCssObj(block, run)}>
-          <TokenText text={run.text} />
-        </span>
+        <RunSpan key={i} block={block} run={run} />
       ))}
     </>
+  );
+}
+
+// 읽기 모드 런 span — 하이퍼링크면 Ctrl/⌘+클릭으로 새 탭 열기(일반 클릭은 블록 선택 유지).
+function RunSpan({ block, run }: { block: Block; run: TextRun }) {
+  const href = run.href;
+  return (
+    <span
+      style={{ ...runCssObj(block, run), ...(href ? { cursor: "pointer" } : {}) }}
+      title={href ? `${href} (Ctrl+클릭으로 열기)` : undefined}
+      onClick={
+        href
+          ? (e) => {
+              if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(href, "_blank", "noopener,noreferrer");
+              }
+            }
+          : undefined
+      }
+    >
+      <TokenText text={run.text} />
+    </span>
   );
 }
 
@@ -853,6 +881,7 @@ function runToSpanEl(block: Block, run: TextRun): HTMLSpanElement {
   if (run.underline !== undefined) span.dataset.u = run.underline ? "1" : "0";
   if (run.strike !== undefined) span.dataset.s = run.strike ? "1" : "0";
   if (run.color) span.dataset.color = run.color;
+  if (run.href) span.dataset.href = run.href;
   if (run.bg) span.dataset.bg = run.bg;
   if (run.fontSize != null) span.dataset.size = String(run.fontSize);
   if (run.font) span.dataset.font = run.font;
@@ -949,6 +978,7 @@ function readRunStyle(el: HTMLElement): Partial<TextRun> {
   if (d.u !== undefined) st.underline = d.u === "1";
   if (d.s !== undefined) st.strike = d.s === "1";
   if (d.color) st.color = d.color;
+  if (d.href) st.href = d.href;
   if (d.bg) st.bg = d.bg;
   if (d.size) st.fontSize = Number(d.size);
   if (d.font) st.font = d.font;
@@ -1404,7 +1434,7 @@ function runsFromClipboardHtml(html: string): TextRun[] {
   return normalizeRuns(runs);
 }
 
-type InlineSel = { rect: DOMRect; bold: boolean; italic: boolean; underline: boolean; strike: boolean; color?: string; bg?: string; fontSize?: number; font?: string; align?: TextAlign; list?: ParaListType | null };
+type InlineSel = { rect: DOMRect; bold: boolean; italic: boolean; underline: boolean; strike: boolean; color?: string; href?: string; bg?: string; fontSize?: number; font?: string; align?: TextAlign; list?: ParaListType | null };
 
 function TextContent({
   block,
@@ -1563,6 +1593,7 @@ function TextContent({
         underline: all((r) => (r.underline ?? block.underline ?? false) === true),
         strike: all((r) => (r.strike ?? block.strike ?? false) === true),
         color: same((r) => r.color ?? block.color ?? TEXT_DEFAULTS.color),
+        href: same((r) => r.href),
         bg: same((r) => r.bg),
         fontSize: same((r) => r.fontSize ?? block.fontSize ?? TEXT_DEFAULTS.fontSize),
         font: same((r) => r.font ?? block.font),
@@ -1916,6 +1947,8 @@ function InlineToolbar({
   const offUnderline = defaults.underline ? false : undefined;
   const offStrike = defaults.strike ? false : undefined;
   const [fontOpen, setFontOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
   // 서식바 위치 — 선택 사각 위쪽 중앙. 화면 밖으로 나가지 않게 좌우 클램프.
   const top = Math.max(8, sel.rect.top - 46);
   const left = Math.min(Math.max(8, sel.rect.left + sel.rect.width / 2), window.innerWidth - 8);
@@ -1944,6 +1977,62 @@ function InlineToolbar({
       <button className={`${btn} ${sel.strike ? btnOn : ""} line-through text-[13px]`} title="취소선 (선택 구간)" onClick={() => onApply({ strike: sel.strike ? offStrike : true })}>
         가
       </button>
+      {/* 링크 — URL 팝오버 (기존 링크면 프리필) */}
+      <div className="relative">
+        <button
+          className={`${btn} ${sel.href ? btnOn : ""}`}
+          title="링크 (선택 구간)"
+          onClick={() => {
+            setLinkUrl(sel.href ?? "");
+            setLinkOpen((v) => !v);
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <path d="M6.5 9.5l3-3M7 4.2l.9-.9a2.6 2.6 0 0 1 3.7 3.7l-.9.9M9 11.8l-.9.9a2.6 2.6 0 0 1-3.7-3.7l.9-.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </button>
+        {linkOpen && (
+          <div
+            className="absolute left-0 top-[34px] w-[228px] rounded-[9px] bg-surface border border-line p-2 z-10 flex items-center gap-1.5"
+            style={{ boxShadow: "var(--sh-pop)" }}
+          >
+            <input
+              autoFocus
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onApply({ href: normalizeUrl(linkUrl) });
+                  setLinkOpen(false);
+                } else if (e.key === "Escape") setLinkOpen(false);
+              }}
+              placeholder="https://…"
+              className="flex-1 h-[26px] px-2 rounded-[6px] border border-line bg-paper text-[12px] text-ink outline-none focus:border-accentline"
+            />
+            <button
+              className="h-[26px] px-2 rounded-[6px] text-[11.5px] font-bold text-accent bg-accentsoft hover:bg-accent hover:text-onaccent transition-colors"
+              onClick={() => {
+                onApply({ href: normalizeUrl(linkUrl) });
+                setLinkOpen(false);
+              }}
+            >
+              적용
+            </button>
+            {sel.href && (
+              <button
+                className="h-[26px] px-1.5 rounded-[6px] text-[11.5px] text-inksoft hover:text-ink"
+                title="링크 제거"
+                onClick={() => {
+                  onApply({ href: undefined });
+                  setLinkOpen(false);
+                }}
+              >
+                제거
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       <span className="w-px h-5 bg-line mx-0.5" />
       {/* 크기 스테퍼 */}
       <button className={`${btn} text-[15px]`} title="작게" onClick={() => onApply({ fontSize: Math.max(6, Math.round((size - 0.5) * 2) / 2) })}>

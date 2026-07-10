@@ -42,6 +42,23 @@ const paras = (text, charRef = "0", paraRef = "0") =>
 // 인라인 리치 텍스트 — 한 문단(줄) 안에 런마다 <hp:run>. lines = [{paraRef?, segs:[{text,charRef}]}]
 // (charRef/paraRef는 refsAt이 미리 발급 — paraRef가 줄마다 다르면 문단별 정렬).
 // 빈 줄도 문단 하나로 유지한다.
+// 하이퍼링크 필드 id 카운터 (fieldBegin/End 매칭용, 문서 내 고유)
+let fieldSeq = 0;
+// 세그먼트 하나 → hp:run(들). href가 있으면 fieldBegin 컨트롤 run + 텍스트 run + fieldEnd
+// 컨트롤 run으로 감싼다(rhwp 역공학 검증: getFieldList가 command=URL로 되읽음).
+// command 형식 = "URL;0"(뒤 0 = 링크 대상/프레임). 인접 동일 href는 이미 한 세그먼트로 병합됨.
+const segRun = (s) => {
+  const textRun = `<hp:run charPrIDRef="${s.charRef}"><hp:t>${esc(s.text)}</hp:t></hp:run>`;
+  if (!s.href) return textRun;
+  const id = ++fieldSeq;
+  const begin =
+    `<hp:run charPrIDRef="${s.charRef}"><hp:ctrl>` +
+    `<hp:fieldBegin id="${id}" type="HYPERLINK" name="" editable="1" dirty="0" zorder="0" fieldid="0">` +
+    `<hp:parameters count="1"><hp:stringParam name="Command">${esc(s.href)};0</hp:stringParam></hp:parameters>` +
+    `</hp:fieldBegin></hp:ctrl></hp:run>`;
+  const end = `<hp:run charPrIDRef="${s.charRef}"><hp:ctrl><hp:fieldEnd beginIDRef="${id}" fieldid="0"/></hp:ctrl></hp:run>`;
+  return begin + textRun + end;
+};
 const richParasFromRefs = (lines, fallbackParaRef = "0") =>
   lines
     .map((line) => {
@@ -49,11 +66,7 @@ const richParasFromRefs = (lines, fallbackParaRef = "0") =>
       const paraRef = (Array.isArray(line) ? null : line.paraRef) ?? fallbackParaRef;
       return (
         `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0">` +
-        (segs.length
-          ? segs
-              .map((s) => `<hp:run charPrIDRef="${s.charRef}"><hp:t>${esc(s.text)}</hp:t></hp:run>`)
-              .join("")
-          : `<hp:run charPrIDRef="0"><hp:t></hp:t></hp:run>`) +
+        (segs.length ? segs.map(segRun).join("") : `<hp:run charPrIDRef="0"><hp:t></hp:t></hp:run>`) +
         `</hp:p>`
       );
     })
@@ -293,7 +306,7 @@ function tableXml(el, reg, borderFill = "2") {
               lineSpacing: s?.lineSpacing,
               list: richLists?.[li] ?? undefined,
             }),
-            segs: line.map((seg) => ({ text: seg.text, charRef: reg.charId(seg.style) })),
+            segs: line.map((seg) => ({ text: seg.text, charRef: reg.charId(seg.style), href: seg.href })),
           }))
         : undefined;
     if (!s || !reg) return { cm, richRefs };
@@ -469,9 +482,7 @@ function buildSection(refSectionXml, canvas, reg) {
             marginPrevMm: i === 0 ? gap : 0,
           });
           const runsXml = segs.length
-            ? segs
-                .map((s) => `<hp:run charPrIDRef="${reg.charId(s.style)}"><hp:t>${esc(s.text)}</hp:t></hp:run>`)
-                .join("")
+            ? segs.map((s) => segRun({ text: s.text, charRef: reg.charId(s.style), href: s.href })).join("")
             : `<hp:run charPrIDRef="${reg.charId(f.style)}"><hp:t></hp:t></hp:run>`;
           return `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0">${runsXml}</hp:p>`;
         })
