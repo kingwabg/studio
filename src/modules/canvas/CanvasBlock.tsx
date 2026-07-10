@@ -582,10 +582,10 @@ function runCssObj(block: Block, run: TextRun): React.CSSProperties {
 }
 
 // 하이퍼링크 표시색 — 화면·내보내기 charPr 공통(한글에서도 링크로 보이게)
-const LINK_COLOR = "#1A5FD6";
+export const LINK_COLOR = "#1A5FD6";
 
 // URL 정규화 — 스킴 없으면 https:// 붙임. 빈 값은 undefined(링크 제거).
-function normalizeUrl(raw: string): string | undefined {
+export function normalizeUrl(raw: string): string | undefined {
   const s = raw.trim();
   if (!s) return undefined;
   if (/^(https?:|mailto:|tel:|ftp:)/i.test(s)) return s;
@@ -946,7 +946,7 @@ function markerSpanEl(text: string): HTMLSpanElement {
 // 구조 = 문단마다 <div data-para style="text-align:…" data-list="bullet|num"> —
 // 문단별 정렬·목록이 편집 중에도 보이고, Enter는 div 분할, domToRuns는 div 경계를
 // \n으로 되읽는다. 빈 문단은 <br> 하나(높이 확보 + 커서 진입 가능).
-function seedEditable(
+export function seedEditable(
   el: HTMLElement,
   block: Block,
   runs: TextRun[],
@@ -986,7 +986,7 @@ function readRunStyle(el: HTMLElement): Partial<TextRun> {
 }
 
 // DOM(편집 중 자유 변형된 상태) → 정규화된 런 배열. 줄바꿈은 \n 텍스트·BR·블록경계 모두 흡수.
-function domToRuns(root: HTMLElement): TextRun[] {
+export function domToRuns(root: HTMLElement): TextRun[] {
   const runs: TextRun[] = [];
   const push = (text: string, style: Partial<TextRun>) => {
     if (text) runs.push({ text, ...style });
@@ -1076,7 +1076,7 @@ function textOffsetOf(root: HTMLElement, node: Node, offset: number): number {
 }
 
 // 현재 선택의 [start,end] 오프셋 (root 안이고 접혀있지 않을 때만)
-function selectionOffsets(root: HTMLElement): [number, number] | null {
+export function selectionOffsets(root: HTMLElement): [number, number] | null {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return null;
   const range = sel.getRangeAt(0);
@@ -1123,7 +1123,7 @@ function locateOffset(root: HTMLElement, target: number): { node: Node; offset: 
   return { node: root, offset: root.childNodes.length };
 }
 
-function setSelectionRange(root: HTMLElement, start: number, end: number) {
+export function setSelectionRange(root: HTMLElement, start: number, end: number) {
   const s = locateOffset(root, start);
   const e = locateOffset(root, end);
   const sel = window.getSelection();
@@ -1137,7 +1137,7 @@ function setSelectionRange(root: HTMLElement, start: number, end: number) {
 
 // 편집 DOM에서 문단별 정렬 배열을 파생 — 모델 문단(text.split("\n"))과 index가 일치하도록
 // emission을 재생하며 각 문단의 "첫 내용이 속한 div"의 textAlign을 기록한다.
-function paraAlignsFromDom(root: HTMLElement): (TextAlign | null)[] {
+export function paraAlignsFromDom(root: HTMLElement): (TextAlign | null)[] {
   const alignOf = (n: Node | null): TextAlign | null => {
     const div = (n instanceof HTMLElement ? n : n?.parentElement)?.closest?.("[data-para]") as HTMLElement | null;
     const a = div?.style.textAlign;
@@ -1170,7 +1170,7 @@ function paraAlignsFromDom(root: HTMLElement): (TextAlign | null)[] {
 }
 
 // 편집 DOM에서 문단별 목록 배열 파생 — paraAlignsFromDom과 같은 재생 규칙(div data-list)
-function paraListsFromDom(root: HTMLElement): (ParaListType | null)[] {
+export function paraListsFromDom(root: HTMLElement): (ParaListType | null)[] {
   const listOf = (n: Node | null): ParaListType | null => {
     const div = (n instanceof HTMLElement ? n : n?.parentElement)?.closest?.("[data-para]") as HTMLElement | null;
     const v = div?.getAttribute("data-list");
@@ -1203,12 +1203,12 @@ function paraListsFromDom(root: HTMLElement): (ParaListType | null)[] {
 }
 
 // 오프셋이 속한 문단 인덱스 — 평문 기준(\n 개수)
-const paraIdxAt = (text: string, offset: number) =>
+export const paraIdxAt = (text: string, offset: number) =>
   (text.slice(0, Math.max(0, Math.min(offset, text.length))).match(/\n/g) ?? []).length;
 
 // [start,end) 교체 시 문단 속성 배열(정렬·목록)도 함께 스플라이스 —
 // 삽입된 새 문단은 시작 문단의 값을 상속
-function spliceAligns<T>(
+export function spliceAligns<T>(
   aligns: (T | null)[],
   text: string,
   start: number,
@@ -1227,7 +1227,7 @@ function spliceAligns<T>(
 }
 
 // Enter — 캐럿 위치에서 현재 문단 div를 둘로 쪼갠다 (뒤쪽이 정렬 상속, 캐럿은 새 문단 시작)
-function splitParagraphAtCaret(root: HTMLElement): boolean {
+export function splitParagraphAtCaret(root: HTMLElement): boolean {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return false;
   const range = sel.getRangeAt(0);
@@ -1258,7 +1258,7 @@ function splitParagraphAtCaret(root: HTMLElement): boolean {
   return true;
 }
 
-function placeCaretEnd(root: HTMLElement) {
+export function placeCaretEnd(root: HTMLElement) {
   const sel = window.getSelection();
   if (!sel) return;
   const range = document.createRange();
@@ -1314,7 +1314,7 @@ function placeCaretFromPoint(root: HTMLElement, point: { x: number; y: number } 
 }
 
 // 캐럿 자리에 평문 삽입 (엔터=\n·붙여넣기 정규화용) — pre-wrap이라 \n이 줄바꿈으로 보인다
-function insertTextAtCaret(text: string) {
+export function insertTextAtCaret(text: string) {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
@@ -1334,7 +1334,7 @@ function insertTextAtCaret(text: string) {
 const escHtml = (t: string) =>
   t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-function runsToClipboardHtml(runs: TextRun[], block: Block): string {
+export function runsToClipboardHtml(runs: TextRun[], block: Block): string {
   const body = runs
     .map((r) => {
       const st: string[] = [];
@@ -1370,7 +1370,7 @@ function cssColorToHex(v: string): string | null {
   return null;
 }
 
-function runsFromClipboardHtml(html: string): TextRun[] {
+export function runsFromClipboardHtml(html: string): TextRun[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const runs: TextRun[] = [];
   type St = Partial<Omit<TextRun, "text">>;

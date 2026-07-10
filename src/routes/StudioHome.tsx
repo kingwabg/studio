@@ -104,10 +104,11 @@ export default function StudioHome() {
     setDocs(await repo.list());
   };
 
-  const tab = (label: string, active: boolean, extra?: string) => (
+  const tab = (label: string, active: boolean, extra?: string, onClick?: () => void) => (
     <button
       key={label}
-      title={active ? undefined : "준비 중"}
+      title={active || onClick ? undefined : "준비 중"}
+      onClick={onClick}
       className={`px-3.5 py-[7px] rounded-lg text-[13.5px] transition-colors ${
         active ? "bg-accentsoft text-accent font-semibold" : "text-inksoft font-medium hover:bg-paper hover:text-ink"
       } ${extra ?? ""}`}
@@ -128,6 +129,7 @@ export default function StudioHome() {
         </div>
         <div className="studio-market-nav flex items-center gap-1">
           {tab("홈", true)}
+          {tab("에디터", false, undefined, () => navigate("/studio/embed"))}
           {tab("템플릿", false)}
           {tab("내 문서", false)}
         </div>
