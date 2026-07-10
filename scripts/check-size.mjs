@@ -25,7 +25,9 @@ const msgIdx = process.argv.indexOf("--msg-file");
 const msgFile = msgIdx >= 0 ? process.argv[msgIdx + 1] : null;
 
 // [size-override] — 탈출구. 판사는 사용자다(커밋 지시에 명시된 경우에만).
-if (msgFile && existsSync(msgFile) && readFileSync(msgFile, "utf8").includes("[size-override]")) {
+// ⚠ 마커는 "줄 머리"에 있을 때만 인정 — 본문에서 규칙을 설명·인용한 문구가
+// 오검출로 게이트를 열던 실전 버그(1047430에서 발생) 방지.
+if (msgFile && existsSync(msgFile) && /^\s*\[size-override\]/m.test(readFileSync(msgFile, "utf8"))) {
   console.log("check-size: [size-override] — 사용자 지시로 게이트 통과.");
   process.exit(0);
 }
