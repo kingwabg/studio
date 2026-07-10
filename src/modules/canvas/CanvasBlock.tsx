@@ -42,6 +42,7 @@ import { useFollowStore } from "./snap";
 import { useMergeStore } from "../merge/store";
 import { TOKEN_RE, resolveTokens } from "../merge/resolve";
 import { IcGrip, IcCopy, IcImage, IcTrash } from "../../ui/icons";
+import { ColorPopover } from "../../components/editor-shell/ColorPopover";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
 import "../../table-king/table-king.css";
 
@@ -340,8 +341,8 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
           return;
         }
         selectBlockOrGroup();
-        // 표 내부 포인터는 셀 선택/경계 드래그 몫 — 블록 이동은 그립 핸들로만. 잠금이면 이동 안 함
-        if (!isTable && !locked) listeners?.onPointerDown?.(e);
+        // 몸통은 콘텐츠 전용(텍스트=커서·선택, 표=셀). 이동은 그립/테두리 프레임으로만 —
+        // 첫 클릭은 선택만 하고 몸통 드래그로 실수 이동이 안 되게 한다(표 모델로 통일).
       }}
       onDoubleClick={handleBlockDoubleClick}
       style={{
@@ -356,18 +357,20 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
           ? `translate3d(${followX}px, ${followY}px, 0)`
           : CSS.Translate.toString(transform),
         zIndex: isDragging ? 20 : following ? 19 : selected ? 10 : 1,
-        cursor: editing ? "text" : locked ? "default" : isText ? "default" : "grab",
+        cursor: editing ? "text" : "default", // 몸통은 콘텐츠 전용 — 이동 커서는 그립/테두리에만
+
         touchAction: "none",
+        ...(isTable ? { outline: "none" } : {}),
       }}
       className={`group/blk rounded-[3px] overflow-visible select-none transition-[outline-color,box-shadow] ${
-        isText ? "" : "bg-white"
+        isText || isTable ? "" : "bg-white"
       } ${
-        isText
-          ? "" // 텍스트: 테두리·그림자는 아래 실제 박스(inner)에 그린다
+        isText || isTable
+          ? "" // 텍스트/표: 실제 내용 DOM이 자체 선택 표시를 담당한다
           : selected
             ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(43,92,230,0.18)]"
             : "outline outline-1 outline-line hover:outline-2 hover:outline-accent"
-      } ${isDragging ? "opacity-95 shadow-[0_8px_24px_rgba(26,34,51,0.18)]" : ""}`}
+      } ${isDragging && !isTable ? "opacity-95 shadow-[0_8px_24px_rgba(26,34,51,0.18)]" : ""}`}
     >
       <div
         className={
@@ -418,21 +421,45 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
       {/* 단일 선택 + 미잠금일 때만 편집 어포던스(그립·플로팅 바·핸들). 다중은 outline만 */}
       {soleSelected && !editing && !locked && (
         <>
-          {/* 표: 이동 그립만 (table-king 리본·우측 패널이 복제·삭제·서식 담당 — 툴바 중복 방지) */}
-          {isTable && (
+          {/* 이동 그립 — 모든 블록 공통(표 모델로 통일). 몸통은 콘텐츠 전용이라 이동은 여기와
+              아래 테두리 스트립으로만. */}
+          <span
+            {...listeners}
+            onPointerDown={(e) => {
+              selectBlockOrGroup();
+              listeners?.onPointerDown?.(e);
+            }}
+            title="이동"
+            className="absolute -top-2.5 -left-2.5 z-40 flex items-center justify-center w-6 h-6 rounded-lg bg-accent text-white cursor-grab"
+            style={{ touchAction: "none", boxShadow: "var(--sh-card)" }}
+          >
+            <IcGrip size={13} />
+          </span>
+          {/* 테두리 드래그 스트립 4변 — 몸통 밖으로 살짝 나와 콘텐츠를 안 가리고, 테두리를
+              잡아 끌면 이동(Figma·PPT식). 리사이즈 핸들(z-30)이 모서리·변중앙에서 우선. */}
+          {(["top", "bottom", "left", "right"] as const).map((edge) => (
             <span
+              key={edge}
               {...listeners}
               onPointerDown={(e) => {
                 selectBlockOrGroup();
                 listeners?.onPointerDown?.(e);
               }}
               title="이동"
-              className="absolute -top-2.5 -left-2.5 z-40 flex items-center justify-center w-6 h-6 rounded-lg bg-accent text-white cursor-grab"
-              style={{ touchAction: "none", boxShadow: "var(--sh-card)" }}
-            >
-              <IcGrip size={13} />
-            </span>
-          )}
+              aria-hidden="true"
+              className="absolute z-20 cursor-grab"
+              style={{
+                touchAction: "none",
+                ...(edge === "top"
+                  ? { left: 0, right: 0, top: -7, height: 10 }
+                  : edge === "bottom"
+                    ? { left: 0, right: 0, bottom: -7, height: 10 }
+                    : edge === "left"
+                      ? { top: 0, bottom: 0, left: -7, width: 10 }
+                      : { top: 0, bottom: 0, right: -7, width: 10 }),
+              }}
+            />
+          ))}
 
           {/* 텍스트/이미지: 플로팅 액션 바 — 그룹 선택·잠금·복제·삭제 */}
           {!isTable && (
@@ -2369,6 +2396,7 @@ function TableKingContent({ block, active }: { block: Block; active: boolean }) 
           showHandles={showHandles}
           setShowHandles={setShowHandles}
           themeVars={TK_THEME_VARS}
+          blockId={block.id}
         />
 
         {active && (
@@ -2518,6 +2546,9 @@ function StaticResolvedTable({
     </table>
   );
 }
+
+
+
 
 
 
