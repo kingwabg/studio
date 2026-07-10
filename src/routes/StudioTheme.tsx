@@ -7,19 +7,23 @@
 // 다크 오버라이드를 되덮는다.
 import { Theme } from "@radix-ui/themes";
 import "@radix-ui/themes/styles.css";
+import "@fontsource/ibm-plex-sans-kr/400.css";
+import "@fontsource/ibm-plex-sans-kr/500.css";
+import "@fontsource/ibm-plex-sans-kr/600.css";
+import "@fontsource/ibm-plex-sans-kr/700.css";
 import { type ReactNode } from "react";
 import { useThemeStore } from "../modules/ui/theme";
 
-// 문서 폰트 스택 — Radix의 --default-font-family를 Pretendard로 덮어 앱 톤 통일
+// 편집기 크롬은 읽기 좋은 IBM Plex Sans KR, A4 지면은 별도 문서 폰트를 유지한다.
 const FONT =
-  '"Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif';
+  '"IBM Plex Sans KR", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 
 export function StudioTheme({ children }: { children: ReactNode }) {
   const dark = useThemeStore((s) => s.dark);
   return (
     <Theme
-      accentColor="indigo"
-      grayColor="slate"
+      accentColor="blue"
+      grayColor="sand"
       radius="large"
       scaling="100%"
       appearance={dark ? "dark" : "light"}

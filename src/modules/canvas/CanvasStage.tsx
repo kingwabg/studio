@@ -11,6 +11,7 @@ import { SCALE, mmToPx } from "./geometry";
 import { collapsedHiddenIds, descendantIds } from "../document/model";
 import { useCanvasStore } from "./store";
 import { useFollowStore } from "./snap";
+import { useRightTabStore } from "../ui/theme";
 import { CanvasBlock } from "./CanvasBlock";
 import { MultiSelectOverlay } from "./MultiSelectOverlay";
 import { SnapGuides, SelectionGuides } from "./SnapGuides";
@@ -93,7 +94,7 @@ function isSameMeasuredBox(a: MeasuredBlockBox | null, b: MeasuredBlockBox) {
 const rulerSurface = {
   display: "block",
   userSelect: "none",
-  pointerEvents: "none",
+  pointerEvents: "auto",
 } as const;
 
 function ProjectionBand({ axis, projection }: { axis: "x" | "y"; projection?: RulerProjection }) {
@@ -121,8 +122,26 @@ function ProjectionBand({ axis, projection }: { axis: "x" | "y"; projection?: Ru
   );
 }
 
+function PageMarginGuides({ page }: { page: { w: number; h: number } }) {
+  const inset = mmToPx(SAFE_MARGIN_MM);
+  const width = mmToPx(page.w - SAFE_MARGIN_MM * 2);
+  const height = mmToPx(page.h - SAFE_MARGIN_MM * 2);
+  if (width <= 0 || height <= 0) return null;
+
+  return (
+    <div className="absolute pointer-events-none z-0" style={{ left: inset, top: inset, width, height }}>
+      <div
+        className="absolute inset-0 rounded-[3px]"
+        style={{
+          border: "1px dashed rgba(43, 92, 230, 0.44)",
+          boxShadow: "0 0 0 1px rgba(255, 255, 255, 0.72)",
+        }}
+      />
+    </div>
+  );
+}
 // 수평 눈금자 — 1mm/5mm/10mm 위계를 나누고 cm 숫자는 큰 눈금 중앙에 둔다.
-function RulerH({ mm, projection }: { mm: number; projection?: RulerProjection }) {
+function RulerH({ mm, projection, onSelect }: { mm: number; projection?: RulerProjection; onSelect: () => void }) {
   const w = mmToPx(mm);
   const ticks = useMemo(() => {
     const t: React.ReactNode[] = [];
@@ -163,9 +182,13 @@ function RulerH({ mm, projection }: { mm: number; projection?: RulerProjection }
     <svg
       width={w}
       height={RULER}
-      className="block select-none"
+      className="block select-none cursor-pointer"
       style={{ ...rulerSurface, background: RULER_BG, borderBottom: `1px solid ${RULER_BORDER}` }}
-      aria-hidden="true"
+      role="button"
+      tabIndex={0}
+      aria-label="상단 눈금자 - 페이지 속성"
+      onClick={onSelect}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect()}
     >
       <rect x="0" y="0" width={w} height={RULER} fill={RULER_BG} />
       <ProjectionBand axis="x" projection={projection} />
@@ -175,7 +198,7 @@ function RulerH({ mm, projection }: { mm: number; projection?: RulerProjection }
 }
 
 // 수직 눈금자
-function RulerV({ mm, projection }: { mm: number; projection?: RulerProjection }) {
+function RulerV({ mm, projection, onSelect }: { mm: number; projection?: RulerProjection; onSelect: () => void }) {
   const h = mmToPx(mm);
   const ticks = useMemo(() => {
     const t: React.ReactNode[] = [];
@@ -216,9 +239,13 @@ function RulerV({ mm, projection }: { mm: number; projection?: RulerProjection }
     <svg
       width={RULER}
       height={h}
-      className="block select-none"
+      className="block select-none cursor-pointer"
       style={{ ...rulerSurface, background: RULER_BG, borderRight: `1px solid ${RULER_BORDER}` }}
-      aria-hidden="true"
+      role="button"
+      tabIndex={0}
+      aria-label="좌측 눈금자 - 페이지 속성"
+      onClick={onSelect}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect()}
     >
       <rect x="0" y="0" width={RULER} height={h} fill={RULER_BG} />
       <ProjectionBand axis="y" projection={projection} />
@@ -232,6 +259,8 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
   const selectedId = useCanvasStore((s) => s.selectedId);
   const select = useCanvasStore((s) => s.select);
   const selectMany = useCanvasStore((s) => s.selectMany);
+  const selectPage = useCanvasStore((s) => s.selectPage);
+  const setRightTab = useRightTabStore((s) => s.setTab);
   const insertTextAt = useCanvasStore((s) => s.insertTextAt);
   const { setNodeRef } = useDroppable({ id: "stage" });
   const pageRef = useRef<HTMLDivElement | null>(null);
@@ -358,12 +387,21 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
     : false;
   const projectionX = projectionBox ? { start: projectionBox.x, size: projectionBox.w, alert: projectionAlert } : undefined;
   const projectionY = projectionBox ? { start: projectionBox.y, size: projectionBox.h, alert: projectionAlert } : undefined;
+  const selectRulerPage = () => {
+    selectPage();
+    setRightTab("props");
+  };
 
   return (
-    <div className="flex-1 relative min-w-0">
-    <div className="absolute inset-0 overflow-auto canvas-dots bg-canvas">
+    <div className="studio-canvas-pane flex-1 relative min-w-0">
+    <div className="studio-workbench-label" aria-hidden="true">
+      <span className="studio-workbench-dot" />
+      A4 작업대
+      <span>여백 20mm</span>
+    </div>
+    <div className="studio-canvas-scroll absolute inset-0 overflow-auto canvas-dots bg-canvas">
       {/* 지면 + 눈금자 묶음 — 가운데 정렬, 함께 스크롤 */}
-      <div className="w-max mx-auto my-8" style={{ position: "relative", paddingLeft: RULER, paddingTop: RULER }}>
+      <div className="studio-page-frame w-max mx-auto my-8" style={{ position: "relative", paddingLeft: RULER, paddingTop: RULER }}>
         {/* 모서리 상자 */}
         <div
           style={{
@@ -376,17 +414,22 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
             borderRight: `1px solid ${RULER_BORDER}`,
             borderBottom: `1px solid ${RULER_BORDER}`,
             boxShadow: "inset -1px -1px 0 rgba(255,255,255,0.9)",
-            pointerEvents: "none",
+            pointerEvents: "auto",
             userSelect: "none",
           }}
+          role="button"
+          tabIndex={0}
+          aria-label="눈금자 모서리 - 페이지 속성"
+          onClick={selectRulerPage}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && selectRulerPage()}
         />
         {/* 상단 눈금자 */}
         <div style={{ position: "absolute", top: 0, left: RULER }}>
-          <RulerH mm={doc.page.w} projection={projectionX} />
+          <RulerH mm={doc.page.w} projection={projectionX} onSelect={selectRulerPage} />
         </div>
         {/* 좌측 눈금자 */}
         <div style={{ position: "absolute", top: RULER, left: 0 }}>
-          <RulerV mm={doc.page.h} projection={projectionY} />
+          <RulerV mm={doc.page.h} projection={projectionY} onSelect={selectRulerPage} />
         </div>
 
         {/* A4 지면 */}
@@ -408,8 +451,9 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
             insertTextAt((e.clientX - rect.left) / SCALE, (e.clientY - rect.top) / SCALE);
           }}
           style={{ width: pageW, height: pageH, boxShadow: "var(--sh-page)" }}
-          className="relative bg-white shrink-0"
+          className="studio-page relative bg-white shrink-0"
         >
+          <PageMarginGuides page={doc.page} />
           {visibleBlocks.map((block) => (
             <CanvasBlock key={block.id} block={block} />
           ))}
@@ -424,8 +468,9 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
                 top: Math.min(marquee.y0, marquee.y1),
                 width: Math.abs(marquee.x1 - marquee.x0),
                 height: Math.abs(marquee.y1 - marquee.y0),
-                border: "1px solid #2B5CE6",
-                background: "rgba(43,92,230,.08)",
+                border: "1.5px solid #2B5CE6",
+                background: "transparent",
+                boxShadow: "0 0 0 1px rgba(255,255,255,.9)",
               }}
             />
           )}
@@ -467,10 +512,10 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
     </div>
 
     {/* 좌하단 페이지 pill · 우하단 줌 컨트롤 (시안 1b — 줌은 준비 중) */}
-    <div className="absolute left-3 bottom-3 h-8 px-3 rounded-full bg-surface border border-line flex items-center text-[11.5px] font-medium text-inksoft pointer-events-none" style={{ boxShadow: "var(--sh-card)" }}>
+    <div className="studio-page-status absolute left-3 bottom-3 h-8 px-3 rounded-full bg-surface border border-line flex items-center text-[11.5px] font-medium text-inksoft pointer-events-none" style={{ boxShadow: "var(--sh-card)" }}>
       1/1 페이지 · A4 210×297mm
     </div>
-    <div className="absolute right-3 bottom-3 h-8 rounded-full bg-surface border border-line flex items-center overflow-hidden" style={{ boxShadow: "var(--sh-card)" }}>
+    <div className="studio-zoom absolute right-3 bottom-3 h-8 rounded-full bg-surface border border-line flex items-center overflow-hidden" style={{ boxShadow: "var(--sh-card)" }}>
       <button title="축소 (준비 중)" className="w-8 h-full flex items-center justify-center text-inkfaint cursor-default">−</button>
       <span className="text-[11.5px] font-semibold text-inksoft px-1">100%</span>
       <button title="확대 (준비 중)" className="w-8 h-full flex items-center justify-center text-inkfaint cursor-default">＋</button>
@@ -478,3 +523,4 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
     </div>
   );
 });
+

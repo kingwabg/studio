@@ -1,6 +1,10 @@
-// PanelDivider.tsx — 좌·우 사이드바와 캔버스 사이의 경계. 드래그로 폭 조절(밀고 당기기),
-// 가운데 손잡이 버튼으로 접기/펴기. 상태는 usePanelStore(localStorage 유지).
-import { usePanelStore } from "../../modules/ui/theme";
+// PanelDivider.tsx — 좌·우 사이드바와 캔버스 사이의 경계. 드래그로 폭 조절한다.
+import { useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  LEFT_DEFAULT,
+  RIGHT_DEFAULT,
+  usePanelStore,
+} from "../../modules/ui/theme";
 
 export function PanelDivider({ side }: { side: "left" | "right" }) {
   const leftW = usePanelStore((s) => s.leftW);
@@ -9,64 +13,99 @@ export function PanelDivider({ side }: { side: "left" | "right" }) {
   const rightOpen = usePanelStore((s) => s.rightOpen);
   const setLeftW = usePanelStore((s) => s.setLeftW);
   const setRightW = usePanelStore((s) => s.setRightW);
-  const toggleLeft = usePanelStore((s) => s.toggleLeft);
-  const toggleRight = usePanelStore((s) => s.toggleRight);
+
+  const [dragging, setDragging] = useState(false);
+  const [previewW, setPreviewW] = useState<number | null>(null);
 
   const open = side === "left" ? leftOpen : rightOpen;
-  const toggle = side === "left" ? toggleLeft : toggleRight;
+  const width = side === "left" ? leftW : rightW;
+  const setWidth = side === "left" ? setLeftW : setRightW;
+  const defaultW = side === "left" ? LEFT_DEFAULT : RIGHT_DEFAULT;
 
-  // 드래그 리사이즈 — 열려 있을 때만. 좌측은 +dx, 우측은 −dx(경계가 안쪽으로 이동).
-  const startResize = (e: React.PointerEvent) => {
+  // 드래그 리사이즈 — 열려 있을 때만. 좌측은 +dx, 우측은 -dx(경계가 안쪽으로 이동).
+  const startResize = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!open) return;
     e.preventDefault();
     const startX = e.clientX;
-    const startW = side === "left" ? leftW : rightW;
+    const startW = width;
+    setDragging(true);
+    setPreviewW(startW);
+
     const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
-      const w = side === "left" ? startW + dx : startW - dx;
-      (side === "left" ? setLeftW : setRightW)(w);
+      const nextW = side === "left" ? startW + dx : startW - dx;
+      setWidth(nextW);
+      setPreviewW(usePanelStore.getState()[side === "left" ? "leftW" : "rightW"]);
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      setDragging(false);
+      setPreviewW(null);
     };
+
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
   };
 
-  // 접힘 방향에 따른 손잡이 화살표 (‹ ›) — 열림/닫힘 × 좌/우
-  const chevronLeft = side === "left" ? open : !open; // 왼쪽을 가리키면 접기(왼) / 펴기(오)
+  const resetWidth = () => {
+    if (!open) return;
+    setWidth(defaultW);
+  };
+  const label = side === "left" ? "왼쪽 사이드바" : "오른쪽 사이드바";
+
   return (
     <div
       onPointerDown={startResize}
-      className={`relative shrink-0 h-full group/divider ${open ? "cursor-col-resize" : ""}`}
-      style={{ width: 7, marginLeft: side === "left" ? -3 : 0, marginRight: side === "right" ? -3 : 0, zIndex: 30 }}
+      onDoubleClick={resetWidth}
+      title={`${label} 너비 조절 · 더블클릭 기본폭`}
+      className={`studio-panel-divider relative shrink-0 h-full group/divider ${open ? "cursor-col-resize" : ""}`}
+      style={{
+        width: 12,
+        marginLeft: side === "left" ? -4 : 0,
+        marginRight: side === "right" ? -4 : 0,
+        zIndex: 30,
+      }}
     >
-      {/* 경계선 — 호버 시 강조 */}
-      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-line group-hover/divider:bg-accent transition-colors" />
-      {/* 손잡이 (접기/펴기) */}
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={toggle}
-        title={open ? "접기" : "펴기"}
-        aria-label={open ? "패널 접기" : "패널 펴기"}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-9 rounded-md bg-surface border border-line text-inkfaint hover:text-accent hover:border-accentline flex items-center justify-center opacity-0 group-hover/divider:opacity-100 transition-all shadow-sm"
-        style={{ opacity: open ? undefined : 1 }}
+      {/* 넓은 히트 영역 + 중앙 경계선 */}
+      <div
+        className={`absolute inset-y-0 left-1/2 -translate-x-1/2 w-[3px] rounded-full transition-colors ${
+          dragging ? "bg-accent" : "bg-line group-hover/divider:bg-accent"
+        }`}
+      />
+
+      {/* 드래그 그립 — 항상 희미하게 보이게 해서 '잡을 수 있음'을 알려준다 */}
+      <div
+        aria-hidden="true"
+        className={`studio-divider-grip absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-14 rounded-full border transition-all flex items-center justify-center ${
+          dragging
+            ? "bg-accent text-onaccent border-accent shadow-[0_4px_14px_rgba(43,92,230,.28)]"
+            : "bg-surface/95 text-inkfaint border-line opacity-55 group-hover/divider:opacity-100 group-hover/divider:text-accent group-hover/divider:border-accentline shadow-sm"
+        }`}
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path
-            d={chevronLeft ? "M6.5 2l-3 3 3 3" : "M3.5 2l3 3-3 3"}
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
+        <span className="flex flex-col gap-1">
+          <span className="w-1 h-1 rounded-full bg-current" />
+          <span className="w-1 h-1 rounded-full bg-current" />
+          <span className="w-1 h-1 rounded-full bg-current" />
+        </span>
+      </div>
+
+      {dragging && previewW !== null && (
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 rounded-md bg-ink text-surface text-[11px] font-semibold px-2 py-1 shadow-lg pointer-events-none tabular-nums ${
+            side === "left" ? "left-4" : "right-4"
+          }`}
+        >
+          {previewW}px
+        </div>
+      )}
     </div>
   );
 }
+
+
+

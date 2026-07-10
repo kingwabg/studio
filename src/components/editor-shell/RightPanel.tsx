@@ -10,12 +10,12 @@ import { AiPanel } from "./AiPanel";
 import { FontSelect } from "./FontSelect";
 import { IcText, IcTable, IcImage, IcTrash, IcSparkles, IcCopy } from "../../ui/icons";
 
-const TEXT_COLORS = ["#1A2233", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
+const TEXT_COLORS = ["#000000", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
 
 // ── 재사용 소품 (시안: 섹션 라벨 11px/700/tracking .08em, 행 26px, 구분선) ──
 function Section({ label, children }: { label?: string; children: ReactNode }) {
   return (
-    <div className="py-3 flex flex-col gap-[7px] border-b border-[color:var(--line)]">
+    <div className="studio-inspector-section py-3 flex flex-col gap-[7px] border-b border-[color:var(--line)]">
       {label && <div className="text-[11px] font-bold text-inkfaint tracking-[.08em]">{label}</div>}
       {children}
     </div>
@@ -150,6 +150,34 @@ function TextFormat({ block }: { block: Block }) {
           onChange={(v) => patch({ align: v })}
         />
       </Row>
+      <Row label="줄간격">
+        <div className="flex items-center h-[26px] border border-line rounded-[7px] overflow-hidden flex-1">
+          <button
+            onClick={() => patch({ lineSpacing: Math.max(100, (block.lineSpacing ?? 138) - 10) })}
+            className="w-6 h-full text-inksoft hover:bg-paper text-[13px]"
+          >
+            −
+          </button>
+          <span className="flex-1 text-center text-[12px] font-semibold text-ink border-x border-line h-full flex items-center justify-center tabular-nums">
+            {block.lineSpacing ?? 138}%
+          </span>
+          <button
+            onClick={() => patch({ lineSpacing: Math.min(300, (block.lineSpacing ?? 138) + 10) })}
+            className="w-6 h-full text-inksoft hover:bg-paper text-[13px]"
+          >
+            ＋
+          </button>
+        </div>
+        {block.lineSpacing != null && block.lineSpacing !== 138 && (
+          <button
+            onClick={() => patch({ lineSpacing: undefined })}
+            title="기본(138%)으로"
+            className="text-[11px] text-inkfaint hover:text-ink px-1 transition-colors"
+          >
+            기본
+          </button>
+        )}
+      </Row>
       <Row label="색">
         <div className="flex items-center gap-2 flex-1">
           {TEXT_COLORS.map((c) => {
@@ -172,7 +200,7 @@ function TextFormat({ block }: { block: Block }) {
 
 // 모양 — 배경 채우기·모서리·테두리 (실동작)
 const FILL_SWATCHES = ["", "#FFFFFF", "#F6F7FA", "#EDF2FE", "#FDEEF0", "#EAF6EF", "#FEF9E7"];
-const BORDER_COLORS = ["#1A2233", "#5B6577", "#CBD2DE", "#2B5CE6", "#D64550", "#3B9B6B"];
+const BORDER_COLORS = ["#000000", "#5B6577", "#98A4BD", "#2B5CE6", "#D64550", "#3B9B6B"];
 
 function ShapeSection({ block }: { block: Block }) {
   const updateBlock = useCanvasStore((s) => s.updateBlock);
@@ -206,7 +234,7 @@ function ShapeSection({ block }: { block: Block }) {
           <Segment
             options={[{ v: "0", label: "없음" }, { v: "1", label: "1" }, { v: "2", label: "2" }]}
             value={String(bw)}
-            onChange={(v) => patch({ borderWidth: Number(v), borderColor: block.borderColor ?? "#CBD2DE" })}
+            onChange={(v) => patch({ borderWidth: Number(v), borderColor: block.borderColor ?? "#98A4BD" })}
           />
         </Row>
       </div>
@@ -214,7 +242,7 @@ function ShapeSection({ block }: { block: Block }) {
         <Row label="선색">
           <div className="flex items-center gap-1.5 flex-1">
             {BORDER_COLORS.map((c) => {
-              const on = (block.borderColor ?? "#CBD2DE").toUpperCase() === c.toUpperCase();
+              const on = (block.borderColor ?? "#98A4BD").toUpperCase() === c.toUpperCase();
               return (
                 <button
                   key={c}
@@ -315,6 +343,87 @@ function HintSection({ block }: { block: Block }) {
   );
 }
 
+const PAGE_MARGIN_MM = 20;
+
+function PageInspector() {
+  const doc = useCanvasStore((s) => s.doc);
+  const setTitle = useCanvasStore((s) => s.setTitle);
+  const selectedCount = useCanvasStore((s) => s.selectedIds.length);
+  const counts = doc.blocks.reduce(
+    (acc, block) => {
+      acc.total += 1;
+      acc[block.type] += 1;
+      return acc;
+    },
+    { total: 0, text: 0, table: 0, image: 0 } as Record<"total" | "text" | "table" | "image", number>
+  );
+  const editableW = Math.max(0, doc.page.w - PAGE_MARGIN_MM * 2);
+  const editableH = Math.max(0, doc.page.h - PAGE_MARGIN_MM * 2);
+
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="studio-inspector-heading px-4 py-3.5 flex items-center gap-2.5 border-b border-line">
+        <div className="w-6 h-6 rounded-[7px] bg-accentsoft text-accent flex items-center justify-center shrink-0">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 2.5h10v11H3z" stroke="currentColor" strokeWidth="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12.5px] font-bold text-ink truncate">페이지 / 눈금자</div>
+          <div className="text-[11px] text-inkfaint truncate">상단·좌측 눈금자 기준 속성</div>
+        </div>
+      </div>
+
+      <div className="px-4">
+        <Section label="문서">
+          <Row label="제목">
+            <input
+              value={doc.title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="h-[26px] flex-1 rounded-[7px] border border-line bg-surface px-2 text-[12px] font-semibold text-ink outline-none focus:border-accentline"
+            />
+          </Row>
+          <Row label="상태"><ReadCell>{counts.total}개 객체</ReadCell></Row>
+        </Section>
+
+        <Section label="용지 크기">
+          <div className="grid grid-cols-2 gap-2">
+            <Row label="폭"><ReadCell>{doc.page.w} mm</ReadCell></Row>
+            <Row label="높이"><ReadCell>{doc.page.h} mm</ReadCell></Row>
+            <Row label="규격"><ReadCell>A4</ReadCell></Row>
+            <Row label="방향"><ReadCell>{doc.page.w > doc.page.h ? "가로" : "세로"}</ReadCell></Row>
+          </div>
+        </Section>
+
+        <Section label="편집 가능 영역">
+          <div className="grid grid-cols-2 gap-2">
+            <Row label="폭"><ReadCell>{editableW} mm</ReadCell></Row>
+            <Row label="높이"><ReadCell>{editableH} mm</ReadCell></Row>
+            <Row label="좌우"><ReadCell>{PAGE_MARGIN_MM} mm</ReadCell></Row>
+            <Row label="상하"><ReadCell>{PAGE_MARGIN_MM} mm</ReadCell></Row>
+          </div>
+          <p className="text-[11px] text-inkfaint leading-relaxed">
+            객체는 이 여백 안쪽에서만 이동·생성됩니다. 눈금자의 파란 하이라이트는 선택 객체의 실제 위치와 크기를 투영합니다.
+          </p>
+        </Section>
+
+        <Section label="객체 요약">
+          <div className="grid grid-cols-2 gap-2">
+            <Row label="텍스트"><ReadCell>{counts.text}</ReadCell></Row>
+            <Row label="표"><ReadCell>{counts.table}</ReadCell></Row>
+            <Row label="이미지"><ReadCell>{counts.image}</ReadCell></Row>
+            <Row label="선택"><ReadCell faint>{selectedCount || "없음"}</ReadCell></Row>
+          </div>
+        </Section>
+
+        <Section label="눈금자 동작">
+          <div className="rounded-lg border border-line bg-paper px-3 py-2 text-[11px] text-inksoft leading-relaxed">
+            상단 눈금자는 X/폭, 좌측 눈금자는 Y/높이를 보여줍니다. 객체를 선택하면 눈금자에 위치가 투영되고, 여백 밖으로 나가면 경고색으로 바뀝니다.
+          </div>
+        </Section>
+        <div className="h-4" />
+      </div>
+    </div>
+  );
+}
 // 표 크기 "R×C" — 스냅샷 셀 배열에서
 function tableDims(block: Block): string {
   const d = block.data as TableKingData | undefined;
@@ -323,6 +432,7 @@ function tableDims(block: Block): string {
 }
 
 export function RightPanel() {
+  const inspectorTarget = useCanvasStore((s) => s.inspectorTarget);
   const block = useCanvasStore((s) => s.doc.blocks.find((b) => b.id === s.selectedId) ?? null);
   const parentText = useCanvasStore((s) => {
     const sel = s.doc.blocks.find((b) => b.id === s.selectedId);
@@ -348,9 +458,16 @@ export function RightPanel() {
         : { label: "이미지 블록", icon: <IcImage size={13} /> };
 
   return (
-    <aside className="shrink-0 border-l border-line bg-surface flex flex-col overflow-hidden" style={{ width: rightW }}>
+    <aside className="studio-right-panel shrink-0 border-l border-line bg-surface flex flex-col overflow-hidden" style={{ width: rightW }}>
+      <div className="studio-inspector-intro">
+        <div>
+          <span className="studio-panel-eyebrow">INSPECT</span>
+          <h2>디자인 속성</h2>
+        </div>
+        <span className="studio-inspector-target">{block ? kind.label : inspectorTarget === "page" ? "페이지" : "선택 없음"}</span>
+      </div>
       {/* 속성 / AI 세그먼트 (시안 1b) */}
-      <div className="px-3.5 pt-3.5 shrink-0">
+      <div className="studio-inspector-tabs px-3.5 pt-3.5 shrink-0">
         <div className="flex bg-paper border border-line rounded-[9px] p-[3px] gap-[3px]">
           {(
             [
@@ -374,6 +491,8 @@ export function RightPanel() {
 
       {tab === "ai" ? (
         <AiPanel />
+      ) : inspectorTarget === "page" ? (
+        <PageInspector />
       ) : !block ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-2">
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-paper text-inkfaint">
@@ -384,7 +503,7 @@ export function RightPanel() {
       ) : (
         <div className="flex-1 overflow-auto">
           {/* 요소 헤더 — 아이콘 타일 + 종류 + 부모(트리) */}
-          <div className="px-4 py-3.5 flex items-center gap-2.5 border-b border-line">
+          <div className="studio-inspector-heading px-4 py-3.5 flex items-center gap-2.5 border-b border-line">
             <div className="w-6 h-6 rounded-[7px] bg-accentsoft text-accent flex items-center justify-center shrink-0">
               {kind.icon}
             </div>
@@ -488,3 +607,4 @@ export function RightPanel() {
     </aside>
   );
 }
+

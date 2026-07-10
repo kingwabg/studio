@@ -117,16 +117,16 @@ export default function StudioHome() {
   );
 
   return (
-    <div className="min-h-dvh bg-canvas" style={{ background: "var(--paper)" }}>
+    <div className="studio-home min-h-dvh bg-canvas">
       {/* ── 상단 네비 60px ── */}
-      <div className="h-[60px] bg-surface border-b border-line flex items-center gap-7 px-7">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-accent text-onaccent flex items-center justify-center text-[12px] font-extrabold tracking-tight">
+      <div className="studio-market-header bg-surface border-b border-line flex items-center gap-7 px-7">
+        <div className="studio-home-brand flex items-center gap-2.5">
+          <div className="studio-home-mark w-7 h-7 rounded-lg bg-accent text-onaccent flex items-center justify-center text-[12px] font-extrabold tracking-tight">
             24
           </div>
-          <div className="text-[16px] font-extrabold text-ink tracking-tight">업무24</div>
+          <div className="studio-home-wordmark text-[16px] font-extrabold text-ink tracking-tight">업무24<span>DOCUMENT MARKET</span></div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="studio-market-nav flex items-center gap-1">
           {tab("홈", true)}
           {tab("템플릿", false)}
           {tab("내 문서", false)}
@@ -160,18 +160,18 @@ export default function StudioHome() {
         </div>
       </div>
 
-      <div className="max-w-[1220px] mx-auto px-12 py-9 flex flex-col gap-9">
+      <div className="studio-home-content max-w-[1220px] mx-auto px-12 py-9 flex flex-col gap-9">
         {/* ── 히어로: 새 문서 시작 ── */}
-        <div className="bg-hero border border-hero rounded-2xl flex flex-col gap-[22px]" style={{ padding: "32px 36px 30px" }}>
+        <div className="studio-market-hero bg-hero border border-hero rounded-2xl flex flex-col gap-[22px]" style={{ padding: "32px 36px 30px" }}>
           <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-extrabold text-ink tracking-tight">오늘은 어떤 문서를 만들까요?</div>
+            <div><div className="studio-market-eyebrow">BUSINESS DOCUMENT MARKET</div><div className="studio-market-title text-2xl font-extrabold text-ink tracking-tight">오늘은 어떤 문서를 만들까요?</div><p className="studio-market-lede">서식부터 표까지 준비된 템플릿으로 필요한 문서를 빠르게 시작하세요.</p></div>
             <button title="준비 중" className="text-[13px] font-semibold text-accent hover:underline">템플릿 전체 보기 →</button>
           </div>
           <div className="flex gap-3.5 flex-wrap">
             {STARTERS.map((s) => (
-              <button key={s.key} onClick={() => start(s)} className="w-32 flex flex-col items-center gap-2.5 cursor-pointer group">
+              <button key={s.key} onClick={() => start(s)} className="studio-start-card w-32 flex flex-col items-center gap-2.5 cursor-pointer group">
                 <div
-                  className="w-32 h-24 bg-surface rounded-xl flex items-center justify-center transition-all group-hover:-translate-y-0.5 group-hover:border-accentline"
+                  className="studio-start-preview w-32 h-24 bg-surface rounded-xl flex items-center justify-center transition-all group-hover:-translate-y-0.5 group-hover:border-accentline"
                   style={{ border: "1px solid var(--heroline)", boxShadow: "var(--sh-card)" }}
                   onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "var(--sh-card-hover)")}
                   onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "var(--sh-card)")}
@@ -185,7 +185,7 @@ export default function StudioHome() {
         </div>
 
         {/* ── 인기 템플릿 ── */}
-        <div className="flex flex-col gap-4">
+        <div className="studio-home-section flex flex-col gap-4">
           <div className="flex items-baseline gap-2.5">
             <div className="text-[17px] font-bold text-ink">인기 템플릿</div>
             <div className="text-[12.5px] text-inkfaint">HWPX 내보내기 검증 완료</div>
@@ -197,7 +197,7 @@ export default function StudioHome() {
                 <button
                   key={t.key}
                   onClick={() => start(s)}
-                  className="bg-surface border border-line rounded-[14px] overflow-hidden text-left transition-all hover:-translate-y-0.5 hover:border-linestrong"
+                  className="studio-market-card bg-surface border border-line rounded-[14px] overflow-hidden text-left transition-all hover:-translate-y-0.5 hover:border-linestrong"
                   style={{ boxShadow: "none" }}
                   onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "var(--sh-card-hover)")}
                   onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
@@ -238,7 +238,7 @@ export default function StudioHome() {
                 <div
                   key={d.id}
                   onClick={() => navigate(`/studio/editor/${d.id}`)}
-                  className="doc-card bg-surface border border-line rounded-xl overflow-hidden cursor-pointer relative transition-all hover:-translate-y-0.5"
+                  className="studio-recent-card doc-card bg-surface border border-line rounded-xl overflow-hidden cursor-pointer relative transition-all hover:-translate-y-0.5"
                   onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "var(--sh-card-hover)")}
                   onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
                 >

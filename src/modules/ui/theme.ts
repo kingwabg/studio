@@ -22,12 +22,12 @@ export const useRightTabStore = create<RightTabState>((set) => ({
 }));
 
 // 사이드바 폭·접힘 (밀고 당기기) — 드래그로 폭 조절, 토글로 접기. localStorage 유지.
-export const LEFT_MIN = 190;
+export const LEFT_MIN = 250;
 export const LEFT_MAX = 420;
-export const LEFT_DEFAULT = 250;
-export const RIGHT_MIN = 248;
+export const LEFT_DEFAULT = 300;
+export const RIGHT_MIN = 280;
 export const RIGHT_MAX = 460;
-export const RIGHT_DEFAULT = 284;
+export const RIGHT_DEFAULT = 320;
 
 const clampW = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
 const num = (key: string, fallback: number) => {
