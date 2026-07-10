@@ -35,6 +35,7 @@ const DEFAULT_TABLE_ROWS = [
 
 const HISTORY_MAX = 50;
 const COALESCE_MS = 800;
+const SAFE_MARGIN_MM = 20;
 
 // table-king 스냅샷의 실제 px 크기 (최대 행 너비 합 × 최대 열 높이 합)
 export function tableSizePx(data: TableKingData): { wPx: number; hPx: number } {
@@ -46,8 +47,23 @@ export function tableSizePx(data: TableKingData): { wPx: number; hPx: number } {
   return { wPx, hPx };
 }
 
+function fitTableDataToSafeArea(data: TableKingData, page: CanvasDoc["page"]): TableKingData {
+  const maxWPx = Math.max(1, (page.w - SAFE_MARGIN_MM * 2) * SCALE);
+  const maxHPx = Math.max(1, (page.h - SAFE_MARGIN_MM * 2) * SCALE);
+  const { wPx, hPx } = tableSizePx(data);
+  const widthRatio = wPx > maxWPx ? maxWPx / wPx : 1;
+  const heightRatio = hPx > maxHPx ? maxHPx / hPx : 1;
+  if (widthRatio === 1 && heightRatio === 1) return data;
+  return {
+    ...data,
+    widths: data.widths.map((row) => row.map((v) => Math.max(4, Math.round(v * widthRatio)))),
+    cellHeights: data.cellHeights.map((row) => row.map((v) => Math.max(4, Math.round(v * heightRatio)))),
+  };
+}
 interface CanvasState {
   doc: CanvasDoc;
+  // 오른쪽 속성 패널이 무엇을 보고 있는지: 블록 / 페이지(눈금자) / 없음.
+  inspectorTarget: "none" | "block" | "page";
   // 다중 선택 — selectedIds가 진실, selectedId는 앵커(마지막 클릭, 우측 패널·서식바용).
   selectedIds: string[];
   selectedId: string | null;
@@ -63,7 +79,12 @@ interface CanvasState {
   moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동 (자손·그룹 동반)
   nudgeMany: (ids: string[], dx: number, dy: number) => void; // 여러 블록 델타 이동
   updateBlock: (id: string, patch: Partial<Block>) => void;
-  setRichText: (id: string, runs: TextRun[]) => void; // 인라인 리치 텍스트 갱신 (text 미러 동기)
+  setRichText: (
+    id: string,
+    runs: TextRun[],
+    paraAligns?: (import("../document/model").TextAlign | null)[],
+    paraLists?: (import("../document/model").ParaListType | null)[]
+  ) => void; // 인라인 리치 텍스트 갱신 (text 미러 동기 + 문단 정렬/목록)
   setTableData: (id: string, data: TableKingData) => void; // 표 스냅샷 교체 + w/h 동기화
   setCell: (id: string, r: number, c: number, text: string) => void; // 표 셀 하나 수정 (구형 rows용)
   setParent: (id: string, parentId: string | null) => void; // 트리 연결/해제 (순환 방지)
@@ -77,6 +98,7 @@ interface CanvasState {
   undo: () => void;
   redo: () => void;
   select: (id: string | null) => void; // 단일 선택 — 클릭한 블록 하나만
+  selectPage: () => void; // 눈금자/페이지 속성 선택
   selectGroup: (id: string) => void; // 그룹 전체 선택 (opt-in)
   toggleSelect: (id: string) => void; // Ctrl+클릭 — 선택 토글
   selectMany: (ids: string[]) => void; // 마퀴 등 다중 선택
@@ -103,6 +125,7 @@ function record(s: Pick<CanvasState, "doc" | "past">, key?: string): Partial<Can
 
 export const useCanvasStore = create<CanvasState>((set) => ({
   doc: createDoc(),
+  inspectorTarget: "none",
   selectedIds: [],
   selectedId: null,
   autoEditId: null,
@@ -115,17 +138,20 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       if (extra) Object.assign(block, extra);
       if (type === "table") {
         // 표는 table-king 스냅샷이 진실 — 크기(w/h)는 스냅샷에서 파생
-        block.data = makeTableKingData(DEFAULT_TABLE_ROWS, 420) as TableKingData;
+        block.data = fitTableDataToSafeArea(makeTableKingData(DEFAULT_TABLE_ROWS, 420) as TableKingData, s.doc.page);
         block.rows = undefined;
         const { wPx, hPx } = tableSizePx(block.data);
         block.w = wPx / SCALE;
         block.h = hPx / SCALE;
       }
+      block.x = clampBlockX(block, block.x, s.doc.page.w);
+      block.y = clampBlockY(block, block.y, s.doc.page.h);
       return {
         ...record(s),
         doc: { ...s.doc, blocks: [...s.doc.blocks, block] },
         selectedIds: [block.id],
         selectedId: block.id,
+        inspectorTarget: "block",
       };
     }),
 
@@ -133,13 +159,18 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   // 시드 텍스트는 빈 문자열: 커서만 깜빡이다 아무 것도 안 쓰면 blur에서 스스로 사라진다.
   insertTextAt: (x, y) =>
     set((s) => {
-      const block = createBlock("text", Math.max(0, Math.round(x)), Math.max(0, Math.round(y)));
+      const block = createBlock("text", x, y);
+      // 텍스트 생성은 마우스 좌표를 최대한 보존한다. 일반 이동/정렬은 정수 mm 스냅을 유지하되,
+      // 새 텍스트 시작점만 소수점 0.01mm까지 살려서 "찍은 곳에 생기는" 느낌을 맞춘다.
+      block.x = clampInsertionAxis(x, block.w, s.doc.page.w);
+      block.y = clampInsertionAxis(y, block.h, s.doc.page.h);
       block.text = "";
       return {
         ...record(s),
         doc: { ...s.doc, blocks: [...s.doc.blocks, block] },
         selectedIds: [block.id],
         selectedId: block.id,
+        inspectorTarget: "block",
         autoEditId: block.id,
       };
     }),
@@ -158,14 +189,15 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         ...structuredClone(b),
         id: idMap.get(b.id)!,
         parentId: b.id === id ? src.parentId : idMap.get(b.parentId!) ?? b.parentId,
-        x: Math.min(b.x + 5, s.doc.page.w - b.w),
-        y: Math.min(b.y + 5, s.doc.page.h - b.h),
+        x: clampBlockX(b, b.x + 5, s.doc.page.w),
+        y: clampBlockY(b, b.y + 5, s.doc.page.h),
       }));
       return {
         ...record(s),
         doc: { ...s.doc, blocks: [...s.doc.blocks, ...copies] },
         selectedIds: [idMap.get(id)!],
         selectedId: idMap.get(id)!,
+        inspectorTarget: "block",
       };
     }),
 
@@ -173,8 +205,8 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     set((s) => {
       const target = s.doc.blocks.find((b) => b.id === id);
       if (!target || target.locked) return {};
-      const nx = clamp(x, s.doc.page.w - target.w);
-      const ny = clamp(y, s.doc.page.h - target.h);
+      const nx = clampBlockX(target, x, s.doc.page.w);
+      const ny = clampBlockY(target, y, s.doc.page.h);
       const dx = nx - target.x;
       const dy = ny - target.y;
       // 단일 드래그: 트리 자손(자석)만 동반한다. 공간 그룹 멤버는 따라오지 않는다 —
@@ -189,7 +221,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
             b.id === id
               ? { ...b, x: nx, y: ny }
               : together.has(b.id) && !b.locked
-                ? { ...b, x: clamp(b.x + dx, s.doc.page.w - b.w), y: clamp(b.y + dy, s.doc.page.h - b.h) }
+                ? { ...b, x: clampBlockX(b, b.x + dx, s.doc.page.w), y: clampBlockY(b, b.y + dy, s.doc.page.h) }
                 : b
           ),
         },
@@ -199,8 +231,10 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   nudgeMany: (ids, dx, dy) =>
     set((s) => {
       const move = moveSetIds(s.doc.blocks, ids);
-      const dxr = Math.round(dx);
-      const dyr = Math.round(dy);
+      const moving = s.doc.blocks.filter((b) => move.has(b.id) && !b.locked);
+      const rawDx = Math.round(dx);
+      const rawDy = Math.round(dy);
+      const { dx: dxr, dy: dyr } = constrainDeltaToSafeArea(moving, rawDx, rawDy, s.doc.page);
       if (!dxr && !dyr) return {};
       return {
         ...record(s, `nudge:${[...move].sort().join(",")}`),
@@ -208,7 +242,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
           ...s.doc,
           blocks: s.doc.blocks.map((b) =>
             move.has(b.id) && !b.locked
-              ? { ...b, x: clamp(b.x + dxr, s.doc.page.w - b.w), y: clamp(b.y + dyr, s.doc.page.h - b.h) }
+              ? { ...b, x: clampBlockX(b, b.x + dxr, s.doc.page.w), y: clampBlockY(b, b.y + dyr, s.doc.page.h) }
               : b
           ),
         },
@@ -267,14 +301,14 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       const derivedOnly = keys.every((k) => k === "h" || k === "collapsed");
       return {
         ...(derivedOnly ? {} : record(s, `upd:${id}:${keys.join(",")}`)),
-        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) },
+        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? clampBlockToSafeArea({ ...b, ...patch }, s.doc.page) : b)) },
       };
     }),
 
   // 인라인 리치 텍스트 — 런 배열을 정규화해 저장하고 text 평문 미러를 동기화한다.
   // 서식이 하나도 없는 단일 런이면 runs를 비워(undefined) 균일 텍스트로 되돌린다
   // → 저장/내보내기가 기존 단순 경로를 타고, 옛 문서와도 동일하게 남는다.
-  setRichText: (id, runs) =>
+  setRichText: (id, runs, paraAligns, paraLists) =>
     set((s) => {
       const norm = normalizeRuns(runs);
       const text = runsToText(norm);
@@ -286,25 +320,34 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         !!r0 &&
         r0.bold === undefined &&
         r0.italic === undefined &&
+        r0.underline === undefined &&
+        r0.strike === undefined &&
         r0.color === undefined &&
+        r0.bg === undefined &&
         r0.fontSize === undefined &&
         r0.font === undefined;
       const patch: Partial<Block> = plain ? { text, runs: undefined } : { text, runs: norm };
+      // 문단별 정렬/목록 — 전부 null(상속/없음)이면 필드 자체를 비워 균일 경로 유지
+      if (paraAligns !== undefined)
+        patch.paraAligns = paraAligns.some((a) => a != null) ? paraAligns : undefined;
+      if (paraLists !== undefined)
+        patch.paraLists = paraLists.some((l) => l != null) ? paraLists : undefined;
       return {
         ...record(s, `rich:${id}`),
-        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) },
+        doc: { ...s.doc, blocks: s.doc.blocks.map((b) => (b.id === id ? clampBlockToSafeArea({ ...b, ...patch }, s.doc.page) : b)) },
       };
     }),
 
   setTableData: (id, data) =>
     set((s) => {
-      const { wPx, hPx } = tableSizePx(data);
+      const fitted = fitTableDataToSafeArea(data, s.doc.page);
+      const { wPx, hPx } = tableSizePx(fitted);
       return {
         ...record(s, `tbl:${id}`),
         doc: {
           ...s.doc,
           blocks: s.doc.blocks.map((b) =>
-            b.id === id ? { ...b, data, w: wPx / SCALE, h: hPx / SCALE } : b
+            b.id === id ? clampBlockToSafeArea({ ...b, data: fitted, w: wPx / SCALE, h: hPx / SCALE }, s.doc.page) : b
           ),
         },
       };
@@ -334,6 +377,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         doc: { ...s.doc, blocks: s.doc.blocks.filter((b) => !gone.has(b.id)) },
         selectedIds,
         selectedId: selectedIds[selectedIds.length - 1] ?? null,
+        inspectorTarget: selectedIds.length ? "block" : "none",
       };
     }),
 
@@ -350,6 +394,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         doc: { ...s.doc, blocks: s.doc.blocks.filter((b) => !gone.has(b.id)) },
         selectedIds: [],
         selectedId: null,
+        inspectorTarget: "none",
       };
     }),
 
@@ -395,12 +440,12 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       const maxY = Math.max(...sel.map((b) => b.y + b.h));
       const patch = (b: Block): Partial<Block> => {
         switch (edge) {
-          case "left": return { x: clamp(minX, s.doc.page.w - b.w) };
-          case "right": return { x: clamp(maxX - b.w, s.doc.page.w - b.w) };
-          case "hcenter": return { x: clamp((minX + maxX) / 2 - b.w / 2, s.doc.page.w - b.w) };
-          case "top": return { y: clamp(minY, s.doc.page.h - b.h) };
-          case "bottom": return { y: clamp(maxY - b.h, s.doc.page.h - b.h) };
-          case "vcenter": return { y: clamp((minY + maxY) / 2 - b.h / 2, s.doc.page.h - b.h) };
+          case "left": return { x: clampBlockX(b, minX, s.doc.page.w) };
+          case "right": return { x: clampBlockX(b, maxX - b.w, s.doc.page.w) };
+          case "hcenter": return { x: clampBlockX(b, (minX + maxX) / 2 - b.w / 2, s.doc.page.w) };
+          case "top": return { y: clampBlockY(b, minY, s.doc.page.h) };
+          case "bottom": return { y: clampBlockY(b, maxY - b.h, s.doc.page.h) };
+          case "vcenter": return { y: clampBlockY(b, (minY + maxY) / 2 - b.h / 2, s.doc.page.h) };
         }
       };
       const inSel = new Set(sel.map((b) => b.id));
@@ -421,6 +466,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         future: [s.doc, ...s.future].slice(0, HISTORY_MAX),
         selectedIds: [],
         selectedId: null,
+        inspectorTarget: "none",
       };
     }),
 
@@ -435,38 +481,75 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         past: [...s.past.slice(-(HISTORY_MAX - 1)), s.doc],
         selectedIds: [],
         selectedId: null,
+        inspectorTarget: "none",
       };
     }),
 
   // 단일 선택 — 클릭한 블록 하나만. 그룹에 속해도 확장하지 않는다(그룹은 드래그 시 함께 이동).
-  select: (id) => set(() => (id === null ? { selectedIds: [], selectedId: null } : { selectedIds: [id], selectedId: id })),
+  select: (id) =>
+    set(() =>
+      id === null
+        ? { selectedIds: [], selectedId: null, inspectorTarget: "none" }
+        : { selectedIds: [id], selectedId: id, inspectorTarget: "block" }
+    ),
+
+  selectPage: () => set(() => ({ selectedIds: [], selectedId: null, inspectorTarget: "page" })),
 
   // 그룹 전체 선택 (opt-in) — 이걸로만 그룹 툴바(해제·정렬)가 뜬다
   selectGroup: (id) =>
     set((s) => {
       const ids = groupMemberIds(s.doc.blocks, id);
-      return { selectedIds: ids, selectedId: id };
+      return { selectedIds: ids, selectedId: id, inspectorTarget: "block" };
     }),
 
   toggleSelect: (id) =>
     set((s) => {
       const has = s.selectedIds.includes(id);
       const selectedIds = has ? s.selectedIds.filter((x) => x !== id) : [...s.selectedIds, id];
-      return { selectedIds, selectedId: has ? selectedIds[selectedIds.length - 1] ?? null : id };
+      return { selectedIds, selectedId: has ? selectedIds[selectedIds.length - 1] ?? null : id, inspectorTarget: selectedIds.length ? "block" : "none" };
     }),
 
-  selectMany: (ids) => set(() => ({ selectedIds: [...ids], selectedId: ids[ids.length - 1] ?? null })),
+  selectMany: (ids) => set(() => ({ selectedIds: [...ids], selectedId: ids[ids.length - 1] ?? null, inspectorTarget: ids.length ? "block" : "none" })),
 
   setTitle: (title) => set((s) => ({ ...record(s, "title"), doc: { ...s.doc, title } })),
   loadDoc: (doc) => {
     lastKey = null;
-    set({ doc, selectedIds: [], selectedId: null, autoEditId: null, past: [], future: [] });
+    set({ doc, inspectorTarget: "none", selectedIds: [], selectedId: null, autoEditId: null, past: [], future: [] });
   },
   reset: (title) => {
     lastKey = null;
-    set({ doc: createDoc(title), selectedIds: [], selectedId: null, autoEditId: null, past: [], future: [] });
+    set({ doc: createDoc(title), inspectorTarget: "none", selectedIds: [], selectedId: null, autoEditId: null, past: [], future: [] });
   },
 }));
 
-// 블록이 지면 밖으로 못 나가게 (0 ~ max). "요소는 페이지 밖으로 못 나감" 불변식.
-const clamp = (v: number, max: number) => Math.max(0, Math.min(Math.round(v), Math.round(max)));
+// 블록이 A4 안전 여백 밖으로 못 나가게 한다. 여백이 사실상 편집 가능한 페이지 경계다.
+const clampInsertionAxis = (v: number, size: number, pageSize: number) => {
+  const min = SAFE_MARGIN_MM;
+  const max = Math.max(min, pageSize - SAFE_MARGIN_MM - size);
+  return Math.round(Math.max(min, Math.min(v, max)) * 100) / 100;
+};
+const clampSafeAxis = (v: number, size: number, pageSize: number) => {
+  const min = SAFE_MARGIN_MM;
+  const max = Math.max(min, pageSize - SAFE_MARGIN_MM - size);
+  return Math.max(min, Math.min(Math.round(v), Math.round(max)));
+};
+const clampBlockX = (b: Block, x: number, pageW: number) => clampSafeAxis(x, b.w, pageW);
+const clampBlockY = (b: Block, y: number, pageH: number) => clampSafeAxis(y, b.h, pageH);
+const clampBlockToSafeArea = (b: Block, page: CanvasDoc["page"]): Block => ({
+  ...b,
+  x: clampBlockX(b, b.x, page.w),
+  y: clampBlockY(b, b.y, page.h),
+});
+const constrainDeltaToSafeArea = (blocks: Block[], dx: number, dy: number, page: CanvasDoc["page"]) => {
+  if (!blocks.length) return { dx: 0, dy: 0 };
+  const minX = Math.min(...blocks.map((b) => b.x));
+  const maxX = Math.max(...blocks.map((b) => b.x + b.w));
+  const minY = Math.min(...blocks.map((b) => b.y));
+  const maxY = Math.max(...blocks.map((b) => b.y + b.h));
+  const clampDelta = (value: number, min: number, max: number, pageSize: number) =>
+    Math.max(SAFE_MARGIN_MM - min, Math.min(value, pageSize - SAFE_MARGIN_MM - max));
+  return { dx: Math.round(clampDelta(dx, minX, maxX, page.w)), dy: Math.round(clampDelta(dy, minY, maxY, page.h)) };
+};
+
+
+

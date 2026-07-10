@@ -17,6 +17,7 @@ export interface TableKingData {
 }
 
 export type TextAlign = "left" | "center" | "right";
+export type ParaListType = "bullet" | "num"; // 문단 목록 — 글머리(•) / 번호(1.)
 
 // 인라인 리치 텍스트 — 한 텍스트 블록 안의 "런"(같은 서식이 연속되는 글자 구간).
 // 런이 없으면(runs 미지정) 블록 전체가 균일 서식(기존 동작 100% 보존). 런이 있으면
@@ -27,7 +28,10 @@ export interface TextRun {
   text: string;
   bold?: boolean;
   italic?: boolean;
+  underline?: boolean; // 밑줄 — bold와 같은 3-상태(undefined=블록 상속)
+  strike?: boolean; // 취소선
   color?: string; // hex
+  bg?: string; // 형광펜(글자 배경) hex — 내보내기: charPr shadeColor. 블록 상속 없음(런 전용)
   fontSize?: number; // pt — 없으면 블록 크기 상속
   font?: string; // 폰트 레지스트리 key — 없으면 블록 글꼴 상속
 }
@@ -40,7 +44,10 @@ export function runStyleEq(a: TextRun, b: TextRun): boolean {
   return (
     (a.bold ?? null) === (b.bold ?? null) &&
     (a.italic ?? null) === (b.italic ?? null) &&
+    (a.underline ?? null) === (b.underline ?? null) &&
+    (a.strike ?? null) === (b.strike ?? null) &&
     (a.color ?? null) === (b.color ?? null) &&
+    (a.bg ?? null) === (b.bg ?? null) &&
     (a.fontSize ?? null) === (b.fontSize ?? null) &&
     (a.font ?? null) === (b.font ?? null)
   );
@@ -117,6 +124,23 @@ export function applyRunStyle(
   return normalizeRuns(next);
 }
 
+// [start,end) 구간을 지우고 그 자리에 insert 런들을 끼워 넣는다 (서식 붙여넣기·잘라내기).
+// 경계에서 런을 쪼갠 뒤 앞/뒤를 보존하고 정규화 — applyRunStyle과 같은 분할 규칙.
+export function spliceRuns(runs: TextRun[], start: number, end: number, insert: TextRun[]): TextRun[] {
+  const split = splitRunsAt(splitRunsAt(runs, start), end);
+  const before: TextRun[] = [];
+  const after: TextRun[] = [];
+  let pos = 0;
+  for (const r of split) {
+    const rEnd = pos + r.text.length;
+    if (rEnd <= start) before.push(r);
+    else if (pos >= end) after.push(r);
+    // start~end 사이 런은 삭제(교체 대상)
+    pos = rEnd;
+  }
+  return normalizeRuns([...before, ...insert, ...after]);
+}
+
 // [start,end) 구간에 실제로 걸린 런들 (선택 서식바의 활성 상태 판정용)
 export function rangeRuns(runs: TextRun[], start: number, end: number): TextRun[] {
   const split = splitRunsAt(splitRunsAt(runs, start), end);
@@ -169,8 +193,19 @@ export interface Block {
   fontSize?: number; // pt
   bold?: boolean;
   italic?: boolean;
+  underline?: boolean; // 밑줄 (블록 전체 기본 — 구간별은 runs)
+  strike?: boolean; // 취소선
   align?: TextAlign;
   color?: string; // hex
+  // 줄간격(%) — 화면 line-height = 값/100, 내보내기 paraPr lineSpacing에 그대로.
+  // 없으면 기본 138(leading-snug 1.375와 정합 — 검증된 기존 값 유지)
+  lineSpacing?: number;
+  // 문단별 정렬 — text의 \n 경계가 문단. index i = i번째 문단, null/누락 = block.align 상속.
+  // 편집 DOM(문단 div의 textAlign)에서 파생돼 flush 때 저장된다.
+  paraAligns?: (TextAlign | null)[];
+  // 문단별 목록 — "bullet"(글머리 •)/"num"(번호 1.)/null. 번호는 연속 num 문단끼리 이어
+  // 세고 끊기면 1부터. 내보내기: paraPr heading NUMBER/BULLET(+bullets 정의 주입).
+  paraLists?: (ParaListType | null)[];
   // ── 모양(shape) — 요소 상자의 겉모습 ──
   fill?: string; // 배경색 hex (없으면 투명). 내보내기: 셀 채우기 색으로.
   radius?: number; // 모서리 반경 px — 화면 전용(HWPX엔 둥근 모서리 개념 없음)
@@ -186,8 +221,10 @@ export const TEXT_DEFAULTS = {
   fontSize: 10.5,
   bold: false,
   italic: false,
+  underline: false,
+  strike: false,
   align: "left" as TextAlign,
-  color: "#1A2233",
+  color: "#000000",
 };
 
 // 텍스트 상자 기본 안쪽 여백(mm) — 화면의 px-2 py-1(8px/4px)과 같은 값.
@@ -210,7 +247,7 @@ export const A4: CanvasDoc["page"] = { w: 210, h: 297 };
 
 // 블록 타입별 기본 크기(mm)와 시드 콘텐츠
 const BLOCK_DEFAULTS: Record<BlockType, Partial<Block>> = {
-  text: { w: 80, h: 12, text: "텍스트를 입력하세요" },
+  text: { w: 80, h: 12, text: "텍스트를 입력하세요", fill: "#ffffff", borderColor: "#98A4BD" },
   table: {
     w: 120,
     h: 24,
@@ -242,6 +279,8 @@ export function createBlock(type: BlockType, x: number, y: number): Block {
     h: d.h ?? 20,
     text: d.text,
     rows: d.rows,
+    fill: d.fill,
+    borderColor: d.borderColor,
   };
 }
 

@@ -39,12 +39,15 @@ const paras = (text, charRef = "0", paraRef = "0") =>
     )
     .join("");
 
-// 인라인 리치 텍스트 — 한 문단(줄) 안에 런마다 <hp:run>. lines = [[{text, charRef}]]
-// (charRef는 refsAt이 세그먼트 스타일마다 미리 발급). 빈 줄도 문단 하나로 유지한다.
-const richParasFromRefs = (lines, paraRef = "0") =>
+// 인라인 리치 텍스트 — 한 문단(줄) 안에 런마다 <hp:run>. lines = [{paraRef?, segs:[{text,charRef}]}]
+// (charRef/paraRef는 refsAt이 미리 발급 — paraRef가 줄마다 다르면 문단별 정렬).
+// 빈 줄도 문단 하나로 유지한다.
+const richParasFromRefs = (lines, fallbackParaRef = "0") =>
   lines
-    .map(
-      (segs) =>
+    .map((line) => {
+      const segs = Array.isArray(line) ? line : line.segs; // 구형(segs 배열 직접) 호환
+      const paraRef = (Array.isArray(line) ? null : line.paraRef) ?? fallbackParaRef;
+      return (
         `<hp:p paraPrIDRef="${paraRef}" styleIDRef="0">` +
         (segs.length
           ? segs
@@ -52,7 +55,8 @@ const richParasFromRefs = (lines, paraRef = "0") =>
               .join("")
           : `<hp:run charPrIDRef="0"><hp:t></hp:t></hp:run>`) +
         `</hp:p>`
-    )
+      );
+    })
     .join("");
 
 // ═════════════════ 스타일 레지스트리 ═════════════════
@@ -91,25 +95,30 @@ export function makeStyleRegistry(baseHeaderXml) {
     const pt = s.pt ?? 10;
     const bold = !!s.bold;
     const italic = !!s.italic;
+    const underline = !!s.underline;
+    const strike = !!s.strike;
     const color = s.color ?? "#000000";
+    const shade = s.shade ?? null; // 형광펜(글자 배경) — charPr shadeColor
     const font = s.font ?? null; // 요소별 글꼴 이름 (없으면 문서 기본)
     wantFont(font);
-    const key = `${pt}|${bold}|${italic}|${color}|${font ?? ""}`;
-    if (!chars.has(key)) chars.set(key, { id: charBase + chars.size, pt, bold, italic, color, font });
+    const key = `${pt}|${bold}|${italic}|${underline}|${strike}|${color}|${shade ?? ""}|${font ?? ""}`;
+    if (!chars.has(key))
+      chars.set(key, { id: charBase + chars.size, pt, bold, italic, underline, strike, color, shade, font });
     return String(chars.get(key).id);
   };
   const paraId = (s) => {
     if (!s) return "0";
     const align = H_ALIGN[s.align] ?? "LEFT";
     const ls = Math.min(500, Math.max(100, Math.round(s.lineSpacing ?? 160))); // % — 비정상 실측값 방어
+    const list = s.list === "num" || s.list === "bullet" ? s.list : null; // 목록 문단(번호/글머리)
     // 흐름 문단(본문) 배치용 마진 — 좌/우 들여쓰기와 앞 간격(mm → HWPUNIT).
     // ⚠ ×2: 문단 여백 값은 렌더러가 "반단위(HWPUNIT/2)"로 해석한다 — rhwp 실측으로
     // 캘리브레이션(50mm 지정 → 25mm에 찍힘). HWP 바이너리의 문단 여백 2배 저장 관례와 일치.
     const ml = Math.max(0, Math.round((s.marginLeftMm ?? 0) * HWPUNIT_PER_MM * 2));
     const mr = Math.max(0, Math.round((s.marginRightMm ?? 0) * HWPUNIT_PER_MM * 2));
     const mp = Math.max(0, Math.round((s.marginPrevMm ?? 0) * HWPUNIT_PER_MM * 2));
-    const key = `${align}|${ls}|${ml}|${mr}|${mp}`;
-    if (!parasReg.has(key)) parasReg.set(key, { id: paraBase + parasReg.size, align, ls, ml, mr, mp });
+    const key = `${align}|${ls}|${ml}|${mr}|${mp}|${list ?? ""}`;
+    if (!parasReg.has(key)) parasReg.set(key, { id: paraBase + parasReg.size, align, ls, ml, mr, mp, list });
     return String(parasReg.get(key).id);
   };
   const fillId = (bg) => {
@@ -154,7 +163,7 @@ export function makeStyleRegistry(baseHeaderXml) {
           (c) =>
             // 굵게/기울임은 OWPML 표준상 "빈 자식 요소"(<hh:bold/>)다. kordoc 계열은 속성도
             // 읽으므로 둘 다 기록 — 어떤 리더에서도 같은 결과가 나오게 한다.
-            `<hh:charPr id="${c.id}" height="${Math.round(c.pt * 100)}" textColor="${c.color}" shadeColor="none" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="1"${c.bold ? ` bold="1"` : ""}${c.italic ? ` italic="1"` : ""}>` +
+            `<hh:charPr id="${c.id}" height="${Math.round(c.pt * 100)}" textColor="${c.color}" shadeColor="${c.shade ?? "none"}" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="1"${c.bold ? ` bold="1"` : ""}${c.italic ? ` italic="1"` : ""}>` +
             `<hh:fontRef hangul="${c.font != null ? fontIds.get(c.font) ?? fh : fh}" latin="${c.font != null ? fontIds.get(c.font) ?? fh : fh}" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
             `<hh:ratio hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100"/>` +
             `<hh:spacing hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
@@ -162,6 +171,9 @@ export function makeStyleRegistry(baseHeaderXml) {
             `<hh:offset hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>` +
             (c.italic ? `<hh:italic/>` : "") +
             (c.bold ? `<hh:bold/>` : "") +
+            // 밑줄/취소선 — OWPML 자식 요소. 색은 글자색을 따른다(한글 기본 동작과 동일)
+            (c.underline ? `<hh:underline type="BOTTOM" shape="SOLID" color="${c.color}"/>` : "") +
+            (c.strike ? `<hh:strikeout shape="SOLID" color="${c.color}"/>` : "") +
             `</hh:charPr>`
         )
         .join("");
@@ -176,7 +188,12 @@ export function makeStyleRegistry(baseHeaderXml) {
           (p) =>
             `<hh:paraPr id="${p.id}" tabPrIDRef="0" condense="0" fontLineHeight="0" snapToGrid="1" suppressLineNumbers="0" checked="0" textDir="AUTO">` +
             `<hh:align horizontal="${p.align}" vertical="BASELINE"/>` +
-            `<hh:heading type="NONE" idRef="0" level="0"/>` +
+            // 목록 문단 — 번호는 봉투 내장 numbering(id=1), 글머리는 patchHeader가 주입하는 bullet(id=1)
+            (p.list === "num"
+              ? `<hh:heading type="NUMBER" idRef="1" level="0"/>`
+              : p.list === "bullet"
+                ? `<hh:heading type="BULLET" idRef="1" level="0"/>`
+                : `<hh:heading type="NONE" idRef="0" level="0"/>`) +
             `<hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="BREAK_WORD" widowOrphan="0" keepWithNext="0" keepLines="0" pageBreakBefore="0" lineWrap="BREAK"/>` +
             `<hh:autoSpacing eAsianEng="0" eAsianNum="0"/>` +
             `<hh:margin><hc:intent value="0" unit="HWPUNIT"/><hc:left value="${p.ml ?? 0}" unit="HWPUNIT"/><hc:right value="${p.mr ?? 0}" unit="HWPUNIT"/><hc:prev value="${p.mp ?? 0}" unit="HWPUNIT"/><hc:next value="0" unit="HWPUNIT"/></hh:margin>` +
@@ -188,6 +205,16 @@ export function makeStyleRegistry(baseHeaderXml) {
       xml = xml
         .replace(/(<hh:paraProperties itemCnt=")(\d+)(")/, (m, p1, n, p3) => `${p1}${Number(n) + parasReg.size}${p3}`)
         .replace("</hh:paraProperties>", entries + "</hh:paraProperties>");
+    }
+
+    // 글머리(bullet) 사용 시 — 봉투에 bullets가 없으므로 정의를 주입한다.
+    // OWPML: numberings 다음에 bullets. paraHead는 봉투 numbering의 것과 같은 형태.
+    if ([...parasReg.values()].some((p) => p.list === "bullet") && !xml.includes("<hh:bullets")) {
+      const bullets =
+        `<hh:bullets itemCnt="1"><hh:bullet id="1" char="•" checkedChar="" useImage="0">` +
+        `<hh:paraHead start="1" level="1" align="LEFT" useInstWidth="1" autoIndent="1" widthAdjust="0" textOffsetType="PERCENT" textOffset="50" numFormat="DIGIT" charPrIDRef="4294967295" checkable="0"/>` +
+        `</hh:bullet></hh:bullets>`;
+      xml = xml.replace("</hh:numberings>", "</hh:numberings>" + bullets);
     }
 
     if (fills.size) {
@@ -252,13 +279,23 @@ function tableXml(el, reg, borderFill = "2") {
   // 셀 스타일 → 레지스트리 참조. cellStyles가 없으면(구형 캔버스) 전부 기본값.
   const cm = el.cellMarginU; // 셀 안쪽 여백 오버라이드 (텍스트 상자 정합용)
   const refsAt = (r, c) => {
-    // 인라인 리치 텍스트: 세그먼트 스타일마다 charPr 발급 (줄 안에 여러 런)
+    // 인라인 리치 텍스트: 세그먼트 스타일마다 charPr, 줄(문단)마다 paraPr 발급 —
+    // 문단별 정렬(cellRichAligns)이 있으면 그 줄만 다른 정렬로 나간다.
     const rich = grid.cellRich?.[r]?.[c];
+    const richAligns = grid.cellRichAligns?.[r]?.[c];
+    const richLists = grid.cellRichLists?.[r]?.[c]; // 문단별 목록(번호/글머리)
+    const s = cellStyles?.[r]?.[c];
     const richRefs =
       rich && reg
-        ? rich.map((line) => line.map((seg) => ({ text: seg.text, charRef: reg.charId(seg.style) })))
+        ? rich.map((line, li) => ({
+            paraRef: reg.paraId({
+              align: richAligns?.[li] ?? s?.hAlign ?? "left",
+              lineSpacing: s?.lineSpacing,
+              list: richLists?.[li] ?? undefined,
+            }),
+            segs: line.map((seg) => ({ text: seg.text, charRef: reg.charId(seg.style) })),
+          }))
         : undefined;
-    const s = cellStyles?.[r]?.[c];
     if (!s || !reg) return { cm, richRefs };
     return {
       charRef: reg.charId(s),
@@ -315,11 +352,46 @@ function gridFromRows(el) {
 // el.style(화면 실측: pt·bold·italic·color·align·lineSpacing)을 1×1 셀의 스타일로 옮긴다.
 const textXml = (el, reg) => {
   const grid = gridFromRows({ ...el, rows: [[el.text]] });
-  if (el.style) grid.cellStyles = [[{ ...el.style, hAlign: el.style.align, vAlign: "center" }]];
+  // ⚠ vAlign은 top — 화면 텍스트 상자는 위 기준으로 흐른다. center로 내보내면 셀
+  // 높이(exportH: 최소 8mm+여유)가 내용보다 클 때 글이 아래로 밀려 겹치기 비교에서
+  // 세로 ~2mm 어긋남(실측 rhwp glyph 199.3 vs 화면 top 179.9+ascent).
+  if (el.style) grid.cellStyles = [[{ ...el.style, hAlign: el.style.align, vAlign: "top" }]];
   // 인라인 리치 텍스트: 런 세그먼트 줄을 1×1 셀에 실어 richParas로 내보낸다
   if (el.richLines) grid.cellRich = [[el.richLines]];
+  if (el.paraAligns) grid.cellRichAligns = [[el.paraAligns]]; // 문단별 정렬 (줄 index 대응)
+  if (el.paraLists) grid.cellRichLists = [[el.paraLists]]; // 문단별 목록 (번호/글머리)
   return tableXml({ ...el, grid }, reg, "1");
 };
+
+// ── 이미지 요소 → hp:pic (절대배치) ──
+// 구조는 rhwp exportHwpx 실물에서 역공학 — rhwp·한글이 그대로 되읽는 형태.
+// el: { x,y,w,h(mm), binId("image1"), natW, natH(px) }.
+// imgClip의 right/bottom은 원본 픽셀 ×75(HWPUNIT/px @96dpi = 7200/96).
+function picXml(el) {
+  const wU = mmToUnit(el.w);
+  const hU = mmToUnit(el.h);
+  const xU = mmToUnit(el.x);
+  const yU = mmToUnit(el.y);
+  const clipR = Math.round((el.natW ?? el.w * 3.7795) * 75);
+  const clipB = Math.round((el.natH ?? el.h * 3.7795) * 75);
+  return (
+    `<hp:pic id="${++idSeq}" zOrder="${idSeq}" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="0" reverse="0">` +
+    `<hp:offset x="${xU}" y="${yU}"/>` +
+    `<hp:orgSz width="${wU}" height="${hU}"/>` +
+    `<hp:curSz width="${wU}" height="${hU}"/>` +
+    `<hp:flip horizontal="0" vertical="0"/>` +
+    `<hp:rotationInfo angle="0" centerX="0" centerY="0" rotateimage="0"/>` +
+    `<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>` +
+    `<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="${wU}" y="0"/><hc:pt2 x="${wU}" y="${hU}"/><hc:pt3 x="0" y="${hU}"/></hp:imgRect>` +
+    `<hp:imgClip left="0" right="${clipR}" top="0" bottom="${clipB}"/>` +
+    `<hp:inMargin left="0" right="0" top="0" bottom="0"/>` +
+    `<hp:imgDim dimwidth="0" dimheight="0"/>` +
+    `<hc:img binaryItemIDRef="${el.binId}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>` +
+    `<hp:effects></hp:effects>` +
+    szPos(el) +
+    `</hp:pic>`
+  );
+}
 
 // ── 캔버스 → section0.xml ──
 // 검증된 봉투의 첫 문단(용지 설정 포함)까지 유지하고 본문만 교체한다.
@@ -361,7 +433,9 @@ function buildSection(refSectionXml, canvas, reg) {
     const flows = els.filter((el) => el.type === "flowText").sort((a, b) => (a.y ?? 0) - (b.y ?? 0));
     const abs = els.filter((el) => el.type !== "flowText");
     const controls = abs
-      .map((el) => (el.type === "table" ? tableXml(el, reg) : textXml(el, reg)))
+      .map((el) =>
+        el.type === "table" ? tableXml(el, reg) : el.type === "image" ? picXml(el) : textXml(el, reg)
+      )
       .join("");
     // 흐름 문단이 있으면 앵커(호스트) 문단의 줄 높이를 0.1pt로 소거 — 안 그러면
     // 빈 줄 하나만큼 본문이 아래로 밀린다. 절대배치 개체는 PAPER 기준이라 영향 없음.
@@ -387,7 +461,8 @@ function buildSection(refSectionXml, canvas, reg) {
       const paraXml = richLines
         .map((segs, i) => {
           const paraRef = reg.paraId({
-            align: f.style?.align ?? "left",
+            align: f.paraAligns?.[i] ?? f.style?.align ?? "left",
+            list: f.paraLists?.[i] ?? undefined,
             lineSpacing: f.style?.lineSpacing ?? 160,
             marginLeftMm: f.x ?? 0,
             marginRightMm: Math.max(0, pageW - (f.x ?? 0) - (f.w ?? pageW)),
@@ -414,7 +489,9 @@ const previewText = (canvas) =>
     .map((el) =>
       el.type === "text" || el.type === "flowText"
         ? el.text
-        : (el.grid?.cellsText ?? el.rows).map((r) => r.join(" ")).join("\n")
+        : el.type === "image"
+          ? "" // 이미지는 미리보기 텍스트 없음
+          : (el.grid?.cellsText ?? el.rows).map((r) => r.join(" ")).join("\n")
     )
     .join("\n");
 
@@ -536,8 +613,10 @@ function buildStoreZip(entries) {
 
 // ═════════════════ 공개 API ═════════════════
 
-// canvas: { page:{w,h}, font?, elements:[...] } → .hwpx Uint8Array
-// canvas.font = 화면의 실효 글꼴 이름 (fontface로 선언되어 모든 생성 charPr가 참조)
+// canvas: { page:{w,h}, font?, elements:[...], images?: [{binId, ext, mime, data:Uint8Array}] }
+// → .hwpx Uint8Array. canvas.font = 화면의 실효 글꼴 이름.
+// images: 이미지 요소(hp:pic)가 참조하는 바이너리 — BinData/ ZIP 항목 + content.hpf
+// 매니페스트 등록 (rhwp exportHwpx 실물 역공학: header 등록은 불필요, 매니페스트만).
 export function buildHwpx(canvas) {
   const files = { ...HWPX_BASE };
   const reg = makeStyleRegistry(HWPX_BASE["Contents/header.xml"]);
@@ -547,6 +626,22 @@ export function buildHwpx(canvas) {
   if (files["Preview/PrvText.txt"] !== undefined)
     files["Preview/PrvText.txt"] = previewText(canvas);
 
+  const images = canvas.images ?? [];
+  if (images.length) {
+    // content.hpf 매니페스트에 바이너리 항목 등록
+    const items = images
+      .map(
+        (im) =>
+          `<opf:item id="${im.binId}" href="BinData/${im.binId}.${im.ext}" media-type="${im.mime}" isEmbeded="1"/>`
+      )
+      .join("");
+    files["Contents/content.hpf"] = files["Contents/content.hpf"].replace(
+      "</opf:manifest>",
+      items + "</opf:manifest>"
+    );
+  }
+
   const entries = HWPX_BASE_ORDER.map((name) => ({ name, data: enc.encode(files[name]) }));
+  for (const im of images) entries.push({ name: `BinData/${im.binId}.${im.ext}`, data: im.data });
   return buildStoreZip(entries);
 }
