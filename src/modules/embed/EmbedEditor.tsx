@@ -43,7 +43,7 @@ import {
   setSelectionRange,
   spliceAligns,
   splitParagraphAtCaret,
-} from "../canvas/CanvasBlock";
+} from "../richtext";
 import { DEFAULT_FONT, ensureFont } from "../document/fonts";
 import { getAssetUrl, putAsset } from "../document/assets";
 import { SCALE } from "../canvas/geometry";
