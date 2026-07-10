@@ -242,6 +242,47 @@ function injectLocalFace(def: FontDef): void {
   document.head.appendChild(el);
 }
 
+// hwpxName(한글 이름) → webFamily 별칭 @font-face 주입.
+// ⚠ 한글 미리보기(rhwp)는 hwpx가 선언한 폰트 이름("나눔고딕")을 CSS font-family 스택 맨
+// 앞에 넣어 SVG를 그린다. 그런데 브라우저에 로드된 웹폰트 family는 "Nanum Gothic"(영문)이라
+// 이름이 안 맞아 맑은 고딕으로 폴백된다(미리보기가 맑은고딕으로 보이던 원인). webFamily의
+// @font-face src를 긁어 hwpxName 이름으로 복제하면, 미리보기도 진짜 나눔고딕으로 렌더된다.
+// (rhwp 조판=줄바꿈은 rhwp 내부 metric이 결정하므로 이 별칭은 "보이는 폰트"만 바로잡는다.)
+const aliasedHwpx = new Set<string>();
+function injectHwpxAlias(def: FontDef): void {
+  if (typeof document === "undefined") return;
+  const alias = def.hwpxName;
+  if (!alias || alias === def.webFamily || aliasedHwpx.has(alias)) return;
+  const faces: { weight: string; style: string; src: string }[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList | null = null;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue; // 교차 출처 시트는 접근 불가 — 건너뜀
+    }
+    if (!rules) continue;
+    for (const rule of Array.from(rules)) {
+      // CSSFontFaceRule.type === 5
+      if ((rule as CSSRule).type !== 5) continue;
+      const style = (rule as CSSFontFaceRule).style;
+      const fam = style.getPropertyValue("font-family").replace(/^['"]|['"]$/g, "").trim();
+      if (fam !== def.webFamily) continue;
+      const src = style.getPropertyValue("src");
+      if (src) faces.push({ weight: style.getPropertyValue("font-weight") || "400", style: style.getPropertyValue("font-style") || "normal", src });
+    }
+  }
+  if (!faces.length) return; // 아직 CSS 미로드 — aliasedHwpx에 안 넣어 다음 호출에 재시도
+  aliasedHwpx.add(alias);
+  const css = faces
+    .map((f) => `@font-face{font-family:"${alias}";font-weight:${f.weight};font-style:${f.style};font-display:swap;src:${f.src};}`)
+    .join("");
+  const el = document.createElement("style");
+  el.dataset.hwpxAlias = alias;
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+
 // 폰트 준비(로드 + 캘리브레이션). 여러 번 불러도 안전(멱등).
 export async function ensureFont(key: string): Promise<void> {
   const def = fontByKey(key);
@@ -254,6 +295,14 @@ export async function ensureFont(key: string): Promise<void> {
     if (typeof document !== "undefined" && document.fonts?.load) {
       await document.fonts.load(`16px "${def.webFamily}"`, SAMPLE);
       if (def.weights.includes(700)) await document.fonts.load(`700 16px "${def.webFamily}"`, SAMPLE);
+    }
+    injectHwpxAlias(def); // hwpxName → webFamily 별칭 (한글 미리보기 폰트 정합)
+    if (typeof document !== "undefined" && document.fonts?.load && def.hwpxName !== def.webFamily) {
+      try {
+        await document.fonts.load(`16px "${def.hwpxName}"`, SAMPLE);
+      } catch {
+        // 별칭 로드 실패는 치명적 아님 — 폴백 렌더
+      }
     }
     useFontStore.getState().setSpacing(def.key, measureSpacingEm(def.webFamily));
   } finally {
@@ -269,4 +318,30 @@ export function fontCss(key?: string): { fontFamily: string; letterSpacing: stri
     fontFamily: `"${def.webFamily}", "Malgun Gothic", "맑은 고딕", sans-serif`,
     letterSpacing: `${em}em`,
   };
+}
+
+// ── 전각(1em) 취급 문자 판별 — 한글 음절 + 호환 자모 ──
+// HWP/rhwp 조판은 "한글"만 전각 고정폭으로 계산하고, 숫자·라틴은 폰트 자연폭(반각)으로
+// 흘린다(rhwp 실측: measureTextWidth 콜백 없이 자체 조판 — 자모는 화면과 정확 일치,
+// 숫자는 보정 걸면 74 vs 82자/줄로 어긋남). 따라서 전각 보정 letter-spacing은 이
+// 문자들에만 걸어야 화면 줄바꿈 = 한글 줄바꿈 정합이 유지된다.
+const HANGUL_CHAR = /[가-힣㄰-㆏]/; // 음절 가-힣 + 호환 자모 ㄱ-ㆎ
+
+// 텍스트를 한글/비한글 구간으로 쪼갠다 — 화면 렌더가 비한글 구간에 letter-spacing:0을 건다
+export function splitByHangul(text: string): { text: string; hangul: boolean }[] {
+  const out: { text: string; hangul: boolean }[] = [];
+  for (const ch of text) {
+    const h = HANGUL_CHAR.test(ch);
+    const last = out[out.length - 1];
+    if (last && last.hangul === h) last.text += ch;
+    else out.push({ text: ch, hangul: h });
+  }
+  return out;
+}
+
+// 전각 보정 대상(한글) 글자 수 — canvas 폭 측정에서 letter-spacing 합산용
+export function countHangul(text: string): number {
+  let n = 0;
+  for (const ch of text) if (HANGUL_CHAR.test(ch)) n++;
+  return n;
 }
