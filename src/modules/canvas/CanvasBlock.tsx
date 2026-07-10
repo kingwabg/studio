@@ -72,6 +72,8 @@ import {
   runsToClipboardHtml,
   runsFromClipboardHtml,
   normalizeUrl,
+  useRichText,
+  type RichSelState,
 } from "../richtext";
 // 이동 전 경로 호환 — EmbedEditor·PageSnapshot 등 기존 import가 그대로 컴파일된다.
 // (docs/refactoring-plan.md: re-export는 3단계 분할 후 한 세션 유예를 두고 제거)
@@ -673,7 +675,7 @@ function ImageContent({ block, locked }: { block: Block; locked: boolean }) {
 }
 
 
-type InlineSel = { rect: DOMRect; bold: boolean; italic: boolean; underline: boolean; strike: boolean; color?: string; href?: string; bg?: string; fontSize?: number; font?: string; align?: TextAlign; list?: ParaListType | null };
+type InlineSel = RichSelState; // 훅의 선택 상태를 그대로 사용 (2단계 통합)
 
 function TextContent({
   block,
@@ -689,64 +691,7 @@ function TextContent({
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const setRichText = useCanvasStore((s) => s.setRichText);
   const pageW = useCanvasStore((s) => s.doc.page.w);
-  const editRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const composingRef = useRef(false);
-  // 마지막 유효 선택 오프셋 — 서식바(폰트 드롭다운 등)로 포커스가 옮겨가 선택이 사라져도
-  // 이 값으로 구간을 되찾아 서식을 적용한다.
-  const selRef = useRef<[number, number] | null>(null);
-  // ── 편집 세션 미니 히스토리 (편집 중 Ctrl+Z/Y) ──
-  // 브라우저 네이티브 CE undo는 우리 프로그램적 DOM 재시드(seedEditable·insertTextAtCaret)를
-  // 모르기 때문에 되돌리기가 스토어와 어긋난다 → 네이티브를 차단하고 runs 스냅샷으로 직접
-  // 되돌린다. 연속 타이핑은 700ms 버스트로 묶고(한 단계), 서식 적용은 항상 새 단계.
-  type EditSnap = { runs: TextRun[]; caret: number; aligns: (TextAlign | null)[]; lists: (ParaListType | null)[] };
-  const histRef = useRef<{ stack: EditSnap[]; idx: number; lastAt: number }>({
-    stack: [],
-    idx: -1,
-    lastAt: 0,
-  });
-  const caretNow = (el: HTMLElement) => selectionOffsets(el)?.[1] ?? (el.textContent ?? "").length;
-  const pushHistory = (
-    runs: TextRun[],
-    caret: number,
-    coalesce: boolean,
-    aligns: (TextAlign | null)[],
-    lists: (ParaListType | null)[]
-  ) => {
-    const h = histRef.current;
-    const now = Date.now();
-    h.stack = h.stack.slice(0, h.idx + 1); // 새 편집은 redo 꼬리를 버린다
-    if (coalesce && h.idx >= 0 && now - h.lastAt < 700) {
-      h.stack[h.idx] = { runs, caret, aligns, lists }; // 같은 버스트 — 최신 상태로 교체
-    } else {
-      h.stack.push({ runs, caret, aligns, lists });
-      h.idx = h.stack.length - 1;
-    }
-    h.lastAt = now;
-  };
-  const applyHistoryState = (st: EditSnap) => {
-    const el = editRef.current;
-    if (!el) return;
-    seedEditable(el, block, st.runs, st.aligns, st.lists);
-    setRichText(block.id, st.runs, st.aligns, st.lists);
-    el.focus();
-    setSelectionRange(el, st.caret, st.caret);
-    syncEditH();
-  };
-  const undoEdit = () => {
-    const h = histRef.current;
-    if (h.idx <= 0) return;
-    h.idx -= 1;
-    h.lastAt = 0; // 되돌린 뒤 이어지는 입력은 새 스냅샷
-    applyHistoryState(h.stack[h.idx]);
-  };
-  const redoEdit = () => {
-    const h = histRef.current;
-    if (h.idx >= h.stack.length - 1) return;
-    h.idx += 1;
-    h.lastAt = 0;
-    applyHistoryState(h.stack[h.idx]);
-  };
   const [sel, setSel] = useState<InlineSel | null>(null);
   // 안쪽 여백(mm→px) — auto-width/height 계산에 쓴다(블록폭 = 글자폭 + 2·여백).
   const pad = padOf(block);
@@ -761,33 +706,39 @@ function TextContent({
 
   // 편집 중 높이 동기화 — contentEditable 자연 높이(패딩 포함)를 block.h로
   const syncEditH = () => {
-    const el = editRef.current;
+    const el = rt.ref.current;
     if (!el) return;
     const needMm = Math.max(1, Math.ceil(el.offsetHeight / SCALE));
     const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
     if (cur && Math.abs((cur.h ?? 0) - needMm) >= 1) updateBlock(block.id, { h: needMm });
   };
 
-  // 편집 진입 — 현재 런으로 contentEditable을 채우고 커서를 끝에 둔다 (1회, editing 토글에만)
+  // 편집 배선 공유 훅 (richtext/useRichText — 임베드 에디터와 동일 코어, 계획 2단계).
+  // 캔버스 특유: 커밋=스토어 반영+auto-height, 서식바 포커스 시 선택 유지, 범위 선택만 서식바.
+  const rt = useRichText({
+    getBase: () => block,
+    onCommit: (runs, aligns, lists) => {
+      setRichText(block.id, runs, aligns, lists);
+      syncEditH();
+    },
+    onSelection: (st) => {
+      if (!st || !st.isRange) {
+        setSel(null);
+        return;
+      }
+      setSel(st);
+    },
+    shouldSkipSelection: () => !!toolbarRef.current?.contains(document.activeElement),
+  });
+
+  // 편집 진입 — 시드 + 캐럿(클릭 지점, 없으면 끝) + 미니 히스토리 초기화 (editing 토글에만)
   useEffect(() => {
     if (!editing) {
       setSel(null);
-      selRef.current = null;
+      rt.clearSel();
       return;
     }
-    const el = editRef.current;
-    if (!el) return;
-    seedEditable(el, block, blockRuns(block), block.paraAligns, block.paraLists);
-    el.focus();
-    placeCaretFromPoint(el, initialCaretPoint);
-    // 미니 히스토리 초기화 — 스택 바닥 = 편집 진입 시점 상태 (Ctrl+Z의 최종 종착지)
-    histRef.current = {
-      stack: [
-        { runs: blockRuns(block), caret: caretNow(el), aligns: paraAlignsFromDom(el), lists: paraListsFromDom(el) },
-      ],
-      idx: 0,
-      lastAt: 0,
-    };
+    rt.seed(blockRuns(block), block.paraAligns, block.paraLists, initialCaretPoint ?? "end");
     syncEditH();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
@@ -795,128 +746,11 @@ function TextContent({
   // 편집 중 선택 변화 → 서식바 위치·활성 상태 갱신 (구간 선택일 때만 표시)
   useEffect(() => {
     if (!editing) return;
-    const onSelChange = () => {
-      const el = editRef.current;
-      if (!el) return;
-      // 서식바 컨트롤에 포커스가 있으면(폰트 드롭다운 등) 유지 — 선택이 사라져도 숨기지 않음
-      if (toolbarRef.current?.contains(document.activeElement)) return;
-      const offs = selectionOffsets(el);
-      if (!offs || offs[0] === offs[1]) {
-        setSel(null);
-        return;
-      }
-      selRef.current = offs;
-      const range = window.getSelection()!.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const rr = rangeRuns(domToRuns(el), offs[0], offs[1]);
-      const all = (pred: (r: TextRun) => boolean) => rr.length > 0 && rr.every(pred);
-      const same = <T,>(get: (r: TextRun) => T): T | undefined => {
-        if (!rr.length) return undefined;
-        const first = get(rr[0]);
-        return rr.every((r) => get(r) === first) ? first : undefined;
-      };
-      // 선택이 걸친 문단들의 정렬 — 전부 같으면 그 값, 섞이면 undefined
-      const fullText = runsToText(domToRuns(el));
-      const pFrom = paraIdxAt(fullText, offs[0]);
-      const pTo = paraIdxAt(fullText, offs[1]);
-      const domAligns = paraAlignsFromDom(el);
-      const paraAlignsInSel = Array.from({ length: pTo - pFrom + 1 }, (_, i) => domAligns[pFrom + i] ?? block.align ?? "left");
-      const alignUniform = paraAlignsInSel.every((v) => v === paraAlignsInSel[0]) ? paraAlignsInSel[0] : undefined;
-      const domLists = paraListsFromDom(el);
-      const listsInSel = Array.from({ length: pTo - pFrom + 1 }, (_, i) => domLists[pFrom + i] ?? null);
-      const listUniform = listsInSel.every((v) => v === listsInSel[0]) ? listsInSel[0] : undefined;
-      setSel({
-        rect,
-        bold: all((r) => (r.bold ?? block.bold ?? false) === true),
-        italic: all((r) => (r.italic ?? block.italic ?? false) === true),
-        underline: all((r) => (r.underline ?? block.underline ?? false) === true),
-        strike: all((r) => (r.strike ?? block.strike ?? false) === true),
-        color: same((r) => r.color ?? block.color ?? TEXT_DEFAULTS.color),
-        href: same((r) => r.href),
-        bg: same((r) => r.bg),
-        fontSize: same((r) => r.fontSize ?? block.fontSize ?? TEXT_DEFAULTS.fontSize),
-        font: same((r) => r.font ?? block.font),
-        align: alignUniform,
-        list: listUniform,
-      });
-    };
+    const onSelChange = rt.handleSelectionChange;
     document.addEventListener("selectionchange", onSelChange);
     return () => document.removeEventListener("selectionchange", onSelChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, block]);
-
-  // DOM→runs 반영 (타이핑·삭제·붙여넣기). IME 조합 중엔 건너뛰고 compositionend에서 처리.
-  const flushRuns = () => {
-    const el = editRef.current;
-    if (!el || composingRef.current) return;
-    const runs = domToRuns(el);
-    const aligns = paraAlignsFromDom(el); // 문단별 정렬·목록은 편집 DOM이 진실
-    const lists = paraListsFromDom(el);
-    setRichText(block.id, runs, aligns, lists);
-    pushHistory(runs, caretNow(el), true, aligns, lists); // 타이핑 버스트는 한 단계로 코얼레싱
-    syncEditH();
-  };
-
-  // 선택 구간에 서식 패치 적용 — DOM을 다시 그리고 커서를 복원한다
-  const applyStyle = (patch: Partial<Omit<TextRun, "text">>) => {
-    const el = editRef.current;
-    const offs = selRef.current;
-    if (!el || !offs || offs[0] === offs[1]) return;
-    const next = applyRunStyle(domToRuns(el), offs[0], offs[1], patch);
-    const aligns = paraAlignsFromDom(el); // 재시드 전에 현재 문단 정렬·목록 보존
-    const lists = paraListsFromDom(el);
-    seedEditable(el, block, next, aligns, lists);
-    setRichText(block.id, next, aligns, lists);
-    pushHistory(next, offs[1], false, aligns, lists); // 서식 적용은 항상 독립 단계
-    el.focus();
-    setSelectionRange(el, offs[0], offs[1]);
-    syncEditH();
-  };
-
-  // 문단 정렬 적용 — 선택(또는 커서)이 걸친 문단들의 textAlign을 바꾼다
-  const applyParaAlign = (a: TextAlign) => {
-    const el = editRef.current;
-    if (!el) return;
-    const offs = selRef.current ?? ([caretNow(el), caretNow(el)] as [number, number]);
-    const runs = domToRuns(el);
-    const text = runsToText(runs);
-    const pFrom = paraIdxAt(text, offs[0]);
-    const pTo = paraIdxAt(text, offs[1]);
-    const old = paraAlignsFromDom(el);
-    const lists = paraListsFromDom(el);
-    const total = text.split("\n").length;
-    const next: (TextAlign | null)[] = Array.from({ length: total }, (_, i) => old[i] ?? null);
-    for (let i = pFrom; i <= pTo && i < total; i++) next[i] = a;
-    seedEditable(el, block, runs, next, lists);
-    setRichText(block.id, runs, next, lists);
-    pushHistory(runs, offs[1], false, next, lists);
-    el.focus();
-    setSelectionRange(el, offs[0], offs[1]);
-    syncEditH();
-  };
-
-  // 문단 목록 토글 — 선택이 걸친 문단들이 전부 그 타입이면 해제, 아니면 적용
-  const applyParaList = (t: ParaListType) => {
-    const el = editRef.current;
-    if (!el) return;
-    const offs = selRef.current ?? ([caretNow(el), caretNow(el)] as [number, number]);
-    const runs = domToRuns(el);
-    const text = runsToText(runs);
-    const pFrom = paraIdxAt(text, offs[0]);
-    const pTo = paraIdxAt(text, offs[1]);
-    const aligns = paraAlignsFromDom(el);
-    const old = paraListsFromDom(el);
-    const total = text.split("\n").length;
-    const next: (ParaListType | null)[] = Array.from({ length: total }, (_, i) => old[i] ?? null);
-    const allSame = Array.from({ length: pTo - pFrom + 1 }, (_, k) => next[pFrom + k]).every((v) => v === t);
-    for (let i = pFrom; i <= pTo && i < total; i++) next[i] = allSame ? null : t;
-    seedEditable(el, block, runs, aligns, next);
-    setRichText(block.id, runs, aligns, next);
-    pushHistory(runs, offs[1], false, aligns, next);
-    el.focus();
-    setSelectionRange(el, offs[0], offs[1]);
-    syncEditH();
-  };
 
   // auto-height (읽기 모드) — 내용 자연 높이를 관찰해 block.h로. 편집 중엔 syncEditH가 담당.
   const sizerRef = useRef<HTMLDivElement>(null);
@@ -959,100 +793,17 @@ function TextContent({
       <>
         <div
           key="editor"
-          ref={editRef}
+          {...rt.editableProps}
           data-text-click-zone={block.id}
           data-text-hitbox={block.id}
           contentEditable
           suppressContentEditableWarning
           role="textbox"
           aria-multiline="true"
-          onInput={flushRuns}
-          onCompositionStart={() => {
-            composingRef.current = true;
-          }}
-          onCompositionEnd={() => {
-            composingRef.current = false;
-            flushRuns();
-          }}
-          onCopy={(e) => {
-            // 서식 복사 — 선택 런을 HTML(화이트리스트 인라인 스타일)로 클립보드에.
-            // 블록 상속값을 구워 넣어 다른 블록/외부 앱에 붙여도 서식이 산다.
-            const el = editRef.current;
-            const offs = el ? selectionOffsets(el) : null;
-            if (!el || !offs || offs[0] === offs[1]) return; // 빈 선택은 기본 동작
-            e.preventDefault();
-            const rr = rangeRuns(domToRuns(el), offs[0], offs[1]);
-            e.clipboardData.setData("text/html", runsToClipboardHtml(rr, block));
-            e.clipboardData.setData("text/plain", runsToText(rr));
-          }}
-          onCut={(e) => {
-            const el = editRef.current;
-            const offs = el ? selectionOffsets(el) : null;
-            if (!el || !offs || offs[0] === offs[1]) return;
-            e.preventDefault();
-            const rr = rangeRuns(domToRuns(el), offs[0], offs[1]);
-            e.clipboardData.setData("text/html", runsToClipboardHtml(rr, block));
-            e.clipboardData.setData("text/plain", runsToText(rr));
-            const cur = domToRuns(el);
-            const next = spliceRuns(cur, offs[0], offs[1], []);
-            const curText = runsToText(cur);
-            const aligns = spliceAligns(paraAlignsFromDom(el), curText, offs[0], offs[1], "");
-            const lists = spliceAligns(paraListsFromDom(el), curText, offs[0], offs[1], "");
-            seedEditable(el, block, next, aligns, lists);
-            setRichText(block.id, next, aligns, lists);
-            pushHistory(next, offs[0], false, aligns, lists);
-            el.focus();
-            setSelectionRange(el, offs[0], offs[0]);
-            syncEditH();
-          }}
-          onPaste={(e) => {
-            e.preventDefault();
-            const el = editRef.current;
-            if (!el) return;
-            // 서식 붙여넣기 — HTML이 있으면 화이트리스트만 남겨 런으로. 없으면 평문.
-            const html = e.clipboardData.getData("text/html");
-            if (html) {
-              const ins = runsFromClipboardHtml(html);
-              const insText = runsToText(ins);
-              if (insText) {
-                const offs = selectionOffsets(el) ?? [
-                  (el.textContent ?? "").length,
-                  (el.textContent ?? "").length,
-                ];
-                const cur = domToRuns(el);
-                const next = spliceRuns(cur, offs[0], offs[1], ins);
-                const curText = runsToText(cur);
-                const aligns = spliceAligns(paraAlignsFromDom(el), curText, offs[0], offs[1], insText);
-                const lists = spliceAligns(paraListsFromDom(el), curText, offs[0], offs[1], insText);
-                seedEditable(el, block, next, aligns, lists);
-                setRichText(block.id, next, aligns, lists);
-                const caret = offs[0] + insText.length;
-                pushHistory(next, caret, false, aligns, lists);
-                el.focus();
-                setSelectionRange(el, caret, caret);
-                syncEditH();
-                return;
-              }
-            }
-            insertTextAtCaret(e.clipboardData.getData("text/plain"));
-            flushRuns();
-          }}
           onBlur={(e) => {
             // 서식바로 포커스가 옮겨간 blur는 편집 종료가 아님 (폰트 드롭다운 등)
             if (toolbarRef.current?.contains(e.relatedTarget as Node | null)) return;
             onDoneEditing();
-          }}
-          onBeforeInput={(e) => {
-            // 컨텍스트 메뉴 "실행 취소" 등 키보드 밖 경로의 네이티브 undo도 차단 →
-            // 미니 히스토리로 우회 (네이티브는 우리 DOM 재시드를 몰라 어긋난다)
-            const it = (e.nativeEvent as InputEvent).inputType;
-            if (it === "historyUndo") {
-              e.preventDefault();
-              undoEdit();
-            } else if (it === "historyRedo") {
-              e.preventDefault();
-              redoEdit();
-            }
           }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
@@ -1060,39 +811,7 @@ function TextContent({
               onDoneEditing();
               return;
             }
-            // 편집 중 Ctrl+Z/Y — 네이티브 CE undo를 차단하고 runs 미니 히스토리로.
-            // IME 조합 중엔 건드리지 않는다(조합 취소는 IME 몫).
-            const mod = e.ctrlKey || e.metaKey;
-            if (mod && !composingRef.current && !e.nativeEvent.isComposing) {
-              const k = e.key.toLowerCase();
-              if (k === "z" && !e.shiftKey) {
-                e.preventDefault();
-                undoEdit();
-                return;
-              }
-              if (k === "y" || (k === "z" && e.shiftKey)) {
-                e.preventDefault();
-                redoEdit();
-                return;
-              }
-            }
-            // 엔터 = 문단 분할(현재 div를 둘로, 정렬·목록 상속). 브라우저 기본을 막아 직렬화 통제.
-            // IME 조합 확정 엔터는 통과(isComposing) — 줄바꿈이 아니라 글자 확정이어야 한다.
-            if (e.key === "Enter" && !e.shiftKey && !composingRef.current && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              const el = editRef.current;
-              if (!el) return;
-              const caretBefore = caretNow(el);
-              if (!splitParagraphAtCaret(el)) insertTextAtCaret("\n"); // 방어적 폴백
-              flushRuns();
-              // 목록 문단이 있으면 재시드 — 새 문단의 마커·이후 번호를 다시 그린다
-              const lists = paraListsFromDom(el);
-              if (lists.some((l) => l != null)) {
-                seedEditable(el, block, domToRuns(el), paraAlignsFromDom(el), lists);
-                el.focus();
-                setSelectionRange(el, caretBefore + 1, caretBefore + 1);
-              }
-            }
+            rt.editableProps.onKeyDown(e); // Ctrl+Z/Y/B/I/U·Enter 분할은 훅 공통
           }}
           onPointerDown={(e) => e.stopPropagation()}
           style={{ ...textStyle(block), whiteSpace: "pre-wrap", minHeight: "1em", backgroundColor: TEXT_SURFACE, borderColor: TEXT_BORDER }}
@@ -1103,9 +822,9 @@ function TextContent({
             <InlineToolbar
               sel={sel}
               toolbarRef={toolbarRef}
-              onApply={applyStyle}
-              onApplyAlign={applyParaAlign}
-              onApplyList={applyParaList}
+              onApply={rt.applyStyle}
+              onApplyAlign={rt.applyAlign}
+              onApplyList={rt.applyList}
               defaults={{
                 bold: block.bold ?? TEXT_DEFAULTS.bold,
                 italic: block.italic ?? TEXT_DEFAULTS.italic,
@@ -1117,6 +836,7 @@ function TextContent({
           )}
       </>
     );
+
 
   // 안내문(placeholder) 표시 여부 — 비었고 토글 켜졌을 때 회색 안내문을 내용 대신 렌더.
   // 사이저도 안내문 기준으로 재므로 빈 블록이 안내문 크기만큼 자리를 차지한다.

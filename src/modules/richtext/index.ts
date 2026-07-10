@@ -8,3 +8,4 @@ export * from "./caret";
 export * from "./clipboard";
 export * from "./render";
 export * from "./measure";
+export * from "./useRichText";

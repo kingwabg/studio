@@ -22,28 +22,10 @@ import {
   type TableKingData,
   type TextAlign,
   type TextRun,
-  applyRunStyle,
   normalizeRuns,
-  rangeRuns,
   runsToText,
-  spliceRuns,
 } from "../document/model";
-import {
-  domToRuns,
-  insertTextAtCaret,
-  normalizeUrl,
-  paraAlignsFromDom,
-  paraIdxAt,
-  paraListsFromDom,
-  placeCaretEnd,
-  runsFromClipboardHtml,
-  runsToClipboardHtml,
-  seedEditable,
-  selectionOffsets,
-  setSelectionRange,
-  spliceAligns,
-  splitParagraphAtCaret,
-} from "../richtext";
+import { normalizeUrl, placeCaretEnd, useRichText } from "../richtext";
 import { DEFAULT_FONT, ensureFont } from "../document/fonts";
 import { getAssetUrl, putAsset } from "../document/assets";
 import { SCALE } from "../canvas/geometry";
@@ -101,212 +83,59 @@ const EmbedTextBlock = forwardRef<
     onEnterEmptyAtEnd?: () => void;
   }
 >(function EmbedTextBlock({ block, onChange, onActive }, ref) {
-  const ceRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<Block>({ id: block.id, type: "text", x: 0, y: 0, w: 0, h: 0, text: "" } as Block);
-  const composingRef = useRef(false);
-  const selRef = useRef<[number, number]>([0, 0]);
-  type Snap = { runs: TextRun[]; caret: number; aligns: (TextAlign | null)[]; lists: (ParaListType | null)[] };
-  const hist = useRef<{ stack: Snap[]; idx: number; lastAt: number }>({ stack: [], idx: -1, lastAt: 0 });
 
-  const caretNow = () => {
-    const el = ceRef.current;
-    return el ? selectionOffsets(el)?.[1] ?? (el.textContent ?? "").length : 0;
-  };
-  const emit = (runs: TextRun[], aligns: (TextAlign | null)[], lists: (ParaListType | null)[]) =>
-    onChange({ id: block.id, kind: "text", runs: normalizeRuns(runs), paraAligns: aligns, paraLists: lists });
-  const push = (runs: TextRun[], caret: number, coalesce: boolean, aligns: (TextAlign | null)[], lists: (ParaListType | null)[]) => {
-    const h = hist.current;
-    const now = Date.now();
-    h.stack = h.stack.slice(0, h.idx + 1);
-    if (coalesce && h.idx >= 0 && now - h.lastAt < 700) h.stack[h.idx] = { runs, caret, aligns, lists };
-    else { h.stack.push({ runs, caret, aligns, lists }); h.idx = h.stack.length - 1; }
-    h.lastAt = now;
-  };
-  const applySnap = (st: Snap) => {
-    const el = ceRef.current;
-    if (!el) return;
-    seedEditable(el, baseRef.current, st.runs, st.aligns, st.lists);
-    emit(st.runs, st.aligns, st.lists);
-    el.focus();
-    setSelectionRange(el, st.caret, st.caret);
-  };
-  const undo = () => { const h = hist.current; if (h.idx <= 0) return; h.idx--; h.lastAt = 0; applySnap(h.stack[h.idx]); };
-  const redo = () => { const h = hist.current; if (h.idx >= h.stack.length - 1) return; h.idx++; h.lastAt = 0; applySnap(h.stack[h.idx]); };
-
-  const flush = () => {
-    const el = ceRef.current;
-    if (!el || composingRef.current) return;
-    const runs = domToRuns(el);
-    const aligns = paraAlignsFromDom(el);
-    const lists = paraListsFromDom(el);
-    emit(runs, aligns, lists);
-    push(runs, caretNow(), true, aligns, lists);
-  };
+  // 편집 배선 공유 훅 (richtext/useRichText — 캔버스 TextContent와 동일 코어, 계획 2단계).
+  // 임베드 특유: 커밋=로컬 blocks 갱신, 선택 통지=상단 고정 툴바 활성 상태(onActive).
+  const rt = useRichText({
+    getBase: () => baseRef.current,
+    onCommit: (runs, aligns, lists) =>
+      onChange({ id: block.id, kind: "text", runs: normalizeRuns(runs), paraAligns: aligns, paraLists: lists }),
+    onSelection: (st) => {
+      if (!st) return; // 에디터 밖 — 마지막 상태 유지 (다중 블록에서 서로 안 지움)
+      onActive(block.id, {
+        bold: st.bold, italic: st.italic, underline: st.underline, strike: st.strike,
+        align: st.align, list: st.list, href: st.href,
+      });
+    },
+  });
 
   useEffect(() => {
     void ensureFont(DEFAULT_FONT);
-    const el = ceRef.current;
-    if (!el) return;
-    const runs = block.runs.length ? block.runs : [{ text: "" }];
-    seedEditable(el, baseRef.current, runs, block.paraAligns, block.paraLists);
-    hist.current = { stack: [{ runs, caret: 0, aligns: block.paraAligns, lists: block.paraLists }], idx: 0, lastAt: 0 };
+    rt.seed(block.runs.length ? block.runs : [{ text: "" }], block.paraAligns, block.paraLists);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    const onSel = () => {
-      const el = ceRef.current;
-      if (!el || !el.contains(document.getSelection()?.anchorNode ?? null)) return;
-      const offs = selectionOffsets(el);
-      if (!offs) return;
-      selRef.current = offs;
-      const runs = domToRuns(el);
-      const rr = offs[0] === offs[1] ? [] : rangeRuns(runs, offs[0], offs[1]);
-      const all = (p: (r: TextRun) => boolean) => rr.length > 0 && rr.every(p);
-      const text = runsToText(runs);
-      const pF = paraIdxAt(text, offs[0]);
-      const pT = paraIdxAt(text, offs[1]);
-      const aligns = paraAlignsFromDom(el);
-      const lists = paraListsFromDom(el);
-      const aSel = Array.from({ length: pT - pF + 1 }, (_, i) => aligns[pF + i] ?? "left");
-      const lSel = Array.from({ length: pT - pF + 1 }, (_, i) => lists[pF + i] ?? null);
-      const same = <T,>(a: T[]) => (a.every((v) => v === a[0]) ? a[0] : undefined);
-      const hrefs = rr.map((r) => r.href);
-      onActive(block.id, {
-        bold: all((r) => r.bold === true), italic: all((r) => r.italic === true),
-        underline: all((r) => r.underline === true), strike: all((r) => r.strike === true),
-        align: same(aSel), list: same(lSel),
-        href: hrefs.length && hrefs.every((h) => h === hrefs[0]) ? hrefs[0] : undefined,
-      });
-    };
+    const onSel = rt.handleSelectionChange;
     document.addEventListener("selectionchange", onSel);
     return () => document.removeEventListener("selectionchange", onSel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const applyStyle = (patch: Partial<Omit<TextRun, "text">>) => {
-    const el = ceRef.current;
-    const [a, b] = selRef.current;
-    if (!el || a === b) return;
-    const next = applyRunStyle(domToRuns(el), a, b, patch);
-    const aligns = paraAlignsFromDom(el);
-    const lists = paraListsFromDom(el);
-    seedEditable(el, baseRef.current, next, aligns, lists);
-    emit(next, aligns, lists);
-    push(next, b, false, aligns, lists);
-    el.focus();
-    setSelectionRange(el, a, b);
-  };
-  const applyPara = (mut: (a: (TextAlign | null)[], l: (ParaListType | null)[], f: number, t: number) => void) => {
-    const el = ceRef.current;
-    if (!el) return;
-    const [a, b] = selRef.current;
-    const runs = domToRuns(el);
-    const text = runsToText(runs);
-    const total = text.split("\n").length;
-    const aligns = Array.from({ length: total }, (_, i) => paraAlignsFromDom(el)[i] ?? null);
-    const lists = Array.from({ length: total }, (_, i) => paraListsFromDom(el)[i] ?? null);
-    mut(aligns, lists, paraIdxAt(text, a), Math.min(paraIdxAt(text, b), total - 1));
-    seedEditable(el, baseRef.current, runs, aligns, lists);
-    emit(runs, aligns, lists);
-    push(runs, b, false, aligns, lists);
-    el.focus();
-    setSelectionRange(el, a, b);
-  };
-
   useImperativeHandle(ref, () => ({
-    applyStyle,
-    applyAlign: (v) => applyPara((a, _l, f, t) => { for (let i = f; i <= t; i++) a[i] = v; }),
-    applyList: (v) => applyPara((_a, l, f, t) => {
-      const same = Array.from({ length: t - f + 1 }, (_, k) => l[f + k]).every((x) => x === v);
-      for (let i = f; i <= t; i++) l[i] = same ? null : v;
-    }),
-    undo, redo,
-    focus: () => ceRef.current?.focus(),
+    applyStyle: rt.applyStyle,
+    applyAlign: rt.applyAlign,
+    applyList: rt.applyList,
+    undo: rt.undo,
+    redo: rt.redo,
+    focus: () => rt.ref.current?.focus(),
   }));
 
   return (
     <div
-      ref={ceRef}
+      {...rt.editableProps}
       data-eb={block.id}
       contentEditable
       suppressContentEditableWarning
       role="textbox"
       aria-multiline="true"
-      onInput={flush}
       onFocus={() => {
-        const el = ceRef.current;
+        const el = rt.ref.current;
         if (el && !(el.textContent ?? "").length && !el.querySelector("[data-para]")) placeCaretEnd(el);
       }}
-      onCompositionStart={() => { composingRef.current = true; }}
-      onCompositionEnd={() => { composingRef.current = false; flush(); }}
-      onCopy={(e) => {
-        const el = ceRef.current;
-        const offs = el ? selectionOffsets(el) : null;
-        if (!el || !offs || offs[0] === offs[1]) return;
-        e.preventDefault();
-        const rr = rangeRuns(domToRuns(el), offs[0], offs[1]);
-        e.clipboardData.setData("text/html", runsToClipboardHtml(rr, baseRef.current));
-        e.clipboardData.setData("text/plain", runsToText(rr));
-      }}
-      onPaste={(e) => {
-        e.preventDefault();
-        const el = ceRef.current;
-        if (!el) return;
-        const html = e.clipboardData.getData("text/html");
-        if (html) {
-          const ins = runsFromClipboardHtml(html);
-          const insText = runsToText(ins);
-          if (insText) {
-            const offs = selectionOffsets(el) ?? [caretNow(), caretNow()];
-            const cur = domToRuns(el);
-            const next = spliceRuns(cur, offs[0], offs[1], ins);
-            const curText = runsToText(cur);
-            const aligns = spliceAligns(paraAlignsFromDom(el), curText, offs[0], offs[1], insText);
-            const lists = spliceAligns(paraListsFromDom(el), curText, offs[0], offs[1], insText);
-            seedEditable(el, baseRef.current, next, aligns, lists);
-            emit(next, aligns, lists);
-            const caret = offs[0] + insText.length;
-            push(next, caret, false, aligns, lists);
-            el.focus();
-            setSelectionRange(el, caret, caret);
-            return;
-          }
-        }
-        insertTextAtCaret(e.clipboardData.getData("text/plain"));
-        flush();
-      }}
-      onBeforeInput={(e) => {
-        const it = (e.nativeEvent as InputEvent).inputType;
-        if (it === "historyUndo") { e.preventDefault(); undo(); }
-        else if (it === "historyRedo") { e.preventDefault(); redo(); }
-      }}
-      onKeyDown={(e) => {
-        const mod = e.ctrlKey || e.metaKey;
-        if (mod && !composingRef.current && !e.nativeEvent.isComposing) {
-          const k = e.key.toLowerCase();
-          if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
-          if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redo(); return; }
-          if (k === "b") { e.preventDefault(); applyStyle({ bold: true }); return; }
-          if (k === "i") { e.preventDefault(); applyStyle({ italic: true }); return; }
-          if (k === "u") { e.preventDefault(); applyStyle({ underline: true }); return; }
-        }
-        if (e.key === "Enter" && !e.shiftKey && !composingRef.current && !e.nativeEvent.isComposing) {
-          e.preventDefault();
-          const el = ceRef.current;
-          if (!el) return;
-          const caretBefore = caretNow();
-          if (!splitParagraphAtCaret(el)) insertTextAtCaret("\n");
-          flush();
-          const lists = paraListsFromDom(el);
-          if (lists.some((l) => l != null)) {
-            seedEditable(el, baseRef.current, domToRuns(el), paraAlignsFromDom(el), lists);
-            el.focus();
-            setSelectionRange(el, caretBefore + 1, caretBefore + 1);
-          }
-        }
-      }}
       onClick={(e) => {
+        // Ctrl+클릭 → 링크 열기 (편집 중에도)
         if (!(e.ctrlKey || e.metaKey)) return;
         const href = (e.target as HTMLElement).closest?.("span[data-href]")?.getAttribute("data-href");
         if (href) { e.preventDefault(); window.open(href, "_blank", "noopener,noreferrer"); }
