@@ -241,9 +241,14 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
     }`;
   };
 
-  // 텍스트 박스 테두리 더블클릭 → A4 여백까지 최대화, 최대 상태면 내용 폭으로 접기.
+  // 더블클릭 진입. 표: 셀 편집 모드(그전엔 객체 선택=이동). 텍스트: 글자 편집.
   const handleBlockDoubleClick = (e: RMouseEvent<HTMLDivElement>) => {
-    if (block.type !== "text" || locked) return;
+    if (locked) return;
+    if (isTable) {
+      setEditing(true); // 표 = 객체 선택 → 더블클릭으로 셀 편집(table-king active)
+      return;
+    }
+    if (block.type !== "text") return;
     if (!isTextHitTarget(e.target)) return;
     setTextCaretPoint(textClickPoint(e));
     setEditing(true);
@@ -356,7 +361,7 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
           ? `translate3d(${followX}px, ${followY}px, 0)`
           : CSS.Translate.toString(transform),
         zIndex: isDragging ? 20 : following ? 19 : selected ? 10 : 1,
-        cursor: editing ? "text" : locked ? "default" : isText ? "default" : "grab",
+        cursor: editing ? "text" : locked ? "default" : isText || isTable ? "default" : "grab",
         touchAction: "none",
       }}
       className={`group/blk rounded-[3px] overflow-visible select-none transition-[outline-color,box-shadow] ${
@@ -391,7 +396,7 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
         {block.type === "text" ? (
           <TextContent block={block} editing={editing} initialCaretPoint={textCaretPoint} onDoneEditing={finishEditing} />
         ) : isTable ? (
-          <TableKingContent block={block} active={selected} />
+          <TableKingContent block={block} active={editing} />
         ) : (
           <ImageContent block={block} locked={locked} />
         )}
@@ -418,24 +423,27 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
       {/* 단일 선택 + 미잠금일 때만 편집 어포던스(그립·플로팅 바·핸들). 다중은 outline만 */}
       {soleSelected && !editing && !locked && (
         <>
-          {/* 표: 이동 그립만 (table-king 리본·우측 패널이 복제·삭제·서식 담당 — 툴바 중복 방지) */}
+          {/* 표: 이동 오버레이 — 객체 선택 상태에선 표 위를 덮어 "어디를 끌어도 이동"(move 커서).
+              더블클릭으로 셀 편집 진입(오버레이 사라짐). 모서리 리사이즈 핸들은 z-30로 위에 둠. */}
           {isTable && (
-            <span
+            <div
               {...listeners}
               onPointerDown={(e) => {
                 selectBlockOrGroup();
                 listeners?.onPointerDown?.(e);
               }}
-              title="이동"
-              className="absolute -top-2.5 -left-2.5 z-40 flex items-center justify-center w-6 h-6 rounded-lg bg-accent text-white cursor-grab"
-              style={{ touchAction: "none", boxShadow: "var(--sh-card)" }}
-            >
-              <IcGrip size={13} />
-            </span>
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditing(true);
+              }}
+              title="드래그하여 이동 · 더블클릭하여 표 편집"
+              className="absolute inset-0 z-20"
+              style={{ cursor: "move", touchAction: "none" }}
+            />
           )}
 
-          {/* 텍스트/이미지: 플로팅 액션 바 — 그룹 선택·잠금·복제·삭제 */}
-          {!isTable && (
+          {/* 플로팅 액션 바 — 그룹 선택·잠금·복제·삭제 (표는 객체 모드에서 여기로 삭제·복제) */}
+          {(
             <div
               className="absolute -top-[58px] left-1/2 -translate-x-1/2 z-40 flex items-center gap-px p-[3px] rounded-[11px] bg-surface border border-line"
               style={{ boxShadow: "var(--sh-pop)" }}
@@ -496,16 +504,20 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
               }}
             />
           )}
-          {!isTable &&
-            RESIZE_HANDLES.filter((h) => (block.type === "text" ? h.dir.length === 2 : true)).map((hdl) => (
-              <div
-                key={hdl.dir}
-                title={isText ? "폭 조절" : "크기 조절"}
-                onPointerDown={(e) => startResize(e, hdl.dir)}
-                className="absolute z-30 bg-white border-[1.5px] border-accent rounded-[2px]"
-                style={isText ? textWidthHandleStyle(hdl.style) : hdl.style}
-              />
-            ))}
+          {/* 모서리 핸들 — 텍스트·표는 4모서리만, 이미지는 8방향. 표는 시각 표식 전용
+              (pointer-events:none)이라 모서리에서도 이동 오버레이가 그대로 잡힌다. */}
+          {RESIZE_HANDLES.filter((h) => (isText || isTable ? h.dir.length === 2 : true)).map((hdl) => (
+            <div
+              key={hdl.dir}
+              title={isTable ? undefined : isText ? "폭 조절" : "크기 조절"}
+              onPointerDown={isTable ? undefined : (e) => startResize(e, hdl.dir)}
+              className="absolute z-30 bg-white border-[1.5px] border-accent rounded-[2px]"
+              style={{
+                ...(isText ? textWidthHandleStyle(hdl.style) : hdl.style),
+                ...(isTable ? { pointerEvents: "none" as const, cursor: "default" } : {}),
+              }}
+            />
+          ))}
         </>
       )}
     </div>
