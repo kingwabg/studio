@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { type CanvasDoc, type Block, type TableKingData, padOf, showingHint } from "../document/model";
 import { mmToPx } from "./geometry";
-import { textStyle, RichRead } from "./CanvasBlock";
+import { RichRead, textStyle } from "../richtext";
 import { getAssetUrl } from "../document/assets";
 import { tableDataToRows } from "../../table-king/TableKingBlock.jsx";
 

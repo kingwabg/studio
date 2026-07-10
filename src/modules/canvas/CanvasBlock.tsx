@@ -45,39 +45,7 @@ import { IcGrip, IcCopy, IcImage, IcTrash } from "../../ui/icons";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
 import "../../table-king/table-king.css";
 
-import {
-  LEGACY_TEXT_INK,
-  TEXT_SURFACE,
-  TEXT_BORDER,
-  normalizeTextColor,
-  textStyle,
-  runCssObj,
-  LINK_COLOR,
-  RichRead,
-  ScriptText,
-  TokenText,
-  measureNaturalWidthPx,
-  seedEditable,
-  domToRuns,
-  selectionOffsets,
-  setSelectionRange,
-  placeCaretEnd,
-  placeCaretFromPoint,
-  insertTextAtCaret,
-  paraAlignsFromDom,
-  paraListsFromDom,
-  paraIdxAt,
-  spliceAligns,
-  splitParagraphAtCaret,
-  runsToClipboardHtml,
-  runsFromClipboardHtml,
-  normalizeUrl,
-  useRichText,
-  type RichSelState,
-} from "../richtext";
-// 이동 전 경로 호환 — EmbedEditor·PageSnapshot 등 기존 import가 그대로 컴파일된다.
-// (docs/refactoring-plan.md: re-export는 3단계 분할 후 한 세션 유예를 두고 제거)
-export * from "../richtext";
+import { LEGACY_TEXT_INK, TEXT_BORDER, TEXT_SURFACE, measureNaturalWidthPx } from "../richtext";
 
 const MIN_W = 12; // mm
 const MIN_H = 8; // mm
