@@ -94,5 +94,5 @@ TextContent(1451행~)와 EmbedTextBlock(embed)의 공통 배선을 훅으로:
 - [ ] `git status` — CanvasBlock.tsx 클린 확인
 - [x] 1단계 ✅ 완료 (994d354) — 실제 구성은 성장 예산에 맞춰 7분할: style/dom/emission/caret/clipboard/render/measure. 감사 3종(순수성 byte-동일·의존 DAG·호환 tsc 0) 통과. 잔여: EmbedEditor→canvas/geometry(SCALE) 결합은 2단계에서 정리
 - [x] 2단계 ✅ 완료 — useRichText 훅(377줄), CanvasBlock 1499줄·EmbedEditor 397줄(예산 안). 의도된 수렴: 캔버스 Ctrl+B/I/U, 임베드 onCut
-- [ ] 3단계: 파일 분할 (커밋 4~5개, 파일당 1커밋)
+- [x] 3단계 ✅ 완료 — CanvasBlock 578줄(셸만). Text/Image/Table/InlineToolbar 각 파일(전부 예산 안). 기계 슬라이싱 1커밋(감사로 대체). 남은 일: richtext 재수출 제거(한 세션 유예 — CanvasStage·PageSnapshot의 ./CanvasBlock import를 직접 경로로 바꾼 뒤)
 - [ ] 각 커밋: tsc·하네스·브라우저 스모크
