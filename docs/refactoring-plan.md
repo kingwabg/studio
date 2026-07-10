@@ -81,8 +81,8 @@ TextContent(1451행~)와 EmbedTextBlock(embed)의 공통 배선을 훅으로:
 - ⚠ **병렬 세션이 CanvasBlock을 만지고 있지 않은 시점에만** (git status로 CanvasBlock 클린 확인 후) — 충돌 최다 지점
 - 순서: 1·2단계 완료 후. re-export 배럴은 이 단계 끝나고 한 세션 뒤에 제거
 
-## 4단계(선택) — exportHwpx 분할
-`measure`(charWidthMm·wrappedLineCount·textExportHeightMm) / `elements`(elementOf·richLinesOf·baseStyle) / `assets`(collectImages) — 658줄이 더 크면 그때.
+## 4단계 ✅ 완료 — exportHwpx 51줄 파사드 + export/{elements(171)·measure(54)·assets(31)}.
+초기 순환(elements↔measure)을 textExportHeightMm 이동으로 해소(타입만 단방향). 콜사이트 0 변경.
 
 ## 하지 말 것
 - 이동 커밋에 동작 변경 섞기 (splitRunsToParas 통일만 예외로 명시)
@@ -91,7 +91,7 @@ TextContent(1451행~)와 EmbedTextBlock(embed)의 공통 배선을 훅으로:
 - re-export 제거를 1단계와 같은 커밋에 (한 세션 유예)
 
 ## 착수 체크리스트
-- [ ] `git status` — CanvasBlock.tsx 클린 확인
+- [x] 재수출 제거 ✅ — PageSnapshot→richtext 직접 전환, CanvasBlock export* 삭제(셸 실사용 4심볼만 import)
 - [x] 1단계 ✅ 완료 (994d354) — 실제 구성은 성장 예산에 맞춰 7분할: style/dom/emission/caret/clipboard/render/measure. 감사 3종(순수성 byte-동일·의존 DAG·호환 tsc 0) 통과. 잔여: EmbedEditor→canvas/geometry(SCALE) 결합은 2단계에서 정리
 - [x] 2단계 ✅ 완료 — useRichText 훅(377줄), CanvasBlock 1499줄·EmbedEditor 397줄(예산 안). 의도된 수렴: 캔버스 Ctrl+B/I/U, 임베드 onCut
 - [x] 3단계 ✅ 완료 — CanvasBlock 578줄(셸만). Text/Image/Table/InlineToolbar 각 파일(전부 예산 안). 기계 슬라이싱 1커밋(감사로 대체). 남은 일: richtext 재수출 제거(한 세션 유예 — CanvasStage·PageSnapshot의 ./CanvasBlock import를 직접 경로로 바꾼 뒤)
