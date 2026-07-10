@@ -5,34 +5,32 @@
 // 데모가 곧 제품 — 여기서 동작하는 그대로를 SDK로 패키징해 판다.
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { EmbedEditor, embedValueToDoc, type EmbedValue } from "../modules/embed/EmbedEditor";
+import { EmbedEditor, type EmbedEditorHandle } from "../modules/embed/EmbedEditor";
 import { buildHwpxBytesAsync, downloadBytes } from "../modules/document/exportHwpx";
-import { type CanvasDoc } from "../modules/document/model";
 import { IcBack, IcDownload } from "../ui/icons";
 
 const SNIPPET = `import { EmbedEditor } from "@upmu24/editor";
 
-<EmbedEditor
-  placeholder="내용을 입력하세요…"
-  onChange={(v) => save(v.runs)}   // runs = 서식 포함 JSON
-/>
+const ref = useRef();
 
-// 한 줄로 한글(.hwpx) 파일 생성 — 국내 유일
-const hwpx = await toHwpx(v);`;
+<EmbedEditor ref={ref} placeholder="내용을 입력하세요…" />
+
+// 텍스트·이미지·표를 담은 그대로 한글(.hwpx) 파일 생성 — 국내 유일
+const hwpx = await toHwpx(ref.current.toDoc());`;
 
 export default function StudioEmbed() {
-  const valueRef = useRef<EmbedValue | null>(null);
+  const editorRef = useRef<EmbedEditorHandle | null>(null);
   const [busy, setBusy] = useState(false);
 
   const downloadHwpx = async () => {
-    const v = valueRef.current;
-    if (!v || !v.text.trim()) {
+    const ed = editorRef.current;
+    if (!ed || ed.isEmpty()) {
       alert("에디터에 내용을 입력한 뒤 내려받아 보세요.");
       return;
     }
     setBusy(true);
     try {
-      const bytes = await buildHwpxBytesAsync(embedValueToDoc(v) as unknown as CanvasDoc);
+      const bytes = await buildHwpxBytesAsync(ed.toDoc());
       downloadBytes(bytes, "임베드에디터.hwpx");
     } finally {
       setBusy(false);
@@ -78,14 +76,12 @@ export default function StudioEmbed() {
             </button>
           </div>
           <EmbedEditor
-            placeholder="여기에 입력해 보세요 — 굵게, 형광펜, 목록, 링크…"
-            minHeight={200}
-            onChange={(v) => {
-              valueRef.current = v;
-            }}
+            ref={editorRef}
+            placeholder="여기에 입력해 보세요 — 굵게, 형광펜, 목록, 링크, 그리고 이미지·표까지…"
+            minHeight={220}
           />
           <p className="text-[11.5px] text-inkfaint">
-            굵게/기울임/밑줄/취소선 · 글자색 · 형광펜 · 정렬 · 글머리/번호 목록 · 링크 · 실행취소 — 기본형 구성입니다.
+            굵게/기울임/밑줄/취소선 · 글자색 · 형광펜 · 정렬 · 글머리/번호 목록 · 링크 · <b className="text-inksoft">이미지 · 표</b> · 실행취소 — 본문 흐름에 그대로 삽입됩니다.
           </p>
         </div>
 
