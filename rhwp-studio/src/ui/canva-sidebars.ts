@@ -7,6 +7,7 @@ import type { CanvaServices } from './canva-services';
 import { CanvaLeftPalette } from './canva-left-palette';
 import { CanvaRightInspector } from './canva-right-inspector';
 import { CanvaAiPanel } from './canva-ai-panel';
+import { mkEl, mkButton } from './canva-dom';
 
 let mounted = false;
 
@@ -36,8 +37,7 @@ export function mountCanvaSidebars(services: CanvaServices): void {
 
   // 우: [속성] 인스펙터 + [AI] 탭 — buildRail이 만든 body를 인스펙터 창으로 재사용(잉여 노드 방지)
   const inspectorPane = right.body;
-  const aiPane = document.createElement('div');
-  aiPane.className = 'canva-ai-pane-wrap';
+  const aiPane = mkEl('div', 'canva-ai-pane-wrap');
   aiPane.style.cssText = 'flex:1;display:flex;min-height:0;';
   aiPane.hidden = true;
   right.content.append(aiPane);
@@ -58,14 +58,9 @@ function mountModeToggle(services: CanvaServices): void {
   const menuBar = document.getElementById('menu-bar');
   if (!menuBar) return;
 
-  const wrap = document.createElement('div');
-  wrap.className = 'canva-mode-toggle';
-  const bCanvas = document.createElement('button');
-  bCanvas.type = 'button';
-  bCanvas.textContent = '캔버스';
-  const bDoc = document.createElement('button');
-  bDoc.type = 'button';
-  bDoc.textContent = '문서';
+  const wrap = mkEl('div', 'canva-mode-toggle');
+  const bCanvas = mkButton('', { text: '캔버스' });
+  const bDoc = mkButton('', { text: '문서' });
   wrap.append(bCanvas, bDoc);
   menuBar.appendChild(wrap);
 
@@ -93,28 +88,22 @@ interface RailParts {
 }
 
 function buildRail(side: 'left' | 'right'): RailParts {
-  const rail = document.createElement('aside');
-  rail.className = `canva-rail canva-rail--${side}`;
+  const rail = mkEl('aside', `canva-rail canva-rail--${side}`);
 
-  const head = document.createElement('div');
-  head.className = 'canva-rail-head';
+  const head = mkEl('div', 'canva-rail-head');
   rail.appendChild(head);
 
   // content = 스크롤/플렉스 컨테이너 (좌: body 하나, 우: 인스펙터+AI 스왑)
   // ⚠ 인라인 display 금지 — 접힘 시 `.is-collapsed > * {display:none}`이 인라인을 못 이겨
   //   콘텐츠 min-content가 폭을 붙잡는다. 반드시 클래스로 지정.
-  const content = document.createElement('div');
-  content.className = 'canva-rail-content';
+  const content = mkEl('div', 'canva-rail-content');
   rail.appendChild(content);
 
-  const body = document.createElement('div');
-  body.className = 'canva-rail-body';
+  const body = mkEl('div', 'canva-rail-body');
   content.appendChild(body);
 
   // 접기 손잡이
-  const handle = document.createElement('button');
-  handle.className = 'canva-rail-handle';
-  handle.type = 'button';
+  const handle = mkButton('canva-rail-handle');
   const setChevron = () => {
     const collapsed = rail.classList.contains('is-collapsed');
     // 좌 레일: 열림=◀(접기)·닫힘=▶(펼치기), 우 레일 반대
@@ -129,18 +118,12 @@ function buildRail(side: 'left' | 'right'): RailParts {
   return {
     rail, head, content, body,
     setTitle(t: string) {
-      const title = document.createElement('span');
-      title.className = 'canva-rail-title';
-      title.textContent = t;
-      head.appendChild(title);
+      head.appendChild(mkEl('span', 'canva-rail-title', t));
     },
     setTabs(labels, onSelect) {
       const btns: HTMLElement[] = [];
       labels.forEach((label, idx) => {
-        const b = document.createElement('button');
-        b.className = 'canva-tab' + (idx === 0 ? ' is-active' : '');
-        b.type = 'button';
-        b.innerHTML = `<span>${label}</span>`;
+        const b = mkButton('canva-tab' + (idx === 0 ? ' is-active' : ''), { html: `<span>${label}</span>` });
         b.addEventListener('click', () => {
           btns.forEach((x) => x.classList.toggle('is-active', x === b));
           onSelect(idx);

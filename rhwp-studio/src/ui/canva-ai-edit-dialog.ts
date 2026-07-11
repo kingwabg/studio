@@ -5,6 +5,7 @@
  * inline-ai의 "골라서 수정하고 한눈에 비교"를 캔버스 개체 단위로 옮긴 것.
  */
 import { callMiniMax, aiErrorHint } from './canva-ai-client';
+import { buildDialogShell, mkDialogBtn } from './canva-dom';
 
 const EDIT_PROMPT =
   '당신은 한국어 문서 편집 도우미입니다. 사용자가 준 "현재 내용"을 요청에 따라 수정해, ' +
@@ -49,11 +50,8 @@ export function showAiEditDialog(ih: any, ref: ShapeRef): void {
   let revised: string | null = null;
   let busy = false;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  const dialog = document.createElement('div');
-  dialog.className = 'dialog-wrap';
-  dialog.style.width = '460px';
+  // 공용 뼈대(canva-dom) — 클래스·구조는 기존과 동일
+  const { overlay, body, footer } = buildDialogShell('AI에게 수정하기', '460px', () => close());
 
   const close = () => {
     document.removeEventListener('keydown', onKey, true);
@@ -65,17 +63,6 @@ export function showAiEditDialog(ih: any, ref: ShapeRef): void {
   };
   document.addEventListener('keydown', onKey, true);
 
-  const titleBar = document.createElement('div');
-  titleBar.className = 'dialog-title';
-  titleBar.textContent = 'AI에게 수정하기';
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'dialog-close';
-  closeBtn.textContent = '×';
-  closeBtn.addEventListener('click', close);
-  titleBar.appendChild(closeBtn);
-
-  const body = document.createElement('div');
-  body.className = 'dialog-body';
   body.style.cssText = 'padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-height:70vh;overflow-y:auto;';
 
   const mkLabel = (t: string) => {
@@ -117,19 +104,10 @@ export function showAiEditDialog(ih: any, ref: ShapeRef): void {
   status.style.cssText = 'font-size:11.5px;color:var(--ui-text-hint);white-space:pre-wrap;';
   body.appendChild(status);
 
-  const footer = document.createElement('div');
-  footer.className = 'dialog-footer';
-  const mkBtn = (label: string, primary: boolean) => {
-    const b = document.createElement('button');
-    b.className = primary ? 'dialog-btn dialog-btn-primary' : 'dialog-btn';
-    b.textContent = label;
-    return b;
-  };
-  const requestBtn = mkBtn('수정 요청', true);
-  const applyBtn = mkBtn('적용', true);
-  const cancelBtn = mkBtn('취소', false);
+  const requestBtn = mkDialogBtn('수정 요청', true);
+  const applyBtn = mkDialogBtn('적용', true);
+  const cancelBtn = mkDialogBtn('취소', false, close);
   applyBtn.style.display = 'none';
-  cancelBtn.addEventListener('click', close);
 
   const doRequest = async () => {
     const instruction = input.value.trim();
@@ -175,8 +153,6 @@ export function showAiEditDialog(ih: any, ref: ShapeRef): void {
   });
 
   footer.append(requestBtn, applyBtn, cancelBtn);
-  dialog.append(titleBar, body, footer);
-  overlay.appendChild(dialog);
   document.body.appendChild(overlay);
   input.focus();
 }

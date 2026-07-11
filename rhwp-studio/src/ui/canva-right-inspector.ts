@@ -6,6 +6,7 @@
  */
 import type { CanvaServices } from './canva-services';
 import type { CharProperties, ParaProperties } from '@/core/types';
+import { mkEl, mkButton } from './canva-dom';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
 
@@ -41,33 +42,24 @@ export class CanvaRightInspector {
   }
 
   private render(): void {
-    const pane = document.createElement('div');
-    pane.className = 'canva-pane';
+    const pane = mkEl('div', 'canva-pane');
 
-    this.banner = document.createElement('div');
-    this.banner.className = 'canva-context-banner';
+    this.banner = mkEl('div', 'canva-context-banner');
     pane.appendChild(this.banner);
 
     // 빈 상태 (문서 없음)
-    this.emptyEl = document.createElement('div');
-    this.emptyEl.className = 'canva-ins-empty';
-    this.emptyEl.textContent = '문서를 열면 선택한 개체의 속성이 여기 표시됩니다.';
+    this.emptyEl = mkEl('div', 'canva-ins-empty', '문서를 열면 선택한 개체의 속성이 여기 표시됩니다.');
     this.emptyEl.hidden = true;
     pane.appendChild(this.emptyEl);
 
     // 글자 서식
-    this.fmtPane = document.createElement('div');
-    this.fmtPane.className = 'canva-pane';
+    this.fmtPane = mkEl('div', 'canva-pane');
 
     // B / I / U
     const biuSec = this.section('글자');
-    const biuRow = document.createElement('div');
-    biuRow.className = 'canva-btn-row';
+    const biuRow = mkEl('div', 'canva-btn-row');
     const mkTog = (key: 'bold' | 'italic' | 'underline', label: string, cmd: string, style: string) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'canva-icon-btn';
-      b.innerHTML = `<i style="${style}">${label}</i>`;
+      const b = mkButton('canva-icon-btn', { html: `<i style="${style}">${label}</i>` });
       b.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch(cmd); });
       this.biu[key] = b;
       return b;
@@ -78,13 +70,11 @@ export class CanvaRightInspector {
     biuSec.appendChild(biuRow);
 
     // 크기 스테퍼
-    const sizeRow = document.createElement('div');
-    sizeRow.className = 'canva-btn-row';
-    const stepper = document.createElement('div');
-    stepper.className = 'canva-stepper';
-    const dec = document.createElement('button'); dec.type = 'button'; dec.textContent = '−';
+    const sizeRow = mkEl('div', 'canva-btn-row');
+    const stepper = mkEl('div', 'canva-stepper');
+    const dec = mkButton('', { text: '−' });
     const inp = document.createElement('input'); inp.type = 'number'; inp.value = '10'; inp.min = '1'; inp.step = '0.5';
-    const inc = document.createElement('button'); inc.type = 'button'; inc.textContent = '+';
+    const inc = mkButton('', { text: '+' });
     dec.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:font-size-decrease'); });
     inc.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:font-size-increase'); });
     inp.addEventListener('keydown', (e) => {
@@ -101,13 +91,9 @@ export class CanvaRightInspector {
 
     // 정렬
     const alignSec = this.section('문단 정렬');
-    const alignRow = document.createElement('div');
-    alignRow.className = 'canva-btn-row';
+    const alignRow = mkEl('div', 'canva-btn-row');
     for (const key of ['left', 'center', 'right', 'justify']) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'canva-icon-btn';
-      b.innerHTML = svg(ALIGN_ICONS[key]);
+      const b = mkButton('canva-icon-btn', { html: svg(ALIGN_ICONS[key]) });
       b.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch(`format:align-${key}`); });
       this.aligns[key] = b;
       alignRow.appendChild(b);
@@ -117,14 +103,10 @@ export class CanvaRightInspector {
 
     // 글자색
     const colorSec = this.section('글자색');
-    const sw = document.createElement('div');
-    sw.className = 'canva-swatches';
+    const sw = mkEl('div', 'canva-swatches');
     for (const c of COLORS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'canva-swatch';
+      const b = mkButton('canva-swatch', { title: c });
       b.style.background = c;
-      b.title = c;
       b.addEventListener('mousedown', (e) => {
         e.preventDefault();
         this.services.eventBus.emit('format-char', { textColor: c } as CharProperties);
@@ -137,16 +119,14 @@ export class CanvaRightInspector {
     this.fmtPane.appendChild(colorSec);
 
     // 전체 글자 모양 다이얼로그
-    const full = document.createElement('button');
-    full.type = 'button';
-    full.className = 'canva-full-btn';
-    full.innerHTML = svg('<path d="M4 7V4h16v3M9 20h6M12 4v16"/>') + '<span>글자 모양 자세히…</span>';
+    const full = mkButton('canva-full-btn', {
+      html: svg('<path d="M4 7V4h16v3M9 20h6M12 4v16"/>') + '<span>글자 모양 자세히…</span>',
+    });
     full.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:char-shape'); });
     this.fmtPane.appendChild(full);
 
     // 컨텍스트 추가(표/그림) 영역
-    this.extrasHost = document.createElement('div');
-    this.extrasHost.className = 'canva-pane';
+    this.extrasHost = mkEl('div', 'canva-pane');
     this.fmtPane.appendChild(this.extrasHost);
 
     pane.appendChild(this.fmtPane);
@@ -154,12 +134,8 @@ export class CanvaRightInspector {
   }
 
   private section(label: string): HTMLElement {
-    const sec = document.createElement('div');
-    sec.className = 'canva-ins-section';
-    const l = document.createElement('div');
-    l.className = 'canva-section-label';
-    l.textContent = label;
-    sec.appendChild(l);
+    const sec = mkEl('div', 'canva-ins-section');
+    sec.appendChild(mkEl('div', 'canva-section-label', label));
     return sec;
   }
 
@@ -233,20 +209,16 @@ export class CanvaRightInspector {
     host.innerHTML = '';
     const disp = (cmd: string) => (e: Event) => { e.preventDefault(); this.services.dispatcher.dispatch(cmd); };
     const fullBtn = (label: string, cmd: string, icon: string) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'canva-full-btn';
-      b.innerHTML = svg(icon) + `<span>${label}</span>`;
+      const b = mkButton('canva-full-btn', { html: svg(icon) + `<span>${label}</span>` });
       b.addEventListener('mousedown', disp(cmd));
       return b;
     };
 
     if (this.ctx === 'cell') {
       const sec = this.section('표 편집');
-      const row1 = document.createElement('div'); row1.className = 'canva-btn-row';
+      const row1 = mkEl('div', 'canva-btn-row');
       const mk = (title: string, cmd: string, inner: string) => {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'canva-icon-btn'; b.title = title;
-        b.innerHTML = svg(inner);
+        const b = mkButton('canva-icon-btn', { title, html: svg(inner) });
         b.addEventListener('mousedown', disp(cmd));
         return b;
       };
@@ -260,9 +232,7 @@ export class CanvaRightInspector {
     } else if (this.ctx === 'table') {
       const sec = this.section('표 개체');
       sec.appendChild(fullBtn('개체 속성…', 'format:object-properties', '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M9 9h6v6H9z"/>'));
-      const hint = document.createElement('div'); hint.className = 'canva-hint';
-      hint.textContent = '셀을 클릭하면 글자 서식과 행·열 편집이 열립니다.';
-      sec.appendChild(hint);
+      sec.appendChild(mkEl('div', 'canva-hint', '셀을 클릭하면 글자 서식과 행·열 편집이 열립니다.'));
       host.appendChild(sec);
     } else if (this.ctx === 'picture') {
       const sec = this.section('그림');
