@@ -3,10 +3,13 @@ import { type ReactNode } from "react";
 import { useCanvasStore } from "../../modules/canvas/store";
 import { type Block, TEXT_DEFAULTS } from "../../modules/document/model";
 import { FontSelect } from "./FontSelect";
+import { ColorPopover } from "./ColorPopover";
+import { RibbonDropdown, DropSection, DropIconButton } from "./RibbonDropdown";
+import { DsIcon } from "../../ui/design-icons";
+import { TEXT_COLOR_PRESETS } from "../../ui/presets";
 
-const TEXT_COLORS = ["#000000", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
-const FILL_COLORS = ["#ffffff", "#F3F6FF", "#FFF4D8", "#EAF8EF", "#FFE9E9", "transparent"];
-const TABLE_BG_COLORS = ["#fef08a", "#bbf7d0", "#bfdbfe", "#fecaca", ""];
+// 글자색 프리셋 정본은 ui/presets.ts — 재선언 금지(4벌 표류 감사)
+import { BG_SWATCHES as TABLE_BG_COLORS } from "../../table-king/table/constants.js"; // 원본 사본 금지 — TableContent와 같은 인덱스 계약
 const TABLE_TEXT_COLORS = ["#111827", "#ef4444", "#2563eb", "#16a34a", "#9333ea"];
 const SAFE_MARGIN_MM = 20;
 
@@ -15,6 +18,7 @@ type TableRibbonCommand =
   | { kind: "style"; title: string }
   | { kind: "background"; index: number }
   | { kind: "textColor"; index: number }
+  | { kind: "stylePatch"; style: Record<string, string | undefined> }
   | { kind: "split"; rows: number; cols: number };
 
 type RibbonButtonProps = {
@@ -27,13 +31,10 @@ type RibbonButtonProps = {
   children: ReactNode;
 };
 
-function RibbonGroup({ label, children }: { label: string; children: ReactNode }) {
+// 디자인: 그룹 박스/라벨 없이 평평하게 나열, 그룹 사이는 얇은 세로 구분선(Divider)으로만 구분.
+function RibbonGroup({ label, children }: { label: string; children: ReactNode; hideLabel?: boolean }) {
   return (
-    <section
-      className="studio-ribbon-group flex h-10 items-center gap-1 rounded-[13px] border border-line bg-surface px-2"
-      aria-label={label}
-    >
-      <span className="mr-1 whitespace-nowrap text-[10px] font-extrabold tracking-[.08em] text-inkfaint">{label}</span>
+    <section className="flex items-center gap-0.5" aria-label={label}>
       {children}
     </section>
   );
@@ -46,7 +47,7 @@ function RibbonButton({ title, disabled, active, danger, compact, onClick, child
       title={disabled ? `${title} (준비 중)` : title}
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
-      className={`studio-ribbon-button ${compact ? "min-w-7 px-1.5" : "min-w-8 px-2"} h-7 rounded-[8px] flex items-center justify-center gap-1 text-[12px] font-bold transition-colors ${
+      className={`studio-ribbon-button ${compact ? "h-8 w-8" : "h-8 min-w-8 px-2.5"} rounded-lg flex items-center justify-center gap-1 text-[12px] font-bold transition-colors ${
         active
           ? "bg-accentsoft text-accent shadow-[inset_0_0_0_1px_var(--accentline)]"
           : disabled
@@ -103,16 +104,7 @@ function RedoIcon() {
 }
 
 function AlignIcon({ mode }: { mode: "left" | "center" | "right" }) {
-  const paths = {
-    left: "M2 3h12M2 7h8M2 11h12M2 15h8",
-    center: "M2 3h12M4 7h8M2 11h12M4 15h8",
-    right: "M2 3h12M6 7h8M2 11h12M6 15h8",
-  };
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 18" fill="none" aria-hidden="true">
-      <path d={paths[mode]} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
+  return <DsIcon name={`align-${mode}`} />;
 }
 
 function VAlignIcon({ mode }: { mode: "top" | "middle" | "bottom" }) {
@@ -122,6 +114,16 @@ function VAlignIcon({ mode }: { mode: "top" | "middle" | "bottom" }) {
     <svg width="16" height="16" viewBox="0 0 16 18" fill="none" aria-hidden="true">
       <path d={guide} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
       <path d={text} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+function BorderScopeIcon({ mode }: { mode: "all" | "outer" | "inner" | "none" }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {mode === "all" && (<><path d="M4 4h16v16H4Z" /><path d="M4 12h16M12 4v16" /></>)}
+      {mode === "outer" && (<><path d="M4 12h16M12 4v16" opacity="0.32" /><path d="M4 4h16v16H4Z" strokeWidth="2.1" /></>)}
+      {mode === "inner" && (<><path d="M4 4h16v16H4Z" opacity="0.32" /><path d="M4 12h16M12 4v16" strokeWidth="2.1" /></>)}
+      {mode === "none" && (<><path d="M4 4h16v16H4M4 12h16M12 4v16" opacity="0.32" /><path d="M5 19 19 5" strokeWidth="2.1" /></>)}
     </svg>
   );
 }
@@ -141,34 +143,19 @@ export function EditorToolbar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const nudgeMany = useCanvasStore((s) => s.nudgeMany);
-  const undo = useCanvasStore((s) => s.undo);
-  const redo = useCanvasStore((s) => s.redo);
-  const duplicateBlock = useCanvasStore((s) => s.duplicateBlock);
-  const removeBlock = useCanvasStore((s) => s.removeBlock);
-  const setLocked = useCanvasStore((s) => s.setLocked);
   const groupSelection = useCanvasStore((s) => s.groupSelection);
   const ungroupSelection = useCanvasStore((s) => s.ungroupSelection);
   const alignSelection = useCanvasStore((s) => s.alignSelection);
 
   const isText = block?.type === "text";
   const isTable = block?.type === "table";
-  const hasSelection = !!block;
   const multi = selectedIds.length > 1;
   const showTextTools = isText && !multi;
   const showTableTools = isTable && !multi;
   const size = block?.fontSize ?? TEXT_DEFAULTS.fontSize;
   const align = block?.align ?? TEXT_DEFAULTS.align;
+  const valign = block?.valign ?? "top";
   const textColor = (block?.color ?? TEXT_DEFAULTS.color).toUpperCase();
-  const fill = block?.fill ?? "transparent";
-  const contextLabel = multi
-    ? `${selectedIds.length}개 요소 선택`
-    : isTable
-      ? "표 편집"
-      : isText
-        ? block?.flow
-          ? "본문 편집"
-          : "텍스트 편집"
-        : "문서 편집";
 
   const patch = (p: Partial<Block>) => {
     if (!block) return;
@@ -190,9 +177,30 @@ export function EditorToolbar() {
 
   const runTable = (command: TableRibbonCommand) => {
     if (!block || block.type !== "table") return;
+    if (command.kind === "stylePatch") {
+      window.dispatchEvent(new CustomEvent("studio:table-apply-style", { detail: { blockId: block.id, style: command.style } }));
+      return;
+    }
     window.dispatchEvent(new CustomEvent("studio:table-ribbon", { detail: { blockId: block.id, ...command } }));
   };
 
+
+  const TEXT_HALIGNS = [
+    { title: "왼쪽", mode: "left" as const },
+    { title: "가운데", mode: "center" as const },
+    { title: "오른쪽", mode: "right" as const },
+  ];
+  const TEXT_VALIGNS = [
+    { title: "위", mode: "top" as const },
+    { title: "가운데", mode: "center" as const },
+    { title: "아래", mode: "bottom" as const },
+  ];
+  const BORDER_SCOPES = [
+    { scope: "all" as const, title: "전체" },
+    { scope: "outer" as const, title: "외곽" },
+    { scope: "inner" as const, title: "중앙" },
+    { scope: "none" as const, title: "없음" },
+  ];
 
   const tableHAligns = [
     { title: "왼쪽 정렬", mode: "left" as const },
@@ -207,67 +215,48 @@ export function EditorToolbar() {
   ];
 
   return (
-    <div className="studio-toolbar-shell shrink-0 h-[62px] overflow-x-auto overflow-y-visible border-b border-line bg-surface px-3 relative z-[2]">
-      <div className="studio-toolbar-track mx-auto flex h-full w-max min-w-fit items-center justify-center gap-2">
-      <div className="studio-ribbon-context" aria-label={contextLabel}>
-        <span className="studio-ribbon-context-dot" />
-        <span>{contextLabel}</span>
-      </div>
-      <RibbonGroup label="공통">
-        <RibbonButton title="실행 취소" compact onClick={undo}><UndoIcon /></RibbonButton>
-        <RibbonButton title="다시 실행" compact onClick={redo}><RedoIcon /></RibbonButton>
-        {hasSelection && (
-          <>
-            <Divider />
-            <RibbonButton title="복제" onClick={() => block && duplicateBlock(block.id)}>복제</RibbonButton>
-            <RibbonButton title="잠금" onClick={() => block && setLocked(selectedIds.length ? selectedIds : [block.id], true)}>잠금</RibbonButton>
-            <RibbonButton title="삭제" danger onClick={() => block && removeBlock(block.id)}>삭제</RibbonButton>
-          </>
-        )}
-      </RibbonGroup>
-
+    <div className="studio-toolbar-shell shrink-0 h-10 overflow-x-auto overflow-y-visible border-b border-line bg-surface px-2.5 relative z-[2]">
+      <div className="studio-toolbar-track flex h-full w-full items-center gap-1.5">
       {showTextTools && (
         <>
           <RibbonGroup label="텍스트">
             <FontSelect value={block?.font} disabled={!isText} onChange={(key) => patch({ font: key })} />
-            <div className="flex h-7 items-center overflow-hidden rounded-lg border border-line bg-surface">
-              <button type="button" onClick={() => patch({ fontSize: Math.max(6, size - 0.5) })} className="h-full w-6 text-[14px] text-inksoft hover:bg-paper">−</button>
-              <span className="flex h-full w-12 items-center justify-center border-x border-line text-[12px] font-extrabold text-ink">{size}pt</span>
-              <button type="button" onClick={() => patch({ fontSize: size + 0.5 })} className="h-full w-6 text-[14px] text-inksoft hover:bg-paper">＋</button>
+            <div className="flex h-8 items-center overflow-hidden rounded-lg border border-line bg-surface">
+              <button type="button" onClick={() => patch({ fontSize: Math.max(6, size - 0.5) })} className="h-full w-7 text-[15px] text-inksoft hover:bg-paper">−</button>
+              <span className="flex h-full w-9 items-center justify-center text-[12.5px] font-bold text-ink">{size}</span>
+              <button type="button" onClick={() => patch({ fontSize: size + 0.5 })} className="h-full w-7 text-[15px] text-inksoft hover:bg-paper">＋</button>
             </div>
-            <RibbonButton title="굵게" active={!!block?.bold} compact onClick={() => patch({ bold: !block?.bold })}>가</RibbonButton>
-            <RibbonButton title="기울임" active={!!block?.italic} compact onClick={() => patch({ italic: !block?.italic })}><span className="italic">가</span></RibbonButton>
-            <RibbonButton title="밑줄" active={!!block?.underline} compact onClick={() => patch({ underline: !block?.underline })}><span className="underline underline-offset-2">가</span></RibbonButton>
-            <RibbonButton title="취소선" active={!!block?.strike} compact onClick={() => patch({ strike: !block?.strike })}><span className="line-through">가</span></RibbonButton>
+            <RibbonButton title="굵게" active={!!block?.bold} compact onClick={() => patch({ bold: !block?.bold })}><DsIcon name="bold" size={15} /></RibbonButton>
+            <RibbonButton title="기울임" active={!!block?.italic} compact onClick={() => patch({ italic: !block?.italic })}><DsIcon name="italic" size={15} /></RibbonButton>
+            <RibbonButton title="밑줄" active={!!block?.underline} compact onClick={() => patch({ underline: !block?.underline })}><DsIcon name="underline" size={15} /></RibbonButton>
+            <RibbonButton title="취소선" active={!!block?.strike} compact onClick={() => patch({ strike: !block?.strike })}><DsIcon name="strikethrough" size={15} /></RibbonButton>
             <Divider />
-            {TEXT_COLORS.map((color) => (
-              <Swatch key={color} color={color} title={`글자색 ${color}`} active={textColor === color.toUpperCase()} onClick={() => patch({ color })} />
-            ))}
+            <ColorPopover
+              label="글자색"
+              glyph="A"
+              value={block?.color ?? TEXT_DEFAULTS.color}
+              presets={TEXT_COLOR_PRESETS}
+              onChange={(color) => patch({ color })}
+            />
           </RibbonGroup>
 
+          <RibbonDropdown label="텍스트 정렬" icon={<AlignIcon mode={align === "center" ? "center" : align === "right" ? "right" : "left"} />}>
+            <DropSection label="가로">
+              {TEXT_HALIGNS.map((item) => (
+                <DropIconButton key={item.mode} title={item.title} active={align === item.mode} onClick={() => patch({ align: item.mode })}>
+                  <AlignIcon mode={item.mode} />
+                </DropIconButton>
+              ))}
+            </DropSection>
+            <DropSection label="세로">
+              {TEXT_VALIGNS.map((item) => (
+                <DropIconButton key={item.mode} title={item.title} active={valign === item.mode} onClick={() => patch({ valign: item.mode })}>
+                  <VAlignIcon mode={item.mode === "center" ? "middle" : item.mode} />
+                </DropIconButton>
+              ))}
+            </DropSection>
+          </RibbonDropdown>
 
-          <RibbonGroup label="박스 위치">
-            <RibbonButton title="박스를 왼쪽 여백에 맞춤" compact onClick={() => positionSelectedBox("left")}><BoxPositionIcon mode="left" /></RibbonButton>
-            <RibbonButton title="박스를 가운데 배치" compact onClick={() => positionSelectedBox("center")}><BoxPositionIcon mode="center" /></RibbonButton>
-            <RibbonButton title="박스를 오른쪽 여백에 맞춤" compact onClick={() => positionSelectedBox("right")}><BoxPositionIcon mode="right" /></RibbonButton>
-          </RibbonGroup>
-
-          <RibbonGroup label="모양">
-            <span className="text-[10px] font-bold text-inkfaint">배경</span>
-            {FILL_COLORS.map((color) => (
-              <Swatch
-                key={color}
-                color={color}
-                title={color === "transparent" ? "배경 없음" : `배경 ${color}`}
-                active={(fill || "transparent").toUpperCase() === color.toUpperCase()}
-                onClick={() => patch({ fill: color })}
-              />
-            ))}
-            <Divider />
-            <RibbonButton title="테두리 없음" compact active={!block?.borderWidth} onClick={() => patch({ borderWidth: 0 })}>0</RibbonButton>
-            <RibbonButton title="얇은 테두리" compact active={block?.borderWidth === 1} onClick={() => patch({ borderWidth: 1, borderColor: "#98A4BD" })}>1</RibbonButton>
-            <RibbonButton title="굵은 테두리" compact active={block?.borderWidth === 2} onClick={() => patch({ borderWidth: 2, borderColor: "#98A4BD" })}>2</RibbonButton>
-          </RibbonGroup>
         </>
       )}
 
@@ -297,26 +286,56 @@ export function EditorToolbar() {
             <RibbonButton title="굵게" compact onClick={() => runTable({ kind: "style", title: "굵게" })}>B</RibbonButton>
             <RibbonButton title="기울임" compact onClick={() => runTable({ kind: "style", title: "기울임" })}><span className="italic">I</span></RibbonButton>
             <Divider />
-            {tableHAligns.map((item) => (
-              <RibbonButton key={item.title} title={item.title} compact onClick={() => runTable({ kind: "style", title: item.title })}>
-                <AlignIcon mode={item.mode} />
-              </RibbonButton>
-            ))}
-            {tableVAligns.map((item) => (
-              <RibbonButton key={item.title} title={item.title} compact onClick={() => runTable({ kind: "style", title: item.title })}>
-                <VAlignIcon mode={item.mode} />
-              </RibbonButton>
-            ))}
-            <Divider />
             <span className="text-[10px] font-bold text-inkfaint">배경</span>
-            {TABLE_BG_COLORS.map((color, index) => (
-              <Swatch key={color || "none"} color={color || "transparent"} title={color ? "배경색" : "배경 지우기"} onClick={() => runTable({ kind: "background", index })} />
-            ))}
+            <ColorPopover
+              label="셀 배경"
+              value={TABLE_BG_COLORS[0]}
+              presets={TABLE_BG_COLORS.filter(Boolean)}
+              allowTransparent
+              transparentLabel="지우기"
+              shape="square"
+              onChange={(color) => runTable({ kind: "stylePatch", style: { backgroundColor: color === "transparent" ? undefined : color } })}
+            />
             <span className="ml-1 text-[10px] font-bold text-inkfaint">글자</span>
-            {TABLE_TEXT_COLORS.map((color, index) => (
-              <Swatch key={color} color={color} title="표 글자색" onClick={() => runTable({ kind: "textColor", index })} />
-            ))}
+            <ColorPopover
+              label="표 글자색"
+              value={TABLE_TEXT_COLORS[0]}
+              presets={TABLE_TEXT_COLORS}
+              onChange={(color) => runTable({ kind: "stylePatch", style: { color } })}
+            />
           </RibbonGroup>
+
+          <RibbonDropdown label="표 정렬" icon={<AlignIcon mode="center" />}>
+            <DropSection label="가로 위치">
+              {tableHAligns.map((item) => (
+                <DropIconButton key={item.title} title={item.title} onClick={() => runTable({ kind: "style", title: item.title })}>
+                  <AlignIcon mode={item.mode} />
+                </DropIconButton>
+              ))}
+            </DropSection>
+            <DropSection label="셀 세로 정렬">
+              {tableVAligns.map((item) => (
+                <DropIconButton key={item.title} title={item.title} onClick={() => runTable({ kind: "style", title: item.title })}>
+                  <VAlignIcon mode={item.mode} />
+                </DropIconButton>
+              ))}
+            </DropSection>
+          </RibbonDropdown>
+
+          <RibbonDropdown label="표 테두리" icon={<BorderScopeIcon mode="all" />}>
+            <DropSection label="적용 범위">
+              {BORDER_SCOPES.map((item) => (
+                <DropIconButton
+                  key={item.scope}
+                  title={item.title}
+                  active={(block?.borderScope ?? "all") === item.scope}
+                  onClick={() => patch({ borderScope: item.scope })}
+                >
+                  <BorderScopeIcon mode={item.scope} />
+                </DropIconButton>
+              ))}
+            </DropSection>
+          </RibbonDropdown>
         </>
       )}
 
@@ -338,10 +357,25 @@ export function EditorToolbar() {
           <RibbonButton title="그룹 해제" onClick={ungroupSelection}>해제</RibbonButton>
         </RibbonGroup>
       )}
+
+      {/* 디자인: 우측 끝 "…블록 편집 중" 상태 pill */}
+      {block && !multi && (
+        <div
+          className="ml-auto flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[11.5px] font-semibold"
+          style={{ background: "var(--accentsoft)", color: "var(--accenttext)" }}
+        >
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--guide)" }} />
+          {isText ? "텍스트 블록 편집 중" : isTable ? "표 블록 편집 중" : "블록 편집 중"}
+        </div>
+      )}
       </div>
     </div>
   );
 }
+
+
+
+
 
 
 

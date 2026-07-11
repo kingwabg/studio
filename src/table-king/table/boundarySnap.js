@@ -1,6 +1,6 @@
 import { MIN_ROW_H, SNAP_THRESHOLD } from "./constants.js";
 
-export const cumulativePositions = (sizes) => {
+export const cumulativePositions = (sizes = []) => {
   let acc = 0;
   return [0, ...sizes.map((size) => (acc += size))];
 };

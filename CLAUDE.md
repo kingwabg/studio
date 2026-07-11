@@ -119,6 +119,9 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 ## 코딩 규칙
 - 디자인 토큰은 `T` 객체 하나로 통일 (잉크 #1A2233, 문서 블루 #2B5CE6, 헤어라인 #E4E8EF).
 - 아이콘은 이모지 금지, 인라인 SVG(1.4px 스트로크)만.
+- 클래스명은 Tailwind 유틸리티명과 겹치면 안 됨(`table-row`·`table-cell`·`grid`·`hidden` 등) —
+  utilities-only 주입이라 display가 덮여 레이아웃이 깨진다. 접두사(tk- 등)로 격리하거나,
+  겹치면 스코프 CSS에서 display 명시 (실사고: 표 행 높이 회귀 — table-king.css 주석 참고).
 - 한국어 UI/주석. 주석은 "왜"를 설명.
 - 파괴적 작업(파일 덮어쓰기, 대량 삭제)은 실행 전 사용자 확인.
 - **완료 선언 전 증거 먼저**: "완료/고쳤다"고 말하기 전에 증명하는 실행 결과(실측 수치·테스트
@@ -137,6 +140,8 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   (기능 diff와 분리 — 병렬 세션 충돌 최소화). 두 사용처의 변경 사유가 다르면 "의도적 중복"
   상호 참조 주석으로 면제, 3번째 등장은 무조건 추출.
 - **예외**: `src/table-king/{table,hooks,components}/`(업스트림 원본)·`hwpxBase.js`(생성물)·CSS.
+  `rhwp-studio/`(rhwp 에디터 입양본 — src/ 밖이라 게이트 자동 비대상, 업스트림 diff 가능하게 유지)·
+  `/pkg`(생성물 — `npm run sync:rhwp`가 @rhwp/core에서 공급).
   우리 래퍼(TableKingBlock.jsx)는 래칫 대상. 예외 디렉터리 안이라도 **신규 파일은 예산 적용**.
 - **`[size-override]`는 사용자가 그 커밋에서 명시적으로 지시했을 때만.** 에이전트가 "불가피"를
   자가 판정해 붙이는 것 금지. 레거시(DocumentStudio.jsx)는 분리 대상이 아니라 동결 — 기능이

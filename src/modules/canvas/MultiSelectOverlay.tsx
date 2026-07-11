@@ -4,10 +4,11 @@
 import { useEffect, useState } from "react";
 import { useCanvasStore } from "./store";
 import { useFollowStore } from "./snap";
-import { moveSetIds } from "../document/model";
+import { collapsedHiddenIds, moveSetIds } from "../document/model";
+import { blocksAtPoint, clampDeltaToSafeArea } from "./gesture";
 import { mmToPx, pxToMm } from "./geometry";
 
-const ACCENT = "#2B5CE6";
+const ACCENT = "#256EF4";
 
 function IconBtn({ title, onClick, danger, children }: { title: string; onClick: () => void; danger?: boolean; children: React.ReactNode }) {
   return (
@@ -115,7 +116,30 @@ export function MultiSelectOverlay() {
     e.stopPropagation();
     openTextAtPoint(e.clientX, e.clientY, e.currentTarget);
   };
+  // 오버레이가 덮은 지점의 최상단 블록 (모델 좌표 점 히트 — 접힌 블록 제외, 배열 순서 = z)
+  const topBlockAtClient = (clientX: number, clientY: number) => {
+    const pageEl = document.querySelector<HTMLElement>(".studio-page");
+    if (!pageEl) return null;
+    const r = pageEl.getBoundingClientRect();
+    // rect 비례 환산 — 줌 배율과 무관하게 mm가 나온다
+    const xMm = ((clientX - r.left) / r.width) * doc.page.w;
+    const yMm = ((clientY - r.top) / r.height) * doc.page.h;
+    const hiddenIds = collapsedHiddenIds(doc.blocks);
+    const hits = blocksAtPoint(doc.blocks, xMm, yMm).filter((b) => !hiddenIds.has(b.id));
+    return hits[hits.length - 1] ?? null;
+  };
+
   const startOverlayDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    // 겹친 비선택 블록 클릭 구제(전 타입) — bbox 안이라도 맨 위가 선택 밖 블록이면
+    // 오버레이가 가로채지 않고 그 블록을 선택한다 (피그마 동일). 이전엔 텍스트만 구제됐다.
+    const top = topBlockAtClient(e.clientX, e.clientY);
+    if (top && !selectedIds.includes(top.id)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (top.groupId) selectGroup(top.id);
+      else select(top.id);
+      return;
+    }
     focusSelectionAtPoint(e.clientX, e.clientY, e.currentTarget);
     if (e.detail >= 2) {
       e.preventDefault();
@@ -129,10 +153,14 @@ export function MultiSelectOverlay() {
     const start = { x: e.clientX, y: e.clientY };
     // 함께 움직일 집합(트리 자손·그룹 확장)은 드래그당 1회 계산 — 단일 드래그와 동일 규칙
     const members = moveSetIds(doc.blocks, selectedIds);
+    const moving = doc.blocks.filter((b) => members.has(b.id) && !b.locked);
     const SENTINEL = "__multi-overlay__"; // 실제 블록 id가 아니어서 모든 멤버가 follow
     const onMove = (ev: PointerEvent) => {
-      const dx = ev.clientX - start.x;
-      const dy = ev.clientY - start.y;
+      // 이동 중에도 안전여백 클램프 — 시각이 여백 밖으로 나갔다 커밋에서 되돌아오는 어긋남 방지.
+      // ⚠ 비반올림(gesture) 버전 — store 버전(정수 반올림)을 쓰면 1mm(3.78px) 양자화로 끊긴다.
+      const c = clampDeltaToSafeArea(moving, pxToMm(ev.clientX - start.x), pxToMm(ev.clientY - start.y), doc.page);
+      const dx = mmToPx(c.dx);
+      const dy = mmToPx(c.dy);
       setDragPx({ x: dx, y: dy });
       useFollowStore.getState().setFollow(SENTINEL, dx, dy, members);
     };
@@ -141,9 +169,8 @@ export function MultiSelectOverlay() {
       window.removeEventListener("pointerup", onUp);
       useFollowStore.getState().clear();
       setDragPx(null);
-      const dxMm = pxToMm(ev.clientX - start.x);
-      const dyMm = pxToMm(ev.clientY - start.y);
-      if (Math.round(dxMm) || Math.round(dyMm)) nudgeMany(selectedIds, dxMm, dyMm); // 커밋 1회
+      const c = clampDeltaToSafeArea(moving, pxToMm(ev.clientX - start.x), pxToMm(ev.clientY - start.y), doc.page);
+      if (Math.round(c.dx) || Math.round(c.dy)) nudgeMany(selectedIds, c.dx, c.dy); // 커밋 1회(정수화는 store가)
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -163,7 +190,7 @@ export function MultiSelectOverlay() {
           height: h + 8,
           transform: dragPx ? `translate3d(${dragPx.x}px, ${dragPx.y}px, 0)` : undefined,
           border: isGroup ? `1.5px solid ${ACCENT}` : `1.5px dashed ${ACCENT}`,
-          background: "rgba(43,92,230,.025)",
+          background: "rgba(37,110,244,.025)",
           touchAction: "none",
         }}
       >

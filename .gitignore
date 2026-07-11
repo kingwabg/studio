@@ -5,3 +5,10 @@ dist
 .env.local
 .verify/
 .claude/
+# 개발용 임시 로그 (codex/vite 프로세스 stdout·stderr)
+.codex-vite-*.log
+
+# rhwp-studio 입양본 — 생성물 제외 (소스만 추적, wasm은 sync:rhwp가 @rhwp/core에서 공급)
+rhwp-studio/node_modules
+rhwp-studio/dist
+/pkg

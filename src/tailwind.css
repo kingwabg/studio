@@ -15,8 +15,13 @@
 /* 스튜디오 스코프 버튼 리셋 — preflight를 안 쓰므로(기존 앱 보호) UA 기본
    테두리·배경이 남는다. .studio-root 안에서만 초기화 — table-king 등 자체 CSS는
    더 구체적인 선택자라 그대로 이긴다. */
+.studio-root button,
+.studio-root input,
+.studio-root select,
+.studio-root textarea {
+  font-family: inherit;
+}
 .studio-root button {
-  font: inherit;
   color: inherit;
   background: none;
   border: none;
@@ -603,38 +608,42 @@
   background: linear-gradient(180deg, #f8faff 0, #edf2fa 32%, #e8edf6 100%);
 }
 .studio-topbar {
-  height: 72px !important;
-  padding: 0 18px !important;
+  height: 58px !important;
+  padding: 0 16px !important;
   border-bottom-color: color-mix(in srgb, var(--line) 74%, transparent) !important;
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   box-shadow: 0 1px 0 rgba(23,32,51,.045), 0 16px 36px -34px rgba(23,32,51,.42);
 }
 .studio-header-left { gap: 14px; }
-.studio-doc-back { background: color-mix(in srgb, var(--paper) 72%, transparent); border: 1px solid color-mix(in srgb, var(--line) 78%, transparent); }
+.studio-doc-back { background: transparent; border: 1px solid transparent; }
+.studio-doc-back:hover { background: var(--accentsoft); }
 .studio-brand-lockup { padding-right: 2px; }
-.studio-brand-mark { width: 36px; height: 36px; border-radius: 12px; }
-.studio-header-divider { height: 34px; background: color-mix(in srgb, var(--line) 80%, transparent); }
+.studio-brand-mark { width: 34px; height: 34px; border-radius: 10px; font-size: 12px; }
+.studio-header-divider { height: 28px; background: color-mix(in srgb, var(--line) 80%, transparent); }
 .studio-doc-title-stack { display: flex; flex-direction: column; justify-content: center; gap: 1px; }
-.studio-doc-title { height: 30px; min-width: 220px; padding-top: 3px !important; padding-bottom: 3px !important; }
+.studio-doc-title { height: 26px; min-width: 220px; padding-top: 2px !important; padding-bottom: 2px !important; }
 .studio-doc-meta { padding-left: 10px; color: var(--inkfaint); font-size: 9px; font-weight: 650; letter-spacing: .035em; line-height: 1; }
-.studio-save-state { height: 26px; padding: 0 9px; background: color-mix(in srgb, var(--paper) 74%, transparent); border: 1px solid color-mix(in srgb, var(--line) 68%, transparent); }
-.studio-header-actions { padding: 4px; border: 1px solid color-mix(in srgb, var(--line) 72%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--paper) 60%, transparent); }
+/* 저장됨 — 디자인의 민트 그린 pill (기존 회색 → #e8f6ee/#118a56) */
+.studio-save-state { height: 24px; padding: 0 9px; border-radius: 999px; background: #e8f6ee; border: 1px solid rgba(17, 138, 86, 0.16); }
+.studio-save-state, .studio-save-state svg, .studio-save-state span { color: #118a56 !important; }
+/* 우측 액션 — 디자인은 세그먼트 pill 래퍼 없이 자유 배치(gap 6px) */
+.studio-header-actions { padding: 0; border: 0; background: transparent; gap: 6px; }
 .studio-header-actions > button { height: 36px; border-radius: 10px !important; }
-.studio-header-actions > button:last-child { padding-left: 16px; padding-right: 16px; }
+.studio-header-actions > button:last-child { height: 38px; padding-left: 17px; padding-right: 17px; }
 .studio-toolbar-shell {
-  height: 68px !important;
-  padding: 8px 14px !important;
+  height: 46px !important;
+  padding: 0 16px !important;
   overflow-y: hidden !important;
   border-bottom: 0 !important;
   background: color-mix(in srgb, var(--surface) 84%, var(--paper) 16%);
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--line) 74%, transparent);
 }
-.studio-toolbar-track { justify-content: flex-start !important; gap: 8px; padding: 0 !important; }
+.studio-toolbar-track { justify-content: flex-start !important; gap: 6px; padding: 0 !important; }
 .studio-ribbon-context { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border: 1px solid rgba(60,111,230,.3); border-radius: 14px; color: #fff; background: linear-gradient(135deg, #244fbd, #3078ee 68%, #24977c); box-shadow: 0 12px 24px -18px rgba(30,74,181,.88), inset 0 1px 0 rgba(255,255,255,.22); font-size: 11.5px; font-weight: 800; white-space: nowrap; }
 .studio-ribbon-context-dot { width: 7px; height: 7px; border-radius: 999px; background: #8df0cd; box-shadow: 0 0 0 4px rgba(141,240,205,.14); }
-.studio-ribbon-group { height: 44px !important; padding-left: 10px !important; padding-right: 10px !important; border-radius: 14px !important; background: color-mix(in srgb, var(--surface) 94%, var(--paper) 6%); box-shadow: 0 8px 22px -20px rgba(23,32,51,.55), inset 0 1px 0 rgba(255,255,255,.62); }
+.studio-ribbon-group { height: 32px !important; padding-left: 8px !important; padding-right: 8px !important; border-radius: 12px !important; background: color-mix(in srgb, var(--surface) 94%, var(--paper) 6%); box-shadow: 0 8px 22px -20px rgba(23,32,51,.55), inset 0 1px 0 rgba(255,255,255,.62); }
 .studio-ribbon-group > span:first-child { padding-right: 5px; color: var(--inkfaint); font-size: 9px; letter-spacing: .11em; }
-.studio-ribbon-button { height: 30px; min-width: 30px; }
+.studio-ribbon-button { height: 32px; min-width: 32px; }
 .studio-editor-body { padding: 10px 10px 0; background: linear-gradient(180deg, color-mix(in srgb, var(--canvas) 78%, #fff 22%), var(--canvas)); }
 .studio-left-panel, .studio-right-panel { border: 1px solid color-mix(in srgb, var(--line) 84%, transparent) !important; border-bottom: 0 !important; border-radius: var(--editor-radius) var(--editor-radius) 0 0; overflow: hidden; box-shadow: 0 16px 38px -34px rgba(23,32,51,.48), inset 0 1px 0 rgba(255,255,255,.65); }
 .studio-tool-rail { width: 76px !important; padding-top: 12px !important; gap: 5px !important; background: color-mix(in srgb, var(--paper) 84%, var(--surface) 16%); }
@@ -646,19 +655,48 @@
 .studio-panel-intro { display: flex; flex-direction: column; gap: 5px; }
 .studio-panel-eyebrow { display: block; color: var(--accenttext); font-size: 8.5px; font-weight: 850; letter-spacing: .15em; }
 .studio-panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.studio-panel-title-row h2, .studio-inspector-intro h2 { margin: 0; color: var(--ink); font-size: 16px; font-weight: 820; letter-spacing: -.035em; }
+.studio-panel-title-row h2, .studio-inspector-intro h2 { margin: 0; color: var(--ink); font-size: 14px; font-weight: 820; letter-spacing: -.035em; }
 .studio-panel-title-row p { margin: 3px 0 0; color: var(--inkfaint); font-size: 10.5px; }
 .studio-panel-count { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--inksoft); background: var(--surface); font-size: 10px; font-weight: 800; }
+.studio-panel-collapse { display: inline-flex !important; align-items: center; justify-content: center; width: 24px !important; height: 24px !important; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--inksoft); font-size: 18px; font-weight: 900; line-height: 1; padding: 0; transition: color .16s ease, border-color .16s ease, background .16s ease, transform .16s ease; }
+.studio-panel-collapse:hover { color: var(--accent); border-color: var(--accentline); background: var(--accentsoft); transform: translateY(-1px); }
+.studio-root.dark .studio-panel-collapse { background: rgba(5,10,17,.36); border-color: rgba(177,199,234,.14); }
 .studio-search { height: 40px !important; border-radius: 12px !important; background: color-mix(in srgb, var(--paper) 82%, var(--surface) 18%); }
+.studio-category-tabs { display: flex; align-items: center; gap: 6px; min-height: 22px; overflow-x: auto; padding: 0 1px 2px; scrollbar-width: none; }
+.studio-category-tabs::-webkit-scrollbar { display: none; }
+.studio-category-tab { flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--inksoft); font-size: 12px; font-weight: 760; letter-spacing: -.015em; line-height: 20px; transition: color .15s ease, transform .15s ease; }
+.studio-category-tab:hover { color: var(--accenttext); transform: translateY(-1px); }
+.studio-category-tab.is-active { color: var(--accenttext); font-weight: 900; }
+.studio-category-separator { color: color-mix(in srgb, var(--inkfaint) 58%, transparent); font-size: 11px; line-height: 20px; user-select: none; }
 .studio-object-card { border-radius: 14px !important; background: color-mix(in srgb, var(--surface) 92%, var(--paper) 8%); }
 .studio-layer-tree { background: color-mix(in srgb, var(--paper) 42%, transparent); }
-.studio-inspector-intro { display: flex; align-items: center; justify-content: space-between; min-height: 72px; padding: 15px 16px 12px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--paper) 42%, transparent)); }
-.studio-inspector-intro > div { display: flex; flex-direction: column; gap: 5px; }
-.studio-inspector-target { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--inksoft); background: var(--surface); font-size: 9.5px; font-weight: 750; }
-.studio-inspector-tabs { padding-top: 10px !important; padding-bottom: 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 65%, transparent); }
-.studio-inspector-tabs > div { height: 38px; padding: 3px; }
-.studio-inspector-heading { margin: 0 10px; border: 1px solid var(--line) !important; border-radius: 12px; }
-.studio-inspector-section { margin-top: 10px; padding: 14px !important; border: 1px solid color-mix(in srgb, var(--line) 78%, transparent) !important; border-radius: 13px; background: color-mix(in srgb, var(--surface) 94%, var(--paper) 6%); }
+.studio-inspector-intro { display: flex; align-items: center; justify-content: space-between; min-height: 58px; padding: 11px 14px 10px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--paper) 42%, transparent)); }
+.studio-inspector-intro > div { display: flex; flex-direction: column; gap: 3px; }
+.studio-inspector-target { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--inksoft); background: var(--surface); font-size: 9.5px; font-weight: 750; }
+.studio-inspector-tabs { padding-top: 8px !important; padding-bottom: 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 65%, transparent); }
+.studio-inspector-tabs > div { height: 32px; padding: 2px; }
+.studio-inspector-heading { margin: 0 8px; border: 1px solid var(--line) !important; border-radius: 10px; }
+.studio-inspector-section { margin-top: 7px; padding: 9px 10px !important; border: 1px solid color-mix(in srgb, var(--line) 78%, transparent) !important; border-radius: 10px; background: color-mix(in srgb, var(--surface) 94%, var(--paper) 6%); }
+.studio-right-panel .studio-inspector-section input, .studio-right-panel .studio-inspector-section select, .studio-right-panel .studio-inspector-section textarea, .studio-right-panel .studio-inspector-section button { font-size: 11px; }
+.studio-right-panel .studio-field-shell {
+  border-color: color-mix(in srgb, var(--line) 88%, transparent) !important;
+  background: color-mix(in srgb, var(--surface) 88%, var(--paper) 12%) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 6%, transparent);
+}
+.studio-right-panel .studio-field-shell:focus-within {
+  border-color: var(--accentline) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent), inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent);
+}
+.studio-right-panel .studio-field-input {
+  border: 0 !important;
+  box-shadow: none !important;
+  appearance: textfield;
+}
+.studio-right-panel .studio-field-input::-webkit-outer-spin-button,
+.studio-right-panel .studio-field-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
 .studio-panel-divider { width: var(--editor-gap) !important; min-width: var(--editor-gap) !important; }
 .studio-divider-grip { opacity: .72; }
 .studio-canvas-pane { overflow: hidden; border: 1px solid color-mix(in srgb, var(--line) 86%, transparent); border-bottom: 0; border-radius: var(--editor-radius) var(--editor-radius) 0 0; box-shadow: 0 20px 52px -42px rgba(23,32,51,.72); }
@@ -687,3 +725,155 @@
 .studio-root.dark .studio-workbench-label { background: rgba(20,28,42,.82); border-color: rgba(177,199,234,.14); box-shadow: 0 12px 26px -20px rgba(0,0,0,.9); }
 @media (max-width: 1320px) { .studio-doc-meta { display: none; } .studio-doc-title { min-width: 150px; max-width: 200px; } .studio-ribbon-context { padding-left: 10px; padding-right: 10px; } }
 @media (max-width: 1040px) { .studio-editor-body { padding-left: 6px; padding-right: 6px; } .studio-header-actions > button:nth-last-child(3) { display: none; } .studio-panel-intro p, .studio-inspector-target { display: none; } }
+
+
+
+
+
+/* react-colorful 공통 색상 선택기 */
+.studio-color-popover .react-colorful {
+  width: 194px;
+  height: 152px;
+}
+
+.studio-color-popover .react-colorful__saturation {
+  border-radius: 11px 11px 7px 7px;
+  border-bottom: 0;
+}
+
+.studio-color-popover .react-colorful__hue {
+  height: 12px;
+  margin-top: 8px;
+  border-radius: 999px;
+}
+
+.studio-color-popover .react-colorful__pointer {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .22);
+}
+
+.studio-color-input::selection {
+  background: var(--accentsoft, #edf2fe);
+}
+
+
+/* ═══ 에디터 한정 퍼플 브랜드 (디자인: 업무24 에디터.dc.html) ═══
+   /studio/editor 화면에서만 토큰을 퍼플로 오버라이드 — 홈·임베드는 기존 블루 유지.
+   .studio-editor-shell이 이미 에디터 루트라 컴포넌트 파일은 안 건드린다(토큰만 교체).
+   ⚠ .studio-root 자손 선택자로 전역 토큰보다 확실히 우선. */
+/* KRDS(범정부 디자인 시스템) 팔레트 — 정부 블루 primary-50 #256EF4를 유일 액센트로,
+   그레이는 KRDS gray 스케일. 관공서 고객에게 익숙한 "정부 표준" 룩이 제품 신뢰의 핵심. */
+.studio-root .studio-editor-shell {
+  --ink: #1e2124;        /* KRDS gray-90 — 본문 */
+  --inksoft: #464c53;    /* gray-70 — 보조 텍스트 */
+  --inkfaint: #6d7882;   /* gray-50 — 캡션/메타 */
+  --accent: #256ef4;     /* primary-50 — 행위(action)의 색 */
+  --accenthover: #0b50d0; /* primary-60 — hover/pressed */
+  --accentsoft: #ecf2fe; /* primary-5 — 약한 배경 */
+  --accentline: #b1cefb; /* primary-20 — 보더/디바이더 */
+  --accenttext: #0b50d0; /* primary-60 — 밝은 표면 위 텍스트 */
+  --on-accent: #ffffff;
+  --surface: #ffffff;
+  --paper: #f4f5f6;      /* gray-5 — subtle 표면 */
+  --canvas: #eff1f3;
+  --line: #e6e8ea;       /* gray-10 — 디바이더 */
+  --linestrong: #cdd1d5; /* gray-20 */
+  --dot: #d4d8dc;
+  --guide: #256ef4;      /* 스냅/정렬선 — 정부 블루 */
+  --guidesoft: #ecf2fe;
+  --groupline: #4c87f6;  /* primary-40 */
+}
+/* 에디터 다크 — 크롬만 어둡게(지면 흰색 유지). KRDS 다크 근사(primary 유지 — 브랜드 앵커). */
+.studio-root.dark .studio-editor-shell {
+  --ink: #fafafa;
+  --inksoft: #b1b8be;
+  --inkfaint: #8a949e;
+  --accent: #4c87f6;
+  --accenthover: #86aff9;
+  --accentsoft: rgba(37, 110, 244, 0.16);
+  --accentline: rgba(37, 110, 244, 0.42);
+  --accenttext: #86aff9;
+  --surface: #16181c;
+  --paper: #0f1115;
+  --canvas: #0b0d10;
+  --line: #292d32;
+  --linestrong: #3a3f45;
+  --guide: #4c87f6;
+  --guidesoft: rgba(37, 110, 244, 0.16);
+}
+
+/* ─── 하드코딩 필 → KRDS 플랫 (병렬 세션 .studio-* 규칙을 라인 수정 없이 후행 오버라이드) ───
+   KRDS 원칙: 그라데이션·과한 그림자로 신뢰를 연출하지 않는다 — 솔리드 정부 블루 + 보더.
+   전부 .studio-editor-shell 스코프 + 상위 특정성이라 홈/임베드는 무영향. */
+.studio-editor-shell .studio-brand-mark {
+  background: #256ef4;
+  box-shadow: none;
+}
+.studio-editor-shell .studio-header-actions > button:last-child {
+  background: #256ef4;
+  border-color: #256ef4;
+  border-radius: 8px !important;
+  box-shadow: none;
+}
+.studio-editor-shell .studio-header-actions > button:last-child:hover {
+  background: #0b50d0;
+  border-color: #0b50d0;
+}
+.studio-editor-shell .studio-ribbon-context {
+  background: #256ef4;
+  border-color: #256ef4;
+  box-shadow: none;
+}
+.studio-editor-shell .studio-canvas-scroll {
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--dot) 80%, transparent) 1px, transparent 1px),
+    linear-gradient(180deg, #f4f5f6, #eff1f3);
+}
+.studio-root.dark .studio-editor-shell .studio-canvas-scroll {
+  background-image:
+    radial-gradient(circle, rgba(104, 132, 182, 0.32) 1px, transparent 1px),
+    linear-gradient(180deg, #101317, #0a0c0f);
+}
+.studio-root.dark .studio-editor-shell .studio-rail-button.bg-accentsoft,
+.studio-root.dark .studio-editor-shell .studio-rail-button[class*="bg-accentsoft"] {
+  background: rgba(37, 110, 244, 0.22);
+  border-color: rgba(37, 110, 244, 0.48);
+  box-shadow: none;
+}
+
+/* 좌측 레일 AI 버튼 — KRDS: 그라데이션 없이 primary-5 틴트 + primary-20 보더 */
+.studio-rail-ai { background: #ecf2fe; border: 1px solid #b1cefb; color: #0b50d0; }
+.studio-root.dark .studio-rail-ai { background: rgba(37,110,244,.16); border-color: var(--accentline); color: var(--accenttext); }
+
+/* 인스펙터 인라인 색 피커 — react-colorful을 패널 폭에 맞춤(디자인 색 섹션) */
+.studio-inspector-picker .react-colorful { width: 100%; height: 172px; }
+.studio-inspector-picker .react-colorful__saturation { border-radius: 10px; margin-bottom: 12px; }
+.studio-inspector-picker .react-colorful__hue { height: 12px; border-radius: 999px; }
+.studio-inspector-picker .react-colorful__saturation-pointer,
+.studio-inspector-picker .react-colorful__hue-pointer { width: 16px; height: 16px; }
+
+/* ── 인스펙터(속성 패널) 확정 디자인 토큰 — 사용자 스펙(2026-07). 패널 스코프 전용.
+   inspector-kit.tsx가 이 변수들을 유일 소스로 참조한다(팔레트 변경은 여기 한 블록에서). ── */
+/* 표 엔진(tk-root)의 업스트림 기본 margin(10px auto) 무력화 — 캔버스에서 표는 블록
+   좌상단(모델 x/y)에 딱 붙어야 한다. 마진이 살아있으면 표 픽셀이 블록 상자보다 10px
+   아래에 그려져 선택 외곽선·이동 히트박스·내보내기 좌표와 어긋난다(표 감사 CONFIRMED).
+   ⚠ 스코프 주의: 레거시(/)와 임베드는 자기 레이아웃이 따로 있어 건드리지 않는다. */
+.studio-editor-shell .tk-root { margin: 0; }
+
+.studio-root .studio-right-panel {
+  background: #ffffff;
+  --ins-title: #6d7882;   /* 섹션 제목 11/700 tracking .08em — KRDS gray-50 */
+  --ins-value: #1e2124;   /* 필드 값·입력 12.5/600 — gray-90 */
+  --ins-tlabel: #464c53;  /* 토글 라벨 11.5/600 — gray-70 */
+  --ins-unit: #8a949e;    /* 단위·접두 라벨(상/하/좌/우, X·Y) 10.5/700 — gray-40 */
+  --ins-hint: #6d7882;    /* 힌트·플레이스홀더 11.5 — gray-50 */
+  --ins-sub: #8a949e;     /* 서브 라벨(테두리>전체, 프리셋) 10/600~700 — gray-40 */
+  --ins-ficon: #58616a;   /* 아이콘 토글 색 — gray-60 */
+  --ins-fborder: #cdd1d5; /* 필드 박스 테두리 — gray-20 (밀도형 인스펙터라 subtle) */
+  --ins-segbg: #f4f5f6;   /* 세그먼트/탭 컨테이너 배경 — gray-5 */
+  --ins-track: #b1b8be;   /* 토글 off 트랙 — gray-30 (KRDS 스위치 정격) */
+  --ins-acc: #256ef4;     /* 주 액센트 — 정부 블루 primary-50 */
+  --ins-tint: #ecf2fe;    /* 연한 액센트 틴트 — primary-5 */
+}

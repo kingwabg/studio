@@ -6,16 +6,20 @@ import {
   useRef,
   useState,
   type MouseEvent as RMouseEvent,
+  type ReactNode,
   type PointerEvent as RPointerEvent,
 } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { type Block, type TableKingData } from "../document/model";
+import { type Block, type TableKingData, padOf } from "../document/model";
 import { useCanvasStore } from "./store";
 import { SCALE, mmToPx, pxToMm } from "./geometry";
 import { useMergeStore } from "../merge/store";
 import { resolveTokens } from "../merge/resolve";
 import { ScriptText } from "../richtext";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
+// BG_SWATCHES는 업스트림 원본 — 인덱스로 숨은 툴바 버튼을 클릭하므로 순서가 어긋나면 오동작(사본 금지)
+import { BG_SWATCHES as TABLE_BG_SWATCHES } from "../../table-king/table/constants.js";
+import { isCoveredByMerge, mergeAt as findMergeAt } from "../../table-king/table/merge.js";
 import "../../table-king/table-king.css";
 // 기존 앱과 같은 table-king 테마 주입 (디자인 토큰 T와 동일 값)
 const TK_THEME_VARS = {
@@ -26,7 +30,7 @@ const TK_THEME_VARS = {
   "--tk-surface": "#FFFFFF",
   "--tk-line": "#E4E8EF",
   "--tk-line-strong": "#CBD2DE",
-  "--tk-accent": "#2B5CE6",
+  "--tk-accent": "#256EF4",
   "--tk-accent-soft": "#EDF2FE",
 } as React.CSSProperties;
 
@@ -56,8 +60,6 @@ const TABLE_CONTEXT_ITEMS: TableMenuItem[] = [
   { label: "셀 나누기", action: "나누기" },
   { label: "테두리", disabled: true },
 ];
-
-const TABLE_BG_SWATCHES = ["#fef08a", "#bbf7d0", "#bfdbfe", "#fecaca", ""];
 
 function UndoIcon() {
   return (
@@ -111,7 +113,19 @@ function BorderIcon() {
     </svg>
   );
 }
-export function TableKingContent({ block, active }: { block: Block; active: boolean }) {
+export function TableKingContent({
+  block,
+  active,
+  resizeHandles,
+  onEnterEditing,
+  onExitEditing,
+}: {
+  block: Block;
+  active: boolean;
+  resizeHandles?: ReactNode;
+  onEnterEditing?: () => void;
+  onExitEditing?: () => void;
+}) {
   const setTableData = useCanvasStore((s) => s.setTableData);
   const select = useCanvasStore((s) => s.select);
   const selectGroup = useCanvasStore((s) => s.selectGroup);
@@ -128,9 +142,20 @@ export function TableKingContent({ block, active }: { block: Block; active: bool
     data: { kind: "tableblock", blockId: block.id },
   });
 
-  // 구형(rows만 있는) 저장 문서 호환 — 첫 렌더에서 스냅샷으로 승격
+  // 구형(rows만 있는) 저장 문서 호환 — 첫 렌더에서 스냅샷으로 승격.
+  // ⚠ 폭 기준은 블록 실폭(mm→px) — CanvasBlock.startResize의 승격과 같은 규칙이어야 함
+  //   (중복 감사: 이전엔 여기만 상수 420px라 두 경로의 열 너비가 달랐다). 의도적 2벌 상호참조.
   const data: TableKingData =
-    block.data ?? (makeTableKingData(block.rows ?? [[""]], 420) as TableKingData);
+    block.data ?? (makeTableKingData(block.rows ?? [[""]], mmToPx(block.w)) as TableKingData);
+
+  // 셀 안 여백(인스펙터 "셀 안 여백" → block.padX/padY) → tk-root CSS 변수(px).
+  // fitCellTextMetrics가 이 변수를 셀 텍스트 패딩으로 쓴다. mm 값이 화면·내보내기 공통 기준.
+  const cellPad = padOf(block);
+  const themeVars: React.CSSProperties = {
+    ...TK_THEME_VARS,
+    "--tk-cell-pad-x": `${mmToPx(cellPad.x)}px`,
+    "--tk-cell-pad-y": `${mmToPx(cellPad.y)}px`,
+  } as React.CSSProperties;
 
   useEffect(() => {
     if (!active) setMenu(null);
@@ -251,11 +276,16 @@ export function TableKingContent({ block, active }: { block: Block; active: bool
         <TableKingBlock
           value={data}
           onChange={(next: TableKingData) => setTableData(block.id, next)}
+          blockId={block.id}
           active={active}
           onActivate={selectBlockOrGroup}
           showHandles={showHandles}
           setShowHandles={setShowHandles}
-          themeVars={TK_THEME_VARS}
+          themeVars={themeVars}
+          outerResizeHandles={resizeHandles}
+          onEnterEditing={onEnterEditing}
+          onExitEditing={onExitEditing}
+          cellPadY={mmToPx(cellPad.y) * 2}
         />
 
         {active && (
@@ -362,9 +392,8 @@ function StaticResolvedTable({
 }) {
   const cellsText = tableDataToRows(data) as string[][];
   const merges = data.merges ?? [];
-  const covered = (r: number, c: number) =>
-    merges.some((m) => r >= m.r && r < m.r + m.rs && c >= m.c && c < m.c + m.cs && !(r === m.r && c === m.c));
-  const mergeAt = (r: number, c: number) => merges.find((m) => m.r === r && m.c === c);
+  const covered = (r: number, c: number) => isCoveredByMerge(merges, r, c);
+  const mergeAt = (r: number, c: number) => findMergeAt(merges, r, c);
 
   return (
     <table
@@ -405,6 +434,9 @@ function StaticResolvedTable({
     </table>
   );
 }
+
+
+
 
 
 

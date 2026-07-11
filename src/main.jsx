@@ -5,6 +5,7 @@ import DocumentStudio from "./DocumentStudio.jsx";
 import StudioHome from "./routes/StudioHome.tsx";
 import StudioEditor from "./routes/StudioEditor.tsx";
 import StudioEmbed from "./routes/StudioEmbed.tsx";
+import StudioRhwp from "./routes/StudioRhwp.tsx";
 import { StudioTheme } from "./routes/StudioTheme.tsx";
 // 지면(문서) 폰트 — 나눔고딕 OFL 웹폰트 self-host (저작권 안전 + 전 OS 동일 렌더).
 // 맑은 고딕(MS 상용·윈도우 전용)을 대체: 한글 전각(1em)이라 줄바꿈 정합 유지, 웹 배포 합법.
@@ -23,6 +24,8 @@ const router = createBrowserRouter([
   { path: "/studio/editor/:id", element: <StudioTheme><StudioEditor /></StudioTheme> },
   // 판매용 임베드 에디터 제품 페이지 (홈 "에디터" 탭)
   { path: "/studio/embed", element: <StudioTheme><StudioEmbed /></StudioTheme> },
+  // rhwp 에디터 무수정 통째 탑재 (@rhwp/editor 공식 iframe 임베드)
+  { path: "/studio/rhwp", element: <StudioTheme><StudioRhwp /></StudioTheme> },
 ]);
 
 createRoot(document.getElementById("root")).render(

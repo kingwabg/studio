@@ -38,11 +38,16 @@ import { CATEGORY_LABEL, FONTS, countHangul, ensureFont, fontByKey, fontCss, spl
 import { getAssetUrl, putAsset } from "../document/assets";
 import { SCALE, mmToPx, pxToMm } from "./geometry";
 import { useCanvasStore } from "./store";
-import { useFollowStore } from "./snap";
+import { useFollowStore, useGuideStore } from "./snap";
+import { dragMemberIds, planMove } from "./gesture";
+import { scaleHeights, scaleWidths } from "./tableScale";
 import { useMergeStore } from "../merge/store";
 import { TOKEN_RE, resolveTokens } from "../merge/resolve";
 import { IcGrip, IcCopy, IcImage, IcTrash } from "../../ui/icons";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
+// 외곽 리사이즈의 콘텐츠 하한(텍스트가 안 잘리는 최소 폭/높이) — 경계 드래그와 같은 규칙 공유
+import { buildContentMinWidths, buildContentMinRows } from "../../table-king/hooks/useBoundaryDrag";
+import { MIN_COL_W as TK_MIN_COL_W, MIN_ROW_H as TK_MIN_ROW_H } from "../../table-king/table/constants.js";
 import "../../table-king/table-king.css";
 
 import { LEGACY_TEXT_INK, TEXT_BORDER, TEXT_SURFACE, measureNaturalWidthPx } from "../richtext";
@@ -67,6 +72,7 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
   const selectGroup = useCanvasStore((s) => s.selectGroup);
   const toggleSelect = useCanvasStore((s) => s.toggleSelect);
   const updateBlock = useCanvasStore((s) => s.updateBlock);
+  const setTableData = useCanvasStore((s) => s.setTableData);
   const page = useCanvasStore((s) => s.doc.page);
   const duplicateBlock = useCanvasStore((s) => s.duplicateBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
@@ -88,15 +94,7 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
   const textFill = isText ? normalizeTextFill(block.fill) : block.fill;
   const textBorderColor = isText ? normalizeTextBorderColor(block.borderColor) : block.borderColor;
   const selectBlockOrGroup = () => (block.groupId ? selectGroup(block.id) : select(block.id));
-  const isTextHitTarget = (target: EventTarget | null) => {
-    if (!isText || !(target instanceof HTMLElement)) return true;
-    const hitbox = target.closest<HTMLElement>("[data-text-hitbox]");
-    if (hitbox?.dataset.textHitbox === block.id) return true;
-    const zone = target.closest<HTMLElement>("[data-text-click-zone]");
-    return zone?.dataset.textClickZone === block.id;
-  };
-
-  const textClickPoint = (e: RMouseEvent<HTMLDivElement>) => {
+  const textClickPoint = (e: RMouseEvent<HTMLDivElement> | RPointerEvent<HTMLDivElement>) => {
     if (!isText || !(e.target instanceof HTMLElement)) return { x: e.clientX, y: e.clientY };
     const directHitbox = e.target.closest<HTMLElement>("[data-text-hitbox]");
     if (directHitbox?.dataset.textHitbox === block.id) return { x: e.clientX, y: e.clientY };
@@ -231,6 +229,22 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
     }`;
   };
 
+  useEffect(() => {
+    if (!isTable || !selected || editing || locked) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        setEditing(true);
+      }
+      if (event.key === "F5") {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editing, isTable, locked, selected]);
   // 더블클릭 진입. 표: 셀 편집 모드(그전엔 객체 선택=이동). 텍스트: 글자 편집.
   const handleBlockDoubleClick = (e: RMouseEvent<HTMLDivElement>) => {
     if (locked) return;
@@ -239,14 +253,86 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
       return;
     }
     if (block.type !== "text") return;
-    if (!isTextHitTarget(e.target)) return;
+    // 더블클릭도 상자 안 어디서든 진입 (히트박스 게이트 제거 — 위 onPointerDown과 동일 정책)
     setTextCaretPoint(textClickPoint(e));
     setEditing(true);
+  };
+  const startObjectBorderMove = (e: RPointerEvent) => {
+    if ((!isTable && !isText) || locked || editing) return;
+    e.stopPropagation();
+    e.preventDefault();
+    selectBlockOrGroup();
+    const start = { px: e.clientX, py: e.clientY, x: block.x, y: block.y };
+    // ⚠ 이동 중 store 갱신 금지 — 매 pointermove마다 updateBlock하면 table-king 그리드·
+    //   인스펙터·눈금자가 전부 프레임마다 리렌더되고, mm 반올림 탓에 3.78px씩 튄다(버벅임).
+    //   dnd-kit 경로와 동일한 planMove(클램프→자석 스냅→재클램프, gesture.ts) + 래퍼 transform.
+    //   자손은 FollowStore로 동반, 커밋은 moveBlock/nudgeMany 1회 — 이동 수식 3중 구현 해소.
+    const node = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-block-id]");
+    const st0 = useCanvasStore.getState();
+    const members = dragMemberIds(st0.doc.blocks, st0.selectedIds, block);
+    let last = { x: start.x, y: start.y };
+    const onMove = (ev: globalThis.PointerEvent) => {
+      const plan = planMove(
+        useCanvasStore.getState().doc,
+        block,
+        start.x + pxToMm(ev.clientX - start.px),
+        start.y + pxToMm(ev.clientY - start.py),
+        members
+      );
+      last = plan;
+      useGuideStore.getState().setGuides(plan.guides, plan.badges);
+      const dxPx = mmToPx(plan.x - start.x);
+      const dyPx = mmToPx(plan.y - start.y);
+      if (node) node.style.transform = `translate3d(${dxPx}px, ${dyPx}px, 0)`;
+      useFollowStore.getState().setFollow(block.id, dxPx, dyPx, members);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      useGuideStore.getState().clear();
+      useFollowStore.getState().clear();
+      // 커밋(반올림) 후 transform 해제 — pointerup은 discrete 이벤트라 페인트 전에 플러시됨.
+      // 다중 선택이면 dnd-kit dragEnd와 동일하게 선택 전체를 같은 델타로.
+      const st = useCanvasStore.getState();
+      if (st.selectedIds.length > 1 && st.selectedIds.includes(block.id))
+        st.nudgeMany(st.selectedIds, last.x - start.x, last.y - start.y);
+      else st.moveBlock(block.id, Math.round(last.x), Math.round(last.y));
+      if (node) node.style.transform = "";
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   };
   const startResize = (e: RPointerEvent, dir: string) => {
     e.stopPropagation();
     e.preventDefault();
     const s = { px: e.clientX, py: e.clientY, x: block.x, y: block.y, w: block.w, h: block.h };
+    // 표: 이동과 같은 규약 — 미리보기는 래퍼 transform(그리드·텍스트·배경이 한 덩어리로
+    // 붙어 움직임), 커밋은 pointerup 1회. 프레임마다 setTableData하면 내부 state↔store
+    // 왕복 동기가 한 프레임씩 어긋나 "내용물이 표에서 분리돼 보이는" 증상이 났다(보고 ①).
+    // 스케일 하한 = 콘텐츠 최소 폭/높이(경계 드래그와 같은 규칙) — 텍스트보다 작아질 수 없다(보고 ⑤).
+    const isTableResize = block.type === "table";
+    const tableStartData = isTableResize
+      ? (block.data ?? (makeTableKingData(block.rows ?? [[""]], mmToPx(s.w)) as TableKingData))
+      : null;
+    let minScaleX = 0;
+    let minScaleY = 0;
+    if (tableStartData) {
+      const minW = buildContentMinWidths(tableStartData.cells) as number[][];
+      // 실제 셀 상하 여백(padOf)을 하한 공식에 반영 — 경계 드래그(TableContent 주입)와 같은 규칙
+      const minRows = buildContentMinRows(tableStartData.cells, mmToPx(padOf(block).y) * 2) as number[];
+      tableStartData.widths.forEach((row, r) =>
+        row.forEach((w0, c) => {
+          if (w0 > 0) minScaleX = Math.max(minScaleX, Math.max(TABLE_RESIZE_MIN_COL_W, minW[r]?.[c] ?? 0) / w0);
+        })
+      );
+      tableStartData.cellHeights.forEach((row, r) =>
+        row.forEach((h0) => {
+          if (h0 > 0) minScaleY = Math.max(minScaleY, Math.max(TABLE_RESIZE_MIN_ROW_H, minRows[r] ?? 0) / h0);
+        })
+      );
+    }
+    const resizeNode = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-block-id]");
+    let tableLast: { sx: number; sy: number } | null = null;
     const onMove = (ev: globalThis.PointerEvent) => {
       const dx = pxToMm(ev.clientX - s.px);
       const dy = pxToMm(ev.clientY - s.py);
@@ -273,7 +359,18 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
       const innerTop = PAGE_MARGIN_MM;
       const innerRight = page.w - PAGE_MARGIN_MM;
       const innerBottom = page.h - PAGE_MARGIN_MM;
-      if (block.type === "text") {
+      if (isTableResize && tableStartData) {
+        const floorX = minScaleX > 0 ? Math.min(minScaleX, 1) : 0; // 이미 하한 이하인 표는 현 크기가 바닥
+        const floorY = minScaleY > 0 ? Math.min(minScaleY, 1) : 0;
+        const sx = Math.max(floorX, s.w > 0 ? w / s.w : 1);
+        const sy = Math.max(floorY, s.h > 0 ? h / s.h : 1);
+        tableLast = { sx, sy };
+        if (resizeNode) {
+          // 고정 모서리(끄는 방향의 반대)를 origin으로 — 위치+크기가 한 transform으로 표현됨
+          resizeNode.style.transformOrigin = `${dir.includes("w") ? "right" : "left"} ${dir.includes("n") ? "bottom" : "top"}`;
+          resizeNode.style.transform = `scale(${sx}, ${sy})`;
+        }
+      } else if (block.type === "text") {
         // 텍스트: 폭만 조절(높이는 auto). 여백 안쪽에서만 폭이 늘어난다.
         const right = dir.includes("w") ? Math.min(s.x + s.w, innerRight) : innerRight;
         if (dir.includes("w")) {
@@ -312,6 +409,26 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      if (isTableResize && tableStartData) {
+        if (resizeNode) {
+          resizeNode.style.transform = "";
+          resizeNode.style.transformOrigin = "";
+        }
+        if (tableLast) {
+          const { sx, sy } = tableLast;
+          // 원자 커밋 1회 — 위치+데이터를 setTableData(pos)로 함께. 따로 커밋하면
+          // ①히스토리가 2항목으로 갈라져 Ctrl+Z 한 번에 반쪽만 풀리고 ②updateBlock이
+          // 낡은 w로 x를 클램프해 미리보기와 다른 자리에 착지했다(감사 E2 CONFIRMED).
+          const wMm = s.w * sx;
+          const hMm = s.h * sy;
+          const nx = dir.includes("w") ? s.x + (s.w - wMm) : s.x;
+          const ny = dir.includes("n") ? s.y + (s.h - hMm) : s.y;
+          setTableData(block.id, scaleTableKingData(tableStartData, sx, sy), {
+            x: Math.round(nx),
+            y: Math.round(ny),
+          });
+        }
+      }
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -324,9 +441,17 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
       {...attributes}
       onPointerDown={(e) => {
         if (editing) return;
-        if (isText && !isTextHitTarget(e.target)) {
-          if (!e.shiftKey && !e.ctrlKey && !e.metaKey) select(null);
-          return;
+        if (isText) {
+          // 블록 상자 안이면 어디를 눌러도 편집 진입 — 글리프 히트박스 밖(여백)을 "빈 곳"으로
+          // 취급해 선택 해제하던 게이트 제거. 캐럿은 textClickPoint가 마우스 위치를
+          // 히트박스 안으로 클램프해 가장 가까운 지점에 놓는다(사용자 요청: 위치 기반 클릭).
+          if (!(e.ctrlKey || e.metaKey || e.shiftKey) && !locked) {
+            e.stopPropagation();
+            selectBlockOrGroup();
+            setTextCaretPoint(textClickPoint(e));
+            setEditing(true);
+            return;
+          }
         }
         // Ctrl/⌘/Shift+클릭 = 다중 선택 토글, 아니면 그룹/단일 선택
         if (e.ctrlKey || e.metaKey || e.shiftKey) {
@@ -360,7 +485,7 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
         isText || isTable
           ? "" // 텍스트/표: 바깥 블록 박스는 그리지 않는다
           : selected
-            ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(43,92,230,0.18)]"
+            ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(37,110,244,0.18)]"
             : "outline outline-1 outline-line hover:outline-2 hover:outline-accent"
       } ${isDragging && !isTable ? "opacity-95 shadow-[0_8px_24px_rgba(26,34,51,0.18)]" : ""}`}
     >
@@ -369,7 +494,7 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
           isText
             ? `rounded-[3px] overflow-hidden transition-[outline-color,box-shadow] ${
                 selected
-                  ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(43,92,230,0.18)]"
+                  ? "outline outline-2 outline-accent shadow-[0_4px_16px_rgba(37,110,244,0.18)]"
                   : "hover:outline hover:outline-2 hover:outline-accent"
               }`
             : `w-full h-full ${isTable ? "overflow-visible" : "overflow-hidden"}`
@@ -381,12 +506,62 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
           borderColor: isText ? textBorderColor : undefined,
           // 텍스트: 글자 편집 DOM의 자연 높이가 곧 선택 박스 높이다.
           ...(isText ? { width: "100%", boxSizing: "border-box" } : {}),
+          // 세로 정렬(valign 설정 시만): 상자를 block.h까지 세로로 벌려(minHeight) 내용을
+          // 위/가운데/아래로 배치. 내용이 더 크면 자라서 클리핑 없음(H5: valign 미설정=현행 auto).
+          ...(isText && block.valign
+            ? {
+                display: "flex",
+                flexDirection: "column" as const,
+                justifyContent: block.valign === "center" ? "center" : block.valign === "bottom" ? "flex-end" : "flex-start",
+                minHeight: mmToPx(block.h),
+              }
+            : {}),
         }}
       >
         {block.type === "text" ? (
           <TextContent block={block} editing={editing} initialCaretPoint={textCaretPoint} onDoneEditing={finishEditing} />
         ) : isTable ? (
-          <TableKingContent block={block} active={editing} />
+          <TableKingContent
+            block={block}
+            active={editing}
+            onEnterEditing={() => setEditing(true)}
+            onExitEditing={() => setEditing(false)}
+            resizeHandles={
+              !editing && !locked
+                ? (
+                    <>
+                      {selected && (
+                        <div
+                          title="표 이동"
+                          data-table-object-surface="true"
+                          onPointerDown={startObjectBorderMove}
+                          className="table-object-move-surface absolute inset-0 z-20 rounded-[2px] cursor-move"
+                        />
+                      )}
+                      {OBJECT_BORDER_HITBOXES.map((hitbox) => (
+                        <div
+                          key={hitbox.key}
+                          title="표 이동"
+                          data-table-object-border="true"
+                          onPointerDown={startObjectBorderMove}
+                          className="table-object-control absolute z-30"
+                          style={hitbox.style}
+                        />
+                      ))}
+                      {soleSelected && RESIZE_HANDLES.map((handle) => (
+                        <div
+                          key={handle.dir}
+                          title="표 전체 크기 조절"
+                          onPointerDown={(event) => startResize(event, handle.dir)}
+                          className="table-object-control absolute z-40 bg-white border-[1.5px] border-accent rounded-[2px]"
+                          style={handle.style}
+                        />
+                      ))}
+                    </>
+                  )
+                : null
+            }
+          />
         ) : (
           <ImageContent block={block} locked={locked} />
         )}
@@ -394,6 +569,21 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
 
       {/* 고정 배지 — 클릭하면 해제(그룹이면 그룹 전체). 잠긴 요소는 플로팅바가 없어
           이 배지가 유일한 해제 통로다. */}
+      {isText && !editing && !locked && (
+        <>
+          {TEXT_OBJECT_BORDER_HITBOXES.map((hitbox) => (
+            <div
+              key={hitbox.key}
+              title="텍스트 이동"
+              data-text-object-border="true"
+              onPointerDown={startObjectBorderMove}
+              className="text-object-control absolute z-30"
+              style={hitbox.style}
+            />
+          ))}
+        </>
+      )}
+
       {locked && selected && (
         <button
           title={block.groupId ? "그룹 고정 해제" : "고정 해제"}
@@ -413,25 +603,6 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
       {/* 단일 선택 + 미잠금일 때만 편집 어포던스(그립·플로팅 바·핸들). 다중은 outline만 */}
       {soleSelected && !editing && !locked && (
         <>
-          {/* 표: 이동 오버레이 — 객체 선택 상태에선 표 위를 덮어 "어디를 끌어도 이동"(move 커서).
-              더블클릭으로 셀 편집 진입(오버레이 사라짐). 모서리 리사이즈 핸들은 z-30로 위에 둠. */}
-          {isTable && (
-            <div
-              {...listeners}
-              onPointerDown={(e) => {
-                selectBlockOrGroup();
-                listeners?.onPointerDown?.(e);
-              }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                setEditing(true);
-              }}
-              title="드래그하여 이동 · 더블클릭하여 표 편집"
-              className="absolute inset-0 z-20"
-              style={{ cursor: "move", touchAction: "none" }}
-            />
-          )}
-
           {/* 플로팅 액션 바 — 그룹 선택·잠금·복제·삭제 (표는 객체 모드에서 여기로 삭제·복제) */}
           {(
             <div
@@ -487,28 +658,23 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
                 top: "50%",
                 right: -7,
                 transform: "translateY(-50%)",
-                backgroundColor: "#2B5CE6",
+                backgroundColor: "#256EF4",
                 borderColor: "#FFFFFF",
-                boxShadow: "0 0 0 2px #2B5CE6, 0 2px 10px rgba(43,92,230,0.38)",
+                boxShadow: "0 0 0 2px #256EF4, 0 2px 10px rgba(37,110,244,0.38)",
                 cursor: "default",
               }}
             />
           )}
-          {/* 모서리 핸들 — 텍스트·표는 4모서리만, 이미지는 8방향. 표는 시각 표식 전용
-              (pointer-events:none)이라 모서리에서도 이동 오버레이가 그대로 잡힌다. */}
-          {!isTable && RESIZE_HANDLES.filter((h) => (isText ? h.dir.length === 2 : true)).map((hdl) => (
+          {/* 표 핸들은 실제 .table-frame 안에 렌더한다. 텍스트/이미지만 블록 기준 핸들을 사용한다. */}
+          {!isTable && RESIZE_HANDLES.filter((handle) => (isText ? handle.dir.length === 2 : true)).map((handle) => (
             <div
-              key={hdl.dir}
-              title={isTable ? undefined : isText ? "폭 조절" : "크기 조절"}
-              onPointerDown={isTable ? undefined : (e) => startResize(e, hdl.dir)}
+              key={handle.dir}
+              title={isText ? "폭 조절" : "크기 조절"}
+              onPointerDown={(event) => startResize(event, handle.dir)}
               className="absolute z-30 bg-white border-[1.5px] border-accent rounded-[2px]"
-              style={{
-                ...(isText ? textWidthHandleStyle(hdl.style) : hdl.style),
-                ...(isTable ? { pointerEvents: "none" as const, cursor: "default" } : {}),
-              }}
+              style={isText ? textWidthHandleStyle(handle.style) : handle.style}
             />
-          ))}
-        </>
+          ))}        </>
       )}
     </div>
   );
@@ -516,6 +682,34 @@ export const CanvasBlock = memo(function CanvasBlock({ block }: { block: Block }
 
 const HANDLE = 8;
 const off = -HANDLE / 2;
+
+// 표 엔진 최소 트랙과 같은 값 — 재선언 금지(값 표류 방지). table/constants.js가 단일 소스.
+const TABLE_RESIZE_MIN_COL_W = TK_MIN_COL_W;
+const TABLE_RESIZE_MIN_ROW_H = TK_MIN_ROW_H;
+const OBJECT_BORDER_HITBOXES: { key: string; style: React.CSSProperties }[] = [
+  { key: "top", style: { top: -6, left: 0, right: 0, height: 12, cursor: "move" } },
+  { key: "right", style: { top: 0, right: -6, bottom: 0, width: 12, cursor: "move" } },
+  { key: "bottom", style: { left: 0, right: 0, bottom: -6, height: 12, cursor: "move" } },
+  { key: "left", style: { top: 0, left: -6, bottom: 0, width: 12, cursor: "move" } },
+];
+const TABLE_OBJECT_BORDER_HITBOXES = OBJECT_BORDER_HITBOXES;
+const TEXT_OBJECT_BORDER_HITBOXES: { key: string; style: React.CSSProperties }[] = [
+  { key: "top", style: { top: -8, left: 0, right: 0, height: 8, cursor: "move" } },
+  { key: "right", style: { top: 0, right: -8, bottom: 0, width: 8, cursor: "move" } },
+  { key: "bottom", style: { left: 0, right: 0, bottom: -8, height: 8, cursor: "move" } },
+  { key: "left", style: { top: 0, left: -8, bottom: 0, width: 8, cursor: "move" } },
+];
+
+function scaleTableKingData(data: TableKingData, scaleX: number, scaleY: number): TableKingData {
+  // ⚠ 경계(누적) 공간 반올림(tableScale.ts) — 셀 단위 독립 round는 공유 경계를 행마다
+  //   1px씩 찢는다(표 감사 실측 170/169/170). 통선 드래그 그룹(EPS 0.6px)도 함께 깨진다.
+  return {
+    ...data,
+    widths: scaleWidths(data.widths, scaleX, TABLE_RESIZE_MIN_COL_W),
+    cellHeights: scaleHeights(data.cellHeights, scaleY, TABLE_RESIZE_MIN_ROW_H),
+    merges: data.merges ?? [],
+  };
+}
 
 
 function MiniBoxPositionIcon({ mode }: { mode: "left" | "center" | "right" }) {
@@ -544,4 +738,20 @@ const RESIZE_HANDLES: { dir: string; style: React.CSSProperties }[] = [
 ];
 
 
-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

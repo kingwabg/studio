@@ -10,7 +10,9 @@
     "verify:hwpx": "node scripts/hwpx-verify.mjs",
     "gen:hwpx-base": "node scripts/gen-hwpx-base.mjs",
     "check:size": "node scripts/check-size.mjs",
-    "postinstall": "git config core.hooksPath .githooks || exit 0"
+    "sync:rhwp": "node scripts/sync-rhwp-pkg.mjs",
+    "dev:rhwp": "npm --prefix rhwp-studio run dev",
+    "postinstall": "(git config core.hooksPath .githooks || exit 0) && node scripts/sync-rhwp-pkg.mjs || exit 0"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -29,7 +31,8 @@
     "@fontsource/noto-serif-kr": "^5.2.9",
     "@fontsource/song-myung": "^5.2.8",
     "@radix-ui/themes": "^3.3.0",
-    "@rhwp/core": "^0.7.17",
+    "@rhwp/core": "^0.7.18",
+    "@rhwp/editor": "^0.7.18",
     "@vitejs/plugin-react": "^4.3.4",
     "react": "^19.0.0",
     "react-colorful": "^5.7.0",

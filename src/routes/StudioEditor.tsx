@@ -12,10 +12,11 @@ import {
   type DragEndEvent,
   type Modifier,
 } from "@dnd-kit/core";
-import { type Block, type BlockType, descendantIds, moveSetIds } from "../modules/document/model";
+import { type Block, type BlockType } from "../modules/document/model";
+import { dragMemberIds, planMove } from "../modules/canvas/gesture";
 import { mmToPx, pxToMm } from "../modules/canvas/geometry";
 import { useCanvasStore } from "../modules/canvas/store";
-import { computeSnap, isAltPressed, neighborBadges, setAltPressed, useFollowStore, useGuideStore, useInspectStore } from "../modules/canvas/snap";
+import { neighborBadges, setAltPressed, useFollowStore, useGuideStore, useInspectStore } from "../modules/canvas/snap";
 import { CanvasStage } from "../modules/canvas/CanvasStage";
 import { LeftPanel } from "../components/editor-shell/LeftPanel";
 import { RightPanel } from "../components/editor-shell/RightPanel";
@@ -24,9 +25,10 @@ import { buildHwpxBytesAsync, downloadBytes } from "../modules/document/exportHw
 import { flattenDoc } from "../modules/document/flatten";
 import { HanPreviewModal } from "../components/editor-shell/HanPreviewModal";
 import { EditorToolbar } from "../components/editor-shell/EditorToolbar";
+import { HwpRibbon } from "../components/editor-shell/HwpRibbon";
 import { PanelDivider } from "../components/editor-shell/PanelDivider";
-import { useThemeStore } from "../modules/ui/theme";
-import { IcBack, IcDownload, IcEye, IcMoon, IcSparkles, IcSun } from "../ui/icons";
+import { IcBack, IcDownload, IcEye, IcRedo, IcUndo } from "../ui/icons";
+import { DsIcon } from "../ui/design-icons";
 
 // 중첩 드롭 대상(지면 안의 텍스트/셀) 우선 — 포인터가 안쪽 대상 위면 그걸 고른다.
 // 지면(stage)은 안쪽 대상이 없을 때의 폴백 (팔레트로 새 블록 만들 때).
@@ -36,44 +38,9 @@ const preferInner: CollisionDetection = (args) => {
   return inner.length ? inner : within;
 };
 
-const SAFE_MARGIN_MM = 20;
-
-const clampSafeAxis = (value: number, size: number, pageSize: number) => {
-  const min = SAFE_MARGIN_MM;
-  const max = Math.max(min, pageSize - SAFE_MARGIN_MM - size);
-  return Math.max(min, Math.min(value, max));
-};
-
-const dragMemberIds = (blocks: Block[], selectedIds: string[], block: Block) =>
-  selectedIds.length > 1 && selectedIds.includes(block.id)
-    ? moveSetIds(blocks, selectedIds)
-    : new Set<string>([block.id, ...descendantIds(blocks, block.id)]);
-
-const constrainDragPosition = (
-  blocks: Block[],
-  active: Block,
-  x: number,
-  y: number,
-  page: { w: number; h: number },
-  members: Set<string>
-) => {
-  const moving = blocks.filter((b) => members.has(b.id) && !b.locked);
-  if (moving.length <= 1) {
-    return { x: clampSafeAxis(x, active.w, page.w), y: clampSafeAxis(y, active.h, page.h) };
-  }
-
-  const dx = x - active.x;
-  const dy = y - active.y;
-  const minX = Math.min(...moving.map((b) => b.x));
-  const maxX = Math.max(...moving.map((b) => b.x + b.w));
-  const minY = Math.min(...moving.map((b) => b.y));
-  const maxY = Math.max(...moving.map((b) => b.y + b.h));
-  const clampedDx = Math.max(SAFE_MARGIN_MM - minX, Math.min(dx, page.w - SAFE_MARGIN_MM - maxX));
-  const clampedDy = Math.max(SAFE_MARGIN_MM - minY, Math.min(dy, page.h - SAFE_MARGIN_MM - maxY));
-  return { x: active.x + clampedDx, y: active.y + clampedDy };
-};
+// 클램프·이동집합·스냅 합성은 gesture.ts(공용 이동 수식)로 이동 — 세 이동 경로가 공유.
 // 스마트 자석 스냅 — 드래그 중 실시간으로 다른 블록·지면 선에 ±2mm 하드 스냅.
-// Alt를 누르면 해제(정밀 조정). dragEnd에서도 같은 computeSnap을 적용해
+// Alt를 누르면 해제(정밀 조정, planMove 내부 처리). dragEnd에서도 같은 planMove를 적용해
 // 시각과 최종 좌표가 항상 일치한다.
 // ⚠ modifier는 렌더 경로에서 호출될 수 있어 여기서 setState 금지 —
 //    가이드 표시는 onDragMove(이벤트 핸들러)가 담당한다.
@@ -83,13 +50,8 @@ const snapModifier: Modifier = ({ active, transform }) => {
   const b = s.doc.blocks.find((x) => x.id === active.id);
   if (!b) return transform;
   const members = dragMemberIds(s.doc.blocks, s.selectedIds, b);
-  const candX = b.x + pxToMm(transform.x);
-  const candY = b.y + pxToMm(transform.y);
-  const constrained = constrainDragPosition(s.doc.blocks, b, candX, candY, s.doc.page, members);
-  if (isAltPressed()) return { ...transform, x: mmToPx(constrained.x - b.x), y: mmToPx(constrained.y - b.y) };
-  const snap = computeSnap(s.doc, b.id, constrained.x, constrained.y, b.w, b.h);
-  const finalPos = constrainDragPosition(s.doc.blocks, b, snap.x, snap.y, s.doc.page, members);
-  return { ...transform, x: mmToPx(finalPos.x - b.x), y: mmToPx(finalPos.y - b.y) };
+  const plan = planMove(s.doc, b, b.x + pxToMm(transform.x), b.y + pxToMm(transform.y), members);
+  return { ...transform, x: mmToPx(plan.x - b.x), y: mmToPx(plan.y - b.y) };
 };
 
 const repo = getRepository();
@@ -105,8 +67,6 @@ export default function StudioEditor() {
   const hydratedRef = useRef(false); // 로드 완료 전에는 오토세이브 금지(빈 문서로 덮어쓰기 방지)
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [previewing, setPreviewing] = useState(false);
-  const dark = useThemeStore((s) => s.dark);
-  const toggleDark = useThemeStore((s) => s.toggle);
   const showGuides = useInspectStore((s) => s.showGuides);
   const toggleGuides = useInspectStore((s) => s.toggle);
 
@@ -191,6 +151,10 @@ export default function StudioEditor() {
       } else if (mod && e.shiftKey && e.key.toLowerCase() === "g") {
         e.preventDefault();
         st.ungroupSelection(); // ⌘⇧G 그룹 해제
+      } else if (mod && (e.key === "]" || e.key === "[") && st.selectedIds.length) {
+        // 겹침 순서(z) — ⌘] 앞으로 / ⌘[ 뒤로, ⇧ 조합이면 맨앞/맨뒤 (피그마 동일)
+        e.preventDefault();
+        st.reorder(st.selectedIds, e.key === "]" ? (e.shiftKey ? "front" : "forward") : e.shiftKey ? "back" : "backward");
       } else if (e.key.startsWith("Arrow") && st.selectedIds.length) {
         // 키보드 마이크로 넛지 — 방향키 1mm, Shift+방향키 10mm. 이동 후 이웃까지의
         // 거리 배지를 잠깐 띄워 "완벽 마감"을 눈으로 확인 (마우스로 잡고 키보드로 마감).
@@ -221,12 +185,8 @@ export default function StudioEditor() {
       const b = st.doc.blocks.find((x) => x.id === active.id);
       if (b) {
         const members = dragMemberIds(st.doc.blocks, st.selectedIds, b);
-        const candX = b.x + pxToMm(delta.x);
-        const candY = b.y + pxToMm(delta.y);
-        const constrained = constrainDragPosition(st.doc.blocks, b, candX, candY, st.doc.page, members);
-        // 드래그 중 보여준 것과 같은 스냅을 최종 좌표에도 적용 (Alt면 스냅만 해제, 여백 제한은 유지)
-        const snapped = isAltPressed() ? constrained : computeSnap(st.doc, b.id, constrained.x, constrained.y, b.w, b.h);
-        const pos = constrainDragPosition(st.doc.blocks, b, snapped.x, snapped.y, st.doc.page, members);
+        // 드래그 중 보여준 것과 같은 planMove(클램프→스냅→재클램프)를 최종 좌표에도 적용
+        const pos = planMove(st.doc, b, b.x + pxToMm(delta.x), b.y + pxToMm(delta.y), members);
         // 다중 선택(임시)이면 선택 전체를 같은 델타로 — 그룹·트리는 nudgeMany가 확장.
         if (st.selectedIds.length > 1 && st.selectedIds.includes(b.id)) {
           st.nudgeMany(st.selectedIds, pos.x - b.x, pos.y - b.y);
@@ -308,7 +268,7 @@ export default function StudioEditor() {
     <div className="studio-editor-shell h-screen flex flex-col bg-canvas text-ink">
       {/* 상단 액션 바 52px (시안 1b) — 좌: 복귀·로고·제목·저장 / 우: 3단 위계 버튼 + 다크 */}
       <header
-        className="studio-topbar h-[64px] shrink-0 flex items-center gap-3 px-4 border-b border-line bg-surface relative z-[3]"
+        className="studio-topbar h-[60px] shrink-0 flex items-center gap-2.5 px-3.5 border-b border-line bg-surface relative z-[3]"
       >
         <div className="studio-header-left flex min-w-0 items-center gap-3">
           <Link
@@ -318,11 +278,7 @@ export default function StudioEditor() {
             <IcBack size={14} /> 문서함
           </Link>
           <div className="studio-brand-lockup" aria-label="업무24 문서 스튜디오">
-            <div className="studio-brand-mark">24</div>
-            <div className="studio-brand-copy">
-              <strong>업무24</strong>
-              <span>DOCUMENT STUDIO</span>
-            </div>
+            <div className="studio-brand-mark"><DsIcon name="brand-logo" size={19} /></div>
           </div>
           <span className="studio-header-divider w-px h-7 bg-line" />
           <div className="studio-doc-identity flex min-w-0 items-center gap-2">
@@ -342,7 +298,7 @@ export default function StudioEditor() {
             >
               {status === "saved" && (
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M2.5 6.5L5 9l4.5-5.5" stroke="var(--success)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M2.5 6.5L5 9l4.5-5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
               {status === "saving" ? "저장 중…" : "저장됨"}
@@ -350,19 +306,28 @@ export default function StudioEditor() {
           </div>
         </div>
         <div className="studio-header-actions ml-auto flex items-center gap-1.5">
+          {/* 실행취소/다시실행 — 디자인은 상단바 우측에 둔다(포맷 툴바에서 이관) */}
           <button
-            onClick={toggleDark}
-            aria-label={dark ? "라이트 모드" : "다크 모드"}
-            className="studio-icon-action w-9 h-9 rounded-xl text-inksoft hover:bg-paper hover:text-ink flex items-center justify-center transition-colors"
+            onClick={() => useCanvasStore.getState().undo()}
+            title="실행 취소"
+            className="studio-icon-action flex h-[34px] w-[34px] items-center justify-center rounded-[9px] text-inksoft transition-colors hover:bg-paper hover:text-ink"
           >
-            {dark ? <IcSun size={15} /> : <IcMoon size={15} />}
+            <IcUndo size={16} />
           </button>
+          <button
+            onClick={() => useCanvasStore.getState().redo()}
+            title="다시 실행"
+            className="studio-icon-action flex h-[34px] w-[34px] items-center justify-center rounded-[9px] text-inkfaint transition-colors hover:bg-paper hover:text-ink"
+          >
+            <IcRedo size={16} />
+          </button>
+          <span className="studio-header-divider mx-0.5 h-6 w-px bg-line" />
           {/* 정렬 점선 항상 표시 — 수정 단계 눈검사용(선택 요소가 맞춰진 정렬선을 계속 표시) */}
           <button
             onClick={toggleGuides}
             aria-pressed={showGuides}
             title="정렬선 — 선택한 요소가 다른 요소·지면과 맞춰진 정렬 점선을 항상 표시"
-            className={`flex items-center gap-1.5 rounded-[9px] text-[13px] font-semibold px-2.5 h-[34px] transition-colors ${
+            className={`flex items-center gap-1.5 rounded-[9px] text-[13px] font-semibold px-2.5 h-9 transition-colors ${
               showGuides ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper hover:text-ink"
             }`}
             style={showGuides ? { boxShadow: "inset 0 0 0 1px var(--accentline)" } : undefined}
@@ -373,34 +338,35 @@ export default function StudioEditor() {
             정렬선
           </button>
           <button
-            onClick={async () => {
-              // 마인드맵 → 공문서: 트리를 개요 번호 문서로 펴서 "새 문서"로 저장·이동 (원본 보존)
-              const flat = flattenDoc(useCanvasStore.getState().doc);
-              await repo.save(flat);
-              navigate(`/studio/editor/${flat.id}`);
-            }}
-            title="트리 구조를 개요 번호(Ⅰ/1/가)가 매겨진 공문서로 펴서 새 문서로 만듭니다"
-            className="flex items-center gap-1.5 rounded-[9px] text-inksoft text-[13px] font-semibold px-3 h-[34px] hover:bg-paper hover:text-ink transition-colors"
-          >
-            <IcSparkles size={14} /> 공문서로 펴기
-          </button>
-          <button
             onClick={() => setPreviewing(true)}
-            className="flex items-center gap-1.5 rounded-[9px] border border-line bg-surface text-ink text-[13px] font-semibold px-3 h-[34px] hover:border-linestrong hover:bg-paper transition-colors"
+            className="flex items-center gap-1.5 rounded-[9px] text-inksoft text-[13px] font-semibold px-3 h-9 hover:bg-paper hover:text-ink transition-colors"
           >
             <IcEye size={14} /> 한글 미리보기
           </button>
           <button
             onClick={async () => downloadBytes(await buildHwpxBytesAsync(doc), `${title || "문서"}.hwpx`)}
-            className="flex items-center gap-1.5 rounded-[9px] bg-accent text-onaccent text-[13px] font-bold px-3.5 h-[34px] hover:bg-accenthover active:scale-[0.98] transition-all"
-            style={{ boxShadow: "0 1px 2px rgba(43,92,230,.35)" }}
+            className="flex items-center gap-1.5 rounded-[9px] bg-accent text-onaccent text-[13px] font-bold px-3.5 h-9 hover:bg-accenthover active:scale-[0.98] transition-all"
           >
             <IcDownload size={14} /> HWPX 내보내기
           </button>
+          {/* 아바타 — 디자인 우측 끝(사용자 이니셜) */}
+          <div
+            className="ml-1 flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-bold"
+            style={{ background: "#ecf2fe", color: "#0b50d0", border: "1px solid #b1cefb" }}
+            aria-hidden="true"
+          >
+            준
+          </div>
         </div>
       </header>
 
       {previewing && <HanPreviewModal doc={doc} onClose={() => setPreviewing(false)} />}
+
+      {/* 한글(HWP) 스타일 리본: 메뉴 탭 + 아이콘 툴바 — 아래 EditorToolbar가 컨텍스트 서식바 */}
+      <HwpRibbon
+        onExport={async () => downloadBytes(await buildHwpxBytesAsync(doc), `${title || "문서"}.hwpx`)}
+        onPreview={() => setPreviewing(true)}
+      />
 
       <EditorToolbar />
 
@@ -419,20 +385,11 @@ export default function StudioEditor() {
           const b = st.doc.blocks.find((x) => x.id === a.id);
           if (!b) return;
           const members = dragMemberIds(st.doc.blocks, st.selectedIds, b);
-          const candX = b.x + pxToMm(e.delta.x);
-          const candY = b.y + pxToMm(e.delta.y);
-          const constrained = constrainDragPosition(st.doc.blocks, b, candX, candY, st.doc.page, members);
-          if (isAltPressed()) {
-            useGuideStore.getState().clear();
-            // Alt(스냅 해제)여도 자손 팔로우와 여백 제한은 유지
-            useFollowStore.getState().setFollow(String(a.id), mmToPx(constrained.x - b.x), mmToPx(constrained.y - b.y), members);
-            return;
-          }
-          const snap = computeSnap(st.doc, b.id, constrained.x, constrained.y, b.w, b.h);
-          const finalPos = constrainDragPosition(st.doc.blocks, b, snap.x, snap.y, st.doc.page, members);
-          useGuideStore.getState().setGuides(snap.guides, snap.badges);
+          // planMove = 클램프→스냅(Alt면 생략)→재클램프. 가이드는 계획에 포함돼 나온다.
+          const plan = planMove(st.doc, b, b.x + pxToMm(e.delta.x), b.y + pxToMm(e.delta.y), members);
+          useGuideStore.getState().setGuides(plan.guides, plan.badges);
           // 자손이 따라올 시각 델타 = 스냅/여백 제한이 반영된 실제 화면 이동량
-          useFollowStore.getState().setFollow(String(a.id), mmToPx(finalPos.x - b.x), mmToPx(finalPos.y - b.y), members);
+          useFollowStore.getState().setFollow(String(a.id), mmToPx(plan.x - b.x), mmToPx(plan.y - b.y), members);
         }}
         onDragEnd={handleDragEnd}
         onDragCancel={() => {

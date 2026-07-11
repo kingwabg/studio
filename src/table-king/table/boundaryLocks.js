@@ -1,9 +1,5 @@
 import { EPS } from "./constants.js";
-
-const cumulativePositions = (sizes = []) => {
-  let acc = 0;
-  return [0, ...sizes.map((size) => (acc += size))];
-};
+import { cumulativePositions } from "./boundarySnap.js";
 
 const hasBoundaryAt = (positions, target, eps) =>
   positions.some((position) => Math.abs(position - target) <= eps);
@@ -58,3 +54,9 @@ export const isRowBoundaryShiftLocked = ({
     });
   });
 };
+export const isColumnBoundaryAnchorLocked = ({
+  widths,
+  row,
+  boundaryIndex,
+}) => widths[row]?.[boundaryIndex + 1] === undefined;
+

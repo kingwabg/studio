@@ -4,11 +4,13 @@
 // 텍스트는 캔버스 읽기 모드와 동일하게(textStyle + RichRead + 안쪽 여백 + pre-wrap) 그려,
 // "화면 줄바꿈"을 그대로 보여준다. 편집 어포던스·핸들·스토어 효과는 없다.
 import { useEffect, useState } from "react";
-import { type CanvasDoc, type Block, type TableKingData, padOf, showingHint } from "../document/model";
+import { type CanvasDoc, type Block, type TableKingData, LINE_SPACING_DEFAULT, padOf, showingHint } from "../document/model";
 import { mmToPx } from "./geometry";
 import { RichRead, textStyle } from "../richtext";
 import { getAssetUrl } from "../document/assets";
-import { tableDataToRows } from "../../table-king/TableKingBlock.jsx";
+import { makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
+import { CELL_FONT_SIZE } from "../../table-king/table/constants.js";
+import { isCoveredByMerge, mergeAt as findMergeAt } from "../../table-king/table/merge.js";
 
 function TextSnapshot({ block }: { block: Block }) {
   const pad = padOf(block);
@@ -21,7 +23,7 @@ function TextSnapshot({ block }: { block: Block }) {
         top: mmToPx(block.y),
         width: mmToPx(block.w),
         ...textStyle(block),
-        lineHeight: (block.lineSpacing ?? 137.5) / 100, // 캔버스 leading-snug(1.375) 기본
+        lineHeight: (block.lineSpacing ?? LINE_SPACING_DEFAULT) / 100, // 내보내기와 같은 정본(138) — 137.5 표류 교정
         whiteSpace: "pre-wrap",
         paddingLeft: mmToPx(pad.x),
         paddingRight: mmToPx(pad.x),
@@ -39,17 +41,20 @@ function TextSnapshot({ block }: { block: Block }) {
 }
 
 function TableSnapshot({ block }: { block: Block }) {
-  const data = block.data as TableKingData | undefined;
+  // 스냅샷 승격 — 캔버스(TableContent)·내보내기(elements)와 같은 규칙. data 없는 레거시
+  // rows 표가 "화면(진실)" 비교 뷰에서만 실종되던 것 방지(감사 E4 CONFIRMED).
+  const data =
+    (block.data as TableKingData | undefined) ??
+    (block.rows?.length ? (makeTableKingData(block.rows, mmToPx(block.w)) as TableKingData) : undefined);
   if (!data?.cells?.length) return null;
   const cellsText = tableDataToRows(data) as string[][];
   const merges = data.merges ?? [];
   const widths = data.widths?.[0] ?? [];
-  const covered = (r: number, c: number) =>
-    merges.some((m) => r >= m.r && r < m.r + m.rs && c >= m.c && c < m.c + m.cs && !(r === m.r && c === m.c));
-  const mergeAt = (r: number, c: number) => merges.find((m) => m.r === r && m.c === c);
+  const covered = (r: number, c: number) => isCoveredByMerge(merges, r, c);
+  const mergeAt = (r: number, c: number) => findMergeAt(merges, r, c);
   return (
     <div style={{ position: "absolute", left: mmToPx(block.x), top: mmToPx(block.y) }}>
-      <table style={{ borderCollapse: "collapse", tableLayout: "fixed", fontSize: "12.5px", color: "#1A2233" }}>
+      <table style={{ borderCollapse: "collapse", tableLayout: "fixed", fontSize: `${CELL_FONT_SIZE}px`, color: "#1A2233" }}>
         <colgroup>
           {widths.map((w, i) => (
             <col key={i} style={{ width: w }} />

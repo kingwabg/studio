@@ -26,6 +26,10 @@ import {
 // 표는 기존 앱에서 검증된 table-king 엔진을 그대로 이관해 쓴다 (Strangler Fig 기능 이관)
 import { makeTableKingData } from "../../table-king/TableKingBlock.jsx";
 import { SCALE } from "./geometry";
+import { reorderBlocks, type ZDir } from "./zorder";
+import { clampDeltaToSafeArea } from "./gesture";
+import { scaleHeights, scaleWidths } from "./tableScale";
+import { MIN_COL_W as TK_MIN_COL_W, MIN_ROW_H as TK_MIN_ROW_H } from "../../table-king/table/constants.js";
 
 const DEFAULT_TABLE_ROWS = [
   ["구분", "내용", "비고"],
@@ -39,7 +43,10 @@ const SAFE_MARGIN_MM = 20;
 
 // table-king 스냅샷의 실제 px 크기 (최대 행 너비 합 × 최대 열 높이 합)
 export function tableSizePx(data: TableKingData): { wPx: number; hPx: number } {
-  const wPx = Math.max(...data.widths.map((row) => row.reduce((s, v) => s + v, 0)));
+  // 빈 widths에 Math.max(...[]) = -Infinity → NaN w/h 전파 방지 (손상 데이터 방어)
+  const wPx = data.widths.length
+    ? Math.max(...data.widths.map((row) => row.reduce((s, v) => s + v, 0)))
+    : 0;
   const nCols = data.cells[0]?.length ?? 0;
   let hPx = 0;
   for (let c = 0; c < nCols; c++)
@@ -54,10 +61,12 @@ function fitTableDataToSafeArea(data: TableKingData, page: CanvasDoc["page"]): T
   const widthRatio = wPx > maxWPx ? maxWPx / wPx : 1;
   const heightRatio = hPx > maxHPx ? maxHPx / hPx : 1;
   if (widthRatio === 1 && heightRatio === 1) return data;
+  // 경계(누적) 공간 반올림 — 셀 단위 독립 round는 공유 경계를 1px씩 찢는다(tableScale.ts 참조)
+  // 하한 = 표 엔진 최소(30/24) — 이전의 4px는 모든 콘텐츠 하한 밑이라 사용 불능 트랙을 만들었다(감사 E3)
   return {
     ...data,
-    widths: data.widths.map((row) => row.map((v) => Math.max(4, Math.round(v * widthRatio)))),
-    cellHeights: data.cellHeights.map((row) => row.map((v) => Math.max(4, Math.round(v * heightRatio)))),
+    widths: scaleWidths(data.widths, widthRatio, TK_MIN_COL_W),
+    cellHeights: scaleHeights(data.cellHeights, heightRatio, TK_MIN_ROW_H),
   };
 }
 interface CanvasState {
@@ -78,6 +87,7 @@ interface CanvasState {
   duplicateBlock: (id: string) => void; // 선택 블록 복제 (+5mm 오프셋)
   moveBlock: (id: string, x: number, y: number) => void; // 절대 좌표(mm)로 이동 (자손·그룹 동반)
   nudgeMany: (ids: string[], dx: number, dy: number) => void; // 여러 블록 델타 이동
+  reorder: (ids: string[], dir: ZDir) => void; // 겹침 순서(z) — 배열 재배치(zorder.ts)
   updateBlock: (id: string, patch: Partial<Block>) => void;
   setRichText: (
     id: string,
@@ -85,7 +95,9 @@ interface CanvasState {
     paraAligns?: (import("../document/model").TextAlign | null)[],
     paraLists?: (import("../document/model").ParaListType | null)[]
   ) => void; // 인라인 리치 텍스트 갱신 (text 미러 동기 + 문단 정렬/목록)
-  setTableData: (id: string, data: TableKingData) => void; // 표 스냅샷 교체 + w/h 동기화
+  // 표 스냅샷 교체 + w/h 동기화. pos를 주면 위치까지 한 히스토리 항목으로 원자 커밋
+  // (외곽 리사이즈가 updateBlock+setTableData 2회로 갈라지면 Ctrl+Z 한 번에 반쪽만 풀린다)
+  setTableData: (id: string, data: TableKingData, pos?: { x: number; y: number }) => void;
   setCell: (id: string, r: number, c: number, text: string) => void; // 표 셀 하나 수정 (구형 rows용)
   setParent: (id: string, parentId: string | null) => void; // 트리 연결/해제 (순환 방지)
   cascadeStyle: (id: string) => void; // 서식 유전 — 하위 텍스트 크기를 깊이당 −2pt 계단 적용
@@ -249,6 +261,12 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       };
     }),
 
+  reorder: (ids, dir) =>
+    set((s) => {
+      const next = reorderBlocks(s.doc.blocks, ids, dir);
+      return next ? { ...record(s, `z:${dir}`), doc: { ...s.doc, blocks: next } } : {};
+    }),
+
   setParent: (id, parentId) =>
     set((s) => {
       // 순환 방지: 자기 자신·자기 자손 밑으로는 못 들어간다
@@ -338,7 +356,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
       };
     }),
 
-  setTableData: (id, data) =>
+  setTableData: (id, data, pos) =>
     set((s) => {
       const fitted = fitTableDataToSafeArea(data, s.doc.page);
       const { wPx, hPx } = tableSizePx(fitted);
@@ -347,7 +365,14 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         doc: {
           ...s.doc,
           blocks: s.doc.blocks.map((b) =>
-            b.id === id ? clampBlockToSafeArea({ ...b, data: fitted, w: wPx / SCALE, h: hPx / SCALE }, s.doc.page) : b
+            b.id === id
+              ? clampBlockToSafeArea(
+                  // pos 먼저, w/h 나중 — 클램프가 "새 크기" 기준으로 계산돼야 낡은 폭으로
+                  // 좌표가 튀지 않는다(감사 E2: updateBlock 선행 시 old w로 클램프)
+                  { ...b, ...(pos ?? {}), data: fitted, w: wPx / SCALE, h: hPx / SCALE },
+                  s.doc.page
+                )
+              : b
           ),
         },
       };
@@ -531,7 +556,8 @@ const clampInsertionAxis = (v: number, size: number, pageSize: number) => {
 const clampSafeAxis = (v: number, size: number, pageSize: number) => {
   const min = SAFE_MARGIN_MM;
   const max = Math.max(min, pageSize - SAFE_MARGIN_MM - size);
-  return Math.max(min, Math.min(Math.round(v), Math.round(max)));
+  // 정수 커밋 — max는 floor: round(max)가 올림되면 안전한계를 최대 0.5mm 초과 허용(중복 감사에서 확인)
+  return Math.max(min, Math.min(Math.round(v), Math.floor(max)));
 };
 const clampBlockX = (b: Block, x: number, pageW: number) => clampSafeAxis(x, b.w, pageW);
 const clampBlockY = (b: Block, y: number, pageH: number) => clampSafeAxis(y, b.h, pageH);
@@ -540,15 +566,10 @@ const clampBlockToSafeArea = (b: Block, page: CanvasDoc["page"]): Block => ({
   x: clampBlockX(b, b.x, page.w),
   y: clampBlockY(b, b.y, page.h),
 });
-const constrainDeltaToSafeArea = (blocks: Block[], dx: number, dy: number, page: CanvasDoc["page"]) => {
-  if (!blocks.length) return { dx: 0, dy: 0 };
-  const minX = Math.min(...blocks.map((b) => b.x));
-  const maxX = Math.max(...blocks.map((b) => b.x + b.w));
-  const minY = Math.min(...blocks.map((b) => b.y));
-  const maxY = Math.max(...blocks.map((b) => b.y + b.h));
-  const clampDelta = (value: number, min: number, max: number, pageSize: number) =>
-    Math.max(SAFE_MARGIN_MM - min, Math.min(value, pageSize - SAFE_MARGIN_MM - max));
-  return { dx: Math.round(clampDelta(dx, minX, maxX, page.w)), dy: Math.round(clampDelta(dy, minY, maxY, page.h)) };
+// 수식의 원본은 gesture.clampDeltaToSafeArea(비반올림) — 여긴 커밋 경계라 정수 반올림만 얹는다.
+export const constrainDeltaToSafeArea = (blocks: Block[], dx: number, dy: number, page: CanvasDoc["page"]) => {
+  const d = clampDeltaToSafeArea(blocks, dx, dy, page);
+  return { dx: Math.round(d.dx), dy: Math.round(d.dy) };
 };
 
 

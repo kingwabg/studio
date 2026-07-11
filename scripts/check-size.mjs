@@ -113,6 +113,35 @@ for (const t of targets) {
   }
 }
 
+// ── 상수 재선언 경고 (비차단) — 중복 2회 룰의 기계 보조 ──
+// 같은 이름의 SCREAMING_SNAKE 상수(숫자/문자열 리터럴)가 여러 파일에 선언되면 경고한다.
+// 2026-07 중복 감사에서 SAFE_MARGIN_MM 6곳·LINE_SPACING 3갈래(138/137.5/160) 같은
+// "값 표류"가 사람 리뷰를 통과해 버그가 됐던 것의 재발 방지. 의도적 재선언(위임 별칭 등)은
+// 같은 줄에 `dup-ok` 주석으로 억제. 게이트를 막지는 않는다 — 판단은 사람 몫.
+{
+  const CONST_RE = /^(?:export )?const ([A-Z][A-Z0-9_]{2,}) = (-?[\d][\d_.]*|"[^"\n]{0,40}")\s*[;,]/;
+  const decls = new Map(); // name -> [{path, value}]
+  // --others 포함 — 아직 커밋 안 된 신규 파일의 재선언도 잡는다 (tracked만 보면 사각)
+  for (const p of git("ls-files", "--cached", "--others", "--exclude-standard", "src").split("\n").filter(Boolean)) {
+    if (!isCode(p) || isExempt(p) || p === "src/DocumentStudio.jsx") continue; // 동결 파일은 소음만
+    let content;
+    try { content = readFileSync(p, "utf8"); } catch { continue; }
+    for (const line of content.split(/\r?\n/)) {
+      if (line.includes("dup-ok")) continue;
+      const m = line.match(CONST_RE);
+      if (m) (decls.get(m[1]) ?? decls.set(m[1], []).get(m[1])).push({ path: p, value: m[2] });
+    }
+  }
+  const dups = [...decls].filter(([, v]) => new Set(v.map((d) => d.path)).size >= 2);
+  if (dups.length) {
+    console.warn("⚠ 상수 재선언 경고 (비차단 — 정본 1곳으로 수렴하거나 의도면 `// dup-ok`):");
+    for (const [name, v] of dups) {
+      const drift = new Set(v.map((d) => d.value)).size > 1 ? " ← 값 표류!" : "";
+      console.warn(`  · ${name}${drift}: ${v.map((d) => `${d.path}=${d.value}`).join(" | ")}`);
+    }
+  }
+}
+
 if (violations.length) {
   console.error("✖ check-size 실패 — 코드 성장 규칙(CLAUDE.md) 위반:\n");
   for (const v of violations) console.error("  · " + v);

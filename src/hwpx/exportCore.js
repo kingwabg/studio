@@ -134,11 +134,18 @@ export function makeStyleRegistry(baseHeaderXml) {
     if (!parasReg.has(key)) parasReg.set(key, { id: paraBase + parasReg.size, align, ls, ml, mr, mp, list });
     return String(parasReg.get(key).id);
   };
-  const fillId = (bg) => {
-    if (!bg) return null;
-    if (!fills.has(bg)) fills.set(bg, { id: fillBase + fills.size, bg });
-    return String(fills.get(bg).id);
+  // 셀 테두리+배경 borderFill 발급. spec: {t,r,b,l(변 on/off, 기본 true), bg?}.
+  // 사방 실선 + 무배경 = 봉투 기본 borderFill("1"/"2")과 같으므로 null(오버라이드 불필요).
+  const borderFillId = (spec) => {
+    const t = spec.t !== false, r = spec.r !== false, b = spec.b !== false, l = spec.l !== false;
+    const bg = spec.bg || null;
+    if (t && r && b && l && !bg) return null;
+    const key = `${t ? 1 : 0}${r ? 1 : 0}${b ? 1 : 0}${l ? 1 : 0}:${bg ?? ""}`;
+    if (!fills.has(key)) fills.set(key, { id: fillBase + fills.size, t, r, b, l, bg });
+    return String(fills.get(key).id);
   };
+  // 배경색만 있는 셀(기존 경로) = 사방 실선 + 채움 — borderFillId로 위임(키·동작 동일).
+  const fillId = (bg) => (bg ? borderFillId({ t: true, r: true, b: true, l: true, bg }) : null);
 
   // header.xml에 실효 글꼴 fontface + 쌓인 charPr/paraPr/borderFill을 주입.
   // itemCnt도 함께 갱신 — 검증기(validateHwpx)가 개수 불일치를 잡는다.
@@ -232,17 +239,19 @@ export function makeStyleRegistry(baseHeaderXml) {
 
     if (fills.size) {
       // 봉투 borderFill 2(사방 실선)와 같은 테두리에 채우기 색만 더한 항목
+      // 변별 SOLID/NONE (봉투 관례: SOLID 0.12mm, NONE 0.1mm). 배경 있을 때만 fillBrush(id=2 형식).
+      const bd = (tag, on) => `<hh:${tag} type="${on ? "SOLID" : "NONE"}" width="${on ? "0.12" : "0.1"} mm" color="#000000"/>`;
       const entries = [...fills.values()]
         .map(
           (f) =>
             `<hh:borderFill id="${f.id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">` +
             `<hh:slash type="NONE" Crooked="0" isCounter="0"/>` +
             `<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>` +
-            `<hh:leftBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
-            `<hh:rightBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
-            `<hh:topBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
-            `<hh:bottomBorder type="SOLID" width="0.12 mm" color="#000000"/>` +
-            `<hc:fillBrush><hc:winBrush faceColor="${f.bg}" hatchColor="#999999" alpha="0"/></hc:fillBrush>` +
+            bd("leftBorder", f.l) +
+            bd("rightBorder", f.r) +
+            bd("topBorder", f.t) +
+            bd("bottomBorder", f.b) +
+            (f.bg ? `<hc:fillBrush><hc:winBrush faceColor="${f.bg}" hatchColor="#999999" alpha="0"/></hc:fillBrush>` : ``) +
             `</hh:borderFill>`
         )
         .join("");
@@ -254,7 +263,7 @@ export function makeStyleRegistry(baseHeaderXml) {
     return xml;
   };
 
-  return { charId, paraId, fillId, patchHeader };
+  return { charId, paraId, fillId, borderFillId, patchHeader };
 }
 
 // ── 셀 하나 (병합 스팬 확장) ──
@@ -274,14 +283,27 @@ const cellXml = (text, r, c, wU, hU, borderFill, colSpan = 1, rowSpan = 1, refs 
 
 let idSeq = 2000;
 
+// borderScope + 셀 위치·병합 스팬 → 셀 4변 on/off. 스팬(rs×cs) 바깥변만 종이 경계로 판정.
+// outer=표 가장자리 변만, inner=내부 격자선만(가장자리 제외), none=없음, 그 외=사방.
+const cellBorders = (r, c, rs, cs, rows, cols, scope, bg) => {
+  const top = r === 0, bottom = r + rs === rows, left = c === 0, right = c + cs === cols;
+  let t, rt, b, l;
+  if (scope === "outer") { t = top; b = bottom; l = left; rt = right; }
+  else if (scope === "inner") { t = !top; b = !bottom; l = !left; rt = !right; }
+  else if (scope === "none") { t = b = l = rt = false; }
+  else { t = b = l = rt = true; }
+  return { t, r: rt, b, l, bg };
+};
+
 // ── 표 요소 → hp:tbl ──
 // grid: { cellsText: string[][], merges: [{r,c,rs,cs}], colWidthsMm: number[][](행별), rowHeightsMm: number[][](셀별) }
 // grid가 없으면 el.rows(균등 격자)로 폴백 — 검증 하네스의 단순 캔버스와 호환.
 function tableXml(el, reg, borderFill = "2") {
   const grid = el.grid ?? gridFromRows(el);
-  const { cellsText, merges, colWidthsMm, rowHeightsMm, cellStyles } = grid;
+  const { cellsText, merges, colWidthsMm, rowHeightsMm, cellStyles, borderScope } = grid;
   const rc = cellsText.length;
   const cc = cellsText[0].length;
+  const scopedBorders = borderScope && borderScope !== "all"; // all=기본(셀 fill 미주입, 기존 동작)
 
   const coveredBy = (r, c) =>
     merges.some(
@@ -333,7 +355,13 @@ function tableXml(el, reg, borderFill = "2") {
       for (let i = c; i < c + cs; i++) wMm += colWidthsMm[r][i];
       let hMm = 0;
       for (let i = r; i < r + rs; i++) hMm += rowHeightsMm[i][c];
-      tcs.push(cellXml(cellsText[r][c], r, c, mmToUnit(wMm), mmToUnit(hMm), borderFill, cs, rs, refsAt(r, c)));
+      const refs = refsAt(r, c);
+      // 테두리 범위(외곽/중앙/없음) — 셀의 스팬 바깥변을 종이 원점 기준으로 판정해 4변 발급.
+      if (scopedBorders && reg) {
+        const bg = cellStyles?.[r]?.[c]?.backgroundColor;
+        refs.fill = reg.borderFillId(cellBorders(r, c, rs, cs, rc, cc, borderScope, bg));
+      }
+      tcs.push(cellXml(cellsText[r][c], r, c, mmToUnit(wMm), mmToUnit(hMm), borderFill, cs, rs, refs));
     }
     if (tcs.length) trs.push(`<hp:tr>${tcs.join("")}</hp:tr>`);
   }
@@ -365,10 +393,11 @@ function gridFromRows(el) {
 // el.style(화면 실측: pt·bold·italic·color·align·lineSpacing)을 1×1 셀의 스타일로 옮긴다.
 const textXml = (el, reg) => {
   const grid = gridFromRows({ ...el, rows: [[el.text]] });
-  // ⚠ vAlign은 top — 화면 텍스트 상자는 위 기준으로 흐른다. center로 내보내면 셀
+  // ⚠ vAlign 기본은 top — 화면 텍스트 상자는 위 기준으로 흐른다. center로 내보내면 셀
   // 높이(exportH: 최소 8mm+여유)가 내용보다 클 때 글이 아래로 밀려 겹치기 비교에서
-  // 세로 ~2mm 어긋남(실측 rhwp glyph 199.3 vs 화면 top 179.9+ascent).
-  if (el.style) grid.cellStyles = [[{ ...el.style, hAlign: el.style.align, vAlign: "top" }]];
+  // 세로 ~2mm 어긋남(실측 rhwp glyph 199.3 vs 화면 top 179.9+ascent). 그래서 미설정=top.
+  // valign을 사용자가 명시하면(el.style.vAlign) 그 어긋남은 의도된 세로정렬이라 존중한다.
+  if (el.style) grid.cellStyles = [[{ ...el.style, hAlign: el.style.align, vAlign: el.style.vAlign ?? "top" }]];
   // 인라인 리치 텍스트: 런 세그먼트 줄을 1×1 셀에 실어 richParas로 내보낸다
   if (el.richLines) grid.cellRich = [[el.richLines]];
   if (el.paraAligns) grid.cellRichAligns = [[el.paraAligns]]; // 문단별 정렬 (줄 index 대응)

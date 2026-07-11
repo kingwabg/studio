@@ -78,3 +78,94 @@
 ```bash
 npm run verify:hwpx   # 7중 게이트 — 모두 ✓ + exit 0 이어야 함
 ```
+
+## 2026-07-11 정밀 감사 — "셀 경계 안 맞음 · 드래그 표시 불완전" (22에이전트 · 전 항목 적대검증 CONFIRMED)
+
+### 근원 진단
+경계선은 셀 border가 아니라 boundary-layer의 절대배치 1px 세그먼트이고, 셀은 (미커밋 병렬 작업에서)
+table→div 절대배치로 전환돼 **행별 float 누적합이 그대로 픽셀에 노출**된다. 근원 버그 = 스케일 시
+"셀 단위 독립 Math.round" — 같은 물리 경계가 행마다 다르게 라운드되어 1px씩 찢어지고(실측 170/169/170),
+드리프트가 통선 그룹 판정 EPS(0.6px)를 넘으면 통선 드래그가 일부 행만 움직여 어긋남이 고착·증폭.
+
+### 이번 수정 ✅ (tsc + 하네스 검증)
+- **tableScale.ts 신설** — 경계(누적) 공간 반올림 단일 구현. scaleTableKingData(전체 리사이즈)와
+  fitTableDataToSafeArea(store) 공유. 하네스: 감사 케이스 169/169/169 정합·행합 일치·float 폭·열간
+  가로경계 전부 PASS (구버전 대조군으로 찢어짐 재현).
+- **corner-handle 투명 트랩** — opacity 0일 때 pointerEvents도 차단 (객체 모드 우하단 14px에서
+  보이지 않는 diag 리사이즈가 걸리던 것).
+- **셀 선택 outline** — offset -1→-2px (경계선 레이어 z8이 ±0.5px를 덮어 선택 사각형이
+  갉아먹히던 것) + KRDS 블루.
+
+### 보류 — 병렬 세션(미커밋 표 객체화 WIP) 소관, CONFIRMED 상태로 인계
+- hover 통선(boundaryIndex 매칭)과 실제 드래그 그룹(위치+EPS 매칭) 판정 불일치 — 어긋난 표에서
+  하이라이트 지그재그/드래그 순간 모양 급변. 근원 반올림 수정으로 비의도 케이스는 소멸, Shift 의도
+  어긋남에선 잔존 → hover도 findColumnBoundaryGroup 사용 권장 (TableKingBlock 1251-1264)
+- 드래그(또는 잠금 거부) 직후 같은 경계 hover 재표시 안 됨 — setStableHoverBoundary ref 캐시 desync
+  (TableKingBlock 1291-1332 vs useBoundaryDrag 170)
+- 병합 셀 아래 가로 경계 row-handle 앵커가 colSpan 미보정 (TableKingBlock 1467-1473 — col-handle은 보정함)
+- 외곽 통선 세그먼트(합-최대 기준, boundarySegments 91-118) — 근원 수정 후 이중선은 소멸하나
+  중복 세그먼트 자체는 잔존, hunk 정리 권장
+- diag 전체 리사이즈의 셀별 콘텐츠 최소폭 클램프 → 축소 시 우측 외곽 지그재그 (useBoundaryDrag 233-237)
+- HANDLE 6→12 확대 — 셀 안쪽 단방향 비대칭이라 30px 최소폭 셀의 40%가 리사이즈 존 (구조 개선은
+  경계 중심 대칭 히트박스로)
+- 미선택 표 가장자리 ±6px 이동 히트박스가 무조건 렌더 (CanvasBlock 496-505 — selected 게이트 검토)
+- 1px 세그먼트 반픽셀 센터링 + float 좌표 → 뿌연 선 (upstream 설계 — DPR 스냅 제안)
+- .tk-root { margin:10px auto } (HEAD부터) — 블록 내 10px 수직 오프셋 의심, 시각 확인 필요
+
+### 2026-07-11 후속 — 병렬 세션 중단 확인, 보류 9건 인계 수리 (사용자 지시)
+검증: esbuild 문법 4파일 OK · tsc 클린 · verify:hwpx 7게이트 · 순수함수 하네스 5/5 PASS
+(병합 앵커 seed 성립 + 대조군 실패 재현, 유령 관통선 소멸, 정직한 우변 유지, 정렬 표 연속성).
+
+- [x] hover 통선 = 실제 드래그 그룹 — makeColumn/RowHoverBoundary가 findGroup(위치 기반) items 생성.
+  fullLine(인덱스 매칭) 생산자 소멸 → mousedown 순간 모양 급변·지그재그 해소 (TableCanvas 매처의 fullLine 분기는 무해하게 잔존)
+- [x] 드래그 직후 hover 실종 — setHoverBoundarySynced(ref 캐시 동기화)를 훅에 전달
+- [x] 병합 셀 row-handle 앵커 colSpan 보정 (hover 2곳 + startDrag) — 하네스로 seed 성립 증명
+- [x] 외곽 통선 오버레이 제거 — 셀별 세그먼트가 4변 전부 커버, 오버레이는 드리프트 밴드에이드였고
+  어긋난 표에서 유령 관통선·이중선 유발 (하네스 증명)
+- [x] diag 리사이즈 열 단위 유효 델타 — 셀별 클램프의 우측 지그재그 해소, 콘텐츠 하한은 열 전체가 함께 멈춤
+- [x] 셀 나누기 정수 분배(큰 나머지) — float 폭(33.33…)이 만들던 소수 경계·뿌연 선의 씨앗 제거, 합 보존
+- [x] .tk-root margin:10px 캔버스 스코프 무력화 — 표 픽셀이 블록 상자보다 10px 아래 그려져
+  선택 외곽선·히트박스·내보내기 좌표와 어긋나던 것 (⚠ 시각 확인 필요 — 브라우저 도구 복구 시)
+- [~] HANDLE 12px 셀 안쪽 비대칭 — 유지(WIP 의도 존중). 구조 개선(경계 중심 대칭 히트박스)은 별도 과제
+- [~] 미선택 표 가장자리 이동 히트박스 — 검토 결과 "끌면 선택+이동"이 캔바 정상 동작이라 유지
+
+## 2026-07-11 2차 정밀감사 — 중복·에러 가능성·보완 (3에이전트 병렬 + 적대검증)
+검증: 순수함수 하네스 21/21 · tsc 클린 · esbuild 18파일 · verify:hwpx 7게이트 · 브라우저 실측
+(행 드래그 균일/하한, 병합 Tab·방향키 스킵+포커스 추종, 리본 셀 배경, 나누기 최소 보정, Ctrl+Z 단계별).
+
+### 수정 완료 ✅
+- **행 높이 회귀 근원 2겹**: ①Tailwind `.table-row/.table-cell` 클래스명 충돌(display 덮임 →
+  익명 테이블) → display 명시, ②병합 앵커열 vs 그룹 타깃열 불일치 → 일반 행 드래그를
+  `moveTableRowBoundary`(행 균일)로. 로드 수리 `repairRowHeights`: 열 합 동일=온전(어긋남 보존),
+  불일치=손상 통일.
+- **빈 셀 최소 높이**(한글식): `HANGUL_MIN_ROW_H` = ceil(12.5×1.6+상하여백) — 새 표 기본·수리
+  바닥·전 조작 경로 하한. 인스펙터 셀 여백(padY)이 공식에 실반영(cellPadY 스레딩).
+- **콘텐츠 하한 통일**: 내부 열 드래그(그동안 30px 바닥뿐)·Shift 국소(셀 단위 하한)·키보드/
+  H같게(24→28)·나누기(최소 미만이면 표 성장). 하한 미만 행은 "악화만 금지"(역방향 점프 제거).
+- **병합 셀 내비게이션**: Tab·방향키(편집/확장 모드 모두)가 스팬을 건너뛰고 앵커로 착지 —
+  이전엔 병합 셀 탈출 불가·선택/포커스 탈선. Shift 행 드래그는 스팬 열을 그룹으로 이동.
+- **실행취소**: 히스토리를 데이터 변경에만 쌓음(선택·스피너가 80칸 밀어내던 것), 외부 변경
+  (외곽 리사이즈·AI)도 히스토리 포함 — Ctrl+Z가 리사이즈를 통째 역전시키던 부작용 제거.
+  외곽 리사이즈 커밋 원자화(setTableData에 pos) — 2항목 분열·낡은 폭 클램프 해소.
+- **WYSIWYG 값 표류**: 셀 글자 12.5px/9.375pt/줄간격 120% 단일 소스(constants.js) — 화면 13px
+  vs 내보내기 9.4pt, 줄간격 화면 120% vs 파일 160% 드리프트 해소. 최소 트랙 상수 4벌 통일
+  (store fit 4px 바닥 제거).
+- **리본 셀 색상 무반응**: TableKingBlock에 blockId 미전달로 apply-style 리스너가 조기 반환 →
+  전달. 인스펙터 죽은 쓰기 배선: 폭/높이=트랙 스케일 커밋, 세로 정렬=선택 셀 vAlign(리본 경로).
+- **중복 추출**: 병합 술어 6벌 → `table/merge.js`(exportCore만 의도적 복사), cumulativePositions
+  2벌, BOUNDARY_EPS≡EPS. 죽은 코드 제거: htmlCol/RowSpan·findBoundaryIndex·colGroupWidths·
+  fullLine 분기·유령 파라미터·죽은 CSS(input 셀렉터·table/th/td·ellipsis).
+- **안정성**: 드래그 중 언마운트 리스너/커서 누수 정리, boundaryGrid 래그드 배열 가드,
+  tableSizePx -Infinity 가드, PageSnapshot 레거시 rows 표 실종 수정, 포커스 지연 rAF→setTimeout(0)
+  (백그라운드 탭 rAF 정지), CanvasStage 측정 deps 축소(키 입력마다 RO 재구성).
+
+### 남긴 것 (백로그 — 의도적 보류)
+- `.table-row` 밴드 구조 자체가 레이아웃 무의미(셀 절대배치) — 평탄화하면 ~40줄+O(R·C) 루프
+  제거 가능 (구조 리팩터링, 별도 작업)
+- 캡션 UI(저장만 되고 렌더/내보내기 미구현) · borderScope 화면 미반영(내보내기는 정상,
+  편집기 격자선은 Word식 가이드로 정당화 가능) · 표 스타일 프리셋/줄무늬 화면 반영
+- 스냅샷(PageSnapshot)·병합 미리보기의 행별 너비/어긋남 미지원(단순 표는 정확)
+- 셀 텍스트의 전각 보정 미적용(본문 텍스트와 달리 셀은 font:inherit) — 셀 줄바꿈 정합 과제
+- valueSignature 전량 JSON 직렬화 퍼포먼스(리비전 카운터로 대체 검토)
+- 콘솔의 `useLayoutEffect changed size` 경고 = HMR(Fast Refresh) 아티팩트로 확정 — deps에
+  followActive 추가가 세션 중 핫리로드로 크기 변화로 보인 것. 런타임 버그 아님.

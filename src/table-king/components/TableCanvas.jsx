@@ -41,9 +41,9 @@ const boundarySegmentClassName = (segment, activeBoundary, hoverBoundary) =>
 export function TableCanvas({
   activeBoundary,
   boundarySegments,
-  colGroupWidths,
   getCellsForYRow,
   hoverBoundary,
+  outerResizeHandles,
   renderCell,
   rowGroupHeights,
   showHandles,
@@ -53,11 +53,13 @@ export function TableCanvas({
 }) {
   return (
     <section className="workspace">
-      <div className="table-frame" style={{ width: totalWidth, minHeight: totalHeight }}>
+      <div className="table-frame" style={{ width: totalWidth, height: totalHeight }}>
         <div
           className="corner-handle"
           onMouseDown={(event) => startDrag(event, "diag", 0)}
-          style={{ opacity: showHandles ? 1 : 0 }}
+          // 숨김일 땐 히트도 꺼야 함 — opacity만 0이면 객체 모드에서 우하단 14px가
+          // "보이지 않는 diag 리사이즈 트랩"이 된다 (셀 핸들의 handleHitboxStyle과 동일 패턴)
+          style={{ opacity: showHandles ? 1 : 0, pointerEvents: showHandles ? "auto" : "none" }}
         />
         <div className="boundary-layer" aria-hidden="true">
           {boundarySegments.map((segment, index) => (
@@ -77,28 +79,24 @@ export function TableCanvas({
             />
           ))}
         </div>
-        <table style={{ width: totalWidth }}>
-          <colgroup>
-            {colGroupWidths.map((width, index) => (
-              <col key={index} style={{ width }} />
-            ))}
-          </colgroup>
-          <tbody>
-            {rowGroupHeights.map((height, yIndex) => {
-              const yCells = getCellsForYRow(yIndex);
-              if (yCells.length === 0) return null;
+        <div className="table-grid" style={{ width: totalWidth, height: totalHeight }}>
+          {rowGroupHeights.map((height, yIndex) => {
+            const yCells = getCellsForYRow(yIndex);
+            if (yCells.length === 0) return null;
 
-              return (
-                <tr key={yIndex} style={{ height }}>
-                  {yCells.map(({ cell, rowIndex, colIndex }) =>
-                    renderCell(cell, rowIndex, colIndex)
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+            return (
+              <div className="table-row" key={yIndex} style={{ height }}>
+                {yCells.map(({ cell, rowIndex, colIndex }) =>
+                  renderCell(cell, rowIndex, colIndex)
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {outerResizeHandles}
       </div>
     </section>
   );
 }
+
+

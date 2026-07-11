@@ -265,7 +265,7 @@ function LintGlyph() {
 const SEV_STYLE: Record<Finding["severity"], { dot: string; label: string }> = {
   error: { dot: "#D64550", label: "오류" },
   warning: { dot: "#C77A28", label: "주의" },
-  info: { dot: "#2B5CE6", label: "참고" },
+  info: { dot: "#256EF4", label: "참고" },
 };
 
 // ── 공문서 린터 뷰 — 행정 서식 오류 검사 + 자동 수정 ──

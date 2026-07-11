@@ -1,7 +1,7 @@
 // LeftPanel.tsx — 좌측 패널: [블록] 팔레트 + 레이어 / [데이터] 병합 데이터 연동.
 // 데이터 탭: 엑셀·CSV 업로드 → 열 이름이 "알약"이 되고, 지면의 텍스트/셀에 끌어다
 // 놓으면 {{열이름}} 토큰이 박힌다. 미리보기 스테퍼로 레코드를 넘겨보고 일괄 생성.
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { type Block, type BlockType, descendantIds } from "../../modules/document/model";
@@ -26,7 +26,9 @@ import {
   IcChevronRight,
   IcSparkles,
   IcSearch,
+  IcDatabase,
 } from "../../ui/icons";
+import { DsIcon } from "../../ui/design-icons";
 
 // Canva식 객체 팔레트 — 현재 문서 모델(text/table/image)을 유지하면서 클릭/드래그 추가를 지원한다.
 type ObjectPreset = {
@@ -77,7 +79,7 @@ const OBJECT_CATEGORIES: ObjectCategory[] = [
         detailGroup: "basic",
         icon: <span className="text-[18px] font-black">T</span>,
         tint: "#EEF2FF",
-        tone: "#2B5CE6",
+        tone: "#256EF4",
         extra: { ...TEXT_BOX, text: "제목을 입력하세요", w: 72, fontSize: 20, bold: true, borderWidth: 0 },
       },
       {
@@ -166,7 +168,7 @@ const OBJECT_CATEGORIES: ObjectCategory[] = [
         detailGroup: "document",
         icon: <span className="text-[15px] font-black">서</span>,
         tint: "#E0E7FF",
-        tone: "#4F46E5",
+        tone: "#256EF4",
         extra: { text: "서명", w: 34, fontSize: 10, align: "center", manualW: true, fill: "#ffffff", borderColor: "#A5B4FC", borderWidth: 1, radius: 7, padX: 2, padY: 1.2 },
       },
       {
@@ -272,7 +274,7 @@ const OBJECT_CATEGORIES: ObjectCategory[] = [
         label: "서명",
         icon: <span className="text-[15px] font-black">서</span>,
         tint: "#E0E7FF",
-        tone: "#4F46E5",
+        tone: "#256EF4",
         extra: { text: "서명", w: 34, fontSize: 10, align: "center", manualW: true, fill: "#ffffff", borderColor: "#A5B4FC", borderWidth: 1, radius: 7, padX: 2, padY: 1.2 },
       },
       {
@@ -387,8 +389,12 @@ function PaletteItem({ preset }: { preset: ObjectPreset }) {
       title={`${preset.label} 추가`}
     >
       <div
-        className="studio-object-preview w-full h-[48px] rounded-[13px] flex items-center justify-center shadow-[inset_0_0_0_1px_rgba(255,255,255,.45)] transition-transform group-hover:scale-[1.03]"
-        style={{ background: preset.tint, color: preset.tone }}
+        className="studio-object-preview aspect-square w-full flex items-center justify-center text-white transition-transform group-hover:scale-[1.03] [&_svg]:h-6 [&_svg]:w-6"
+        style={{
+          borderRadius: 14,
+          background: `linear-gradient(140deg, ${preset.tone}, color-mix(in srgb, ${preset.tone} 60%, #171034))`,
+          boxShadow: `0 10px 18px -12px color-mix(in srgb, ${preset.tone} 70%, transparent), inset 0 1px 0 rgba(255,255,255,.28)`,
+        }}
       >
         {preset.icon}
       </div>
@@ -450,6 +456,9 @@ function TextPresetCard({ preset }: { preset: ObjectPreset }) {
 
 function TextDetailPanel({ onBack }: { onBack: () => void }) {
   const presets = textPresets();
+  const addBlock = useCanvasStore((s) => s.addBlock);
+  const openAi = useRightTabStore((s) => s.setTab);
+  const addTextBox = () => addBlock("text", 28, 28, { ...TEXT_BOX, text: "텍스트를 입력하세요", w: 44, fontSize: 10.5 });
   return (
     <div className="h-full flex flex-col">
       <div className="px-3.5 py-3.5 border-b border-line flex flex-col gap-3">
@@ -465,6 +474,24 @@ function TextDetailPanel({ onBack }: { onBack: () => void }) {
           <p className="text-[11.5px] text-inkfaint mt-1 leading-relaxed">
             원하는 글자 스타일을 클릭하면 A4 중앙에 추가되고, 끌어다 놓으면 원하는 위치에 바로 배치됩니다.
           </p>
+        </div>
+        {/* 디자인: 텍스트 모드 상단 CTA — 그라데이션 '텍스트 상자 추가' + 테두리 'AI로 작성' */}
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={addTextBox}
+            className="flex h-[42px] items-center justify-center gap-2 rounded-xl text-[13.5px] font-bold text-white transition-transform active:scale-[0.98]"
+            style={{ background: "linear-gradient(135deg, #7c3aed, #5a2fe0)", boxShadow: "0 10px 20px -12px rgba(90,47,224,.6)" }}
+          >
+            <IcText size={16} /> 텍스트 상자 추가
+          </button>
+          <button
+            type="button"
+            onClick={() => openAi("ai")}
+            className="flex h-10 items-center justify-center gap-2 rounded-xl border-[1.5px] border-line text-[13px] font-bold text-inksoft transition-colors hover:border-accentline hover:bg-accentsoft hover:text-accent"
+          >
+            <IcSparkles size={15} /> AI로 작성
+          </button>
         </div>
         <div className="studio-search h-9 bg-paper border border-line rounded-[11px] flex items-center gap-2 px-2.5">
           <span className="text-inkfaint"><IcSearch size={14} /></span>
@@ -598,10 +625,11 @@ function LayerRow({ block, depth, kidCount }: { block: Block; depth: number; kid
   );
 }
 
-function BlocksTab() {
-  const [category, setCategory] = useState("all");
+function BlocksTab({ view = "blocks" }: { view?: "text" | "blocks" | "layers" }) {
+  const [category] = useState("all");
   const [detailCategory, setDetailCategory] = useState<string | null>(null);
   const blocks = useCanvasStore((s) => s.doc.blocks);
+  const toggleLeft = usePanelStore((s) => s.toggleLeft);
   // 루트 해제 드롭 영역 (레이어 목록 하단)
   const rootDrop = useDroppable({ id: "layerroot", data: { kind: "layerroot" } });
   const shownCategories = category === "all" ? OBJECT_CATEGORIES : OBJECT_CATEGORIES.filter((c) => c.id === category);
@@ -620,52 +648,59 @@ function BlocksTab() {
   };
   walk(undefined, 0);
 
-  if (detailCategory === "text") {
+  if (detailCategory === "text" || view === "text") {
     return <TextDetailPanel onBack={() => setDetailCategory(null)} />;
+  }
+
+  // 레이어 뷰 — 디자인의 별도 '레이어' 탭 (기존 BlocksTab 하단 '구조'를 독립 뷰로)
+  if (view === "layers") {
+    return (
+      <div className="studio-layer-tree px-3.5 py-3.5 flex-1 overflow-auto flex flex-col">
+        <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2.5">
+          구조 {blocks.length > 0 && <span className="text-inkfaint/70">· {blocks.length}</span>}
+        </p>
+        <div className="flex flex-col gap-0.5">
+          {rows.map(({ block, depth, kidCount }) => (
+            <LayerRow key={block.id} block={block} depth={depth} kidCount={kidCount} />
+          ))}
+          {blocks.length === 0 && <p className="text-[12px] text-inkfaint px-2 py-1">아직 블록이 없습니다</p>}
+        </div>
+        {blocks.length > 0 && (
+          <div
+            ref={rootDrop.setNodeRef}
+            className={`mt-2 rounded-lg border border-dashed px-2 py-2 text-[11px] text-center transition-colors ${
+              rootDrop.isOver ? "border-accent bg-accentsoft text-accent" : "border-line text-inkfaint"
+            }`}
+          >
+            여기로 끌면 최상위로
+          </div>
+        )}
+        <p className="text-[11px] text-inkfaint leading-relaxed mt-2">
+          행을 다른 행에 끌어다 놓으면 하위로 연결됩니다. 부모를 움직이면 하위가 함께 움직여요.
+        </p>
+      </div>
+    );
   }
 
   return (
     <>
       <div className="studio-library-head px-3.5 py-3.5 border-b border-line flex flex-col gap-3">
-        <div className="studio-panel-intro">
-          <span className="studio-panel-eyebrow">CREATE</span>
-          <div className="studio-panel-title-row">
-            <div>
-              <h2>요소 라이브러리</h2>
-              <p>클릭하거나 끌어서 문서에 추가</p>
-            </div>
-            <span className="studio-panel-count">{OBJECT_CATEGORIES.reduce((sum, item) => sum + item.presets.length, 0)}</span>
-          </div>
+        {/* 디자인: CREATE 아이브로우·카테고리 필터 탭 없이 간결한 헤더(제목 + 검색). 카테고리는 아래 스크롤 섹션. */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-[14px] font-extrabold tracking-tight text-ink">요소 라이브러리</h2>
+          <button
+            type="button"
+            title="왼쪽 패널 접기"
+            aria-label="왼쪽 패널 접기"
+            onClick={toggleLeft}
+            className="studio-panel-collapse"
+          >
+            ‹
+          </button>
         </div>
         <div className="studio-search h-9 bg-paper border border-line rounded-[11px] flex items-center gap-2 px-2.5">
           <span className="text-inkfaint"><IcSearch size={14} /></span>
           <span className="text-[12px] text-inkfaint">객체·서식 검색</span>
-        </div>
-
-        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5">
-          {CATEGORY_FILTERS.map((c) => {
-            const active = category === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  if (c.id === "text") {
-                    setDetailCategory("text");
-                    setCategory("all");
-                    return;
-                  }
-                  setDetailCategory(null);
-                  setCategory(c.id);
-                }}
-                className={`shrink-0 h-8 px-3 rounded-full text-[11.5px] font-bold border transition-colors ${
-                  active ? "bg-accent text-onaccent border-accent" : "bg-surface text-inksoft border-line hover:border-accentline hover:text-accent"
-                }`}
-              >
-                {c.title}
-              </button>
-            );
-          })}
         </div>
 
         <div className="max-h-[430px] overflow-auto pr-1 flex flex-col gap-4">
@@ -694,32 +729,27 @@ function BlocksTab() {
           ))}
         </div>
       </div>
-      <div className="studio-layer-tree px-3.5 py-3.5 flex-1 overflow-auto flex flex-col">
-        <p className="text-[11px] font-semibold text-inkfaint tracking-wide mb-2.5">
-          구조 {blocks.length > 0 && <span className="text-inkfaint/70">· {blocks.length}</span>}
-        </p>
-        <div className="flex flex-col gap-0.5">
-          {rows.map(({ block, depth, kidCount }) => (
-            <LayerRow key={block.id} block={block} depth={depth} kidCount={kidCount} />
+      {/* 데이터 필드 미리보기 — 디자인: 하단 상시 컬러 알약(업로드하면 실제 드롭 대상이 된다) */}
+      <div className="border-t border-line px-3.5 py-3.5 flex flex-col gap-2">
+        <p className="text-[11px] font-bold text-ink">데이터 필드 · 엑셀 업로드</p>
+        <p className="text-[10.5px] text-inkfaint leading-snug">열 이름이 알약이 되어 지면의 텍스트·셀에 드롭할 수 있어요.</p>
+        <div className="mt-0.5 flex flex-wrap gap-1.5">
+          {[
+            { label: "성명", tone: "var(--accenttext)", soft: "var(--accentsoft)" },
+            { label: "부서", tone: "var(--cat-green)", soft: "var(--cat-green-soft)" },
+            { label: "직급", tone: "var(--cat-orange)", soft: "var(--cat-orange-soft)" },
+            { label: "수신기관", tone: "var(--cat-purple)", soft: "var(--cat-purple-soft)" },
+          ].map((f) => (
+            <span
+              key={f.label}
+              className="inline-flex items-center gap-1 rounded-full pl-2 pr-2.5 py-1 text-[11.5px] font-medium"
+              style={{ background: f.soft, color: f.tone }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: f.tone }} />
+              {f.label}
+            </span>
           ))}
-          {blocks.length === 0 && (
-            <p className="text-[12px] text-inkfaint px-2 py-1">아직 블록이 없습니다</p>
-          )}
         </div>
-        {/* 루트 해제 영역 — 행을 여기로 끌면 최상위로 */}
-        {blocks.length > 0 && (
-          <div
-            ref={rootDrop.setNodeRef}
-            className={`mt-2 rounded-lg border border-dashed px-2 py-2 text-[11px] text-center transition-colors ${
-              rootDrop.isOver ? "border-accent bg-accentsoft text-accent" : "border-line text-inkfaint"
-            }`}
-          >
-            여기로 끌면 최상위로
-          </div>
-        )}
-        <p className="text-[11px] text-inkfaint leading-relaxed mt-2">
-          행을 다른 행에 끌어다 놓으면 하위로 연결됩니다. 부모를 움직이면 하위가 함께 움직여요.
-        </p>
       </div>
     </>
   );
@@ -874,7 +904,7 @@ function DataTab() {
             <button
               onClick={generateZip}
               disabled={busy || bound.length === 0}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-accent text-white text-[12.5px] font-semibold py-2.5 hover:bg-accenthover active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100 shadow-[0_1px_2px_rgba(43,92,230,0.25)]"
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-accent text-white text-[12.5px] font-semibold py-2.5 hover:bg-accenthover active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100 shadow-[0_1px_2px_rgba(37,110,244,0.25)]"
             >
               {busy ? (
                 "생성 중…"
@@ -903,8 +933,8 @@ function DataTab() {
   );
 }
 
-// 캔바식 2단: 아이콘 레일 66px + 콘텐츠 패널 250px (시안 1b)
-type RailKey = "blocks" | "templates" | "data" | "upload";
+// 캔바식 2단: 아이콘 레일 66px + 콘텐츠 패널 (디자인: 텍스트·블록·템플릿·데이터·레이어 + 구분선 + AI)
+type RailKey = "text" | "blocks" | "templates" | "data" | "layers";
 
 export function LeftPanel() {
   const [tab, setTab] = useState<RailKey>("blocks");
@@ -913,12 +943,13 @@ export function LeftPanel() {
   const leftW = usePanelStore((s) => s.leftW);
   const leftOpen = usePanelStore((s) => s.leftOpen);
 
-  const rail: { key: RailKey | "ai"; label: string; icon: ReactNode; soon?: boolean }[] = [
-    { key: "blocks", label: "요소", icon: <IcText size={17} /> },
+  const rail: { key: RailKey | "ai"; label: string; icon: ReactNode; soon?: boolean; sep?: boolean; hot?: boolean }[] = [
+    { key: "text", label: "텍스트", icon: <IcText size={17} /> },
+    { key: "blocks", label: "블록", icon: <DsIcon name="group" size={19} /> },
     { key: "templates", label: "템플릿", icon: <IcFile size={17} />, soon: true },
-    { key: "data", label: "데이터", icon: <IcTable size={17} /> },
-    { key: "upload", label: "업로드", icon: <IcUpload size={17} />, soon: true },
-    { key: "ai", label: "AI", icon: <IcSparkles size={17} /> },
+    { key: "data", label: "데이터", icon: <IcDatabase size={17} /> },
+    { key: "layers", label: "레이어", icon: <DsIcon name="duplicate" size={18} /> },
+    { key: "ai", label: "AI", icon: <IcSparkles size={17} />, sep: true, hot: true },
   ];
 
   return (
@@ -928,39 +959,49 @@ export function LeftPanel() {
         {rail.map((r) => {
           const active = r.key === tab;
           return (
-            <button
-              key={r.key}
-              title={r.soon ? `${r.label} (준비 중)` : r.label}
-              onClick={() => (r.key === "ai" ? openAi("ai") : setTab(r.key as RailKey))}
-              className={`studio-rail-button w-14 py-2 rounded-[10px] flex flex-col items-center gap-1 transition-colors ${
-                active ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper hover:text-ink"
-              }`}
-            >
-              {r.icon}
-              <span className={`text-[10.5px] ${active ? "font-bold" : "font-medium"}`}>{r.label}</span>
-            </button>
+            <Fragment key={r.key}>
+              {r.sep && <span className="my-1 h-px w-9 bg-line" aria-hidden="true" />}
+              <button
+                title={r.soon ? `${r.label} (준비 중)` : r.label}
+                onClick={() => (r.key === "ai" ? openAi("ai") : setTab(r.key as RailKey))}
+                className={`studio-rail-button w-14 py-2 rounded-[10px] flex flex-col items-center gap-1 transition-colors ${
+                  r.hot
+                    ? "studio-rail-ai"
+                    : active
+                      ? "bg-accentsoft text-accent"
+                      : "text-inksoft hover:bg-paper hover:text-ink"
+                }`}
+              >
+                {r.icon}
+                <span className={`text-[10.5px] ${active || r.hot ? "font-bold" : "font-medium"}`}>{r.label}</span>
+              </button>
+            </Fragment>
           );
         })}
         {hasDataset && <span className="w-1.5 h-1.5 rounded-full bg-accent -mt-9 ml-9" />}
       </div>
       {/* 콘텐츠 패널 — 폭 조절/접힘 (밀고 당기기). 접히면 rail(66px)만 남는다 */}
       <div className={`studio-left-content flex flex-col min-h-0 ${leftOpen ? "" : "hidden"}`} style={{ width: leftW }}>
-        {tab === "blocks" ? (
-          <BlocksTab />
+        {tab === "text" ? (
+          <BlocksTab view="text" />
+        ) : tab === "blocks" ? (
+          <BlocksTab view="blocks" />
+        ) : tab === "layers" ? (
+          <BlocksTab view="layers" />
         ) : tab === "data" ? (
           <DataTab />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-paper text-inkfaint">
-              {tab === "templates" ? <IcFile size={18} /> : <IcUpload size={18} />}
+              <IcFile size={18} />
             </span>
-            <p className="text-[12px] text-inkfaint leading-relaxed">
-              {tab === "templates" ? "템플릿 라이브러리는 준비 중이에요" : "이미지 업로드는 준비 중이에요"}
-            </p>
+            <p className="text-[12px] text-inkfaint leading-relaxed">템플릿 라이브러리는 준비 중이에요</p>
           </div>
         )}
       </div>
     </aside>
   );
 }
+
+
 

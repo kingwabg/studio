@@ -180,16 +180,19 @@ function bestSnap(lines: Line[], base: number, offsets: number[]): { at: number;
   return best;
 }
 
-// 이동 후보 (xMm, yMm)의 블록(id, w, h)을 다른 블록·지면에 스냅
+// 이동 후보 (xMm, yMm)의 블록(id, w, h)을 다른 블록·지면에 스냅.
+// exclude: 함께 움직이는 팔로워(자손·그룹·다중선택) — 드래그 중 doc 좌표가 원위치라
+// 후보선에 넣으면 유령 스냅(상·중·"중하"·하처럼 한 번 더 걸림)이 생긴다. 반드시 제외.
 export function computeSnap(
   doc: CanvasDoc,
   movingId: string,
   xMm: number,
   yMm: number,
   w: number,
-  h: number
+  h: number,
+  exclude?: ReadonlySet<string>
 ): SnapResult {
-  const others = doc.blocks.filter((b) => b.id !== movingId);
+  const others = doc.blocks.filter((b) => b.id !== movingId && !exclude?.has(b.id));
 
   // 후보선 수집: 지면(가장자리+중앙) + 다른 블록들(가장자리+중앙)
   const linesX: Line[] = [

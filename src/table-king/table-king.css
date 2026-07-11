@@ -146,15 +146,23 @@
   height: 14px;
   background: linear-gradient(135deg, transparent 50%, rgb(43 92 230 / 60%) 50%);
   cursor: nwse-resize;
-  transition: opacity 150ms ease;
+  transition: none;
 }
 
-.tk-root table {
+.tk-root .table-grid {
   position: relative;
   z-index: 1;
   width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+  height: 100%;
+}
+
+.tk-root .table-row {
+  position: static;
+  /* ⚠ Tailwind 충돌 방어: 유틸리티 `.table-row`가 `display: table-row`를 주입하면 브라우저가
+     익명 <table>을 만들어 절대배치 셀의 inline 높이를 무시한다(행 높이 조절이 프레임·테두리엔
+     반영되지만 셀 배경·텍스트는 옛 높이로 렌더). 셀은 position:absolute라 행은 순수 배치용
+     블록이어야 한다. 같은 이유로 셀도 block 고정(절대배치가 table-cell을 blockify하지만 명시). */
+  display: block;
 }
 
 .tk-root .boundary-layer {
@@ -167,9 +175,7 @@
 .tk-root .boundary-segment {
   position: absolute;
   background: var(--tk-line-strong);
-  transition:
-    background-color 120ms ease,
-    box-shadow 120ms ease;
+  transition: none;
 }
 
 .tk-root .boundary-segment-hover {
@@ -185,9 +191,9 @@
   box-shadow: 0 0 0 2px rgb(249 115 22 / 35%);
 }
 
-.tk-root th,
-.tk-root td {
+.tk-root .table-cell {
   position: relative;
+  display: block; /* Tailwind `.table-cell`(display:table-cell) 충돌 방어 — 위 .table-row 주석 참고 */
   overflow: hidden;
   min-width: 30px;
   border: 0;
@@ -196,15 +202,18 @@
 }
 
 /* 원본의 다크 헤더·얼룩 줄무늬는 데이터 그리드용 — 공문서 표 관례(옅은 머리행)로 교체. */
-.tk-root th {
+.tk-root .table-header-cell {
   background: var(--tk-paper);
   color: var(--tk-ink);
   font-weight: 600;
 }
 
-.tk-root th.selected,
-.tk-root td.selected {
-  outline: 2px solid var(--tk-accent);
+.tk-root .table-cell.selected {
+  /* 셀 드래그 선택은 기존 셀 배경을 보존하면서 선택 범위만 표시한다.
+     ⚠ offset -2px: 경계선 레이어(z8)가 경계 중심 ±0.5px를 덮으므로 -1px이면 선택선의
+     바깥 절반이 회색에 먹혀 "갉아먹힌 사각형"이 된다 — 경계선 안쪽으로 완전히 들인다. */
+  background-image: linear-gradient(rgb(37 110 244 / 12%), rgb(37 110 244 / 12%));
+  outline: 1px solid rgb(37 110 244 / 78%);
   outline-offset: -2px;
 }
 
@@ -216,11 +225,12 @@
   flex-direction: column;
 }
 
-.tk-root th input,
-.tk-root td input {
+/* 셀 편집기는 textarea 단일 (input 시절 셀렉터·ellipsis는 제거 — textarea에 무효).
+   ⚠ font-size·padding 기본값은 인라인 스타일(fitCellTextMetrics)이 항상 덮는다 —
+   여기 값은 인라인이 빠진 예외 상황의 폴백이며 constants.js CELL_FONT_SIZE와 같아야 한다. */
+.tk-root .table-cell textarea {
   display: block;
   width: 100%;
-  height: auto;
   min-width: 0;
   min-height: 0;
   border: 0;
@@ -231,18 +241,19 @@
   font-weight: inherit;
   padding: 0 8px;
   padding-block: 0;
-  text-overflow: ellipsis;
 }
 
-.tk-root input:focus {
+.tk-root input:focus,
+.tk-root textarea:focus {
   outline: 0;
 }
 
 .tk-root .resize-handle {
   position: absolute;
   z-index: 20;
-  background: rgb(43 92 230 / 30%);
-  transition: opacity 150ms ease;
+  /* 기능용 hitbox는 유지하고, 표 위에 보이던 파란 막대만 숨긴다. */
+  background: transparent;
+  transition: none;
 }
 
 .tk-root .col-handle {
@@ -265,3 +276,26 @@
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
 }
+
+
+.tk-root textarea {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  resize: none;
+}
+/* 리사이즈 중 표 선과 셀 배경이 같은 프레임에 칠해지도록 레이아웃 힌트를 준다.
+   (table/th/td 셀렉터는 div 렌더 전환으로 대상이 사라져 제거 — 감사 I6) */
+.tk-root .table-frame,
+.tk-root .boundary-layer {
+  transition: none;
+}
+.tk-root .table-object-move-surface {
+  background: rgb(43 92 230 / 7%);
+  outline: 2px solid rgb(43 92 230 / 55%);
+  outline-offset: -2px;
+}
+
+

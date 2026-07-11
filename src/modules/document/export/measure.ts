@@ -6,7 +6,7 @@ import { type ExportTextStyleOf } from "./elements"; // 타입만 — 런타임 
 
 export type ExportTextStyle = ExportTextStyleOf;
 const PT_TO_MM = 0.352778;
-const LINE_SPACING = 138;
+// 줄간격 정본은 model.LINE_SPACING_DEFAULT — 이 파일의 재선언(138)은 미사용 죽은 상수라 삭제(중복 감사)
 
 export function fontKeyForStyle(style: ExportTextStyle): string {
   if (!style.font) return DEFAULT_FONT;

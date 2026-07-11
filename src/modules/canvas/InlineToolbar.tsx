@@ -12,7 +12,7 @@ import { CATEGORY_LABEL, FONTS, ensureFont, fontByKey } from "../document/fonts"
 // 서식바가 받는 선택 상태 — 훅(useRichText)의 RichSelState를 그대로 사용
 export type InlineSel = RichSelState;
 // ── 선택 위 플로팅 서식바 (굵게·기울임·색·크기·글꼴) ──
-const INLINE_COLORS = ["#1A2233", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
+import { TEXT_COLOR_PRESETS } from "../../ui/presets"; // 정본 — 첫 값 #1A2233→#000000 수렴(화면 기본색과 일치)
 // 형광펜 스와치 — 한글 형광펜 감성의 연한 톤 4 + 지우기("")
 const INLINE_HIGHLIGHTS = ["#FDF3B4", "#D7F5DD", "#DBEAFE", "#FCE1E4", ""];
 
@@ -135,7 +135,7 @@ export function InlineToolbar({
       </button>
       <span className="w-px h-5 bg-line mx-0.5" />
       {/* 색 */}
-      {INLINE_COLORS.map((c) => (
+      {TEXT_COLOR_PRESETS.map((c) => (
         <button
           key={c}
           title={`색 ${c}`}

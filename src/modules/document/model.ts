@@ -17,7 +17,14 @@ export interface TableKingData {
 }
 
 export type TextAlign = "left" | "center" | "right";
+// 세로 정렬 — export(hp:subList vertAlign)·table-king 셀 vAlign과 같은 어휘라 어댑터 불필요.
+export type TextVAlign = "top" | "center" | "bottom";
 export type ParaListType = "bullet" | "num"; // 문단 목록 — 글머리(•) / 번호(1.)
+// 표 테두리 범위 — 셀별 4변을 위치로 해석. all=사방(기본)·outer=외곽만·inner=중앙만·none=없음.
+// 내보내기에서 셀 위치·병합 스팬으로 각 변 on/off 계산(exportCore). 화면 반영은 table-king 몫(추후).
+export type TableBorderScope = "all" | "outer" | "inner" | "none";
+// 표 스타일 프리셋(표·셀 탭) — grid=기본 격자, header=머리글 강조, stripe=줄무늬.
+export type TableStyle = "grid" | "header" | "stripe";
 
 // 인라인 리치 텍스트 — 한 텍스트 블록 안의 "런"(같은 서식이 연속되는 글자 구간).
 // 런이 없으면(runs 미지정) 블록 전체가 균일 서식(기존 동작 100% 보존). 런이 있으면
@@ -189,6 +196,21 @@ export interface Block {
   flow?: boolean;
   rows?: string[][]; // table 블록 구형 포맷 (data 없을 때 폴백 — 저장된 옛 문서 호환)
   data?: TableKingData; // table 블록 — table-king 엔진 스냅샷 (진실)
+  borderScope?: TableBorderScope; // table 블록 — 테두리 범위(내보내기 반영, 미설정=all)
+  // 표 캡션 — 화면 전용(내보내기 미연결). 표시 여부·위치·문구.
+  captionOn?: boolean;
+  caption?: string;
+  captionPos?: "top" | "bottom" | "left" | "right";
+  // ── 표 스타일(표·셀 탭) — 표 전체에 적용하는 셀 서식. 세로 정렬은 위 valign을 공유한다.
+  //    ⚠ 지금은 블록에 "상태"로 저장(진실)만 하고, 렌더된 표에 시각 반영은 렌더/내보내기
+  //    통합 단계에서 붙인다(CanvasBlock·exportCore). 상태를 먼저 진실로 두는 이유는 H4. ──
+  tableStyle?: TableStyle; // 프리셋(격자/머리글/줄무늬)
+  headerRow?: boolean; // 머리글 행 자동 (첫 행 강조)
+  firstCol?: boolean; // 첫 열 강조
+  striped?: boolean; // 줄무늬 행
+  headerLock?: boolean; // 머리글 행 잠금 (행 크기 고정)
+  firstColLock?: boolean; // 첫 열 잠금 (열 너비 고정)
+  cellFill?: string; // 셀 배경 기본색 hex
   src?: string; // image 블록 (Phase 2 Storage)
   // 텍스트 스타일 (text 블록) — 없으면 기본값. 내보내기(exportHwpx)도 이 값을 쓴다.
   font?: string; // 폰트 레지스트리 key (fonts.ts) — 없으면 문서 기본(나눔고딕)
@@ -198,6 +220,9 @@ export interface Block {
   underline?: boolean; // 밑줄 (블록 전체 기본 — 구간별은 runs)
   strike?: boolean; // 취소선
   align?: TextAlign;
+  // 세로 정렬 — 상자가 내용보다 클 때만 보인다(텍스트는 대개 auto-height라 h를 키운 상자에서
+  // 의미). 미지정이면 내보내기에 vAlign을 넣지 않아 기존 동작을 그대로 보존한다.
+  valign?: TextVAlign;
   color?: string; // hex
   // 줄간격(%) — 화면 line-height = 값/100, 내보내기 paraPr lineSpacing에 그대로.
   // 없으면 기본 138(leading-snug 1.375와 정합 — 검증된 기존 값 유지)
@@ -233,6 +258,11 @@ export const TEXT_DEFAULTS = {
 // SCALE=3.7795px/mm → 8/SCALE≈2.12, 4/SCALE≈1.06. 이 값이 화면·내보내기 공통 기준이라
 // 캔버스 줄바꿈 = 한글 줄바꿈 정합이 유지된다(검증된 240자 실측 기준).
 export const DEFAULT_TEXT_PAD = { x: 8 / 3.7795275591, y: 4 / 3.7795275591 };
+// 기본 줄간격(%) — 화면·스냅샷·내보내기가 공유하는 유일 정본. 138 ≈ leading-snug(1.375)와
+// 정합(검증된 기존 값). ⚠ 재선언 금지 — 값이 갈라지면 미리보기/HWPX 세로 정렬이 어긋난다
+// (2026-07 중복 감사에서 138/137.5/160 3갈래 표류 확인). exportCore.js(의존성 0 코어)의
+// 폴백 160만 예외 — 레거시 실측 경로 방어값이라 그대로 둔다.
+export const LINE_SPACING_DEFAULT = 138;
 export const padOf = (b: Block) => ({
   x: b.padX ?? DEFAULT_TEXT_PAD.x,
   y: b.padY ?? DEFAULT_TEXT_PAD.y,

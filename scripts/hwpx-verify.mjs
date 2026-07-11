@@ -49,6 +49,17 @@ const canvas = {
         ],
       },
     },
+    // 테두리 범위(borderScope) 경로: outer — 셀별 4변 SOLID/NONE + borderFill itemCnt 검증
+    {
+      type: "table", x: 130, y: 120, w: 50, h: 20,
+      grid: {
+        cellsText: [["외", "곽"], ["테", "두"]],
+        merges: [],
+        colWidthsMm: [[25, 25], [25, 25]],
+        rowHeightsMm: [[10, 10], [10, 10]],
+        borderScope: "outer",
+      },
+    },
     // 다중 페이지 경로: page=1 → 앵커 문단 pageBreak="1" + 페이지 로컬 y
     { type: "text", page: 1, x: 55, y: 25, w: 100, h: 12, text: "둘째 페이지 제목" },
     {

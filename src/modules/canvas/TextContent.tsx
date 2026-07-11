@@ -1,6 +1,6 @@
 // TextContent.tsx — 캔버스 텍스트 블록: 편집(useRichText 훅) + 읽기(RichRead) +
 // auto-width/height (CanvasBlock에서 분할 — 계획 3단계).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useDroppable } from "@dnd-kit/core";
 import { type Block, TEXT_DEFAULTS, blockRuns, padOf, showingHint } from "../document/model";
@@ -10,6 +10,9 @@ import {
   TEXT_BORDER,
   TEXT_SURFACE,
   measureNaturalWidthPx,
+  offsetFromPoint,
+  selectionEndpointRects,
+  setSelectionRange,
   textStyle,
   useRichText,
 } from "../richtext";
@@ -17,6 +20,101 @@ import { ensureFont, fontByKey, useFontStore } from "../document/fonts";
 import { SCALE, mmToPx } from "./geometry";
 import { useCanvasStore } from "./store";
 import { InlineToolbar, type InlineSel } from "./InlineToolbar";
+type SelectionEdge = "start" | "end";
+
+type TextSelectionHandlesProps = {
+  sel: InlineSel;
+  editorRef: { current: HTMLDivElement | null };
+};
+
+function TextSelectionHandles({ sel, editorRef }: TextSelectionHandlesProps) {
+  const [points, setPoints] = useState<{ start: DOMRect; end: DOMRect } | null>(null);
+  const dragRef = useRef<{ edge: SelectionEdge; fixed: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const root = editorRef.current;
+    if (!root || !sel.isRange) {
+      setPoints(null);
+      return;
+    }
+    const update = () => setPoints(selectionEndpointRects(root, sel.offs[0], sel.offs[1]));
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [editorRef, sel.isRange, sel.offs[0], sel.offs[1]]);
+
+  const startDrag = (edge: SelectionEdge, event: RPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const root = editorRef.current;
+    if (!root) return;
+    const [start, end] = sel.offs;
+    dragRef.current = { edge, fixed: edge === "start" ? end : start };
+    root.focus({ preventScroll: true });
+    const previousUserSelect = document.body.style.userSelect;
+
+    const stop = () => {
+      dragRef.current = null;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+    const move = (moveEvent: globalThis.PointerEvent) => {
+      const currentRoot = editorRef.current;
+      const drag = dragRef.current;
+      if (!currentRoot || !drag) return;
+      const next = offsetFromPoint(currentRoot, moveEvent.clientX, moveEvent.clientY);
+      if (next == null) return;
+      const range = drag.edge === "start"
+        ? (next <= drag.fixed ? [next, drag.fixed] : [drag.fixed, next])
+        : (next >= drag.fixed ? [drag.fixed, next] : [next, drag.fixed]);
+      setSelectionRange(currentRoot, range[0], range[1]);
+    };
+
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
+
+  if (!points) return null;
+  const handle = (edge: SelectionEdge, rect: DOMRect) => (
+    <button
+      type="button"
+      aria-label={edge === "start" ? "선택 시작점 조절" : "선택 끝점 조절"}
+      title={edge === "start" ? "선택 시작점" : "선택 끝점"}
+      onPointerDown={(event) => startDrag(edge, event)}
+      style={{
+        position: "fixed",
+        left: rect.left - 6,
+        top: rect.bottom - 6,
+        width: 12,
+        height: 12,
+        padding: 0,
+        borderRadius: "999px",
+        border: "2px solid #FFFFFF",
+        background: "#256EF4",
+        boxShadow: "0 0 0 1px #256EF4, 0 2px 8px rgba(37,110,244,0.35)",
+        cursor: "ew-resize",
+        zIndex: 1000,
+      }}
+    />
+  );
+
+  return createPortal(
+    <>
+      {handle("start", points.start)}
+      {handle("end", points.end)}
+    </>,
+    document.body,
+  );
+}
 export function TextContent({
   block,
   editing,
@@ -44,13 +142,15 @@ export function TextContent({
     void ensureFont(fontKey);
   }, [fontKey]);
 
-  // 편집 중 높이 동기화 — contentEditable 자연 높이(패딩 포함)를 block.h로
+  // 편집 중 높이 동기화 — contentEditable 자연 높이(패딩 포함)를 block.h로.
+  // 0.1mm 반올림 + dead-band 0.25mm: 이전의 "정수 mm 올림 + 1mm dead-band"는 h를 최대
+  // ~2mm 부풀려 중심선(y+h/2)이 시각 중앙보다 ~1mm 아래로 처졌다(정렬선 어긋남의 원인).
   const syncEditH = () => {
     const el = rt.ref.current;
     if (!el) return;
-    const needMm = Math.max(1, Math.ceil(el.offsetHeight / SCALE));
+    const needMm = Math.max(1, Math.round((el.offsetHeight / SCALE) * 10) / 10);
     const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
-    if (cur && Math.abs((cur.h ?? 0) - needMm) >= 1) updateBlock(block.id, { h: needMm });
+    if (cur && Math.abs((cur.h ?? 0) - needMm) >= 0.25) updateBlock(block.id, { h: needMm });
   };
 
   // 편집 배선 공유 훅 (richtext/useRichText — 임베드 에디터와 동일 코어, 계획 2단계).
@@ -101,9 +201,10 @@ export function TextContent({
     const el = sizerRef.current;
     if (!el) return;
     const sync = () => {
-      const needMm = Math.max(1, Math.ceil(el.offsetHeight / SCALE));
+      // syncEditH와 같은 규칙(0.1mm 반올림 + 0.25mm dead-band) — 두 경로의 h가 달라지면 안 됨
+      const needMm = Math.max(1, Math.round((el.offsetHeight / SCALE) * 10) / 10);
       const cur = useCanvasStore.getState().doc.blocks.find((b) => b.id === block.id);
-      if (cur && Math.abs((cur.h ?? 0) - needMm) >= 1) updateBlock(block.id, { h: needMm });
+      if (cur && Math.abs((cur.h ?? 0) - needMm) >= 0.25) updateBlock(block.id, { h: needMm });
     };
     sync();
     const ro = new ResizeObserver(sync);
@@ -157,6 +258,7 @@ export function TextContent({
           style={{ ...textStyle(block), whiteSpace: "pre-wrap", minHeight: "1em", backgroundColor: TEXT_SURFACE, borderColor: TEXT_BORDER }}
           className="w-full leading-snug bg-white outline-none border-0 cursor-text"
         />
+        {sel && <TextSelectionHandles sel={sel} editorRef={rt.ref} />}
         {sel &&
           createPortal(
             <InlineToolbar
@@ -201,7 +303,9 @@ export function TextContent({
           // ⚠ 문단별 정렬이 있으면 전체 폭 — 밀착(수축) 폭에서는 text-align의 기준이
           // "가장 긴 줄"뿐이라 화면(블록 폭) 기준 정렬이 안 보인다. 편집 모드(w-full)와
           // 같은 기준 폭을 줘야 편집=읽기 정렬이 일치한다. 정렬 없으면 밀착 유지.
-          ...(block.paraAligns?.some((a) => a != null) ? { width: "100%" } : {}),
+          ...(block.paraAligns?.some((a) => a != null) || (block.align && block.align !== "left")
+            ? { width: "100%" }
+            : {}),
           whiteSpace: "pre-wrap",
           backgroundColor: TEXT_SURFACE,
           borderColor: TEXT_BORDER,

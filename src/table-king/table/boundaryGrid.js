@@ -83,11 +83,13 @@ export const findNearestBoundaryIndex = (boundaries, value) => {
   return bestIndex;
 };
 
+// Y축 쌍(cellStartY/cellHeight)과 같은 방어 — 외부 문서(AI 생성·가져오기)가 cells보다 짧은
+// widths를 줄 때 첫 렌더 TypeError 방지 (cells·widths·heights는 독립 시드라 교차 검증이 없다)
 export const cellStartX = (widths, row, col) =>
-  widths[row].slice(0, col).reduce((sum, width) => sum + width, 0);
+  (widths[row] ?? []).slice(0, col).reduce((sum, width) => sum + width, 0);
 
 export const cellWidth = (widths, row, col, colSpan = 1) =>
-  widths[row].slice(col, col + colSpan).reduce((sum, width) => sum + width, 0);
+  (widths[row] ?? []).slice(col, col + colSpan).reduce((sum, width) => sum + width, 0);
 
 export const cellStartY = (cellHeights, row, col) => {
   let acc = 0;

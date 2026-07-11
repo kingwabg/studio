@@ -62,8 +62,8 @@ const TICK_MID = "var(--linestrong)";
 const TICK_MAJOR = "var(--inkfaint)";
 const LABEL = "var(--inkfaint)";
 const SAFE_MARGIN_MM = 20;
-const PROJECTION_FILL = "rgba(43, 92, 230, 0.18)";
-const PROJECTION_STROKE = "rgba(43, 92, 230, 0.78)";
+const PROJECTION_FILL = "rgba(37, 110, 244, 0.16)"; // KRDS 정부 블루 primary-50
+const PROJECTION_STROKE = "rgba(37, 110, 244, 0.78)";
 const PROJECTION_ALERT_FILL = "rgba(239, 68, 68, 0.2)";
 const PROJECTION_ALERT_STROKE = "rgba(220, 38, 38, 0.82)";
 const BOX_EPSILON_MM = 0.05;
@@ -128,15 +128,15 @@ function PageMarginGuides({ page }: { page: { w: number; h: number } }) {
   const height = mmToPx(page.h - SAFE_MARGIN_MM * 2);
   if (width <= 0 || height <= 0) return null;
 
+  // 디자인: 여백 안쪽 4모서리에만 'ㄱ'자 브래킷(15px, 1.5px). 전체 테두리는 그리지 않는다.
+  const LEG = 15;
+  const C = "#b1cefb"; // KRDS primary-20 — 여백 가이드
   return (
     <div className="absolute pointer-events-none z-0" style={{ left: inset, top: inset, width, height }}>
-      <div
-        className="absolute inset-0 rounded-[3px]"
-        style={{
-          border: "1px dashed rgba(43, 92, 230, 0.44)",
-          boxShadow: "0 0 0 1px rgba(255, 255, 255, 0.72)",
-        }}
-      />
+      <span style={{ position: "absolute", width: LEG, height: LEG, top: -1, left: -1, borderTop: `1.5px solid ${C}`, borderLeft: `1.5px solid ${C}` }} />
+      <span style={{ position: "absolute", width: LEG, height: LEG, top: -1, right: -1, borderTop: `1.5px solid ${C}`, borderRight: `1.5px solid ${C}` }} />
+      <span style={{ position: "absolute", width: LEG, height: LEG, bottom: -1, left: -1, borderBottom: `1.5px solid ${C}`, borderLeft: `1.5px solid ${C}` }} />
+      <span style={{ position: "absolute", width: LEG, height: LEG, bottom: -1, right: -1, borderBottom: `1.5px solid ${C}`, borderRight: `1.5px solid ${C}` }} />
     </div>
   );
 }
@@ -265,8 +265,13 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
   const { setNodeRef } = useDroppable({ id: "stage" });
   const pageRef = useRef<HTMLDivElement | null>(null);
   const [measuredBlockBox, setMeasuredBlockBox] = useState<MeasuredBlockBox | null>(null);
-  // 마퀴(빈 지면 드래그로 사각 범위 선택) — px 좌표(지면 원점 기준)
-  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  // 드래그(팔로우) 중인가 — 눈금자 실측 rAF 루프를 이때만 돌린다 (아래 measure 효과 참조)
+  const followActive = useFollowStore((s) => s.activeId !== null);
+  // 마퀴(빈 지면 드래그로 사각 범위 선택) — px 좌표(지면 원점 기준).
+  // ⚠ 이동 중 setState 금지: 매 pointermove 리렌더는 눈금자(수백 틱)·가이드까지 다시 그려
+  //   빈 지면 드래그가 눈에 띄게 버벅였다. 사각형은 ref div의 style을 직접 갱신(리렌더 0),
+  //   커밋(선택 계산)은 pointerup 1회 — 이동 제스처와 같은 규약.
+  const marqueeRef = useRef<HTMLDivElement | null>(null);
 
   const startMarquee = (e: React.PointerEvent) => {
     const pageNode = pageRef.current;
@@ -276,22 +281,41 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
     const y0 = e.clientY - rect.top;
     if (!e.shiftKey && !e.ctrlKey && !e.metaKey) select(null); // 새 선택
     let moved = false;
+    // rAF 배칭 — 고주사율 마우스(500~1000Hz)는 프레임당 pointermove가 여러 번 온다.
+    // 이벤트마다 left/top/width를 쓰면 초당 수백 회 레이아웃 무효화로 드래그가 버벅인다.
+    let rafId = 0;
+    let last = { x: x0, y: y0 };
+    const paint = () => {
+      rafId = 0;
+      const node = marqueeRef.current;
+      if (!node) return;
+      node.style.display = "block";
+      node.style.left = `${Math.min(x0, last.x)}px`;
+      node.style.top = `${Math.min(y0, last.y)}px`;
+      node.style.width = `${Math.abs(last.x - x0)}px`;
+      node.style.height = `${Math.abs(last.y - y0)}px`;
+    };
     const onMove = (ev: PointerEvent) => {
       moved = true;
-      setMarquee({ x0, y0, x1: ev.clientX - rect.left, y1: ev.clientY - rect.top });
+      last = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+      if (!rafId) rafId = window.requestAnimationFrame(paint);
     };
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      setMarquee(null);
+      if (rafId) window.cancelAnimationFrame(rafId);
+      if (marqueeRef.current) marqueeRef.current.style.display = "none";
       if (!moved) return; // 클릭만 = 선택 해제로 끝
       const rx0 = Math.min(x0, ev.clientX - rect.left);
       const ry0 = Math.min(y0, ev.clientY - rect.top);
       const rx1 = Math.max(x0, ev.clientX - rect.left);
       const ry1 = Math.max(y0, ev.clientY - rect.top);
-      const hit = useCanvasStore
-        .getState()
-        .doc.blocks.filter((b) => {
+      // 접기로 지면에서 숨긴 블록은 마퀴 대상에서도 제외 — 렌더와 히트가 같은 집합을 봐야 함
+      const allBlocks = useCanvasStore.getState().doc.blocks;
+      const marqueeHidden = collapsedHiddenIds(allBlocks);
+      const hit = allBlocks
+        .filter((b) => {
+          if (marqueeHidden.has(b.id)) return false;
           const bx0 = mmToPx(b.x), by0 = mmToPx(b.y), bx1 = mmToPx(b.x + b.w), by1 = mmToPx(b.y + b.h);
           return bx0 < rx1 && bx1 > rx0 && by0 < ry1 && by1 > ry0;
         })
@@ -367,7 +391,10 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
     };
 
     measure();
-    frameId = window.requestAnimationFrame(measureFrame);
+    // ⚠ 상시 rAF 루프 금지 — 프레임마다 getBoundingClientRect 2회는 강제 레이아웃이라
+    //   선택만 해둬도 에디터 전체가 무거워진다(감사 발견). 루프는 transform 드래그(팔로우)
+    //   중에만 — 그때만 RO가 못 잡는 시각 이동이 생긴다. 나머지는 RO·resize·doc 변경이 커버.
+    if (followActive) frameId = window.requestAnimationFrame(measureFrame);
     const resizeObserver = new ResizeObserver(() => measure());
     resizeObserver.observe(measuredNode);
     window.addEventListener("resize", measure);
@@ -376,7 +403,9 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
       resizeObserver.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [selectedId, doc.blocks]);
+    // doc.blocks 전체가 아니라 선택 블록만 — 블록은 절대배치라 다른 블록의 변경이 선택
+    // 블록의 지오메트리를 못 바꾼다. 전체 deps는 키 입력마다 RO를 재구성했다(감사 E1 잔여).
+  }, [selectedId, selectedBlock, followActive]);
 
   const projectionBox = measuredBlockBox ?? selectedBlock;
   const projectionAlert = projectionBox
@@ -394,11 +423,7 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
 
   return (
     <div className="studio-canvas-pane flex-1 relative min-w-0">
-    <div className="studio-workbench-label" aria-hidden="true">
-      <span className="studio-workbench-dot" />
-      A4 작업대
-      <span>여백 20mm</span>
-    </div>
+    {/* 작업대 라벨 제거 — 디자인엔 없고, 하단 상태바(A4 210×297mm)와 중복 */}
     <div className="studio-canvas-scroll absolute inset-0 overflow-auto canvas-dots bg-canvas">
       {/* 지면 + 눈금자 묶음 — 가운데 정렬, 함께 스크롤 */}
       <div className="studio-page-frame w-max mx-auto my-8" style={{ position: "relative", paddingLeft: RULER, paddingTop: RULER }}>
@@ -459,21 +484,17 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
           ))}
           {/* 다중 선택 바운딩 + 그룹 툴바 */}
           <MultiSelectOverlay />
-          {/* 마퀴(드래그 사각 선택) */}
-          {marquee && (
-            <div
-              className="absolute pointer-events-none z-[12] rounded-[2px]"
-              style={{
-                left: Math.min(marquee.x0, marquee.x1),
-                top: Math.min(marquee.y0, marquee.y1),
-                width: Math.abs(marquee.x1 - marquee.x0),
-                height: Math.abs(marquee.y1 - marquee.y0),
-                border: "1.5px solid #2B5CE6",
-                background: "transparent",
-                boxShadow: "0 0 0 1px rgba(255,255,255,.9)",
-              }}
-            />
-          )}
+          {/* 마퀴(드래그 사각 선택) — 상시 마운트, startMarquee가 ref로 직접 그림(리렌더 0) */}
+          <div
+            ref={marqueeRef}
+            className="absolute pointer-events-none z-[12] rounded-[2px]"
+            style={{
+              display: "none",
+              border: "1.5px solid var(--guide)",
+              background: "transparent",
+              boxShadow: "0 0 0 1px rgba(255,255,255,.9)",
+            }}
+          />
           {/* 그룹 선택 점선 테두리 — 자석 그룹 범위 (시안: #7C9AF0 점선 + 칩) */}
           {groupBox && (
             <div
@@ -484,8 +505,8 @@ export const CanvasStage = forwardRef<HTMLDivElement>(function CanvasStage(_prop
                 width: mmToPx(groupBox.x2 - groupBox.x1) + 12,
                 height: mmToPx(groupBox.y2 - groupBox.y1) + 12,
                 border: "1.5px dashed var(--groupline)",
-                borderRadius: 7,
-                background: "rgba(43,92,230,.02)",
+                borderRadius: 6,
+                background: "rgba(37,110,244,.03)",
               }}
             >
               <span

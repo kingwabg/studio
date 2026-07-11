@@ -13,6 +13,8 @@ export function PanelDivider({ side }: { side: "left" | "right" }) {
   const rightOpen = usePanelStore((s) => s.rightOpen);
   const setLeftW = usePanelStore((s) => s.setLeftW);
   const setRightW = usePanelStore((s) => s.setRightW);
+  const toggleLeft = usePanelStore((s) => s.toggleLeft);
+  const toggleRight = usePanelStore((s) => s.toggleRight);
 
   const [dragging, setDragging] = useState(false);
   const [previewW, setPreviewW] = useState<number | null>(null);
@@ -21,6 +23,8 @@ export function PanelDivider({ side }: { side: "left" | "right" }) {
   const width = side === "left" ? leftW : rightW;
   const setWidth = side === "left" ? setLeftW : setRightW;
   const defaultW = side === "left" ? LEFT_DEFAULT : RIGHT_DEFAULT;
+  const toggleOpen = side === "left" ? toggleLeft : toggleRight;
+  const label = side === "left" ? "왼쪽 사이드바" : "오른쪽 사이드바";
 
   // 드래그 리사이즈 — 열려 있을 때만. 좌측은 +dx, 우측은 -dx(경계가 안쪽으로 이동).
   const startResize = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -56,7 +60,6 @@ export function PanelDivider({ side }: { side: "left" | "right" }) {
     if (!open) return;
     setWidth(defaultW);
   };
-  const label = side === "left" ? "왼쪽 사이드바" : "오른쪽 사이드바";
 
   return (
     <div
@@ -78,21 +81,37 @@ export function PanelDivider({ side }: { side: "left" | "right" }) {
         }`}
       />
 
-      {/* 드래그 그립 — 항상 희미하게 보이게 해서 '잡을 수 있음'을 알려준다 */}
-      <div
-        aria-hidden="true"
-        className={`studio-divider-grip absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-14 rounded-full border transition-all flex items-center justify-center ${
-          dragging
-            ? "bg-accent text-onaccent border-accent shadow-[0_4px_14px_rgba(43,92,230,.28)]"
-            : "bg-surface/95 text-inkfaint border-line opacity-55 group-hover/divider:opacity-100 group-hover/divider:text-accent group-hover/divider:border-accentline shadow-sm"
-        }`}
-      >
-        <span className="flex flex-col gap-1">
-          <span className="w-1 h-1 rounded-full bg-current" />
-          <span className="w-1 h-1 rounded-full bg-current" />
-          <span className="w-1 h-1 rounded-full bg-current" />
-        </span>
-      </div>
+      {open ? (
+        <div
+          aria-hidden="true"
+          className={`studio-divider-grip absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-14 rounded-full border transition-all flex items-center justify-center ${
+            dragging
+              ? "bg-accent text-onaccent border-accent shadow-[0_4px_14px_rgba(43,92,230,.28)]"
+              : "bg-surface/95 text-inkfaint border-line opacity-55 group-hover/divider:opacity-100 group-hover/divider:text-accent group-hover/divider:border-accentline shadow-sm"
+          }`}
+        >
+          <span className="flex flex-col gap-1">
+            <span className="w-1 h-1 rounded-full bg-current" />
+            <span className="w-1 h-1 rounded-full bg-current" />
+            <span className="w-1 h-1 rounded-full bg-current" />
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          title={`${label} 열기`}
+          aria-label={`${label} 열기`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleOpen();
+          }}
+          className="studio-divider-open-button absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-16 rounded-full border border-accentline bg-accent text-onaccent shadow-[0_8px_24px_rgba(43,92,230,.32)] flex items-center justify-center text-[15px] font-black"
+        >
+          {side === "left" ? "›" : "‹"}
+        </button>
+      )}
 
       {dragging && previewW !== null && (
         <div
@@ -106,6 +125,3 @@ export function PanelDivider({ side }: { side: "left" | "right" }) {
     </div>
   );
 }
-
-
-

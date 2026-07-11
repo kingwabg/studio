@@ -87,6 +87,34 @@ export function setSelectionRange(root: HTMLElement, start: number, end: number)
   sel.addRange(range);
 }
 
+// 선택 범위의 시작/끝을 실제 화면 좌표로 변환한다. collapsed range의 rect는
+// 브라우저가 해당 문자 위치에 그리는 캐럿 선을 기준으로 반환하므로, 화면 고정 핸들에 바로 쓸 수 있다.
+export function selectionEndpointRects(root: HTMLElement, start: number, end: number) {
+  const rectAt = (offset: number) => {
+    const loc = locateOffset(root, offset);
+    const range = document.createRange();
+    range.setStart(loc.node, loc.offset);
+    range.collapse(true);
+    return range.getClientRects()[0] ?? range.getBoundingClientRect();
+  };
+  return { start: rectAt(start), end: rectAt(end) };
+}
+
+// 화면 좌표를 편집기 평문 오프셋으로 변환한다. 표/그룹 오버레이가 좌표 위에
+// 놓여도 실제 contentEditable 내부의 캐럿만 반환하도록 root 포함 여부를 확인한다.
+export function offsetFromPoint(root: HTMLElement, x: number, y: number): number | null {
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+  };
+  const pos = doc.caretPositionFromPoint?.(x, y);
+  if (pos && root.contains(pos.offsetNode)) return textOffsetOf(root, pos.offsetNode, pos.offset);
+  const legacy = doc.caretRangeFromPoint?.(x, y);
+  if (legacy && root.contains(legacy.startContainer)) {
+    return textOffsetOf(root, legacy.startContainer, legacy.startOffset);
+  }
+  return null;
+}
 export function placeCaretEnd(root: HTMLElement) {
   const sel = window.getSelection();
   if (!sel) return;

@@ -5,6 +5,7 @@ import {
   cellStartY,
   cellWidth,
 } from "./boundaryGrid.js";
+import { isCoveredByMerge, mergeAt } from "./merge.js";
 
 export const moveRowBoundary = (
   rowWidths,
@@ -89,19 +90,6 @@ export const moveTableRowBoundary = (
 
   return nextHeights;
 };
-
-const isCoveredByMerge = (merges, row, col) =>
-  merges.some(
-    (merge) =>
-      row >= merge.r &&
-      row < merge.r + merge.rs &&
-      col >= merge.c &&
-      col < merge.c + merge.cs &&
-      !(row === merge.r && col === merge.c)
-  );
-
-const mergeAt = (merges, row, col) =>
-  merges.find((merge) => merge.r === row && merge.c === col);
 
 const sumUntil = (values, endIndex) =>
   values.slice(0, endIndex).reduce((sum, value) => sum + value, 0);

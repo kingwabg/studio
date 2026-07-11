@@ -96,3 +96,47 @@ TextContent(1451행~)와 EmbedTextBlock(embed)의 공통 배선을 훅으로:
 - [x] 2단계 ✅ 완료 — useRichText 훅(377줄), CanvasBlock 1499줄·EmbedEditor 397줄(예산 안). 의도된 수렴: 캔버스 Ctrl+B/I/U, 임베드 onCut
 - [x] 3단계 ✅ 완료 — CanvasBlock 578줄(셸만). Text/Image/Table/InlineToolbar 각 파일(전부 예산 안). 기계 슬라이싱 1커밋(감사로 대체). 남은 일: richtext 재수출 제거(한 세션 유예 — CanvasStage·PageSnapshot의 ./CanvasBlock import를 직접 경로로 바꾼 뒤)
 - [ ] 각 커밋: tsc·하네스·브라우저 스모크
+
+## 5단계 — 중복 전수 감사 백로그 (2026-07-11 감사: 59건 발견 · 45건 extract 판정, 적대 검증 통과)
+
+즉시 수정된 4건(제외): 오버레이 델타 클램프 반올림 양자화(gesture.clampDeltaToSafeArea로 단일화),
+store.clampSafeAxis max 올림 0.5mm 초과, 링크 밑줄 화면/내보내기 상충(underlineRaw), /studio 표면 구파랑 #2B5CE6 표류.
+
+### 5a. 값 표류로 이미 버그인 것 ✅ 완료 (2026-07-11 · tsc + verify:hwpx 7게이트 통과)
+- [x] 기본 줄간격 — model.LINE_SPACING_DEFAULT(138) 단일 정본. PageSnapshot 137.5 표류 교정, export/measure 죽은 재선언 삭제, RightPanel 리터럴 5곳 수렴. exportCore 폴백 160은 의존성 0 코어 + 레거시 실측 방어라 예외(model 주석에 명시)
+- [x] 본문 글자색 프리셋 — ui/presets.ts TEXT_COLOR_PRESETS 정본, 3곳 수렴(InlineToolbar 첫 값 #1A2233→#000000 정합). EmbedEditor는 병렬 세션 정리 후 합류
+- [x] rows→data 승격 — TableContent 상수 420px → 블록 실폭 mmToPx(block.w) (CanvasBlock 리사이즈 경로와 동일 규칙, 상호참조 주석)
+- [x] BG_SWATCHES — 업스트림 원본(table/constants.js) import로 사본 2벌 제거 (인덱스 계약 주석)
+- [x] +보너스: check-size에 **상수 재선언 경고 게이트**(비차단, `dup-ok`로 억제) — 신규 untracked 파일 포함 스캔. 남은 5b 표류(SAFE_MARGIN_MM 4곳·PT_TO_MM·HWPUNIT 등 8건)를 매 커밋 자동 경고
+
+### 5b. 수식/규칙 중복 (버그 대기)
+- [ ] 안전여백 축 클램프 4벌 → gesture.clampSafeAxis 원본 + store는 정수 래퍼 (clampInsertionAxis 포함)
+- [ ] SAFE_MARGIN_MM=20 6곳 재선언 → gesture(또는 model) export 1곳
+- [ ] bboxOf(min/max 4-spread) 7곳 → geometry.bboxOf (빈 배열=null 명시)
+- [ ] client px→문서 mm 점 변환 3벌 → geometry.clientToMm (줌 도입 시 비례 환산만 생존)
+- [ ] 오버레이 드래그에 planMove 미적용(스냅 없음) — planMoveDelta 변형 추가 또는 의도 주석
+- [ ] 병합 커버 판정 4벌 (exportCore·PageSnapshot·TableContent·TableKingBlock) → 공유 술어
+- [ ] 런 실효 스타일 해석 4벌 (style.runCssObj·elements.richLinesOf·clipboard·measure) → resolveRunStyle 커널
+- [ ] runs \n 분할 3벌 → dom.splitRunsToParas만 사용 (measure.splitRunsIntoLines는 사설 복제)
+- [ ] 전각 측정 공식 2벌 (richtext/measure vs export/measure — 폰트 폴백 스택도 상이)
+- [ ] 단위 상수: PT_TO_MM 3벌·pt↔px 5벌·HWPUNIT 상수 재선언 → geometry/units 정리
+- [ ] 글자 크기 스테퍼 규칙(min 6·0.5스텝) 3+1벌 (InlineToolbar만 반올림 추가) → 공유 함수
+- [ ] 박스 좌/중/우 배치 2벌 (CanvasBlock vs EditorToolbar) → gesture.boxPositionX
+- [ ] startResize 내 텍스트/이미지 x/w 클램프 복붙 → clampResizeAxis
+- [ ] 파일명 정제 정규식 3벌 → exportHwpx sanitizeFilename (신규 표면 2곳은 정제 자체가 없음 — 버그)
+- [ ] 목록 마커 규칙 재구현 (render.tsx는 markerTextAt import로 대체 가능)
+
+### 5c. UI 프리미티브/아이콘 (kit로 수렴)
+- [ ] 툴바 아이콘 버튼 25곳 → 공용 IconBtn
+- [ ] 색 스와치 버튼 8곳(active 표시 3갈래) → 공용 Swatch
+- [ ] pill 탭: InspectorTypeTabs가 InsTabs 미사용 / AiPanel 세그먼트 / ReadCell↔InsRead(죽은 export)
+- [ ] 인스펙터 고스트 버튼 클래스 2벌 (InspectorTable.EditBtn ↔ RightPanel 순서 버튼) → kit InsGhostBtn
+- [ ] 아이콘 SVG 복붙: 자물쇠 5곳·그룹 글리프 4곳·undo/redo 2벌·세로정렬 2벌·링크·chevron → design-icons로
+- [ ] 팝오버 닫힘 규약 3벌 → useDismiss 훅
+- [ ] TK_THEME_VARS 3벌 / studio:* 이벤트 계약(이름+페이로드 타입) 산발 → events.ts 상수화
+- [ ] EmbedEditor 빈 텍스트 리터럴 3회 / AiPanel의 tableDataToRows 인라인 재구현 → 원본 import
+
+### 5d. 파일 크기 (예산 500 초과 8)
+동결·업스트림 제외 실제 대상: CanvasBlock 712(병렬 세션 +166 정리 후 재분할), exportCore 690(기계 분할 후보),
+store 564(액션 도메인별 분리 검토), CanvasStage 526(눈금자/마퀴 분리), LeftPanel 1010(탭별 분리 — 최대),
+RightPanel 506(TextFormat·ShapeSection 분리로 즉시 해소 가능). 경계(400+): TableContent 447, StudioEditor 407.

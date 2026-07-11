@@ -5,239 +5,167 @@
 import { type ReactNode } from "react";
 import { useRightTabStore, usePanelStore } from "../../modules/ui/theme";
 import { useCanvasStore } from "../../modules/canvas/store";
-import { type Block, type TableKingData, type TextAlign, TEXT_DEFAULTS, DEFAULT_TEXT_PAD, padOf } from "../../modules/document/model";
+import { type Block, type TableKingData, type TextAlign, LINE_SPACING_DEFAULT, TEXT_DEFAULTS } from "../../modules/document/model";
 import { AiPanel } from "./AiPanel";
 import { FontSelect } from "./FontSelect";
+import { ColorPopover } from "./ColorPopover";
 import { IcText, IcTable, IcImage, IcTrash, IcSparkles, IcCopy } from "../../ui/icons";
+import { DsIcon } from "../../ui/design-icons";
+import { TEXT_COLOR_PRESETS } from "../../ui/presets";
+import { InspectorColor } from "./InspectorColor";
+import { InspectorTypeTabs } from "./InspectorTypeTabs";
+import { InspectorDimensions } from "./InspectorDimensions";
+import { InspectorTable } from "./InspectorTable";
+// 인스펙터 공용 키트(타이포·박스·탭·토글 단일 소스). 로컬 이름으로 별칭해 사용처는 그대로 둔다.
+import { InsSection as Section, InsField as FieldBox, InsToggle as Toggle, InsIconBtn as FmtBtn, InsPill as SoonPill, InsHint } from "./inspector-kit";
 
-const TEXT_COLORS = ["#000000", "#5B6577", "#2B5CE6", "#D64550", "#3B9B6B", "#C77A28"];
+// 글자색 프리셋 정본은 ui/presets.ts — 재선언 금지(4벌 표류 감사)
 
-// ── 재사용 소품 (시안: 섹션 라벨 11px/700/tracking .08em, 행 26px, 구분선) ──
-function Section({ label, children }: { label?: string; children: ReactNode }) {
-  return (
-    <div className="studio-inspector-section py-3 flex flex-col gap-[7px] border-b border-[color:var(--line)]">
-      {label && <div className="text-[11px] font-bold text-inkfaint tracking-[.08em]">{label}</div>}
-      {children}
-    </div>
-  );
-}
-
-// 값 표시 셀 (26px, 우측 정렬) — 편집 가능한 건 NumField, 아닌 건 ReadCell
-function NumField({ value, onChange, suffix }: { value: number; onChange: (v: number) => void; suffix?: string }) {
-  return (
-    <div className="h-[26px] border border-line rounded-[7px] flex items-center px-2 bg-surface focus-within:border-accentline transition-colors">
-      <input
-        type="number"
-        value={Math.round(value)}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full text-right text-[12px] font-semibold text-ink outline-none bg-transparent tabular-nums"
-      />
-      {suffix && <span className="text-[11px] text-inkfaint ml-1">{suffix}</span>}
-    </div>
-  );
-}
+// ── 이 파일 전용 소품 (공용은 inspector-kit) ──
+// 읽기 전용 값 셀 (페이지 인스펙터의 촘촘한 읽기 그리드용 — 편집 필드는 키트 InsNumber)
 function ReadCell({ children, faint }: { children: ReactNode; faint?: boolean }) {
   return (
-    <div className="h-[26px] border border-line rounded-[7px] flex items-center justify-end px-2 bg-surface">
-      <span className={`text-[12px] ${faint ? "text-inkfaint" : "text-ink font-semibold"} tabular-nums`}>{children}</span>
+    <div className="flex h-9 items-center justify-end rounded-lg border border-[color:var(--ins-fborder)] bg-white px-2.5">
+      <span className={`text-[12.5px] font-semibold tabular-nums ${faint ? "text-[color:var(--ins-unit)]" : "text-[color:var(--ins-value)]"}`}>{children}</span>
     </div>
   );
 }
 
-// 라벨 + 컨트롤 한 줄 (좌 라벨 고정폭)
+// 라벨 + 컨트롤 한 줄 (좌 라벨 고정폭) — 라벨은 단위·접두 스타일
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[12px] text-inksoft w-9 shrink-0">{label}</span>
+    <div className="flex min-h-9 items-center gap-2">
+      <span className="w-8 shrink-0 text-[10.5px] font-bold text-[color:var(--ins-unit)]">{label}</span>
       {children}
     </div>
   );
 }
 
-// 세그먼트 (인라인/절대, 좁게/보통/넓게 등) — active 옵션만 콜백
-function Segment<T extends string>({
-  options,
-  value,
-  onChange,
-  disabled,
-}: {
-  options: { v: T; label: string; soon?: boolean }[];
-  value: T;
-  onChange?: (v: T) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className={`flex h-[26px] bg-paper border border-line rounded-[7px] overflow-hidden p-px ${disabled ? "opacity-60" : ""}`}>
-      {options.map((o) => {
-        const on = o.v === value;
-        return (
-          <button
-            key={o.v}
-            title={o.soon ? `${o.label} (준비 중)` : o.label}
-            onClick={o.soon || disabled ? undefined : () => onChange?.(o.v)}
-            className={`flex-1 flex items-center justify-center text-[11px] rounded-[6px] transition-colors ${
-              on ? "bg-surface text-accent font-bold" : "text-inksoft hover:bg-line/50"
-            }`}
-            style={on ? { boxShadow: "inset 0 0 0 1px var(--accentline)" } : undefined}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// "준비 중" 점선 pill (추가: 그림자·필터 등)
-function SoonPill({ children }: { children: ReactNode }) {
-  return (
-    <span
-      title="준비 중"
-      className="text-[11px] text-inksoft border border-dashed border-linestrong rounded-full px-2 py-0.5 cursor-default select-none"
-    >
-      {children}
-    </span>
-  );
-}
-
-// 글자 서식 (크기 스테퍼·가/가·정렬·색) — 텍스트 블록 실동작
+// 글자 서식 (글꼴·B/I/U/S·정렬·크기·줄간격·색) — 텍스트 블록 실동작
 function TextFormat({ block }: { block: Block }) {
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const patch = (p: Partial<Block>) => updateBlock(block.id, p);
   const size = block.fontSize ?? TEXT_DEFAULTS.fontSize;
   const align = block.align ?? TEXT_DEFAULTS.align;
-  const aligns: { v: TextAlign; label: string }[] = [
-    { v: "left", label: "좌" },
-    { v: "center", label: "중" },
-    { v: "right", label: "우" },
+  const aligns: { v: TextAlign; title: string }[] = [
+    { v: "left", title: "왼쪽" },
+    { v: "center", title: "가운데" },
+    { v: "right", title: "오른쪽" },
   ];
   return (
     <>
-      <Row label="글꼴">
-        <FontSelect
-          value={block.font}
-          onChange={(key) => patch({ font: key })}
-          className="h-[26px] px-1.5 rounded-[7px] border border-line bg-surface text-[12px] text-ink flex-1 outline-none hover:border-linestrong focus:border-accentline transition-colors cursor-pointer"
-        />
-      </Row>
+      {/* 글꼴 — 풀 폭 드롭다운 (디자인 글자 섹션) */}
+      <FontSelect
+        fullWidth
+        value={block.font}
+        onChange={(key) => patch({ font: key })}
+        className="w-full appearance-none h-9 pl-2.5 pr-7 rounded-lg border border-[color:var(--ins-fborder)] bg-white text-[color:var(--ins-value)] outline-none hover:border-[color:var(--ins-track)] focus:border-[color:var(--ins-acc)] transition-colors cursor-pointer"
+      />
+      {/* B I U S + 정렬 — 두 그룹(유동 정사각으로 좁은 패널에 맞춤) */}
+      <div className="flex items-center gap-2">
+        <div className="grid flex-[4] grid-cols-4 gap-1">
+          <FmtBtn fluid active={!!block.bold} title="굵게" onClick={() => patch({ bold: !block.bold })}><DsIcon name="bold" size={15} /></FmtBtn>
+          <FmtBtn fluid active={!!block.italic} title="기울임" onClick={() => patch({ italic: !block.italic })}><DsIcon name="italic" size={15} /></FmtBtn>
+          <FmtBtn fluid active={!!block.underline} title="밑줄" onClick={() => patch({ underline: !block.underline })}><DsIcon name="underline" size={15} /></FmtBtn>
+          <FmtBtn fluid active={!!block.strike} title="취소선" onClick={() => patch({ strike: !block.strike })}><DsIcon name="strikethrough" size={15} /></FmtBtn>
+        </div>
+        <div className="grid flex-[3] grid-cols-3 gap-1">
+          {aligns.map((a) => (
+            <FmtBtn fluid key={a.v} active={align === a.v} title={a.title} onClick={() => patch({ align: a.v })}>
+              <DsIcon name={`align-${a.v}`} size={15} />
+            </FmtBtn>
+          ))}
+        </div>
+      </div>
+      {/* 크기 */}
       <Row label="크기">
-        <div className="flex items-center h-[26px] border border-line rounded-[7px] overflow-hidden flex-1">
-          <button onClick={() => patch({ fontSize: Math.max(6, size - 0.5) })} className="w-6 h-full text-inksoft hover:bg-paper text-[13px]">−</button>
-          <span className="flex-1 text-center text-[12px] font-semibold text-ink border-x border-line h-full flex items-center justify-center tabular-nums">{size}pt</span>
-          <button onClick={() => patch({ fontSize: size + 0.5 })} className="w-6 h-full text-inksoft hover:bg-paper text-[13px]">＋</button>
+        <div className="flex h-9 flex-1 items-center overflow-hidden rounded-lg border border-[color:var(--ins-fborder)] text-[13px]">
+          <button onClick={() => patch({ fontSize: Math.max(6, size - 0.5) })} className="h-full w-7 text-[color:var(--ins-ficon)] hover:bg-[color:var(--ins-segbg)]">−</button>
+          <span className="flex h-full flex-1 items-center justify-center text-center text-[12.5px] font-semibold tabular-nums text-[color:var(--ins-value)]">{size}pt</span>
+          <button onClick={() => patch({ fontSize: size + 0.5 })} className="h-full w-7 text-[color:var(--ins-ficon)] hover:bg-[color:var(--ins-segbg)]">＋</button>
         </div>
-        <div className="flex gap-1">
-          <button
-            onClick={() => patch({ bold: !block.bold })}
-            title="굵게"
-            className={`w-[26px] h-[26px] rounded-[7px] text-[13px] font-extrabold transition-colors ${block.bold ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper"}`}
-          >
-            가
-          </button>
-          <button
-            onClick={() => patch({ italic: !block.italic })}
-            title="기울임"
-            className={`w-[26px] h-[26px] rounded-[7px] text-[13px] italic transition-colors ${block.italic ? "bg-accentsoft text-accent" : "text-inksoft hover:bg-paper"}`}
-          >
-            가
-          </button>
-        </div>
-      </Row>
-      <Row label="정렬">
-        <Segment
-          options={aligns.map((a) => ({ v: a.v, label: a.label }))}
-          value={align}
-          onChange={(v) => patch({ align: v })}
-        />
       </Row>
       <Row label="줄간격">
-        <div className="flex items-center h-[26px] border border-line rounded-[7px] overflow-hidden flex-1">
+        <div className="flex h-9 flex-1 items-center overflow-hidden rounded-lg border border-[color:var(--ins-fborder)] text-[13px]">
           <button
-            onClick={() => patch({ lineSpacing: Math.max(100, (block.lineSpacing ?? 138) - 10) })}
-            className="w-6 h-full text-inksoft hover:bg-paper text-[13px]"
+            onClick={() => patch({ lineSpacing: Math.max(100, (block.lineSpacing ?? LINE_SPACING_DEFAULT) - 10) })}
+            className="h-full w-7 text-[color:var(--ins-ficon)] hover:bg-[color:var(--ins-segbg)]"
           >
             −
           </button>
-          <span className="flex-1 text-center text-[12px] font-semibold text-ink border-x border-line h-full flex items-center justify-center tabular-nums">
-            {block.lineSpacing ?? 138}%
+          <span className="flex h-full flex-1 items-center justify-center border-x border-[color:var(--ins-fborder)] text-center text-[12.5px] font-semibold tabular-nums text-[color:var(--ins-value)]">
+            {block.lineSpacing ?? LINE_SPACING_DEFAULT}%
           </span>
           <button
-            onClick={() => patch({ lineSpacing: Math.min(300, (block.lineSpacing ?? 138) + 10) })}
-            className="w-6 h-full text-inksoft hover:bg-paper text-[13px]"
+            onClick={() => patch({ lineSpacing: Math.min(300, (block.lineSpacing ?? LINE_SPACING_DEFAULT) + 10) })}
+            className="h-full w-7 text-[color:var(--ins-ficon)] hover:bg-[color:var(--ins-segbg)]"
           >
             ＋
           </button>
         </div>
-        {block.lineSpacing != null && block.lineSpacing !== 138 && (
+        {block.lineSpacing != null && block.lineSpacing !== LINE_SPACING_DEFAULT && (
           <button
             onClick={() => patch({ lineSpacing: undefined })}
-            title="기본(138%)으로"
-            className="text-[11px] text-inkfaint hover:text-ink px-1 transition-colors"
+            title={`기본(${LINE_SPACING_DEFAULT}%)으로`}
+            className="px-1 text-[10.5px] font-bold text-[color:var(--ins-sub)] transition-colors hover:text-[color:var(--ins-acc)]"
           >
             기본
           </button>
         )}
       </Row>
-      <Row label="색">
-        <div className="flex items-center gap-2 flex-1">
-          {TEXT_COLORS.map((c) => {
-            const on = (block.color ?? TEXT_DEFAULTS.color).toUpperCase() === c.toUpperCase();
-            return (
-              <button
-                key={c}
-                onClick={() => patch({ color: c })}
-                aria-label={`색 ${c}`}
-                className="w-[18px] h-[18px] rounded-full transition-transform hover:scale-[1.15]"
-                style={{ backgroundColor: c, border: `2px solid ${on ? "var(--accent)" : "var(--surface)"}`, boxShadow: "0 0 0 1px rgba(16,24,40,.08)" }}
-              />
-            );
-          })}
-        </div>
-      </Row>
+      {/* 색 — 디자인: 팝오버가 아니라 인스펙터에 펼쳐진 인라인 피커(스와치+그라데이션+HEX) */}
+      <div className="flex flex-col gap-2 pt-0.5">
+        <span className="text-[10.5px] font-bold text-[color:var(--ins-unit)]">색</span>
+        <InspectorColor
+          value={block.color ?? TEXT_DEFAULTS.color}
+          presets={TEXT_COLOR_PRESETS}
+          onChange={(color) => patch({ color })}
+        />
+      </div>
     </>
   );
 }
 
 // 모양 — 배경 채우기·모서리·테두리 (실동작)
 const FILL_SWATCHES = ["", "#FFFFFF", "#F6F7FA", "#EDF2FE", "#FDEEF0", "#EAF6EF", "#FEF9E7"];
-const BORDER_COLORS = ["#000000", "#5B6577", "#98A4BD", "#2B5CE6", "#D64550", "#3B9B6B"];
+const BORDER_COLORS = ["#000000", "#5B6577", "#98A4BD", "#256EF4", "#D64550", "#3B9B6B"];
 
 function ShapeSection({ block }: { block: Block }) {
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const patch = (p: Partial<Block>) => updateBlock(block.id, p);
   const bw = block.borderWidth ?? 0;
   return (
-    <Section label="모양">
-      <Row label="배경">
-        <div className="flex items-center gap-1.5 flex-1">
-          {FILL_SWATCHES.map((c) => {
-            const on = (block.fill ?? "") === c;
-            return (
-              <button
-                key={c || "none"}
-                onClick={() => patch({ fill: c || undefined })}
-                title={c || "없음"}
-                className="w-[18px] h-[18px] rounded-[5px] transition-transform hover:scale-[1.15] flex items-center justify-center shrink-0"
-                style={{ background: c || "var(--surface)", border: `2px solid ${on ? "var(--accent)" : "var(--line)"}`, boxShadow: "0 0 0 1px rgba(16,24,40,.06)" }}
-              >
-                {!c && <span className="text-[9px] text-inkfaint leading-none">✕</span>}
-              </button>
-            );
-          })}
-        </div>
-      </Row>
+    <Section label="박스모양">
+      {/* 배경 + 모서리 한 줄 (디자인 박스모양 — 각 필드가 테두리 박스) */}
       <div className="grid grid-cols-2 gap-2">
-        <Row label="모서리">
-          <NumField value={block.radius ?? 0} onChange={(v) => patch({ radius: Math.max(0, Math.min(40, v)) })} suffix="px" />
-        </Row>
-        <Row label="테두리">
-          <Segment
-            options={[{ v: "0", label: "없음" }, { v: "1", label: "1" }, { v: "2", label: "2" }]}
-            value={String(bw)}
-            onChange={(v) => patch({ borderWidth: Number(v), borderColor: block.borderColor ?? "#98A4BD" })}
+        <FieldBox label="배경">
+          <ColorPopover
+            label="배경색"
+            value={block.fill ?? "transparent"}
+            presets={FILL_SWATCHES.filter(Boolean)}
+            allowTransparent
+            transparentLabel="없음"
+            shape="square"
+            compact
+            onChange={(color) => patch({ fill: color === "transparent" ? undefined : color })}
           />
-        </Row>
+        </FieldBox>
+        <FieldBox label="모서리">
+          <span className="flex items-center gap-1">
+            <input
+              type="number"
+              value={block.radius ?? 0}
+              onChange={(e) => patch({ radius: Math.max(0, Math.min(40, Number(e.target.value))) })}
+              className="w-7 appearance-none border-0 bg-transparent text-right tabular-nums text-[color:var(--ins-value)] outline-none focus:outline-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <span className="text-[10.5px] font-bold text-[color:var(--ins-unit)]">px</span>
+          </span>
+        </FieldBox>
       </div>
+      {/* 테두리 — 전폭, 클릭 시 없음→1px→2px 순환 */}
+      <FieldBox label="테두리" onClick={() => patch({ borderWidth: (bw + 1) % 3, borderColor: block.borderColor ?? "#98A4BD" })}>
+        <span className="text-[color:var(--ins-value)]">{bw === 0 ? "없음" : `${bw}px`}</span>
+      </FieldBox>
       {bw > 0 && (
         <Row label="선색">
           <div className="flex items-center gap-1.5 flex-1">
@@ -248,7 +176,7 @@ function ShapeSection({ block }: { block: Block }) {
                   key={c}
                   onClick={() => patch({ borderColor: c })}
                   aria-label={`선색 ${c}`}
-                  className="w-[18px] h-[18px] rounded-full transition-transform hover:scale-[1.15] shrink-0"
+                  className="w-4 h-4 rounded-full transition-transform hover:scale-[1.12] shrink-0"
                   style={{ backgroundColor: c, border: `2px solid ${on ? "var(--accent)" : "var(--surface)"}`, boxShadow: "0 0 0 1px rgba(16,24,40,.08)" }}
                 />
               );
@@ -256,56 +184,13 @@ function ShapeSection({ block }: { block: Block }) {
           </div>
         </Row>
       )}
-      <div className="flex items-center gap-1.5 flex-wrap mt-1">
-        <span className="text-[11px] text-inkfaint">추가:</span>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-bold text-[color:var(--ins-sub)]">추가:</span>
         <SoonPill>그림자</SoonPill>
         <SoonPill>불투명도</SoonPill>
         <SoonPill>필터</SoonPill>
       </div>
     </Section>
-  );
-}
-
-// 여백 — 상자 안쪽 패딩(mm). 화면 CSS = 내보내기 cellMargin 같은 값 → 줄바꿈 정합.
-function PaddingSection({ block }: { block: Block }) {
-  const updateBlock = useCanvasStore((s) => s.updateBlock);
-  const patch = (p: Partial<Block>) => updateBlock(block.id, p);
-  const pad = padOf(block);
-  const level = pad.x < 1.5 ? "s" : pad.x > 3.5 ? "l" : "m";
-  return (
-    <Section label="여백">
-      <Row label="안쪽">
-        <Segment
-          options={[{ v: "s", label: "좁게" }, { v: "m", label: "보통" }, { v: "l", label: "넓게" }]}
-          value={level}
-          onChange={(v) =>
-            patch(v === "s" ? { padX: 1, padY: 0.6 } : v === "l" ? { padX: 5, padY: 3 } : { padX: DEFAULT_TEXT_PAD.x, padY: DEFAULT_TEXT_PAD.y })
-          }
-        />
-      </Row>
-      <div className="grid grid-cols-2 gap-2">
-        <Row label="좌우"><NumField value={pad.x} onChange={(v) => patch({ padX: Math.max(0, v) })} suffix="mm" /></Row>
-        <Row label="상하"><NumField value={pad.y} onChange={(v) => patch({ padY: Math.max(0, v) })} suffix="mm" /></Row>
-      </div>
-    </Section>
-  );
-}
-
-// 온/오프 스위치 (시안 토큰 — 켜짐=accent)
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      onClick={() => onChange(!on)}
-      className={`relative w-[38px] h-[22px] rounded-full transition-colors shrink-0 ${on ? "bg-accent" : "bg-linestrong"}`}
-    >
-      <span
-        className={`absolute top-[3px] w-4 h-4 rounded-full bg-white transition-transform ${on ? "translate-x-[19px]" : "translate-x-[3px]"}`}
-        style={{ boxShadow: "0 1px 2px rgba(16,24,40,.2)" }}
-      />
-    </button>
   );
 }
 
@@ -322,7 +207,7 @@ function HintSection({ block }: { block: Block }) {
   return (
     <Section label="안내문">
       <div className="flex items-center justify-between">
-        <span className="text-[12px] text-inksoft">채우기 안내문 (placeholder)</span>
+        <span className="text-[11.5px] font-semibold text-[color:var(--ins-tlabel)]">채우기 안내문 (placeholder)</span>
         <Toggle on={on} onChange={toggle} />
       </div>
       {on && (
@@ -332,11 +217,10 @@ function HintSection({ block }: { block: Block }) {
             onChange={(e) => updateBlock(block.id, { hint: e.target.value })}
             rows={2}
             placeholder="예: [문서 제목을 입력하세요]"
-            className="px-2.5 py-2 rounded-lg border border-line text-ink text-[13px] outline-none focus:border-accentline transition-colors resize-none leading-relaxed bg-surface"
+            style={{ fontSize: 12 }}
+            className="resize-none rounded-lg border border-[color:var(--ins-fborder)] bg-white px-2.5 py-1.5 leading-snug text-[color:var(--ins-value)] outline-none transition-colors placeholder:text-[color:var(--ins-hint)] focus:border-[color:var(--ins-acc)]"
           />
-          <p className="text-[11px] text-inkfaint leading-relaxed">
-            비어있을 때 회색으로 표시되고, 지면에서 실제 글자를 입력하면 사라집니다. 내보내기(HWPX)엔 포함되지 않아요.
-          </p>
+          <InsHint>비어있을 때 회색으로 표시되고, 지면에서 실제 글자를 입력하면 사라집니다. 내보내기(HWPX)엔 포함되지 않아요.</InsHint>
         </>
       )}
     </Section>
@@ -362,23 +246,24 @@ function PageInspector() {
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="studio-inspector-heading px-4 py-3.5 flex items-center gap-2.5 border-b border-line">
-        <div className="w-6 h-6 rounded-[7px] bg-accentsoft text-accent flex items-center justify-center shrink-0">
+      <div className="studio-inspector-heading px-3.5 py-2.5 flex items-center gap-2 border-b border-line">
+        <div className="w-6 h-6 rounded-md bg-accentsoft text-accent flex items-center justify-center shrink-0">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 2.5h10v11H3z" stroke="currentColor" strokeWidth="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-bold text-ink truncate">페이지 / 눈금자</div>
+          <div className="text-[13px] font-bold text-ink truncate">페이지 / 눈금자</div>
           <div className="text-[11px] text-inkfaint truncate">상단·좌측 눈금자 기준 속성</div>
         </div>
       </div>
 
-      <div className="px-4">
+      <div className="flex flex-col gap-4 px-4 pt-3 pb-4">
         <Section label="문서">
           <Row label="제목">
             <input
               value={doc.title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-[26px] flex-1 rounded-[7px] border border-line bg-surface px-2 text-[12px] font-semibold text-ink outline-none focus:border-accentline"
+              style={{ fontSize: 12.5 }}
+              className="h-9 flex-1 rounded-lg border border-[color:var(--ins-fborder)] bg-white px-2.5 font-semibold text-[color:var(--ins-value)] outline-none focus:border-[color:var(--ins-acc)]"
             />
           </Row>
           <Row label="상태"><ReadCell>{counts.total}개 객체</ReadCell></Row>
@@ -415,7 +300,7 @@ function PageInspector() {
         </Section>
 
         <Section label="눈금자 동작">
-          <div className="rounded-lg border border-line bg-paper px-3 py-2 text-[11px] text-inksoft leading-relaxed">
+          <div className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[10.5px] text-inksoft leading-relaxed">
             상단 눈금자는 X/폭, 좌측 눈금자는 Y/높이를 보여줍니다. 객체를 선택하면 눈금자에 위치가 투영되고, 여백 밖으로 나가면 경고색으로 바뀝니다.
           </div>
         </Section>
@@ -442,12 +327,15 @@ export function RightPanel() {
   const updateBlock = useCanvasStore((s) => s.updateBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
   const duplicateBlock = useCanvasStore((s) => s.duplicateBlock);
+  const setLocked = useCanvasStore((s) => s.setLocked);
+  const reorder = useCanvasStore((s) => s.reorder);
   const cascadeStyle = useCanvasStore((s) => s.cascadeStyle);
   const hasKids = useCanvasStore((s) => s.doc.blocks.some((b) => b.parentId === s.selectedId));
   const tab = useRightTabStore((s) => s.tab);
   const setTab = useRightTabStore((s) => s.setTab);
   const rightW = usePanelStore((s) => s.rightW);
   const rightOpen = usePanelStore((s) => s.rightOpen);
+  const toggleRight = usePanelStore((s) => s.toggleRight);
   if (!rightOpen) return null;
 
   const kind =
@@ -464,29 +352,41 @@ export function RightPanel() {
           <span className="studio-panel-eyebrow">INSPECT</span>
           <h2>디자인 속성</h2>
         </div>
-        <span className="studio-inspector-target">{block ? kind.label : inspectorTarget === "page" ? "페이지" : "선택 없음"}</span>
-      </div>
-      {/* 속성 / AI 세그먼트 (시안 1b) */}
-      <div className="studio-inspector-tabs px-3.5 pt-3.5 shrink-0">
-        <div className="flex bg-paper border border-line rounded-[9px] p-[3px] gap-[3px]">
-          {(
-            [
-              ["props", "속성", null],
-              ["ai", "AI", <IcSparkles key="i" size={12} />],
-            ] as const
-          ).map(([key, label, icon]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[7px] text-[13px] transition-colors ${
-                tab === key ? "bg-surface text-ink font-bold shadow-sm" : "text-inksoft font-medium hover:text-ink"
-              }`}
-            >
-              {icon}
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5">
+          <span className="studio-inspector-target">{block ? kind.label : inspectorTarget === "page" ? "페이지" : "선택 없음"}</span>
+          <button
+            type="button"
+            title="오른쪽 패널 접기"
+            aria-label="오른쪽 패널 접기"
+            onClick={toggleRight}
+            className="studio-panel-collapse"
+          >
+            ›
+          </button>
         </div>
+      </div>
+      {/* 속성/AI — 박스(세그먼트 컨테이너) 없는 KRDS 수평 탭: 활성 = 블루 700 + 하단 2px 라인 */}
+      <div className="flex shrink-0 border-b border-line px-4 text-[12px]">
+        {(
+          [
+            ["props", "속성", null],
+            ["ai", "AI", <IcSparkles key="i" size={12} />],
+          ] as const
+        ).map(([key, label, icon]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            style={{
+              fontWeight: tab === key ? 700 : 600,
+              color: tab === key ? "var(--ins-acc)" : "var(--ins-title)",
+              boxShadow: tab === key ? "inset 0 -2px 0 var(--ins-acc)" : "none",
+            }}
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 transition-colors"
+          >
+            {icon}
+            {label}
+          </button>
+        ))}
       </div>
 
       {tab === "ai" ? (
@@ -498,30 +398,40 @@ export function RightPanel() {
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-paper text-inkfaint">
             <IcText size={18} />
           </span>
-          <p className="text-[12px] text-inkfaint leading-relaxed">블록을 선택하면<br />속성이 여기에 표시됩니다</p>
+          <p className="text-[11px] text-inkfaint leading-relaxed">블록을 선택하면<br />속성이 여기에 표시됩니다</p>
         </div>
       ) : (
         <div className="flex-1 overflow-auto">
           {/* 요소 헤더 — 아이콘 타일 + 종류 + 부모(트리) */}
-          <div className="studio-inspector-heading px-4 py-3.5 flex items-center gap-2.5 border-b border-line">
-            <div className="w-6 h-6 rounded-[7px] bg-accentsoft text-accent flex items-center justify-center shrink-0">
+          <div className="studio-inspector-heading px-3.5 py-2.5 flex items-center gap-2 border-b border-line">
+            <div className="w-6 h-6 rounded-md bg-accentsoft text-accent flex items-center justify-center shrink-0">
               {kind.icon}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[12.5px] font-bold text-ink truncate">{kind.label}</div>
+              <div className="text-[13px] font-bold text-ink truncate">{kind.label}</div>
               <div className="text-[11px] text-inkfaint truncate">
                 {parentText ? `${parentText.slice(0, 16)}의 하위` : "루트 블록"}
               </div>
             </div>
-            <button onClick={() => duplicateBlock(block.id)} title="복제" className="w-7 h-7 rounded-lg text-inkfaint hover:text-ink hover:bg-paper flex items-center justify-center transition-colors">
+            <button
+              onClick={() => setLocked([block.id], !block.locked)}
+              title={block.locked ? "잠금 해제" : "위치 잠금"}
+              className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${block.locked ? "text-accent bg-accentsoft" : "text-inkfaint hover:text-ink hover:bg-paper"}`}
+            >
+              <DsIcon name="lock" size={14} />
+            </button>
+            <button onClick={() => duplicateBlock(block.id)} title="복제" className="w-6 h-6 rounded-md text-inkfaint hover:text-ink hover:bg-paper flex items-center justify-center transition-colors">
               <IcCopy size={14} />
             </button>
-            <button onClick={() => removeBlock(block.id)} title="삭제" className="w-7 h-7 rounded-lg text-inkfaint hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors">
+            <button onClick={() => removeBlock(block.id)} title="삭제" className="w-6 h-6 rounded-md text-inkfaint hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors">
               <IcTrash size={14} />
             </button>
           </div>
 
-          <div className="px-4">
+          {/* 타입 탭 (텍스트/표/이미지/그룹) — 디자인 인스펙터 ptype 탭 */}
+          <InspectorTypeTabs block={block} />
+
+          <div className="flex flex-col gap-4 px-4 pt-3 pb-4">
             {/* 안내문 (폼 placeholder) — 비어있을 때 회색 안내문, 입력하면 사라짐. 내보내기 제외. */}
             {block.type === "text" && <HintSection block={block} />}
 
@@ -532,63 +442,38 @@ export function RightPanel() {
               </Section>
             )}
 
-            {/* 위치 유형 (텍스트) — 본문(인라인)/절대 = flow 토글 */}
-            {block.type === "text" && (
-              <Section label="위치 유형">
-                <Segment
-                  options={[
-                    { v: "flow", label: "본문(인라인)" },
-                    { v: "abs", label: "절대 배치" },
-                  ]}
-                  value={block.flow ? "flow" : "abs"}
-                  onChange={(v) => updateBlock(block.id, { flow: v === "flow" })}
-                />
-                <p className="text-[11px] text-inkfaint leading-relaxed">
-                  {block.flow
-                    ? "한글에서 커서가 흐르는 진짜 문단 (길면 페이지 넘김)"
-                    : "지면 좌표에 고정된 개체 (자유 배치)"}
-                </p>
-              </Section>
+
+            {/* 표 블록 — 표 편집·셀 여백·크기·캡션 (디자인 표 인스펙터). 그 외는 박스모양+치수. */}
+            {block.type === "table" ? (
+              <InspectorTable block={block} />
+            ) : (
+              <>
+                <ShapeSection block={block} />
+                <InspectorDimensions block={block} />
+              </>
             )}
 
-            {/* 크기 · 위치 (공통) — 실제 x/y/w/h */}
-            <Section label="크기 · 위치 (mm)">
-              <div className="grid grid-cols-2 gap-2">
-                <Row label="X"><NumField value={block.x} onChange={(v) => updateBlock(block.id, { x: v })} /></Row>
-                <Row label="Y"><NumField value={block.y} onChange={(v) => updateBlock(block.id, { y: v })} /></Row>
-                <Row label="폭"><NumField value={block.w} onChange={(v) => updateBlock(block.id, { w: v })} /></Row>
-                <Row label="높이">
-                  {block.type === "text" ? <ReadCell faint>자동 {Math.round(block.h)}</ReadCell> : <NumField value={block.h} onChange={(v) => updateBlock(block.id, { h: v })} />}
-                </Row>
+            {/* 순서 — 겹침(z). 진실은 blocks 배열 순서(렌더·HWPX 내보내기 공통 파생), ⌘]/⌘[ */}
+            <Section label="순서">
+              <div className="grid grid-cols-4 gap-1 text-[11px] font-semibold">
+                {([["back", "맨뒤"], ["backward", "뒤로"], ["forward", "앞으로"], ["front", "맨앞"]] as const).map(([d, l]) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => reorder([block.id], d)}
+                    className="h-8 rounded-lg border border-[color:var(--ins-fborder)] text-[color:var(--ins-tlabel)] transition-colors hover:border-[color:var(--ins-acc)] hover:bg-[color:var(--ins-tint)] hover:text-[color:var(--ins-acc)]"
+                  >
+                    {l}
+                  </button>
+                ))}
               </div>
             </Section>
-
-            {/* 서식 유전 (자식 있을 때) */}
-            {hasKids && (
-              <Section label="트리">
-                <button
-                  onClick={() => cascadeStyle(block.id)}
-                  className="flex flex-col items-start rounded-lg border border-line px-3 py-2 text-left hover:border-accentline hover:bg-accentsoft/30 transition-colors"
-                >
-                  <span className="text-[12px] font-semibold text-ink">하위 서식 계단 적용</span>
-                  <span className="text-[11px] text-inkfaint mt-0.5">
-                    이 블록({block.fontSize ?? TEXT_DEFAULTS.fontSize}pt) 기준, 하위 텍스트를 한 단계씩 −2pt
-                  </span>
-                </button>
-              </Section>
-            )}
-
-            {/* 모양 — 배경·모서리·테두리 (실동작) */}
-            <ShapeSection block={block} />
-
-            {/* 여백 — 안쪽 패딩 (텍스트 실동작) */}
-            {block.type === "text" && <PaddingSection block={block} />}
 
             {/* 접힌 섹션 (준비 중) */}
             <div className="opacity-55 pointer-events-none select-none">
               {["고급", "내보내기 설정"].map((s) => (
-                <div key={s} className="flex items-center h-[34px] border-b border-line">
-                  <span className="flex-1 text-[12px] font-semibold text-ink">{s}</span>
+                <div key={s} className="flex items-center h-7 border-b border-line">
+                  <span className="flex-1 text-[11px] font-semibold text-ink">{s}</span>
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2l3 3-3 3" stroke="var(--inkfaint)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
               ))}
@@ -596,7 +481,7 @@ export function RightPanel() {
 
             {/* 디버그 — 실제 블록 JSON (개발·검증에 유용) */}
             <Section label="디버그">
-              <div className="bg-paper border border-line rounded-lg px-2.5 py-2 font-mono text-[10px] leading-relaxed text-inksoft break-all">
+              <div className="bg-paper border border-line rounded-md px-2 py-1.5 font-mono text-[9.5px] leading-relaxed text-inksoft break-all">
                 {JSON.stringify({ id: block.id.slice(0, 12), type: block.type, x: Math.round(block.x), y: Math.round(block.y), w: Math.round(block.w), h: Math.round(block.h), ...(block.flow ? { flow: true } : {}), ...(block.parentId ? { parent: true } : {}) })}
               </div>
             </Section>
@@ -607,4 +492,12 @@ export function RightPanel() {
     </aside>
   );
 }
+
+
+
+
+
+
+
+
 

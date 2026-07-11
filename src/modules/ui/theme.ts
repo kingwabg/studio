@@ -25,9 +25,9 @@ export const useRightTabStore = create<RightTabState>((set) => ({
 export const LEFT_MIN = 250;
 export const LEFT_MAX = 420;
 export const LEFT_DEFAULT = 300;
-export const RIGHT_MIN = 280;
+export const RIGHT_MIN = 276;
 export const RIGHT_MAX = 460;
-export const RIGHT_DEFAULT = 320;
+export const RIGHT_DEFAULT = 276; // 확정 스펙: 속성 패널 기본 276px
 
 const clampW = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
 const num = (key: string, fallback: number) => {
