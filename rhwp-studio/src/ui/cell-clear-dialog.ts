@@ -6,6 +6,8 @@
  *  - 취소: 아무것도 안 함                         → 'cancel'
  * ModalDialog는 2버튼 고정이라 이 케이스만 독립 구현(같은 CSS 클래스 재사용).
  */
+import { buildDialogShell, mkDialogBtn } from './canva-dom';
+
 export type CellClearChoice = 'content' | 'shape' | 'cancel';
 
 export function showCellClearChoice(): Promise<CellClearChoice> {
@@ -19,45 +21,15 @@ export function showCellClearChoice(): Promise<CellClearChoice> {
       resolve(v);
     };
 
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-
-    const dialog = document.createElement('div');
-    dialog.className = 'dialog-wrap';
-    dialog.style.width = '380px';
-
-    const titleBar = document.createElement('div');
-    titleBar.className = 'dialog-title';
-    titleBar.textContent = '한글';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'dialog-close';
-    closeBtn.textContent = '×';
-    closeBtn.addEventListener('click', () => finish('cancel'));
-    titleBar.appendChild(closeBtn);
-
-    const body = document.createElement('div');
-    body.className = 'dialog-body';
+    // 공용 뼈대(canva-dom) — 클래스·구조는 기존과 동일
+    const { overlay, body, footer } = buildDialogShell('한글', '380px', () => finish('cancel'));
     body.style.cssText = 'padding:16px 20px;line-height:1.6;white-space:pre-line;';
     body.textContent = '선택된 셀들을 지웁니다.\n내용만 지우고 셀 모양은 남겨 둘까요?';
 
-    const footer = document.createElement('div');
-    footer.className = 'dialog-footer';
-    const mk = (label: string, primary: boolean, val: CellClearChoice) => {
-      const b = document.createElement('button');
-      b.className = primary ? 'dialog-btn dialog-btn-primary' : 'dialog-btn';
-      b.textContent = label;
-      b.addEventListener('click', () => finish(val));
-      return b;
-    };
-    const yesBtn = mk('예', true, 'content');
+    const yesBtn = mkDialogBtn('예', true, () => finish('content'));
     footer.appendChild(yesBtn);
-    footer.appendChild(mk('아니오', false, 'shape'));
-    footer.appendChild(mk('취소', false, 'cancel'));
-
-    dialog.appendChild(titleBar);
-    dialog.appendChild(body);
-    dialog.appendChild(footer);
-    overlay.appendChild(dialog);
+    footer.appendChild(mkDialogBtn('아니오', false, () => finish('shape')));
+    footer.appendChild(mkDialogBtn('취소', false, () => finish('cancel')));
 
     const onKey = (e: KeyboardEvent) => {
       e.stopPropagation();

@@ -7,6 +7,7 @@
 import type { CanvaServices } from './canva-services';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
 import { callMiniMax, aiErrorHint } from './canva-ai-client';
+import { mkEl, mkButton } from './canva-dom';
 const SYSTEM_PROMPT =
   '당신은 한국어 문서(HWPX) 편집을 돕는 작성 도우미입니다. ' +
   '사용자의 요청에 따라 문서에 바로 넣을 수 있는 깔끔한 한국어 본문 텍스트를 작성하세요. ' +
@@ -36,21 +37,16 @@ export class CanvaAiPanel {
   }
 
   private render(): void {
-    const pane = document.createElement('div');
-    pane.className = 'canva-ai-pane';
+    const pane = mkEl('div', 'canva-ai-pane');
 
-    this.log = document.createElement('div');
-    this.log.className = 'canva-ai-log';
+    this.log = mkEl('div', 'canva-ai-log');
     pane.appendChild(this.log);
 
     this.pushMsg({ role: 'ai', text: '안녕하세요! 만들 문서를 말씀해 주세요 — 지면 위에 제목·본문·표를 배치해 드립니다.\n예) "주간 회의록 만들어줘", "출장 보고서 양식"\n(칩을 눌러 일반 글쓰기 모드로 바꿀 수 있어요)' });
 
-    const bar = document.createElement('div');
-    bar.className = 'canva-ai-input-bar';
+    const bar = mkEl('div', 'canva-ai-input-bar');
     // 문서 생성(배치) ↔ 일반 글쓰기 모드 칩
-    this.modeChip = document.createElement('button');
-    this.modeChip.type = 'button';
-    this.modeChip.className = 'canva-ai-mode';
+    this.modeChip = mkButton('canva-ai-mode');
     this.modeChip.addEventListener('click', () => {
       this.genMode = !this.genMode;
       this.syncModeChip();
@@ -63,11 +59,10 @@ export class CanvaAiPanel {
     this.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void this.send(); }
     });
-    this.sendBtn = document.createElement('button');
-    this.sendBtn.className = 'canva-ai-send';
-    this.sendBtn.type = 'button';
-    this.sendBtn.title = '보내기';
-    this.sendBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-3-6-7-2z"/></svg>';
+    this.sendBtn = mkButton('canva-ai-send', {
+      title: '보내기',
+      html: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-3-6-7-2z"/></svg>',
+    });
     this.sendBtn.addEventListener('click', () => void this.send());
     bar.append(this.input, this.sendBtn);
     pane.appendChild(bar);
@@ -76,9 +71,7 @@ export class CanvaAiPanel {
     this.root.appendChild(pane);
 
     // 모델 배지 (레일 헤더 우측에 표시하도록 노출)
-    this.modelBadge = document.createElement('span');
-    this.modelBadge.className = 'canva-ai-model';
-    this.modelBadge.textContent = 'MiniMax M3';
+    this.modelBadge = mkEl('span', 'canva-ai-model', 'MiniMax M3');
   }
 
   getModelBadge(): HTMLElement { return this.modelBadge; }
@@ -89,11 +82,8 @@ export class CanvaAiPanel {
   }
 
   private pushMsg(m: Msg): HTMLElement {
-    const el = document.createElement('div');
-    el.className = `canva-ai-msg ${m.role}${m.err ? ' err' : ''}`;
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = m.text;
+    const el = mkEl('div', `canva-ai-msg ${m.role}${m.err ? ' err' : ''}`);
+    const bubble = mkEl('div', 'bubble', m.text);
     el.appendChild(bubble);
     this.log.appendChild(el);
     this.log.scrollTop = this.log.scrollHeight;
@@ -150,12 +140,8 @@ export class CanvaAiPanel {
       .map((e) => (e.type === 'text' ? `· 텍스트 (${e.x},${e.y}) "${e.text.split('\n')[0].slice(0, 24)}"` : `· 표 (${e.x},${e.y}) ${e.rows.length}×${e.rows[0].length}`))
       .join('\n');
     const msgEl = this.pushMsg({ role: 'ai', text: `배치 계획 — 텍스트 ${texts} · 표 ${tables}\n${preview}` });
-    const actions = document.createElement('div');
-    actions.className = 'canva-ai-actions';
-    const apply = document.createElement('button');
-    apply.className = 'canva-ai-act';
-    apply.type = 'button';
-    apply.textContent = '캔버스에 배치';
+    const actions = mkEl('div', 'canva-ai-actions');
+    const apply = mkButton('canva-ai-act', { text: '캔버스에 배치' });
     apply.addEventListener('click', () => {
       const done = applyAiLayout(this.services, layout);
       apply.disabled = true;
@@ -167,22 +153,15 @@ export class CanvaAiPanel {
   }
 
   private addInsertAction(msgEl: HTMLElement, text: string): void {
-    const actions = document.createElement('div');
-    actions.className = 'canva-ai-actions';
-    const insert = document.createElement('button');
-    insert.className = 'canva-ai-act';
-    insert.type = 'button';
-    insert.textContent = '본문에 삽입';
+    const actions = mkEl('div', 'canva-ai-actions');
+    const insert = mkButton('canva-ai-act', { text: '본문에 삽입' });
     insert.addEventListener('click', () => {
       const ih = this.services.getInputHandler();
       if (ih && this.services.wasm.pageCount > 0) {
         (ih as any).insertPlainTextAtCursor(text);
       }
     });
-    const copy = document.createElement('button');
-    copy.className = 'canva-ai-act';
-    copy.type = 'button';
-    copy.textContent = '복사';
+    const copy = mkButton('canva-ai-act', { text: '복사' });
     copy.addEventListener('click', () => { void navigator.clipboard?.writeText(text); });
     actions.append(insert, copy);
     msgEl.appendChild(actions);

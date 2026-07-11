@@ -5,6 +5,7 @@
  * 삽입은 rhwp의 배치 모드(클릭/드래그로 위치 지정)로 이어져 "자유 배치" 감각을 유지한다.
  */
 import type { CanvaServices } from './canva-services';
+import { mkEl, mkButton } from './canva-dom';
 
 interface ObjPreset {
   cmd: string;
@@ -33,23 +34,17 @@ export class CanvaLeftPalette {
   }
 
   private render(): void {
-    const pane = document.createElement('div');
-    pane.className = 'canva-pane';
+    const pane = mkEl('div', 'canva-pane');
 
-    const label = document.createElement('div');
-    label.className = 'canva-section-label';
-    label.textContent = '개체 삽입';
-    pane.appendChild(label);
+    pane.appendChild(mkEl('div', 'canva-section-label', '개체 삽입'));
 
-    const grid = document.createElement('div');
-    grid.className = 'canva-palette-grid';
+    const grid = mkEl('div', 'canva-palette-grid');
     for (const p of PRESETS) {
-      const card = document.createElement('button');
-      card.className = 'canva-obj-card';
-      card.type = 'button';
-      card.innerHTML =
-        `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${p.icon}</svg>` +
-        `<span>${p.label}</span>`;
+      const card = mkButton('canva-obj-card', {
+        html:
+          `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${p.icon}</svg>` +
+          `<span>${p.label}</span>`,
+      });
       // mousedown(preventDefault)로 편집 포커스/선택 보존 후 dispatch
       card.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -59,10 +54,7 @@ export class CanvaLeftPalette {
     }
     pane.appendChild(grid);
 
-    const hint = document.createElement('div');
-    hint.className = 'canva-hint';
-    hint.textContent = '개체를 고르면 문서 위 원하는 자리를 클릭·드래그해 배치합니다.';
-    pane.appendChild(hint);
+    pane.appendChild(mkEl('div', 'canva-hint', '개체를 고르면 문서 위 원하는 자리를 클릭·드래그해 배치합니다.'));
 
     this.root.appendChild(pane);
   }
