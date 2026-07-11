@@ -103,7 +103,7 @@ test('표 경계 hover는 hitTest 실패 시 직전 bbox 캐시로 경계선을 
   assert.match(block, /hitTestBorder\(pageX,\s*pageY,\s*pageBboxes\)/, 'fallback도 경계선 hitTest를 사용해야 함');
 });
 
-test('표 경계 mousedown은 hover 캐시가 없으면 새 table bbox를 만들지 않는다', () => {
+test('표 경계 mousedown은 hover 캐시가 없으면 새 table bbox를 만들지 않는다 (캐럿이 표 안일 때만 1회 조회 허용)', () => {
   const helper = resolveTableResizeHitBlock();
   const block = generalTableResizeMouseDownBlock();
 
@@ -112,7 +112,15 @@ test('표 경계 mousedown은 hover 캐시가 없으면 새 table bbox를 만들
   assert.doesNotMatch(helper, /self\.wasm\.hitTest\(pageIdx,\s*pageX,\s*pageY\)/, '일반 mousedown에서 표 hitTest 기반 cold lookup 금지');
   assert.doesNotMatch(helper, /self\.wasm\.getTableCellBboxes/, '일반 mousedown에서 table bbox 생성 금지');
   assert.doesNotMatch(helper, /self\.wasm\.getPageControlLayout\(pageIdx\)/, '일반 mousedown에서 layout fallback 기반 cold lookup 금지');
-  assert.match(block, /const resizeHit = resolveTableResizeHit\(this,\s*pageIdx,\s*pageX,\s*pageY\);/, '일반 mousedown resize는 helper를 사용해야 함');
+  // [캔버스 한컴 포크] 한글 규약(셀 선택 없이도 경계 드래그)을 위해 호출부는 helper 미스 시
+  // "캐럿이 표 안(getCellTableContext)"일 때만 1회 cold 조회를 허용한다 — 원 성능 가드(모든
+  // 일반 클릭에서 무조건 조회 금지)의 취지는 게이트로 유지되므로 계약을 게이트 검사로 강화.
+  assert.match(block, /let resizeHit = resolveTableResizeHit\(this,\s*pageIdx,\s*pageX,\s*pageY\);/, '일반 mousedown resize는 helper를 사용해야 함');
+  assert.match(block, /if \(!resizeHit\)/, 'cold 조회 폴백은 helper 미스에서만 시도해야 함');
+  const gateIdx = block.indexOf('getCellTableContext');
+  const coldIdx = block.indexOf('getTableCellBboxes');
+  assert.ok(gateIdx !== -1, '폴백은 캐럿이 표 안인지(getCellTableContext) 먼저 확인해야 함');
+  assert.ok(coldIdx !== -1 && gateIdx < coldIdx, 'cold 조회(getTableCellBboxes)는 표 안 게이트 뒤에만 허용');
 });
 
 test('표 경계 hitTest는 교차점에서 행 경계 선반환으로 컬럼 resize를 막지 않는다', () => {
