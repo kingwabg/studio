@@ -10,7 +10,8 @@ import { CanvaAiPanel } from './canva-ai-panel';
 
 let mounted = false;
 
-const CANVAS_MODE_KEY = 'rhwpCanvasMode'; // '1'=캔버스 모드(기본), '0'=문서 모드
+// '1'=캔버스 모드(기본), '0'=문서 모드. main.ts(새 문서 여백 0 분기)와 공유 — 문자열 중복 금지.
+export const CANVAS_MODE_KEY = 'rhwpCanvasMode';
 
 export function mountCanvaSidebars(services: CanvaServices): void {
   if (mounted) return;
