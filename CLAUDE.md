@@ -19,6 +19,8 @@
   `browser-drive.md`(rhwp 실구동 레시피) · `debugging.md`(낯선 버그 = 창의적 디버깅 절차서).
   역사·상세는 `docs/rhwp-adoption.md`를 grep으로. **규칙 문서를 고치면 `playbooks/CHANGELOG.md`
   맨 위에 항목 필수**(날짜·무엇·왜·쉽게 말하면 — 초보자용 이력, 2026-07-12 신설).
+  제품 방향·로드맵 정본 = `docs/product-spec.md`, 기술 선택(라이브러리) 정본 = `docs/tech-choices.md`
+  — 완료 보고 시 다음 기능 제안, 새 기능 전 라이브러리 검토가 의무(agent-protocol §4, 2026-07-12).
   슬래시 명령: `/boot`(세션 부팅) · `/done`(완료 게이트) — `.claude/commands/`.
 
 ## 편집 표면 구조 (Strangler Fig — 2단계 진화 중)
