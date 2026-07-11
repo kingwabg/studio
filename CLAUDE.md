@@ -13,6 +13,8 @@
   자동 설치. 포트: **5175**(문서편집기, 자동 실행) · **7700**(rhwp 캔버스 한컴, `npm run dev:rhwp`).
 - **AI 키**: Codespaces Secret `MINIMAX_API_KEY` — vite 프록시(rhwp-studio/vite.config.ts)가
   process.env를 우선 읽으므로 파일 없이 동작. 로컬은 rhwp-studio/.env.local(gitignore).
+- **병렬 체제**: 기능 작업은 feature 브랜치+CI, 문서/규칙은 main 직push (agent-protocol §1.5 —
+  구역 분할: engine 핫스팟은 동시 1세션만).
 - Codespace는 미사용 30일 후 자동 삭제 — 세션을 미커밋 상태로 끝내지 말 것(승인 대기면 WIP
   브랜치 push 여부를 사용자에게 질문). 저장소 보호·백업 설정은 docs/saas-gates.md 맨 아래 참조.
 - **세션 시작 = 운영 프로토콜**: 이 파일 다음에 `docs/playbooks/agent-protocol.md`를 읽고 거기
