@@ -27,7 +27,7 @@ import { showValidationModalIfNeeded } from '@/ui/validation-modal';
 import { showLocalFontsModalIfNeeded } from '@/ui/local-fonts-modal';
 import { showToast } from '@/ui/toast';
 import { showDropConfirmDialog } from '@/ui/drop-confirm-dialog';
-import { mountCanvaSidebars } from '@/ui/canva-sidebars';
+import { mountCanvaSidebars, CANVAS_MODE_KEY } from '@/ui/canva-sidebars';
 import { initRhwpDev } from '@/core/rhwp-dev';
 import { DocumentDirtyState } from '@/core/document-dirty-state';
 import { initThemeSync, setThemeMode, getThemeMode, getEffectiveTheme } from '@/core/theme';
@@ -930,6 +930,21 @@ async function createNewDocument(): Promise<void> {
   try {
     msg.textContent = '새 문서 생성 중...';
     const docInfo = wasm.createNewDocument();
+    // [캔버스 한컴 포크] 캔버스 모드 새 문서 = 여백 전부 0 (로드맵 P0-1) —
+    // 화면 좌표가 종이 원점(=내보내기 봉투 원점)과 일치해 배치한 자리가 그대로 저장된다.
+    // 문서 모드 새 문서는 기존 한글 기본 여백 유지(동작 보존).
+    try {
+      if (localStorage.getItem(CANVAS_MODE_KEY) !== '0') {
+        const pd = wasm.getPageDef(0);
+        wasm.setPageDef(0, {
+          ...pd,
+          marginLeft: 0, marginRight: 0, marginTop: 0, marginBottom: 0,
+          marginHeader: 0, marginFooter: 0, marginGutter: 0,
+        });
+      }
+    } catch (e) {
+      console.warn('[main] 캔버스 모드 여백 0 설정 실패(문서 생성은 계속):', e);
+    }
     await autosaveManager.beginDocument(
       { fileName: wasm.fileName, sourceFormat: wasm.getSourceFormat() },
       { discardPreviousDraft: true },
