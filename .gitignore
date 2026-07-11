@@ -4,7 +4,10 @@ dist
 .env
 .env.local
 .verify/
-.claude/
+# .claude는 로컬 설정만 무시 — 팀 공용 슬래시 명령(commands)은 추적한다
+# (주의: 디렉터리 자체를 .claude/ 로 무시하면 하위 재포함(!)이 불가능 — 반드시 /* 패턴 유지)
+.claude/*
+!.claude/commands/
 # 개발용 임시 로그 (codex/vite 프로세스 stdout·stderr)
 .codex-vite-*.log
 
