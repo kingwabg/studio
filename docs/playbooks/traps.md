@@ -46,6 +46,10 @@
   플레이스홀더만.
 - **vite.config 수정 = 서버 자동 재시작이지만 env는 시작 시 1회 로드** — 키 추가 후 재시작 필수.
 - **devcontainer.json은 JSONC**(주석 허용) — 도구로 파싱 검증 시 주석 제거 후 JSON.parse.
+- **npm 11 lock을 npm 10 `npm ci`가 거부** (실사고 2026-07-12: CI 첫 4런 전멸, "Missing: X from
+  lock file") — 로컬 npm 11이 일부 전이 의존성(@types/node·@emnapi 등)을 lock에서 생략, CI의
+  node22+npm 10은 필수로 요구. → 해법: `npx npm@10 install --package-lock-only`로 lock 재생성 +
+  `npx npm@10 ci --dry-run`으로 CI 시뮬레이션. lock 갱신 커밋 전 npm 10 dry-run이 규칙.
 
 ## 포크/테스트
 
