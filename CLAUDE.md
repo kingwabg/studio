@@ -3,27 +3,60 @@
 ## 프로젝트 개요
 캔바(Canva)식 자유 배치 UI를 가진 한국어 문서 편집기.
 사용자(준하)는 React/TypeScript 프론트엔드 개발자이며, 최종 목표는
-"AI가 통합된, HWPX(한글) 호환 문서 도구"다.
+"AI가 통합된, HWPX(한글) 호환 문서 도구"다. 사업 방향은 월 구독 + 템플릿 마켓.
+**현재 주력: rhwp-studio 입양본 위에 "캔버스 한컴"을 만드는 것** (아래 전용 섹션 참조).
 (별도 프로젝트 junha-ai/ 에서 데스크탑 AI 에이전트를 병행 개발 중 — 이 저장소와 섞지 말 것)
 
-## 두 편집 표면 공존 (Strangler Fig 마이그레이션)
-기존 흐름 에디터를 갈아엎지 않고, 새 모듈형 캔버스를 옆에 신설해 점진 이관한다.
-라우팅: `/` = 기존 앱(DocumentStudio, 무손상), `/studio` = 새 모듈형 캔버스.
-둘 다 `src/hwpx/` 코어를 공유. 목표 스택: Vite+react-router / TS(점진) / Tailwind(신규만) /
+## 작업 환경 (2026-07 확정)
+- **주 작업장 = GitHub main + Codespaces.** 로컬 클론들은 동결 — pull/push 기준을 main으로 통일.
+  devcontainer가 postCreate에서 root+rhwp-studio 의존성, /pkg(WASM, sync:rhwp), Claude Code CLI까지
+  자동 설치. 포트: **5175**(문서편집기, 자동 실행) · **7700**(rhwp 캔버스 한컴, `npm run dev:rhwp`).
+- **AI 키**: Codespaces Secret `MINIMAX_API_KEY` — vite 프록시(rhwp-studio/vite.config.ts)가
+  process.env를 우선 읽으므로 파일 없이 동작. 로컬은 rhwp-studio/.env.local(gitignore).
+- **세션 시작 추천**: 이 파일과 `docs/rhwp-adoption.md`(캔버스 한컴 융합 로그 — 함정·검증법의
+  정본)를 먼저 읽을 것.
+
+## 편집 표면 구조 (Strangler Fig — 2단계 진화 중)
+라우팅: `/` = 기존 앱(DocumentStudio, 무손상) · `/studio` = 모듈형 캔버스 · rhwp-studio = 독립
+앱(7700, `/studio/rhwp`에서 iframe 임베드). 스택: Vite+react-router / TS(점진) / Tailwind(신규만) /
 Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
-- **기존(흐름 에디터)**: sections→blocks, 브라우저가 배치 → 실측 내보내기. JS.
-- **신규(자유배치 캔버스)**: 블록이 mm 좌표(x/y/w/h) 직접 소유. TS + Zustand + dnd-kit.
-  `src/modules/document/model.ts`(타입) · `src/modules/canvas/`(store·Stage·Block·geometry) ·
-  `src/components/editor-shell/`(L/C/R) · `src/routes/`(StudioHome/StudioEditor).
-- **데이터 병합**(`src/modules/merge/`): 하이브리드 전략 — 저장·엔진의 진실은 {{열이름}}
-  토큰(정규식), 화면은 칩. 좌측 데이터 탭에서 엑셀/CSV 업로드(CSV는 UTF-8→EUC-KR 폴백
-  디코딩 필수 — SheetJS에 바이트로 주면 한글 깨짐) → 열 알약을 텍스트/셀에 드롭 →
-  레코드 미리보기 → 일괄 생성(개별 ZIP / 한 파일 N쪽=el.page).
-  `exportHwpx.ts`: CanvasDoc은 모델이 곧 mm라 실측 없이 exportCore로 직변환.
-- Tailwind는 **utilities만**(preflight 제외, tailwind.css 주석 참고) — 기존 앱 스타일 보호.
-- TS는 `allowJs`+`checkJs:false` — 기존 JS와 공존, table-king·hwpx는 JS 유지(불가침).
+- **1단계(완료)**: 흐름 에디터(`/`) → 모듈형 자유배치 캔버스(`/studio`). 블록이 mm 좌표(x/y/w/h)
+  직접 소유. `src/modules/document/model.ts` · `src/modules/canvas/` · `src/components/editor-shell/`.
+  검증된 HWPX 내보내기/가져오기 파이프라인(`src/hwpx/`)이 여기 있음 — **영구 자산**.
+- **2단계(진행 중)**: rhwp-studio 입양본이 차기 제품 표면. `/studio` 캔버스의 UX 자산(팔레트·
+  인스펙터·스냅·텍스트 도구)을 rhwp 위로 이식하는 중. `src/hwpx/` 지식(매핑·검증)은 그대로 유효.
+- **데이터 병합**(`src/modules/merge/`, `/studio` 소속): 진실은 {{열이름}} 토큰, 화면은 칩.
+  엑셀/CSV 업로드(CSV는 UTF-8→EUC-KR 폴백 디코딩 필수 — SheetJS에 바이트로 주면 한글 깨짐) →
+  열 알약 드롭 → 일괄 생성(개별 ZIP / 한 파일 N쪽=el.page). rhwp 쪽 이식은 로드맵 후보.
+- Tailwind는 **utilities만**(preflight 제외) — 기존 앱 스타일 보호. TS는 `allowJs`+`checkJs:false`.
+
+## rhwp-studio = "캔버스 한컴" (현 주력)
+입양본(MIT, 6만 줄 vanilla TS HWP/HWPX 에디터). 원칙과 규약:
+- **포크 규약**: 업스트림 diff 가능하게 유지. 우리가 고친 곳은 반드시 `[캔버스 한컴 포크]` 주석.
+- **대원칙: 엔진·문서 모델 무변경.** rhwp의 HWP 문서 모델이 진실이고, floating 개체(오프셋)가
+  곧 캔버스 좌표다. 캔버스다움은 **입력 해석 레이어(캔버스 모드)**로만 구현 — 별도 JSON 캔버스
+  모델을 이식하지 말 것(진실 2개 = H4 위반).
+- **캔버스 모드** (InputHandler.canvasMode + canvasEditingRef, 메뉴바 토글·기본 ON·localStorage):
+  클릭=개체 선택 → 재클릭(이동 없이)/더블클릭=텍스트 편집 → Esc=편집→선택→해제 계층.
+  빈 지면 더블클릭=그 자리에 새 글상자+바로 편집(빈 채 이탈 시 소멸). 무편집 시 본문 캐럿 숨김.
+  **표는 예외 — 글 넣는 그릇**: 셀 클릭=글영역 편집, 드래그=셀 범위 선택, 개체 잡기는 Alt+클릭.
+  문서 모드 토글 시 기존 한글 동작 완전 보존.
+- **AI 통합** (MiniMax M3, OpenAI 호환): 브라우저는 같은 출처 `/api/ai/*`만 호출, dev 프록시가
+  Bearer 키를 서버측 주입(vite.config — 키 번들 노출 0). 기능: AI 패널 [문서 생성](A4 배치 JSON
+  → 승인 → 글상자/표 실체화, 단일 스냅샷=Ctrl+Z 일괄 취소) / [일반](텍스트 → 커서 삽입) /
+  글상자 우클릭 "AI에게 수정하기"(수정 전후 비교 → 적용). 공용 클라이언트 ui/canva-ai-client.ts.
+  ⚠ 프록시는 dev 전용 — Vercel 배포 시 서버리스 함수로 이관 필요.
+- **실측으로 확정한 함정** (재발견 금지 — 상세·검증법은 docs/rhwp-adoption.md):
+  - 표 위치 지정은 `setTableProperties({vertRelTo:'Paper', horzRelTo:'Paper', ...})` 절대 오프셋
+    + 렌더 잔차(바깥여백 ≈1mm) 보정 패스. `moveTableOffset`(Para 상대)은 위쪽 이동이 조용히
+    클램프됨(ok:true인데 렌더 불변). 여러 표는 전부 생성 후 위치 해결(2-phase).
+  - hover/드래그 갱신은 RAF 스로틀 — 자동화 브라우저(RAF 미실행)에선 내부 함수 직접 호출로 검증.
+  - mousemove는 canvas 요소에 디스패치(리스너가 container 등록 — document에 쏘면 안 닿음).
+- **로드맵**: ①모드 토글+포인터 기본값 ✅ → ②새 문서 여백 0(내보내기 원점 일치) → ③다중
+  선택·정렬·복제 → ④크롬 다이어트(컨텍스트 툴바) → ⑤레이어 패널+z순서 → ⑥템플릿 갤러리.
 
 ## 핵심 아키텍처 (변경 시 반드시 사용자와 상의)
+`/studio` 모듈형 캔버스의 구조 (rhwp-studio는 위 섹션의 원칙을 따름):
 ```
 [진실]   캔버스 JSON 모델  ← 사용자가 조작하는 유일한 상태 (mm 단위, A4 210×297)
            요소 = { id, type: "text"|"table", x, y, w, h, ... }
@@ -32,11 +65,10 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 [검증]   rhwp / 한글       ← 우리가 만든 HWPX를 여는 외부 렌더러
 ```
 - **rhwp** (github.com/edwardkim/rhwp, MIT): 조판·렌더링·파싱 담당. 우리는 재발명하지 않는다.
-  제품 의존성 `@rhwp/core`(WASM ~5.7MB)로 통합됨 — 단, "한글 미리보기"(파생) 전용.
-  dynamic import로 지연 로딩하므로 편집 화면 첫 로딩에는 영향 없음.
+  쓰임 셋: ①`/studio` "한글 미리보기"(@rhwp/core WASM ~5.7MB, dynamic import) ②가져오기 파서
+  ③rhwp-studio 입양본(에디터 전체). 내보내기 경로에는 관여하지 않는다.
 - **kordoc** (npm): 개발용 비계(스키마 학습·검증 도구). **최종 제품에 포함 금지.**
 - 제품의 내보내기 코어는 **의존성 0** (자체 CRC32 + STORE ZIP + 내장 템플릿).
-  rhwp는 내보내기 경로에 관여하지 않는다 — exportCore가 만든 바이트를 소비만 한다.
 
 ## 검증 완료된 HWPX 매핑 (건드릴 때 주의)
 - 단위: 1mm = 283.465 HWPUNIT
@@ -83,31 +115,27 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   → Contents/header.xml → Contents/section0.xml → Preview/PrvText.txt
 
 ## 파일 인벤토리
-- `src/DocumentStudio.jsx` — 메인 앱. 홈 대시보드 → 템플릿 팝업 → 캔버스 워크스페이스.
-  내장: HWPX_BASE(검증된 봉투 템플릿), 내보내기 코어, AI 패널(Fable 5 우선 → Sonnet 4.6 폴백).
-- `src/table-king/` — 표 엔진 (github.com/kingwabg/table-king-Custom 이식본).
-  한컴식 경계선 어긋남 편집·병합/나누기·셀 스타일·클립보드·실행취소.
-  `TableKingBlock.jsx`만 우리 래퍼(문서 모델 시드 + onChange + active 게이팅),
-  `table/`·`hooks/`·`components/`는 원본 그대로 — 업스트림과 diff 가능하게 유지.
+- `rhwp-studio/` — **현 주력.** 입양 에디터 + 캔버스 한컴 포크. 길잡이:
+  `src/engine/input-handler*.ts`(입력 해석 — 캔버스 모드·표·마우스·키보드) ·
+  `src/ui/canva-*.ts`(사이드바·팔레트·인스펙터·AI 패널/클라이언트/배치/수정 대화상자) ·
+  `src/command/commands/`(커맨드 25종+, ai.ts 포함) · `vite.config.ts`(AI 프록시 /api/ai).
+  진행 로그·함정·검증법의 정본: `docs/rhwp-adoption.md`.
+- `src/routes/StudioRhwp.tsx` — rhwp-studio iframe 임베드(@rhwp/editor, 7700 프로브→github.io 폴백).
+- `src/DocumentStudio.jsx` — 레거시 메인 앱(동결). 홈 대시보드 → 캔버스 워크스페이스.
+- `src/table-king/` — `/studio` 캔버스의 표 엔진 (github.com/kingwabg/table-king-Custom 이식본).
+  `TableKingBlock.jsx`만 우리 래퍼, `table/`·`hooks/`·`components/`는 원본 그대로.
   표 데이터 모델: { cells:[[{text,style}]], widths(행별), cellHeights(셀별), merges }.
   문서를 통째로 갈아끼울 땐(AI 적용) key(docRev)로 리마운트해 시드를 갱신한다.
 - `src/hwpx/exportCore.js` — 제품 내보내기 코어 (의존성 0: 자체 CRC32 + STORE ZIP + 내장 봉투).
   검증된 매핑 + table-king 확장(병합 cellSpan, 행별 열 너비, 셀 내 줄바꿈=여러 hp:p).
-- `src/hwpx/hwpxBase.js` — 자동 생성(수정 금지). kordoc이 만든 유효 봉투를 내장.
-  재생성: `npm run gen:hwpx-base`.
+- `src/hwpx/hwpxBase.js` — 자동 생성(수정 금지). 재생성: `npm run gen:hwpx-base`.
 - `src/hwpx/rhwpLoader.js` — @rhwp/core WASM 공용 로더 (미리보기·가져오기 공유, 1회 초기화).
-  measureTextWidth는 init 전 등록 필수(rhwp 요구). WASM은 Vite `?url` 임포트로 배포.
-  Vite 전용이므로 Node(하네스)에서 import 금지 — 순수 로직과 분리하는 이유.
+  measureTextWidth는 init 전 등록 필수(rhwp 요구). Vite 전용 — Node(하네스)에서 import 금지.
 - `src/hwpx/hanPreview.js` — "한글 미리보기": hwpx 바이트 → 페이지 SVG 배열.
 - `src/hwpx/importCore.js` — 가져오기: HwpDocument → 문서 JSON (순수 — Node 하네스 공용).
-  1×1 표=텍스트 블록(우리 매핑의 역방향), 머리글 패턴(Ⅰ/1/가)은 번호를 벗겨 저장,
-  표는 중립형 {rows, merges}로 반환(테이블 모델 변환은 DocumentStudio hydrateImported).
-- `scripts/hwpx-verify.mjs` — 3중 검증 하네스 (kordoc devDependency 사용).
-  `npm run verify:hwpx` → validateHwpx ok + 내용 왕복 + SVG 렌더 확인. 코어 수정 시 필수 실행.
-- `hwpx-export.mjs` — 초기 kordoc 기반 어댑터(참고용). 제품 경로는 src/hwpx/가 대체.
-  ⚠ 표 모델이 table-king으로 바뀜 — 셀 텍스트는 cells[r][c].text (tableDataToRows 참고).
-- `spreadsheet.jsx`, `resizable-table.jsx` — 이전 실험 자산(수식 엔진, HWP식 표 격리 엔진).
-  격리 엔진은 table-king으로 대체되어 참고용으로만 남음.
+- `scripts/hwpx-verify.mjs` — 검증 하네스(kordoc devDependency). 코어 수정 시 필수 실행.
+- `scripts/sync-rhwp-pkg.mjs` — /pkg(WASM)를 @rhwp/core에서 공급(postinstall 자동).
+- `hwpx-export.mjs`·`spreadsheet.jsx`·`resizable-table.jsx` — 초기 실험 자산(참고용).
 
 ## 설계 휴리스틱 (thinking-protocol 부록 요약 — 코드 결정 시 적용)
 - H1: 막히면 "현재 데이터 모델로 목표 상태를 직렬화할 수 있는가?" 못 하면 구조를 바꾼다.
@@ -118,10 +146,10 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 
 ## 코딩 규칙
 - 디자인 토큰은 `T` 객체 하나로 통일 (잉크 #1A2233, 문서 블루 #2B5CE6, 헤어라인 #E4E8EF).
+  에디터 신규 UI는 KRDS 룩(정부 블루 #256EF4·플랫+보더) — rhwp-studio는 krds-theme.css.
 - 아이콘은 이모지 금지, 인라인 SVG(1.4px 스트로크)만.
 - 클래스명은 Tailwind 유틸리티명과 겹치면 안 됨(`table-row`·`table-cell`·`grid`·`hidden` 등) —
-  utilities-only 주입이라 display가 덮여 레이아웃이 깨진다. 접두사(tk- 등)로 격리하거나,
-  겹치면 스코프 CSS에서 display 명시 (실사고: 표 행 높이 회귀 — table-king.css 주석 참고).
+  utilities-only 주입이라 display가 덮여 레이아웃이 깨진다. 접두사(tk-, canva- 등)로 격리.
 - 한국어 UI/주석. 주석은 "왜"를 설명.
 - 파괴적 작업(파일 덮어쓰기, 대량 삭제)은 실행 전 사용자 확인.
 - **완료 선언 전 증거 먼저**: "완료/고쳤다"고 말하기 전에 증명하는 실행 결과(실측 수치·테스트
@@ -147,26 +175,30 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   `rhwp-studio/`(rhwp 에디터 입양본 — src/ 밖이라 게이트 자동 비대상, 업스트림 diff 가능하게 유지)·
   `/pkg`(생성물 — `npm run sync:rhwp`가 @rhwp/core에서 공급).
   우리 래퍼(TableKingBlock.jsx)는 래칫 대상. 예외 디렉터리 안이라도 **신규 파일은 예산 적용**.
+  단 rhwp-studio 안에서도 우리가 새로 만드는 파일은 예산 정신(500줄)을 지킬 것.
 - **`[size-override]`는 사용자가 그 커밋에서 명시적으로 지시했을 때만.** 에이전트가 "불가피"를
-  자가 판정해 붙이는 것 금지. 레거시(DocumentStudio.jsx)는 분리 대상이 아니라 동결 — 기능이
-  필요하면 답은 분리가 아니라 신규 표면(/studio) 이관이다.
+  자가 판정해 붙이는 것 금지. 레거시(DocumentStudio.jsx)는 분리 대상이 아니라 동결.
+  ⚠ 현재 예산 초과 부채 6종(2026-07-12 [size-override]로 반입): TableKingBlock.jsx·
+  CanvasBlock.tsx·LeftPanel.tsx·exportCore.js·CanvasStage.tsx·store.ts — 분리 리팩토링 대기.
 
 ## 다음 과제 (우선순위 순)
-0. ~~한글 미리보기~~ ✅ 완료 — 툴바 "한글 미리보기" 버튼 → rhwp 조판 페이지 SVG 모달
-1. ~~다중 페이지 지원~~ ✅ 완료 — 에디터: 블록 단위 페이지 넘김(스페이서, 자연 위치
-   불변량으로 1회 수렴) + 페이지 구분선/여백 가이드. 내보내기: el.page + pageBreak 앵커.
-   한계: 한 페이지보다 큰 블록은 밀지 않고 걸친 채 둔다(표 행 분할은 나중 과제).
-2. ~~스타일 반영~~ ✅ 완료 — 화면 실측(computed style + table-king 셀 모델 + 실효 글꼴 감지)
-   → 스타일 레지스트리 → header.xml. 화면 px = 미리보기 px 일치 확인.
-3. ~~HWPX 가져오기~~ ✅ 완료 — 홈 "한글 문서 열기" → importCore(rhwp 파서) → 편집기.
-   verify ⑦ 왕복 게이트(내보내기→가져오기 구조 복원 + 열 너비 복원).
-   셀 크기는 getCellProperties(HWPUNIT÷75=px)로 복원 — 행별 반올림 금지(1px 유령 열).
-   한계: 셀 스타일·이미지·중첩표는 미지원. 표 기능 전수 점검: docs/table-features.md.
-4. 이미지 요소 타입 추가 (캔버스 + hp:pic 매핑 — rhwp getControlImageData로 가져오기도 가능)
-5. Undo/Redo (요소 배열 스냅샷 히스토리)
+**rhwp 캔버스 한컴 트랙 (주력)** — 로드맵은 위 rhwp-studio 섹션:
+1. 캔버스 모드 ② 새 문서 기본 여백 0 (화면 좌표 = 내보내기 봉투 원점 일치)
+2. ③ 다중 선택·정렬·복제 (마퀴 드래그, Ctrl+D — rhwp에 다중 그림 선택 이미 있음, 표까지 확장)
+3. ④ 크롬 다이어트 (캔버스 모드에서 한컴 메뉴/툴바 접고 선택 컨텍스트 툴바)
+4. ⑤ 레이어 패널 + z순서 · ⑥ 템플릿 갤러리 (사업 목표 직결)
+5. AI 확장: 표 셀 선택에도 우클릭 AI 수정 · 수정 전/후 단어 diff · 자료(엑셀/CSV) 읽어 채우기
+6. Vercel 배포 시 AI 프록시를 서버리스 함수로 이관 (현재 dev 전용)
+
+**`/studio` 캔버스 트랙 (완료분 유지·이관 판단)**: 한글 미리보기 ✅ · 다중 페이지 ✅ ·
+스타일 반영 ✅ · HWPX 가져오기 ✅ (셀 크기 HWPUNIT÷75, 행별 반올림 금지 — 1px 유령 열).
+이미지 요소·Undo/Redo는 rhwp 트랙이 자체 보유하므로 신규 투자 전 이관 여부 판단.
 
 ## 실행/검증 명령
-- 웹 앱: `npm run dev` (Vite, 127.0.0.1:5173)
-- HWPX 검증: `npm run verify:hwpx` (validateHwpx ok + 왕복 + SVG 3중 확인)
+- 문서편집기: `npm run dev` (로컬 5173 / Codespaces는 postAttach가 5175로 자동 실행)
+- rhwp 캔버스 한컴: `npm run dev:rhwp` (7700)
+- rhwp-studio 타입 체크: `cd rhwp-studio && npx tsc --noEmit` (포크 수정 후 필수)
+- rhwp-studio 단위 테스트: `cd rhwp-studio && npm test`
+- HWPX 검증: `npm run verify:hwpx` (validateHwpx ok + 왕복 + SVG — exportCore 수정 시 필수)
 - 봉투 재생성(봉투 스키마 바뀔 때만): `npm run gen:hwpx-base`
-- 앱에서 내보내기: 에디터 상단 "HWPX 내보내기" 버튼 → 화면 배치를 mm로 실측해 다운로드
+- WASM 재공급(필요시): `npm run sync:rhwp` (postinstall이 자동 수행)
