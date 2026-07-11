@@ -1,6 +1,6 @@
 # 규칙 변경 이력 — 초보자용 (최신이 맨 위)
 
-이 파일은 **규칙 문서(CLAUDE.md · docs/playbooks/* · .claude/commands/*)가 바뀔 때마다**
+이 파일은 **규칙 문서(CLAUDE.md · docs/playbooks/* · .claude/commands/*)와 정본 문서(product-spec·tech-choices·saas-gates·design/tokens.md)의 결정이 바뀔 때마다**
 한 항목씩 쌓입니다. 형식: 날짜 → 무엇이 → 왜 → 쉽게 말하면. 코드 변경은 여기 안 적습니다
 (그건 git log). **규칙 문서를 고친 사람(AI 포함)은 반드시 맨 위에 항목을 추가할 것.**
 
@@ -15,11 +15,26 @@
 | `docs/playbooks/browser-drive.md` | rhwp 에디터를 자동화로 조작·측정하는 레시피 |
 | `docs/playbooks/debugging.md` | 처음 보는 버그를 잡는 절차서 ("창의적 디버깅"의 체크리스트판) |
 | `.claude/commands/boot.md, done.md` | 슬래시 명령 — `/boot`(세션 시작), `/done`(완료 검사) |
+| `docs/product-spec.md` | 제품 기능 로드맵의 정본 (P0~P3) — AI 기능 제안의 기준 |
+| `docs/tech-choices.md` | 라이브러리 쓸까/직접 만들까 결정 대장 |
+| `docs/saas-gates.md` | 공개 배포 전 필수 체크리스트 (보안·법률·품질 G1~G10) |
+| `design/tokens.md` | 디자인 값(색·크기)의 정본 |
 | `docs/rhwp-adoption.md` | 규칙 아님 — 작업 일지(역사). 함정의 상세 서사가 여기 있음 |
 
 ---
 
 ## 2026-07-12
+
+### ➕ 1인 개발자 사각지대 감사 27건 반영 — 법률·생존·출시 게이트 (사용자 지시 "조언자가 되어라")
+- **왜**: 규칙이 전부 "코드 다루는 법"뿐이라 1인 개발의 진짜 위험(법률·백업·출시 준비)이 무방비.
+  5렌즈 감사에서 치명 3건 발견: 폰트 라이선스 동봉 위반(셀링포인트가 '저작권 Safe'인데!),
+  rhwp 6만 줄 입양본에 원저작자 고지 없음(MIT 위반), 배포 로드맵에 법정 문서 3종 부재.
+- **쉽게 말하면**: ①라이선스 파일 3종 신설(rhwp-studio/LICENSE·THIRD_PARTY_LICENSES.md·
+  public/fonts/LICENSES/)로 저작권 위반 해소 ②docs/saas-gates.md 신설 — 배포 전 꼭 해야 할
+  10가지 체크리스트(보안·법률·품질·검증) ③CI 신설(.github/workflows/ci.yml) — 테스트를 사람이
+  아니라 GitHub가 자동으로 돌림 ④도그푸딩 게이트(만든 문서를 진짜 한글에서 열어보기)·파일럿
+  1명·1-in-1-out 스코프 방어 로드맵 반영 ⑤문서 모순 7건 수리(§4 오참조·깨진 참조·중복 정본).
+  GitHub 계정 설정 4가지(푸시 보호·main 보호 등)는 준하 님이 직접 해야 함 — saas-gates 맨 아래.
 
 ### ➕ 작업 티어 라우팅 (S/M/L) — 작은 수정에 규칙 전체를 적용하지 않기
 - **왜**: 준하 님 지적 — "버튼 모양 수정마저 규칙을 하나하나 파악해야 하면 별로다."

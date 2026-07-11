@@ -1,0 +1,38 @@
+# CI — verify.md 매트릭스의 핵심 2행을 기계가 대신 지킨다 (규칙 부담 축소, saas-gates G8)
+# main 직접 push 워크플로는 유지 — 실패해도 push를 막지 않고 빨간 배지로만 알린다.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            rhwp-studio/package-lock.json
+
+      # root 의존성 (postinstall이 /pkg WASM을 @rhwp/core에서 공급)
+      - name: root npm ci
+        run: npm ci
+
+      # HWPX 7중 검증 (exportCore/importCore 골든 게이트)
+      - name: verify:hwpx
+        run: npm run verify:hwpx
+
+      # rhwp-studio 타입 + 단위(소스 계약 포함 185+)
+      - name: rhwp-studio deps
+        run: npm ci --prefix rhwp-studio
+      - name: rhwp-studio tsc
+        run: npx --prefix rhwp-studio tsc --noEmit -p rhwp-studio
+      - name: rhwp-studio test
+        run: npm test --prefix rhwp-studio

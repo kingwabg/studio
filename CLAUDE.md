@@ -13,6 +13,8 @@
   자동 설치. 포트: **5175**(문서편집기, 자동 실행) · **7700**(rhwp 캔버스 한컴, `npm run dev:rhwp`).
 - **AI 키**: Codespaces Secret `MINIMAX_API_KEY` — vite 프록시(rhwp-studio/vite.config.ts)가
   process.env를 우선 읽으므로 파일 없이 동작. 로컬은 rhwp-studio/.env.local(gitignore).
+- Codespace는 미사용 30일 후 자동 삭제 — 세션을 미커밋 상태로 끝내지 말 것(승인 대기면 WIP
+  브랜치 push 여부를 사용자에게 질문). 저장소 보호·백업 설정은 docs/saas-gates.md 맨 아래 참조.
 - **세션 시작 = 운영 프로토콜**: 이 파일 다음에 `docs/playbooks/agent-protocol.md`를 읽고 거기
   부팅 순서를 따른다(모든 모델 공통 — 낮은 모델일수록 필수). 플레이북은 필요할 때만 로드:
   `traps.md`(함정 사전 — 증상 grep) · `verify.md`(검증 매트릭스+완료 게이트) ·
@@ -147,7 +149,7 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 - `scripts/sync-rhwp-pkg.mjs` — /pkg(WASM)를 @rhwp/core에서 공급(postinstall 자동).
 - `hwpx-export.mjs`·`spreadsheet.jsx`·`resizable-table.jsx` — 초기 실험 자산(참고용).
 
-## 설계 휴리스틱 (thinking-protocol 부록 요약 — 코드 결정 시 적용)
+## 설계 휴리스틱 (코드 결정 시 적용 — 이 절이 정본)
 - H1: 막히면 "현재 데이터 모델로 목표 상태를 직렬화할 수 있는가?" 못 하면 구조를 바꾼다.
 - H2: 요구사항이 도구의 불변식과 충돌하면 버그가 아니라 도구 미스매치다.
 - H4: 진실은 한 곳, 나머지는 파생(useMemo). 동기화 코드가 보이면 설계를 의심.
@@ -201,7 +203,7 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   ⚠ 현재 예산 초과 부채 6종(2026-07-12 [size-override]로 반입): TableKingBlock.jsx·
   CanvasBlock.tsx·LeftPanel.tsx·exportCore.js·CanvasStage.tsx·store.ts — 분리 리팩토링 대기.
 
-## 다음 과제 (우선순위 순)
+## 다음 과제 (정본 = docs/product-spec.md 로드맵 — 어긋나면 spec이 이김. 아래는 스냅샷)
 **rhwp 캔버스 한컴 트랙 (주력)** — 로드맵은 위 rhwp-studio 섹션:
 1. 캔버스 모드 ② 새 문서 기본 여백 0 (화면 좌표 = 내보내기 봉투 원점 일치)
 2. ③ 다중 선택·정렬·복제 (마퀴 드래그, Ctrl+D — rhwp에 다중 그림 선택 이미 있음, 표까지 확장)

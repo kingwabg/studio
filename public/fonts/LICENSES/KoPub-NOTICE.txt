@@ -1,0 +1,12 @@
+KoPub World 서체 (KoPubWorld Batang / KoPubWorld Dotum) 고지
+
+저작권: (사)한국출판인회의(KOPUS) · 문화체육관광부
+공식 배포처: 한국출판인회의 KoPub 서체 페이지 (kopus.org)
+
+이용 조건 요지 (공식 라이선스 기준):
+- 개인·기업 모두 무료 사용, 상업적 이용 허용 (인쇄물·광고물·웹 포함)
+- 서체 파일 자체의 유료 판매 금지, 임의 수정·개작 후 재배포 금지
+- 소프트웨어/웹에 임베드·번들 배포 허용
+
+⚠ TODO (docs/saas-gates.md G6): 공식 배포처에서 라이선스 전문(원문)을 내려받아
+이 폴더에 KoPub-LICENSE.txt 로 추가할 것 — 이 NOTICE는 요지이며 전문 동봉이 원칙.

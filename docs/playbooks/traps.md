@@ -2,7 +2,7 @@
 
 전부 **실측으로 확정된 것만** 수록. 새 함정을 확정하면 여기 "증상 → 원인 → 해법" 3줄로 추가하고,
 서사(어떻게 찾았나)는 docs/rhwp-adoption.md 로그에 남긴다.
-작업 전 이 파일을 증상 키워드로 grep하는 것이 규칙 (agent-protocol.md 작업 루프 1단계).
+작업 전 이 파일을 증상 키워드로 grep하는 것이 규칙 (M/L 티어 — agent-protocol §1-0 티어 라우팅 참조).
 
 ## rhwp-studio 엔진/API
 
