@@ -1,0 +1,62 @@
+/* krds-theme.css — [캔버스 한컴 포크] KRDS 룩 오버라이드 (2026-07-11, 합체 1단계)
+   업스트림 diff 최소화 원칙: 기존 파일은 건드리지 않고 이 파일 하나로 :root 변수만 덮는다
+   (style.css 마지막 @import — 캐스케이드로 승리). 팔레트 = document-studio KRDS 확정값:
+   정부 블루 primary-50 #256EF4 / 60 #0B50D0 / 20 #B1CEFB / 5 #ECF2FE,
+   gray-90 #1E2124 / 70 #464C53 / 50 #6D7882 / 20 #CDD1D5 / 10 #E6E8EA / 5 #F4F5F6,
+   danger #DE3412 · warning #FFB114. 플랫+보더 — 툴바 그라데이션 제거. */
+
+:root {
+  /* 지면·표면 — KRDS 그레이 */
+  --ui-bg: #f4f5f6;
+  --ui-bg-light: #f8f9fa;
+  --ui-surface: #ffffff;
+  --ui-surface-raised: #ffffff;
+  --ui-surface-muted: #e6e8ea;
+  --ui-border: #cdd1d5;
+  --ui-border-light: #e6e8ea;
+  --ui-border-subtle: #e6e8ea;
+  --ui-border-strong: #b1b8be;
+
+  /* 텍스트 */
+  --ui-text: #1e2124;
+  --ui-text-secondary: #464c53;
+  --ui-text-muted: #6d7882;
+  --ui-text-hint: #8a949e;
+
+  /* 상호작용 — 정부 블루 */
+  --ui-hover: #eceef0;
+  --ui-hover-strong: #ecf2fe;
+  --ui-active: #dde3ea;
+  --ui-selected: #ecf2fe;
+  --ui-menu-open: #256ef4;
+  --ui-menu-open-border: #0b50d0;
+  --ui-accent-bg: #ecf2fe;
+  --ui-accent-bg-light: #f4f8fe;
+  --ui-link: #256ef4;
+  --ui-focus-soft: rgba(37, 110, 244, 0.18);
+
+  /* 플랫+보더 — 툴바 그라데이션 소거(양끝 동일값) */
+  --ui-toolbar-bg-start: #ffffff;
+  --ui-toolbar-bg-end: #ffffff;
+
+  /* 시맨틱 */
+  --ui-danger: #de3412;
+  --ui-danger-strong: #de3412;
+  --ui-danger-soft: rgba(222, 52, 18, 0.16);
+  --ui-warning-bg: #fff8e9;
+  --ui-warning-border: #ffb114;
+  --ui-warning-text: #8a6100;
+  --ui-note-bg: #f4f8fe;
+  --ui-note-border: #b1cefb;
+}
+
+/* 다크 — 그레이는 업스트림 다크 유지, 액센트만 정부 블루 톤으로 */
+:root[data-theme-effective="dark"] {
+  --ui-menu-open: #256ef4;
+  --ui-menu-open-border: #4a87f7;
+  --ui-selected: rgba(37, 110, 244, 0.22);
+  --ui-accent-bg: rgba(37, 110, 244, 0.18);
+  --ui-accent-bg-light: rgba(37, 110, 244, 0.1);
+  --ui-link: #7fabf9;
+  --ui-focus-soft: rgba(74, 135, 247, 0.28);
+}

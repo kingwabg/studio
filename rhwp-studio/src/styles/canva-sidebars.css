@@ -1,0 +1,422 @@
+/* ================================================================
+   [캔버스 한컴 포크] 캔바식 좌/우 사이드바
+   좌: 개체 삽입 팔레트 · 우: 속성 인스펙터 + AI (탭)
+   rhwp --ui-* 토큰만 사용 → 라이트/다크 자동. 업스트림 파일 무수정, 신규 CSS.
+   ================================================================ */
+
+/* editor-area를 감싸는 가로 워크스페이스 (좌 레일 · 편집영역 · 우 레일) */
+#canva-workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 편집 영역은 가운데서 늘어나되 0까지 축소 가능 (레일이 폭을 못 밀게) */
+#canva-workspace > #editor-area {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.canva-rail {
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-bg-light);
+  flex-shrink: 0;
+  position: relative;
+  transition: width 0.14s ease;
+}
+.canva-rail--left {
+  width: 176px;
+  border-right: 1px solid var(--ui-border);
+}
+.canva-rail--right {
+  width: 264px;
+  border-left: 1px solid var(--ui-border);
+}
+/* 레일 본문 컨테이너 — 인라인 display 대신 클래스로 둬야 접힘 시 display:none이 이긴다 */
+.canva-rail-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* min-width/flex-basis:0 필수 — 레일은 flex-shrink:0이라 콘텐츠 min-content가 폭을 붙잡는다.
+   손잡이는 레일 밖(absolute)이라 overflow:visible로 남겨 다시 펼칠 수 있게 한다. */
+.canva-rail.is-collapsed { width: 0; min-width: 0; flex-basis: 0; border: none; overflow: visible; }
+.canva-rail.is-collapsed > * { display: none; }
+.canva-rail.is-collapsed > .canva-rail-handle { display: flex; }
+
+/* 접기/펼치기 손잡이 (레일 바깥 가장자리에 얇게) */
+.canva-rail-handle {
+  position: absolute;
+  top: 8px;
+  width: 18px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  z-index: 6;
+  font-size: 11px;
+  user-select: none;
+}
+.canva-rail--left .canva-rail-handle { right: -19px; border-radius: 0 6px 6px 0; border-left: none; }
+.canva-rail--right .canva-rail-handle { left: -19px; border-radius: 6px 0 0 6px; border-right: none; }
+.canva-rail-handle:hover { background: var(--ui-hover); color: var(--ui-text); }
+
+/* 레일 헤더 (탭 or 제목) */
+.canva-rail-head {
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+.canva-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.canva-tab:hover { background: var(--ui-hover); color: var(--ui-text); }
+.canva-tab.is-active {
+  color: var(--ui-link);
+  border-bottom-color: var(--ui-link);
+  background: var(--ui-accent-bg-light);
+}
+.canva-rail-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ui-text-secondary);
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+}
+
+/* 레일 본문 (스크롤) */
+.canva-rail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.canva-pane { display: flex; flex-direction: column; gap: 14px; }
+.canva-pane[hidden] { display: none; }
+
+/* ── 좌: 삽입 팔레트 ── */
+.canva-palette-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.canva-obj-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 6px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--ui-text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: border-color 0.1s, background 0.1s, transform 0.06s;
+}
+.canva-obj-card:hover {
+  border-color: var(--ui-link);
+  background: var(--ui-accent-bg-light);
+  color: var(--ui-text);
+}
+.canva-obj-card:active { transform: scale(0.97); }
+.canva-obj-card svg { width: 26px; height: 26px; stroke: currentColor; }
+.canva-obj-card.is-disabled { opacity: 0.4; pointer-events: none; }
+
+.canva-section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ui-text-hint);
+  margin-bottom: -6px;
+}
+.canva-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ui-text-hint);
+}
+
+/* ── 우: 인스펙터 ── */
+.canva-context-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  background: var(--ui-accent-bg-light);
+  border: 1px solid var(--ui-note-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-text-secondary);
+}
+.canva-context-banner svg { width: 16px; height: 16px; stroke: var(--ui-link); flex-shrink: 0; }
+
+.canva-ins-section { display: flex; flex-direction: column; gap: 8px; }
+.canva-ins-section > .canva-section-label { margin-bottom: 0; }
+
+.canva-btn-row { display: flex; gap: 6px; }
+.canva-icon-btn {
+  flex: 1;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+.canva-icon-btn:hover { background: var(--ui-hover); color: var(--ui-text); }
+.canva-icon-btn.is-active {
+  background: var(--ui-link);
+  border-color: var(--ui-link);
+  color: var(--ui-text-on-accent);
+}
+.canva-icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+.canva-icon-btn i { font-style: normal; }
+
+.canva-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--ui-surface);
+}
+.canva-stepper button {
+  width: 28px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ui-text-muted);
+  font-size: 15px;
+  line-height: 1;
+}
+.canva-stepper button:hover { background: var(--ui-hover); color: var(--ui-text); }
+.canva-stepper input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  border: none;
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ui-text);
+  background: transparent;
+  height: 30px;
+  -moz-appearance: textfield;
+}
+.canva-stepper input::-webkit-outer-spin-button,
+.canva-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.canva-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.canva-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--ui-border);
+  cursor: pointer;
+  padding: 0;
+}
+.canva-swatch:hover { transform: scale(1.1); }
+.canva-swatch.is-active { box-shadow: 0 0 0 2px var(--ui-link); }
+
+.canva-full-btn {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.canva-full-btn:hover { background: var(--ui-hover); border-color: var(--ui-border-strong); color: var(--ui-text); }
+.canva-full-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+
+.canva-ins-empty {
+  font-size: 12px;
+  color: var(--ui-text-hint);
+  line-height: 1.6;
+  text-align: center;
+  padding: 24px 8px;
+}
+
+/* ── 우: AI 패널 ── */
+.canva-ai-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+}
+.canva-ai-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.canva-ai-msg { display: flex; flex-direction: column; gap: 3px; max-width: 100%; }
+.canva-ai-msg .bubble {
+  padding: 8px 11px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.canva-ai-msg.user { align-items: flex-end; }
+.canva-ai-msg.user .bubble { background: var(--ui-link); color: var(--ui-text-on-accent); border-bottom-right-radius: 3px; }
+.canva-ai-msg.ai .bubble { background: var(--ui-surface); border: 1px solid var(--ui-border); color: var(--ui-text); border-bottom-left-radius: 3px; }
+.canva-ai-msg.ai.err .bubble { background: var(--ui-warning-bg); border-color: var(--ui-warning-border); color: var(--ui-warning-text); }
+.canva-ai-actions { display: flex; gap: 6px; margin-top: 4px; }
+.canva-ai-act {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-link);
+  cursor: pointer;
+}
+.canva-ai-act:hover { background: var(--ui-accent-bg-light); }
+.canva-ai-input-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--ui-border);
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  background: var(--ui-surface);
+}
+.canva-ai-input-bar textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+  line-height: 1.4;
+  color: var(--ui-text);
+  background: var(--ui-bg-light);
+  max-height: 96px;
+}
+.canva-ai-input-bar textarea:focus { outline: none; border-color: var(--ui-link); background: var(--ui-surface); }
+.canva-ai-mode {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.canva-ai-mode:hover { background: var(--ui-hover); color: var(--ui-text); }
+.canva-ai-mode.is-gen {
+  background: var(--ui-accent-bg);
+  border-color: var(--ui-note-border);
+  color: var(--ui-link);
+}
+.canva-ai-send {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: none;
+  background: var(--ui-link);
+  color: var(--ui-text-on-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canva-ai-send:disabled { opacity: 0.5; cursor: default; }
+.canva-ai-send svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+.canva-ai-model {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--ui-accent-bg);
+  color: var(--ui-link);
+}
+
+/* ── 메뉴바 우측 캔버스/문서 모드 토글 ── */
+.canva-mode-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 20px;
+}
+.canva-mode-toggle button {
+  border: none;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 10px;
+  height: 100%;
+  cursor: pointer;
+}
+.canva-mode-toggle button + button { border-left: 1px solid var(--ui-border); }
+.canva-mode-toggle button:hover { background: var(--ui-hover); color: var(--ui-text); }
+.canva-mode-toggle button.is-active {
+  background: var(--ui-link);
+  color: var(--ui-text-on-accent);
+}
+
+/* 접힘 상태에서 편집영역이 꽉 차도록 (모바일/좁은 화면) */
+@media (max-width: 900px) {
+  .canva-rail--left { width: 140px; }
+  .canva-rail--right { width: 220px; }
+}
