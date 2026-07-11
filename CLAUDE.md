@@ -14,9 +14,10 @@
 - **AI 키**: Codespaces Secret `MINIMAX_API_KEY` — vite 프록시(rhwp-studio/vite.config.ts)가
   process.env를 우선 읽으므로 파일 없이 동작. 로컬은 rhwp-studio/.env.local(gitignore).
 - **세션 시작 = 운영 프로토콜**: 이 파일 다음에 `docs/playbooks/agent-protocol.md`를 읽고 거기
-  부팅 순서를 따른다(모든 모델 공통 — 낮은 모델일수록 필수). 플레이북 4종은 필요할 때만 로드:
+  부팅 순서를 따른다(모든 모델 공통 — 낮은 모델일수록 필수). 플레이북은 필요할 때만 로드:
   `traps.md`(함정 사전 — 증상 grep) · `verify.md`(검증 매트릭스+완료 게이트) ·
-  `browser-drive.md`(rhwp 실구동 레시피). 역사·상세는 `docs/rhwp-adoption.md`를 grep으로.
+  `browser-drive.md`(rhwp 실구동 레시피) · `debugging.md`(낯선 버그 = 창의적 디버깅 절차서).
+  역사·상세는 `docs/rhwp-adoption.md`를 grep으로.
   슬래시 명령: `/boot`(세션 부팅) · `/done`(완료 게이트) — `.claude/commands/`.
 
 ## 편집 표면 구조 (Strangler Fig — 2단계 진화 중)
