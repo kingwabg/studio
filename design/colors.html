@@ -1,0 +1,42 @@
+<!-- @dsCard group="Colors" -->
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>KRDS 팔레트 — Document Studio</title>
+<style>
+body{font-family:'IBM Plex Sans KR',system-ui,sans-serif;margin:0;padding:20px;background:#fff;color:#1e2124}
+h1{font-size:15px;margin:0 0 4px} p{font-size:11.5px;color:#6d7882;margin:0 0 16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.sw{border:1px solid #e6e8ea;border-radius:8px;overflow:hidden}
+.chip{height:52px} .meta{padding:7px 9px}
+.nm{font-size:11px;font-weight:700} .hx{font-size:10.5px;color:#6d7882;font-family:ui-monospace,monospace}
+.use{font-size:10px;color:#8a949e;margin-top:2px}
+h2{font-size:12px;color:#464c53;margin:18px 0 8px}
+.ban{margin-top:16px;padding:8px 11px;border:1px solid #f5c6bc;background:#fdf1ee;border-radius:8px;font-size:11px;color:#8a2410}
+</style></head><body>
+<h1>KRDS 팔레트 — 디자인 정본</h1>
+<p>정격 출처: krds.go.kr · 확정 2026-07-11. 값의 정본은 저장소 design/tokens.md — 여기는 시각 미러.</p>
+<h2>Primary (정부 블루)</h2>
+<div class="grid">
+<div class="sw"><div class="chip" style="background:#256EF4"></div><div class="meta"><div class="nm">primary-50</div><div class="hx">#256EF4</div><div class="use">액센트·링크·포커스</div></div></div>
+<div class="sw"><div class="chip" style="background:#0B50D0"></div><div class="meta"><div class="nm">primary-60</div><div class="hx">#0B50D0</div><div class="use">hover·액센트 텍스트</div></div></div>
+<div class="sw"><div class="chip" style="background:#B1CEFB"></div><div class="meta"><div class="nm">primary-20</div><div class="hx">#B1CEFB</div><div class="use">연한 강조 보더</div></div></div>
+<div class="sw"><div class="chip" style="background:#ECF2FE"></div><div class="meta"><div class="nm">primary-5</div><div class="hx">#ECF2FE</div><div class="use">틴트 배경</div></div></div>
+</div>
+<h2>Gray</h2>
+<div class="grid">
+<div class="sw"><div class="chip" style="background:#1E2124"></div><div class="meta"><div class="nm">gray-90</div><div class="hx">#1E2124</div><div class="use">본문 잉크</div></div></div>
+<div class="sw"><div class="chip" style="background:#464C53"></div><div class="meta"><div class="nm">gray-70</div><div class="hx">#464C53</div><div class="use">보조 텍스트</div></div></div>
+<div class="sw"><div class="chip" style="background:#6D7882"></div><div class="meta"><div class="nm">gray-50</div><div class="hx">#6D7882</div><div class="use">섹션 제목·힌트</div></div></div>
+<div class="sw"><div class="chip" style="background:#B1B8BE"></div><div class="meta"><div class="nm">gray-30</div><div class="hx">#B1B8BE</div><div class="use">트랙·비활성</div></div></div>
+<div class="sw"><div class="chip" style="background:#CDD1D5"></div><div class="meta"><div class="nm">gray-20</div><div class="hx">#CDD1D5</div><div class="use">필드 보더</div></div></div>
+<div class="sw"><div class="chip" style="background:#E6E8EA"></div><div class="meta"><div class="nm">gray-10</div><div class="hx">#E6E8EA</div><div class="use">헤어라인</div></div></div>
+<div class="sw"><div class="chip" style="background:#F4F5F6"></div><div class="meta"><div class="nm">gray-5</div><div class="hx">#F4F5F6</div><div class="use">세그먼트 배경</div></div></div>
+</div>
+<h2>Semantic</h2>
+<div class="grid">
+<div class="sw"><div class="chip" style="background:#DE3412"></div><div class="meta"><div class="nm">danger</div><div class="hx">#DE3412</div><div class="use">위험·삭제</div></div></div>
+<div class="sw"><div class="chip" style="background:#FFB114"></div><div class="meta"><div class="nm">warning</div><div class="hx">#FFB114</div><div class="use">경고</div></div></div>
+<div class="sw"><div class="chip" style="background:#228738"></div><div class="meta"><div class="nm">success</div><div class="hx">#228738</div><div class="use">성공</div></div></div>
+<div class="sw"><div class="chip" style="background:#0B78CB"></div><div class="meta"><div class="nm">info</div><div class="hx">#0B78CB</div><div class="use">정보</div></div></div>
+<div class="sw"><div class="chip" style="background:#D63D4A"></div><div class="meta"><div class="nm">point</div><div class="hx">#D63D4A</div><div class="use">포인트</div></div></div>
+</div>
+<div class="ban">⚠ 금지: #dc3545(부트스트랩 빨강 — danger는 #DE3412), 그라데이션, 과한 그림자, 이모지 아이콘</div>
+</body></html>

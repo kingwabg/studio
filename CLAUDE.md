@@ -155,13 +155,13 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 ## 코딩 규칙
 - 디자인 토큰은 `T` 객체 하나로 통일 (잉크 #1A2233, 문서 블루 #2B5CE6, 헤어라인 #E4E8EF).
   에디터 신규 UI는 KRDS 룩(정부 블루 #256EF4·플랫+보더) — rhwp-studio는 krds-theme.css.
-- **디자인 구현은 정본 대조 → 카탈로그 동기화** (2026-07-12 신설, 사용자 제안): UI를 새로
-  만들거나 룩을 바꿀 때 ①구현 전 디자인 정본 확인 — inspector-kit.tsx(인스펙터 프리미티브)·
-  krds-theme.css(색/토큰)·DesignSync 카탈로그(도구 가능 환경: list_files로 유사 컴포넌트 카드
-  검색, 있으면 그 스펙 재사용 — 새로 짓지 말 것) ②구현 후 새/변경 컴포넌트 미리보기를
-  DesignSync 카드로 동기화 ③도구가 없는 환경(CLI 등)이면 스킵하되 완료 보고에 "디자인 카탈로그
-  미동기화" 명시. ⚠ 카탈로그 프로젝트 미생성 상태(2026-07-12) — 첫 UI 작업 때 create_project로
-  부트스트랩하고 이 줄의 ⚠를 지울 것.
+- **디자인 구현은 정본 대조 → 카탈로그 동기화** (2026-07-12 신설, 사용자 제안): 디자인 값의
+  **정본 = `design/tokens.md`** (팔레트·사용처 지도·표면별 크기 번역·알려진 표류). UI를 새로
+  만들거나 룩을 바꿀 때 ①구현 전 design/tokens.md + design/*.html 카드에서 유사 컴포넌트 확인
+  — 있으면 그 스펙 재사용, 새로 짓지 말 것. 색을 지어내지 말고 표에 없으면 표부터 추가.
+  ②구현 후 값 변경이 있으면 tokens.md 먼저 갱신 → 사용처 전파, 새/변경 컴포넌트는 카드에 반영
+  후 DesignSync로 동기화(도구 가능 환경 — claude.ai/design "Document Studio 디자인 시스템").
+  ③DesignSync 없는 환경(CLI 등)은 카드 파일만 갱신하고 보고에 "카탈로그 미러 미동기화" 명시.
 - 아이콘은 이모지 금지, 인라인 SVG(1.4px 스트로크)만.
 - 클래스명은 Tailwind 유틸리티명과 겹치면 안 됨(`table-row`·`table-cell`·`grid`·`hidden` 등) —
   utilities-only 주입이라 display가 덮여 레이아웃이 깨진다. 접두사(tk-, canva- 등)로 격리.

@@ -1,0 +1,33 @@
+<!-- @dsCard group="Type" -->
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>타이포·인스펙터 스케일 — Document Studio</title>
+<style>
+body{font-family:'IBM Plex Sans KR',system-ui,sans-serif;margin:0;padding:20px;background:#fff;color:#1e2124}
+h1{font-size:15px;margin:0 0 4px} p{font-size:11.5px;color:#6d7882;margin:0 0 14px}
+table{border-collapse:collapse;width:100%;font-size:11.5px}
+th{font-size:10.5px;color:#6d7882;text-align:left;padding:6px 8px;border-bottom:1px solid #cdd1d5}
+td{padding:7px 8px;border-bottom:1px solid #e6e8ea;vertical-align:middle}
+.spec{font-family:ui-monospace,monospace;font-size:10.5px;color:#464c53}
+h2{font-size:12px;color:#464c53;margin:16px 0 8px}
+.note{font-size:10.5px;color:#8a949e;margin-top:10px}
+</style></head><body>
+<h1>타이포·인스펙터 스케일</h1>
+<p>KRDS 정격(17px 본문/56px 인풋)은 민원사이트용 — 에디터 밀도로 번역한 값이 정본. (design/tokens.md §3)</p>
+<h2>/studio 인스펙터 (inspector-kit.tsx가 코드 정본)</h2>
+<table>
+<tr><th>역할</th><th>미리보기</th><th>스펙</th></tr>
+<tr><td>섹션 제목</td><td><span style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#6d7882">모양</span></td><td class="spec">11px / 700 / tracking .08em / gray-50</td></tr>
+<tr><td>필드 라벨</td><td><span style="font-size:10.5px;font-weight:700;color:#464c53">W</span></td><td class="spec">10.5px / 700 / gray-70</td></tr>
+<tr><td>값·입력</td><td><span style="font-size:12.5px;font-weight:600;color:#1e2124">210.0</span></td><td class="spec">12.5px / 600 / gray-90 · 필드 36px r9</td></tr>
+<tr><td>토글 라벨</td><td><span style="font-size:11.5px;font-weight:600;color:#1e2124">안내문</span></td><td class="spec">11.5px / 600</td></tr>
+<tr><td>탭</td><td><span style="font-size:11.5px;font-weight:700;background:#fff;border:1px solid #cdd1d5;border-radius:6px;padding:2px 10px">속성</span></td><td class="spec">11.5px / active 700 / r6</td></tr>
+<tr><td>힌트</td><td><span style="font-size:11.5px;color:#6d7882">준비 중</span></td><td class="spec">11.5px / gray-50</td></tr>
+</table>
+<h2>rhwp 캔바 사이드바 (canva-sidebars.css)</h2>
+<table>
+<tr><th>역할</th><th>미리보기</th><th>스펙</th></tr>
+<tr><td>섹션 라벨</td><td><span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:#8a949e">개체 삽입</span></td><td class="spec">10.5px / 700 / uppercase</td></tr>
+<tr><td>버튼·칩</td><td><span style="font-size:11.5px;font-weight:600;border:1px solid #cdd1d5;border-radius:8px;padding:4px 10px;color:#464c53">글상자</span></td><td class="spec">11.5px / 600 / r6~8 / 높이 30~34px</td></tr>
+<tr><td>모드 칩(활성)</td><td><span style="font-size:11px;font-weight:700;background:#ecf2fe;border:1px solid #b1cefb;border-radius:8px;padding:3px 10px;color:#256ef4">문서 생성</span></td><td class="spec">11px / 700 / primary-5 배경 + primary-50 텍스트</td></tr>
+</table>
+<p class="note">포커스 공통: 보더 #256EF4 + 3px halo rgba(37,110,244,.15) · 패널 폭 — /studio 276px, 캔바 좌 176/우 264px</p>
+</body></html>
