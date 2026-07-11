@@ -17,7 +17,8 @@
   부팅 순서를 따른다(모든 모델 공통 — 낮은 모델일수록 필수). 플레이북은 필요할 때만 로드:
   `traps.md`(함정 사전 — 증상 grep) · `verify.md`(검증 매트릭스+완료 게이트) ·
   `browser-drive.md`(rhwp 실구동 레시피) · `debugging.md`(낯선 버그 = 창의적 디버깅 절차서).
-  역사·상세는 `docs/rhwp-adoption.md`를 grep으로.
+  역사·상세는 `docs/rhwp-adoption.md`를 grep으로. **규칙 문서를 고치면 `playbooks/CHANGELOG.md`
+  맨 위에 항목 필수**(날짜·무엇·왜·쉽게 말하면 — 초보자용 이력, 2026-07-12 신설).
   슬래시 명령: `/boot`(세션 부팅) · `/done`(완료 게이트) — `.claude/commands/`.
 
 ## 편집 표면 구조 (Strangler Fig — 2단계 진화 중)
