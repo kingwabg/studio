@@ -1,0 +1,21 @@
+{
+  "name": "Document Studio",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "postCreateCommand": "npm ci",
+  "postAttachCommand": "npx vite --host 0.0.0.0 --port 5175",
+  "forwardPorts": [5175],
+  "portsAttributes": {
+    "5175": {
+      "label": "Document Studio",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}
