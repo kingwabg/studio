@@ -8,6 +8,8 @@ import type { CanvaServices } from './canva-services';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
 import { callMiniMax, aiErrorHint } from './canva-ai-client';
 import { mkEl, mkButton } from './canva-dom';
+import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
+import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
 const SYSTEM_PROMPT =
   '당신은 한국어 문서(HWPX) 편집을 돕는 작성 도우미입니다. ' +
   '사용자의 요청에 따라 문서에 바로 넣을 수 있는 깔끔한 한국어 본문 텍스트를 작성하세요. ' +
@@ -45,6 +47,13 @@ export class CanvaAiPanel {
     this.pushMsg({ role: 'ai', text: '안녕하세요! 만들 문서를 말씀해 주세요 — 지면 위에 제목·본문·표를 배치해 드립니다.\n예) "주간 회의록 만들어줘", "출장 보고서 양식"\n(칩을 눌러 일반 글쓰기 모드로 바꿀 수 있어요)' });
 
     const bar = mkEl('div', 'canva-ai-input-bar');
+    // 문서 전체 검토 버튼 — 프롬프트가 아니라 버튼 동작(수집→동의→검토→findings 리스트)이라 별도 진입점.
+    const reviewBtn = mkButton('canva-ai-review-btn', {
+      title: '문서 전체 검토 (표현·오탈자)',
+      html: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+    });
+    reviewBtn.addEventListener('click', () => void this.reviewFlow());
+    bar.appendChild(reviewBtn);
     // 문서 생성(배치) ↔ 일반 글쓰기 모드 칩
     this.modeChip = mkButton('canva-ai-mode');
     this.modeChip.addEventListener('click', () => {
@@ -165,6 +174,55 @@ export class CanvaAiPanel {
     copy.addEventListener('click', () => { void navigator.clipboard?.writeText(text); });
     actions.append(insert, copy);
     msgEl.appendChild(actions);
+  }
+
+  // 로그에 빈 컨테이너 버블 하나 추가 (검토 UI가 여기에 렌더) — pushMsg는 텍스트 전용이라 별도.
+  private pushPanel(): HTMLElement {
+    const el = mkEl('div', 'canva-ai-msg ai');
+    const bubble = mkEl('div', 'bubble');
+    el.appendChild(bubble);
+    this.log.appendChild(el);
+    this.log.scrollTop = this.log.scrollHeight;
+    return bubble;
+  }
+
+  // 문서 전체 검토 흐름: 수집 → 전송 동의 → 검토 → findings 리스트(각 적용=스냅샷).
+  // 검토는 문서 전체를 보내는 기능이라, 전송 전 "보낼 내용"을 명시하고 동의를 받는다(원칙 2).
+  private async reviewFlow(): Promise<void> {
+    if (this.busy || this.services.wasm.pageCount === 0) return;
+    const elements = gatherTextElements(this.services);
+    if (!elements.length) {
+      this.pushMsg({ role: 'ai', text: '검토할 글상자가 없습니다. 먼저 글상자를 만들어 주세요.' });
+      return;
+    }
+    const chars = elements.reduce((s, e) => s + e.text.length, 0);
+    const card = this.pushPanel();
+    renderSendPreview(card, { count: elements.length, chars }, {
+      onCancel: () => card.remove(),
+      onConfirm: () => void this.runReview(card),
+    });
+  }
+
+  private async runReview(card: HTMLElement): Promise<void> {
+    card.remove();
+    this.setBusy(true);
+    const thinking = this.pushMsg({ role: 'ai', text: '문서 검토 중…' });
+    try {
+      const result = await runDocReview(this.services);
+      thinking.remove();
+      const list = this.pushPanel();
+      renderReviewFindings(list, result, {
+        onApply: (f) => { applyFinding(this.services, f, result.elements); },
+        onIgnore: () => { /* UI에서 행 상태만 갱신 */ },
+        onJumpTo: (f) => { jumpToElement(this.services, f, result.elements); },
+      });
+    } catch (e) {
+      thinking.remove();
+      const detail = e instanceof Error ? e.message : String(e);
+      this.pushMsg({ role: 'ai', err: true, text: `문서 검토에 실패했습니다.\n${detail}${aiErrorHint(detail)}` });
+    } finally {
+      this.setBusy(false);
+    }
   }
 
   private async callModel(userText: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {

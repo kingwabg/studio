@@ -378,6 +378,23 @@
 }
 .canva-ai-send:disabled { opacity: 0.5; cursor: default; }
 .canva-ai-send svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+/* 문서 전체 검토 버튼 — 중립(테두리) 아이콘 버튼, 보내기(강조)와 구분 */
+.canva-ai-review-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-link);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canva-ai-review-btn:hover { background: var(--ui-accent-bg-light); }
+.canva-ai-review-btn:disabled { opacity: 0.5; cursor: default; }
+.canva-ai-review-btn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
 .canva-ai-model {
   font-size: 10px;
   font-weight: 700;
