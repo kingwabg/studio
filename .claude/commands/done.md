@@ -1,4 +1,6 @@
-완료 게이트 실행. docs/playbooks/verify.md 의 매트릭스대로:
+완료 게이트 실행. 먼저 티어 확인(agent-protocol §1-0):
+**S 경량 작업이면** 간이 게이트만 — 전/후 확인 1개 + "S 티어: 색은 tokens.md 준수" 한 줄 보고 후 종료.
+**M/L이면** docs/playbooks/verify.md 의 매트릭스대로:
 
 1. 이번 변경이 닿은 영역의 필수 검증을 **실제로 실행**한다
    (rhwp 소스면 `cd rhwp-studio && npx tsc --noEmit && npm test`, src/hwpx면 `npm run verify:hwpx`,
