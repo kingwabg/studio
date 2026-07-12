@@ -120,8 +120,10 @@
    속성 인스펙터와 AI 패널이 동시에 뜨던 버그 수정(속성/AI 탭이 서로를 안 가림).
    AI 래퍼 레이아웃도 여기서(인라인 display였으면 [hidden]을 이겨 안 숨음). */
 .canva-ai-pane-wrap { flex: 1; display: flex; min-height: 0; }
+.canva-record-pane-wrap { flex: 1; display: flex; min-height: 0; }
 .canva-rail-body[hidden],
-.canva-ai-pane-wrap[hidden] { display: none; }
+.canva-ai-pane-wrap[hidden],
+.canva-record-pane-wrap[hidden] { display: none; }
 
 /* ── 좌: 삽입 팔레트 ── */
 .canva-palette-grid {
@@ -430,6 +432,109 @@
   border-radius: 20px;
   background: var(--ui-accent-bg);
   color: var(--ui-link);
+}
+
+/* ── 우: 녹음(STT→회의록, P1-9) ── */
+.canva-record-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.canva-record-idle,
+.canva-record-consent,
+.canva-record-bar,
+.canva-record-transcript-wrap,
+.canva-record-result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* [캔버스 한컴 포크] 상태 전환 hidden 처리 — 인라인 display 대신 클래스+[hidden] 규칙
+   (이 파일 상단 canva-rail-body/canva-ai-pane-wrap과 동일 패턴: 인라인 display는 [hidden]을 이겨
+   패널이 겹쳐 보인다 — 실사고 있음. 새 래퍼도 반드시 이 목록에 등록). */
+.canva-record-idle[hidden],
+.canva-record-consent[hidden],
+.canva-record-bar[hidden],
+.canva-record-transcript-wrap[hidden],
+.canva-record-result-actions[hidden],
+.canva-icon-btn[hidden] { display: none; }
+
+.canva-record-consent {
+  border: 1px solid var(--ui-note-border);
+  border-radius: 8px;
+  background: var(--ui-accent-bg-light);
+  padding: 12px 14px;
+}
+.canva-record-consent-title { font-size: 12.5px; font-weight: 700; color: var(--ui-text); }
+.canva-record-consent-body { font-size: 12px; line-height: 1.5; color: var(--ui-text-secondary); }
+.canva-record-consent-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.canva-record-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  cursor: pointer;
+}
+.canva-record-btn:hover { background: var(--ui-hover); }
+.canva-record-btn-primary {
+  border: none;
+  background: var(--ui-link);
+  color: var(--ui-text-on-accent);
+  font-weight: 700;
+}
+.canva-record-btn-primary:hover { filter: brightness(0.96); background: var(--ui-link); }
+
+.canva-record-bar {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+}
+.canva-record-status { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--ui-text-secondary); }
+.canva-record-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ui-text-hint); flex-shrink: 0; }
+.canva-record-dot.is-live { background: var(--ui-danger); animation: canva-record-blink 1.2s ease-in-out infinite; }
+@keyframes canva-record-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.canva-record-controls { display: flex; gap: 6px; }
+.canva-record-controls .canva-icon-btn { flex: 0 0 30px; }
+
+.canva-record-textarea {
+  min-height: 160px;
+  resize: vertical;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+  line-height: 1.55;
+  color: var(--ui-text);
+  background: var(--ui-bg-light);
+}
+.canva-record-textarea:focus { outline: none; border-color: var(--ui-link); background: var(--ui-surface); }
+.canva-record-interim {
+  font-size: 12px;
+  color: var(--ui-text-hint);
+  font-style: italic;
+  min-height: 1.4em;
+}
+.canva-record-result-actions { padding-top: 10px; border-top: 1px solid var(--ui-border); }
+.canva-record-genresult { display: flex; flex-direction: column; gap: 8px; }
+.canva-record-err {
+  font-size: 12px;
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-bg);
+  border: 1px solid var(--ui-warning-border);
+  border-radius: 6px;
+  padding: 8px 10px;
 }
 
 /* ── 메뉴바 우측 캔버스/문서 모드 토글 ── */
