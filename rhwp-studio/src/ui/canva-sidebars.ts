@@ -7,6 +7,7 @@ import type { CanvaServices } from './canva-services';
 import { CanvaLeftPalette } from './canva-left-palette';
 import { CanvaRightInspector } from './canva-right-inspector';
 import { CanvaAiPanel } from './canva-ai-panel';
+import { CanvaRecordPanel } from './canva-record-panel';
 import { mkEl, mkButton } from './canva-dom';
 
 let mounted = false;
@@ -36,19 +37,24 @@ export function mountCanvaSidebars(services: CanvaServices): void {
   left.setTitle('삽입');
   new CanvaLeftPalette(left.body, services);
 
-  // 우: [속성] 인스펙터 + [AI] 탭 — buildRail이 만든 body를 인스펙터 창으로 재사용(잉여 노드 방지)
+  // 우: [속성] 인스펙터 + [AI] + [녹음] 탭 — buildRail이 만든 body를 인스펙터 창으로 재사용(잉여 노드 방지)
   const inspectorPane = right.body;
-  // ⚠ 레이아웃은 CSS 클래스로 — 인라인 display:flex는 [hidden] 규칙을 이겨 AI 탭이 안 숨는다.
+  // ⚠ 레이아웃은 CSS 클래스로 — 인라인 display:flex는 [hidden] 규칙을 이겨 탭이 안 숨는다.
   const aiPane = mkEl('div', 'canva-ai-pane-wrap');
   aiPane.hidden = true;
   right.content.append(aiPane);
+  const recordPane = mkEl('div', 'canva-record-pane-wrap');
+  recordPane.hidden = true;
+  right.content.append(recordPane);
 
   new CanvaRightInspector(inspectorPane, services);
   const ai = new CanvaAiPanel(aiPane, services);
+  new CanvaRecordPanel(recordPane, services);
 
-  const tabs = right.setTabs(['속성', 'AI'], (idx) => {
+  const tabs = right.setTabs(['속성', 'AI', '녹음'], (idx) => {
     inspectorPane.hidden = idx !== 0;
     aiPane.hidden = idx !== 1;
+    recordPane.hidden = idx !== 2;
   });
   // AI 탭에 모델 배지 부착
   tabs[1].appendChild(ai.getModelBadge());
