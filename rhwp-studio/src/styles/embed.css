@@ -1,0 +1,52 @@
+/* embed.css — [캔버스 한컴 포크] 임베드 모드.
+ *
+ * URL ?embed=1 이면 main.ts가 #studio-root에 .embed-mode를 붙인다. 그러면 rhwp 크롬
+ * (메뉴바·아이콘툴바·눈금자·상태바)을 숨기고 서식 리본(#style-bar)+문서(#scroll-container)만
+ * 남긴다 — 판매 페이지가 iframe으로 rhwp를 "이 리본만" 최소 껍데기로 임베드하는 용도.
+ * rhwp 엔진·문서 모델·A4 지면은 그대로. 삽입(표·이미지·모양·링크)은 메뉴/툴바가 숨겨지므로
+ * 스타일바에 붙인 .sb-insert 버튼으로 노출(main.ts에서 data-cmd 배선).
+ */
+
+/* 크롬 숨김 */
+.embed-mode #menu-bar,
+.embed-mode #icon-toolbar,
+.embed-mode #ruler-corner,
+.embed-mode #h-ruler,
+.embed-mode #v-ruler,
+.embed-mode #status-bar {
+  display: none !important;
+}
+
+/* 눈금자를 숨겼으니 눈금자 트랙(20px)을 0으로 접어 문서가 처음부터 채우게.
+   (2트랙 구조는 유지 — #scroll-container가 2번째 행/열에 배치돼 있어 단일 트랙으로 바꾸면 어긋남) */
+.embed-mode #editor-area {
+  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-rows: 0 minmax(0, 1fr);
+}
+
+/* 스타일바 삽입 버튼 — 기본(일반 rhwp)에서는 숨기고, 임베드 모드에서만 노출 */
+.sb-insert,
+.sb-insert-sep {
+  display: none;
+}
+.embed-mode .sb-insert-sep {
+  display: inline-block;
+}
+.embed-mode .sb-insert {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  font-size: var(--font-size-base);
+  white-space: nowrap;
+}
+.embed-mode .sb-insert:hover {
+  background: var(--ui-hover-strong);
+  border-color: var(--ui-border-light);
+}

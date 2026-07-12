@@ -298,6 +298,13 @@ async function initialize(): Promise<void> {
     );
     inputHandler.setEditMode(editMode);
 
+    // [캔버스 한컴 포크] 임베드 모드 — URL ?embed=1 이면 studio-root에 embed-mode 클래스를 붙여
+    // 크롬(메뉴바·아이콘툴바·눈금자·상태바)을 숨기고 서식 리본(style-bar)만 남긴다(판매 페이지
+    // iframe 임베드용). CSS = styles/embed.css. 스타일바의 삽입 버튼(sb-insert)도 이때만 노출.
+    if (new URLSearchParams(location.search).has('embed')) {
+      document.getElementById('studio-root')?.classList.add('embed-mode');
+    }
+
     toolbar = new Toolbar(document.getElementById('style-bar')!, wasm, eventBus, dispatcher);
     toolbar.setEnabled(false);
 
@@ -326,6 +333,16 @@ async function initialize(): Promise<void> {
 
     // 툴바 내 data-cmd 버튼 클릭 → 커맨드 디스패치
     document.querySelectorAll('.tb-btn[data-cmd]').forEach(btn => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const cmd = (btn as HTMLElement).dataset.cmd;
+        if (cmd) dispatcher.dispatch(cmd, { anchorEl: btn as HTMLElement });
+      });
+    });
+
+    // [캔버스 한컴 포크] 임베드 모드 스타일바 삽입 버튼(표·이미지·모양·링크) → 커맨드 디스패치.
+    // 아이콘 툴바와 동일 규약(mousedown+preventDefault, anchorEl로 그리드/도형 피커 위치).
+    document.querySelectorAll('#style-bar .sb-insert[data-cmd]').forEach(btn => {
       btn.addEventListener('mousedown', (e) => {
         e.preventDefault();
         const cmd = (btn as HTMLElement).dataset.cmd;
