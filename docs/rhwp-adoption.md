@@ -124,6 +124,16 @@
     늘리기/줄이기 모두. 줄이기는 최소 셀(200 HWPUNIT) 클램프. (지난 턴 구현 — shrink 이미 동작.)
   검증: 실코드 하네스 **11/11**(스냅 eps·clamp 밖 무시·Alt·최근접 + e/s/se 늘리기·줄이기·클램프)
   + rhwp-studio tsc 클린 + dev 서버 파싱 무오류. UI 체감은 사용자 확인 필요.
+- **표 hover 핸들 — Alt 없이 표 선택 + 리사이즈** ✅ (2026-07-12, 사용자 설계). 캔버스 모드에서
+  표 hover → 외곽선 + 흰 네모 8핸들. 핸들 클릭=표 전체 선택, e/s/se 드래그=리사이즈(기존
+  startTableHandleResize 재사용), 핸들 아닌 안쪽=셀 텍스트 편집. 신규 engine/table-hover-handles.ts
+  (오버레이, 핸들만 pointer-events:auto). 핵심: 핸들 mousedown → onTableHoverHandleGrab이
+  selectTableObject(export) + startTableHandleResize 호출 → **거대 onClick 핫스팟 무수정**.
+  ⚠ #scroll-content 재생성 대응(리스너 container·ensureAttached). 이전 폐기 2건(단일 ⊹ 핸들
+  침범적 / 테두리 10px 텍스트 방해)의 대체 — 흰 네모는 모서리/변 8px라 셀 텍스트와 안 겹침.
+  **⭐ 실측**: 2×3 표 hover→외곽선+8핸들(방향별 커서) / nw클릭→선택(hover숨김) / se드래그→
+  559×34→619×74(델타 +60·+40) / 셀 안쪽 클릭→elementFromPoint=CANVAS·표선택 안됨·커서 셀 안.
+  tsc 0·185/185. (절제판=모서리만은 노이즈 보이면 후속.)
 - **4단계 캔버스 UX ②-수정: 외곽 핸들 = 전체 "비례" 스케일** ✅ (2026-07-11, 사용자 보고 이미지
   — 표 늘리면 아래 행 하나만 거대해짐). 초판이 마지막 행/열에만 델타를 몰아넣은 게 근본 오류.
   전면 재작성: e(너비 전체)·s(높이 전체)·se(대각 전체) 모두 **모든 셀을 같은 비율 sx/sy로 스케일**
