@@ -31,6 +31,9 @@ import { getAssetUrl, putAsset } from "../document/assets";
 import { SCALE } from "../canvas/geometry";
 import { IcImage, IcTable } from "../../ui/icons";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
+// [레거시 제거 재배선 2026-07-13] 예전엔 DocumentStudio/CanvasBlock이 이 CSS를 전역 로드해줬으나
+// 그것들을 지우면서 고아가 됨 → 임베드 표 스타일 유지를 위해 여기서 직접 로드.
+import "../../table-king/table-king.css";
 
 const TK_THEME: React.CSSProperties = {
   "--tk-ink": "#1A2233", "--tk-ink-soft": "#5B6577", "--tk-ink-faint": "#98A2B3",
