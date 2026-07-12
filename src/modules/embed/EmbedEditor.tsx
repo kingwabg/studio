@@ -15,7 +15,40 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
+
+// [A4 룩 2026-07-13] 리본+A4 페이지 프레젠테이션 래퍼. 모듈 레벨이라 참조가 안정적 →
+// contentEditable 리마운트 없음. a4=false면 그대로 통과(유연한 임베드 유지).
+function EditorPage({ a4, children }: { a4: boolean; children: ReactNode }) {
+  if (!a4) return <>{children}</>;
+  return (
+    <div className="overflow-y-auto bg-canvas px-6 py-7 flex justify-center" style={{ maxHeight: 640 }}>
+      <div
+        className="bg-surface shrink-0 w-full"
+        style={{ maxWidth: 794, minHeight: 1123, padding: "76px 84px", boxShadow: "0 2px 22px rgba(16,24,40,.14)" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// [A4 룩 2026-07-13] 한컴식 리본 그룹: 버튼 묶음 + (문서 모드에서만) 하단 그룹 라벨.
+// a4=false(임베드)면 라벨을 감춰 콤팩트 유지 — 폼에 붙는 흐름형 용도를 해치지 않음.
+function RibbonGroup({ label, showLabel, children }: { label: string; showLabel: boolean; children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex items-center gap-px">{children}</div>
+      {showLabel && <span className="text-[10px] leading-none text-inkfaint tracking-wide select-none">{label}</span>}
+    </div>
+  );
+}
+// 그룹 사이 세로 구분선 — 라벨 유무와 무관하게 그룹 높이에 맞춰 늘어남(한컴 리본 느낌).
+function RibbonDiv() {
+  return <span className="w-px self-stretch bg-line mx-1 my-0.5" />;
+}
+
 import {
   type Block,
   type ParaListType,
@@ -31,6 +64,9 @@ import { getAssetUrl, putAsset } from "../document/assets";
 import { SCALE } from "../canvas/geometry";
 import { IcImage, IcTable } from "../../ui/icons";
 import { TableKingBlock, makeTableKingData, tableDataToRows } from "../../table-king/TableKingBlock.jsx";
+// [레거시 제거 재배선 2026-07-13] 예전엔 DocumentStudio/CanvasBlock이 이 CSS를 전역 로드해줬으나
+// 그것들을 지우면서 고아가 됨 → 임베드 표 스타일 유지를 위해 여기서 직접 로드.
+import "../../table-king/table-king.css";
 
 const TK_THEME: React.CSSProperties = {
   "--tk-ink": "#1A2233", "--tk-ink-soft": "#5B6577", "--tk-ink-faint": "#98A2B3",
@@ -54,6 +90,8 @@ export interface EmbedEditorHandle {
 export interface EmbedEditorProps {
   placeholder?: string;
   minHeight?: number;
+  /** true면 리본 + A4 페이지 룩(문서 에디터). 기본 false = 유연한 임베드(폼에 붙는 흐름형). */
+  a4?: boolean;
   className?: string;
   onChange?: (blocks: EmbedBlock[]) => void;
 }
@@ -192,7 +230,7 @@ function EmbedTableBlock({
 
 // ── 블록 스택 컨테이너 ──
 export const EmbedEditor = forwardRef<EmbedEditorHandle, EmbedEditorProps>(function EmbedEditor(
-  { placeholder = "내용을 입력하세요…", minHeight = 220, className, onChange },
+  { placeholder = "내용을 입력하세요…", minHeight = 220, a4 = false, className, onChange },
   ref
 ) {
   const [blocks, setBlocks] = useState<EmbedBlock[]>(() => [
@@ -292,56 +330,66 @@ export const EmbedEditor = forwardRef<EmbedEditorHandle, EmbedEditorProps>(funct
   const HIGHLIGHTS = ["#FDF3B4", "#DBEAFE", ""];
 
   return (
-    <div className={`border border-line rounded-xl bg-surface overflow-hidden ${className ?? ""}`}>
-      {/* ── 고정 툴바 ── */}
-      <div className="flex items-center gap-px flex-wrap px-2 py-1.5 border-b border-line bg-paper/60">
-        <button className="w-7 h-7 rounded-md flex items-center justify-center text-inksoft hover:bg-paper font-bold" title="실행취소" onClick={() => h()?.undo()} disabled={!focusedIsText}>↶</button>
-        <button className="w-7 h-7 rounded-md flex items-center justify-center text-inksoft hover:bg-paper font-bold" title="재실행" onClick={() => h()?.redo()} disabled={!focusedIsText}>↷</button>
-        <span className="w-px h-4 bg-line mx-1" />
-        <button className={`${tb(fmt.bold)} font-extrabold`} title="굵게" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ bold: fmt.bold ? undefined : true })}>가</button>
-        <button className={`${tb(fmt.italic)} italic`} title="기울임" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ italic: fmt.italic ? undefined : true })}>가</button>
-        <button className={`${tb(fmt.underline)} underline underline-offset-2`} title="밑줄" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ underline: fmt.underline ? undefined : true })}>가</button>
-        <button className={`${tb(fmt.strike)} line-through`} title="취소선" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ strike: fmt.strike ? undefined : true })}>가</button>
-        <span className="w-px h-4 bg-line mx-1" />
-        {COLORS.map((c) => (
-          <button key={c} title={`글자색 ${c}`} onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ color: c })}
-            className={`w-[16px] h-[16px] rounded-full mx-[2px] hover:scale-110 transition-transform ${!focusedIsText ? "opacity-40 pointer-events-none" : ""}`}
-            style={{ backgroundColor: c, boxShadow: "0 0 0 1px rgba(16,24,40,.15)" }} />
-        ))}
-        <span className="w-px h-4 bg-line mx-1" />
-        {HIGHLIGHTS.map((c) => (
-          <button key={c || "none"} title={c ? `형광펜 ${c}` : "형광펜 지우기"} onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ bg: c || undefined })}
-            className={`w-[16px] h-[16px] rounded-[4px] mx-[2px] hover:scale-110 flex items-center justify-center text-[8px] text-inkfaint ${!focusedIsText ? "opacity-40 pointer-events-none" : ""}`}
-            style={{ backgroundColor: c || "var(--surface)", border: "1px solid var(--line)" }}>{!c && "✕"}</button>
-        ))}
-        <span className="w-px h-4 bg-line mx-1" />
-        {(["left", "center", "right"] as TextAlign[]).map((v, i) => (
-          <button key={v} className={`${tb(fmt.align === v)} text-[11px] font-bold`} title={`${["왼쪽", "가운데", "오른쪽"][i]} 정렬`} onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyAlign(v)}>{["좌", "중", "우"][i]}</button>
-        ))}
-        <span className="w-px h-4 bg-line mx-1" />
-        <button className={tb(fmt.list === "bullet")} title="글머리 목록" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyList("bullet")}>•</button>
-        <button className={`${tb(fmt.list === "num")} text-[10px] font-bold`} title="번호 목록" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyList("num")}>1.</button>
-        <span className="w-px h-4 bg-line mx-1" />
-        <div className="relative">
-          <button className={tb(!!fmt.href)} title="링크" onPointerDown={(e) => e.preventDefault()} onClick={() => { setLinkUrl(fmt.href ?? ""); setLinkOpen((v) => !v); }}>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6.5 9.5l3-3M7 4.2l.9-.9a2.6 2.6 0 0 1 3.7 3.7l-.9.9M9 11.8l-.9.9a2.6 2.6 0 0 1-3.7-3.7l.9-.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-          </button>
-          {linkOpen && focusedIsText && (
-            <div className="absolute left-0 top-[32px] w-[220px] rounded-lg bg-surface border border-line p-1.5 z-30 flex items-center gap-1.5" style={{ boxShadow: "var(--sh-pop)" }}>
-              <input autoFocus value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { h()?.applyStyle({ href: normalizeUrl(linkUrl) }); setLinkOpen(false); } else if (e.key === "Escape") setLinkOpen(false); }}
-                placeholder="https://…" className="flex-1 h-[24px] px-2 rounded-md border border-line bg-paper text-[12px] text-ink outline-none" />
-              <button className="h-[24px] px-2 rounded-md text-[11px] font-bold text-accent bg-accentsoft" onClick={() => { h()?.applyStyle({ href: normalizeUrl(linkUrl) }); setLinkOpen(false); }}>적용</button>
-            </div>
-          )}
-        </div>
-        {/* 삽입 그룹 — 오른쪽 */}
+    <div className={`border border-line rounded-xl overflow-hidden ${a4 ? "bg-canvas" : "bg-surface"} ${className ?? ""}`}>
+      {/* ── 고정 툴바(리본) — 한컴식 그룹 리본. a4(문서/데모)면 그룹 라벨 노출 ── */}
+      <div className={`flex items-center gap-px flex-wrap px-2.5 py-1.5 border-b border-line ${a4 ? "bg-surface" : "bg-paper/60"}`}>
+        <RibbonGroup label="실행" showLabel={a4}>
+          <button className="w-7 h-7 rounded-md flex items-center justify-center text-inksoft hover:bg-paper font-bold" title="실행취소" onClick={() => h()?.undo()} disabled={!focusedIsText}>↶</button>
+          <button className="w-7 h-7 rounded-md flex items-center justify-center text-inksoft hover:bg-paper font-bold" title="재실행" onClick={() => h()?.redo()} disabled={!focusedIsText}>↷</button>
+        </RibbonGroup>
+        <RibbonDiv />
+        <RibbonGroup label="글자" showLabel={a4}>
+          <button className={`${tb(fmt.bold)} font-extrabold`} title="굵게" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ bold: fmt.bold ? undefined : true })}>가</button>
+          <button className={`${tb(fmt.italic)} italic`} title="기울임" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ italic: fmt.italic ? undefined : true })}>가</button>
+          <button className={`${tb(fmt.underline)} underline underline-offset-2`} title="밑줄" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ underline: fmt.underline ? undefined : true })}>가</button>
+          <button className={`${tb(fmt.strike)} line-through`} title="취소선" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ strike: fmt.strike ? undefined : true })}>가</button>
+        </RibbonGroup>
+        <RibbonDiv />
+        <RibbonGroup label="색" showLabel={a4}>
+          {COLORS.map((c) => (
+            <button key={c} title={`글자색 ${c}`} onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ color: c })}
+              className={`w-[16px] h-[16px] rounded-full mx-[2px] hover:scale-110 transition-transform ${!focusedIsText ? "opacity-40 pointer-events-none" : ""}`}
+              style={{ backgroundColor: c, boxShadow: "0 0 0 1px rgba(16,24,40,.15)" }} />
+          ))}
+          <span className="w-px h-3.5 bg-line mx-1" />
+          {HIGHLIGHTS.map((c) => (
+            <button key={c || "none"} title={c ? `형광펜 ${c}` : "형광펜 지우기"} onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyStyle({ bg: c || undefined })}
+              className={`w-[16px] h-[16px] rounded-[4px] mx-[2px] hover:scale-110 flex items-center justify-center text-[8px] text-inkfaint ${!focusedIsText ? "opacity-40 pointer-events-none" : ""}`}
+              style={{ backgroundColor: c || "var(--surface)", border: "1px solid var(--line)" }}>{!c && "✕"}</button>
+          ))}
+        </RibbonGroup>
+        <RibbonDiv />
+        <RibbonGroup label="문단" showLabel={a4}>
+          {(["left", "center", "right"] as TextAlign[]).map((v, i) => (
+            <button key={v} className={`${tb(fmt.align === v)} text-[11px] font-bold`} title={`${["왼쪽", "가운데", "오른쪽"][i]} 정렬`} onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyAlign(v)}>{["좌", "중", "우"][i]}</button>
+          ))}
+          <span className="w-px h-3.5 bg-line mx-1" />
+          <button className={tb(fmt.list === "bullet")} title="글머리 목록" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyList("bullet")}>•</button>
+          <button className={`${tb(fmt.list === "num")} text-[10px] font-bold`} title="번호 목록" onPointerDown={(e) => e.preventDefault()} onClick={() => h()?.applyList("num")}>1.</button>
+        </RibbonGroup>
+        {/* 삽입 그룹 — 오른쪽 정렬 */}
         <span className="flex-1" />
-        <button className="h-7 px-2 rounded-md text-[12px] font-semibold text-inksoft hover:bg-paper hover:text-ink flex items-center gap-1.5" title="이미지 삽입" onClick={insertImage}><IcImage size={14} /> 이미지</button>
-        <button className="h-7 px-2 rounded-md text-[12px] font-semibold text-inksoft hover:bg-paper hover:text-ink flex items-center gap-1.5" title="표 삽입" onClick={insertTable}><IcTable size={14} /> 표</button>
+        <RibbonGroup label="삽입" showLabel={a4}>
+          <div className="relative">
+            <button className={tb(!!fmt.href)} title="링크" onPointerDown={(e) => e.preventDefault()} onClick={() => { setLinkUrl(fmt.href ?? ""); setLinkOpen((v) => !v); }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6.5 9.5l3-3M7 4.2l.9-.9a2.6 2.6 0 0 1 3.7 3.7l-.9.9M9 11.8l-.9.9a2.6 2.6 0 0 1-3.7-3.7l.9-.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+            </button>
+            {linkOpen && focusedIsText && (
+              <div className="absolute right-0 top-[32px] w-[220px] rounded-lg bg-surface border border-line p-1.5 z-30 flex items-center gap-1.5" style={{ boxShadow: "var(--sh-pop)" }}>
+                <input autoFocus value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { h()?.applyStyle({ href: normalizeUrl(linkUrl) }); setLinkOpen(false); } else if (e.key === "Escape") setLinkOpen(false); }}
+                  placeholder="https://…" className="flex-1 h-[24px] px-2 rounded-md border border-line bg-paper text-[12px] text-ink outline-none" />
+                <button className="h-[24px] px-2 rounded-md text-[11px] font-bold text-accent bg-accentsoft" onClick={() => { h()?.applyStyle({ href: normalizeUrl(linkUrl) }); setLinkOpen(false); }}>적용</button>
+              </div>
+            )}
+          </div>
+          <button className="h-7 px-2 rounded-md text-[12px] font-semibold text-inksoft hover:bg-paper hover:text-ink flex items-center gap-1.5" title="이미지 삽입" onClick={insertImage}><IcImage size={14} /> 이미지</button>
+          <button className="h-7 px-2 rounded-md text-[12px] font-semibold text-inksoft hover:bg-paper hover:text-ink flex items-center gap-1.5" title="표 삽입" onClick={insertTable}><IcTable size={14} /> 표</button>
+        </RibbonGroup>
       </div>
 
-      {/* ── 블록 스택 ── */}
+      {/* ── 블록 스택 (a4면 A4 페이지 안에) ── */}
+      <EditorPage a4={a4}>
       <div ref={contentRef} className="relative" style={{ minHeight }} onPointerDownCapture={(e) => {
         // 빈 곳 클릭 → 마지막 텍스트 블록에 포커스
         if (e.target === contentRef.current) {
@@ -389,6 +437,7 @@ export const EmbedEditor = forwardRef<EmbedEditorHandle, EmbedEditorProps>(funct
           </div>
         ))}
       </div>
+      </EditorPage>
     </div>
   );
 });

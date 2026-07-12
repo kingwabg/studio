@@ -41,7 +41,7 @@ export default function StudioEmbed() {
     <div className="min-h-dvh bg-canvas">
       {/* 상단 바 */}
       <div className="h-[56px] bg-surface border-b border-line flex items-center gap-4 px-6">
-        <Link to="/studio" className="flex items-center gap-1.5 text-[13px] font-semibold text-inksoft hover:text-ink transition-colors">
+        <Link to="/" className="flex items-center gap-1.5 text-[13px] font-semibold text-inksoft hover:text-ink transition-colors">
           <IcBack size={15} /> 홈
         </Link>
         <div className="text-[15px] font-extrabold text-ink">
@@ -77,6 +77,7 @@ export default function StudioEmbed() {
           </div>
           <EmbedEditor
             ref={editorRef}
+            a4
             placeholder="여기에 입력해 보세요 — 굵게, 형광펜, 목록, 링크, 그리고 이미지·표까지…"
             minHeight={220}
           />
