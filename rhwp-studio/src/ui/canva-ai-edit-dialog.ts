@@ -6,42 +6,11 @@
  */
 import { callMiniMax, aiErrorHint } from './canva-ai-client';
 import { buildDialogShell, mkDialogBtn } from './canva-dom';
+import { readShapeText, replaceShapeText, type ShapeRef } from './canva-ai-doc';
 
 const EDIT_PROMPT =
   '당신은 한국어 문서 편집 도우미입니다. 사용자가 준 "현재 내용"을 요청에 따라 수정해, ' +
   '수정된 전체 텍스트만 출력하세요. 설명·인사·마크업 없이 결과 텍스트만. 줄바꿈은 유지하거나 요청에 맞게 조정합니다.';
-
-interface ShapeRef { sec: number; ppi: number; ci: number; }
-
-/** 글상자 전체 텍스트 읽기 (문단들 → \n 결합) */
-function readShapeText(wasm: any, ref: ShapeRef): string {
-  const n = wasm.getCellParagraphCount(ref.sec, ref.ppi, ref.ci, 0);
-  const lines: string[] = [];
-  for (let cpi = 0; cpi < n; cpi++) {
-    const len = wasm.getCellParagraphLength(ref.sec, ref.ppi, ref.ci, 0, cpi);
-    lines.push(len > 0 ? wasm.getTextInCell(ref.sec, ref.ppi, ref.ci, 0, cpi, 0, len) : '');
-  }
-  return lines.join('\n');
-}
-
-/** 글상자 내용을 새 텍스트로 통째 교체 (스냅샷 안에서 호출) */
-function replaceShapeText(wasm: any, ref: ShapeRef, next: string): void {
-  // 뒤 문단부터 비우고 앞 문단에 합쳐 1문단으로 정리
-  const n = wasm.getCellParagraphCount(ref.sec, ref.ppi, ref.ci, 0);
-  for (let cpi = n - 1; cpi >= 1; cpi--) {
-    const len = wasm.getCellParagraphLength(ref.sec, ref.ppi, ref.ci, 0, cpi);
-    if (len > 0) wasm.deleteTextInCell(ref.sec, ref.ppi, ref.ci, 0, cpi, 0, len);
-    wasm.mergeParagraphInCell(ref.sec, ref.ppi, ref.ci, 0, cpi);
-  }
-  const len0 = wasm.getCellParagraphLength(ref.sec, ref.ppi, ref.ci, 0, 0);
-  if (len0 > 0) wasm.deleteTextInCell(ref.sec, ref.ppi, ref.ci, 0, 0, 0, len0);
-  // 새 텍스트 삽입 (줄마다 insert → 분할)
-  const lines = next.split(/\r?\n/);
-  for (let k = 0; k < lines.length; k++) {
-    if (lines[k]) wasm.insertTextInCell(ref.sec, ref.ppi, ref.ci, 0, k, 0, lines[k]);
-    if (k < lines.length - 1) wasm.splitParagraphInCell(ref.sec, ref.ppi, ref.ci, 0, k, lines[k].length);
-  }
-}
 
 export function showAiEditDialog(ih: any, ref: ShapeRef): void {
   const wasm = ih.wasm;

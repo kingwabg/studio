@@ -18,6 +18,7 @@
 | DnD | dnd-kit | 접근성·검증됨 | 없음 |
 | 엑셀/CSV | SheetJS(xlsx) | 사실상 표준. ⚠ CSV는 UTF-8→EUC-KR 폴백 직접 디코딩 후 투입 | 라이선스 정책 변화 시 |
 | AI 클라이언트 | **SDK 없이 fetch 직접** (OpenAI 호환 /api/ai 프록시) | 프록시가 키 주입·형식 단순·번들 0 | 스트리밍/툴콜 필요 시 SDK 재평가 |
+| 단어 단위 diff | **`diff`(jsdiff, MIT, gzip ~4KB) 도입** (2026-07-12, 문서 검토 기능) | 검토 전/후 대조는 신뢰의 핵심 — 한글 단어 경계(Intl.Segmenter 'ko')를 손으로 짜면 취약. 단일 목적·초경량. "내보내기 코어 의존성 0" 규율은 exportCore.js 전용이라 무관 | 없음 |
 | 자산 저장 | IndexedDB 얇은 자체 래퍼 | Supabase/NAS 교체 대비 인터페이스 유지 목적 | 저장 백엔드(P2 #9) 착수 시 |
 | 테스트 러너 | node --test (rhwp), 자체 하네스(hwpx) | 의존성 최소 | 없음 |
 

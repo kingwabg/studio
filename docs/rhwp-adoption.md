@@ -309,6 +309,27 @@
   재생성되며 DOM에서 빠지고 show()에서만 재부착되므로, show를 스킵하면 아예 요소가 없다.
   **⭐ 실측(.caret display)**: 새로고침 캔버스=no-el / 새 문서=no-el / 문서모드=block /
   캔버스복귀=none / 더블클릭 텍스트 편집=block(과잉 억제 X) / 빈 채 이탈=none. tsc 클린.
+- **문서 전체 검토 AI (P1)** ✅ (2026-07-12, 병렬 체제 2번째 배치 — 기반 나 + 코어·UI 에이전트 2).
+  글상자 전체 텍스트를 모아 M3에 표현·오탈자 검토 → findings 리스트 → 개별 적용(단일 스냅샷).
+  파일: `canva-ai-doc.ts`(계약+헬퍼 추출) · `canva-ai-review.ts`(수집·프롬프트·파싱·적용,
+  코어 에이전트) · `canva-ai-review-ui.ts`(전송 동의·findings 리스트·jsdiff 단어 diff, UI
+  에이전트) · `canva-ai-panel.ts`(검토 버튼·흐름 배선, 나). 원칙 2 예외의 첫 사례(전송 동의 카드).
+  **⭐ 실측(실구동)**: 글상자 2개(오류문) → "글상자 2개·62자" 동의 카드 → M3 4초 응답 →
+  발견 2건(띄어쓰기) → [적용] "진행 하겠"→"진행하겠"(box2 불변=선택 적용) → 행 "적용됨" →
+  **Ctrl+Z로 원복**(단일 스냅샷 HIL 확인). tsc 0 · 185/185 · npm10/11 lock 양립.
+  ⚠ 글상자 열거 = getPageControlLayout(pg).controls type:'shape'만, ref={sec:secIdx??0,
+  ppi:paraIdx, ci:controlIdx}. ⚠ Vite에 새 npm 의존성(diff) 추가 시 dev 서버 재시작 필요
+  (실행 중이면 "Failed to resolve import diff").
+- **문서 검토 표 셀 지원 + AI 패널 버튼 줄 + 탭 겹침 버그** ✅ (2026-07-12, 사용자 피드백
+  "표 인식 못함 / 기능 버튼으로 / 속성이 AI 탭에 겹침"). ①**표 셀 검토**: 원인=gatherTextElements가
+  type:'shape'만 봐 type:'table'을 통째로 건너뜀. 표 컨트롤 cells[]={row,col,rowSpan,colSpan,
+  cellIdx}, 셀 텍스트는 getTextInCell의 4번째 인자(cellIdx)로 접근. ShapeRef에 cellIdx 추가·
+  read/replaceShapeText가 ref.cellIdx 사용(글상자=0 하위호환). 이미지 등 무텍스트는 자동 제외.
+  DocTextElement.context("표 N행 M열")로 findings 위치 표시. **⭐ 실측**: 2×2 표(오류 4셀)→
+  "텍스트 영역 4곳"→발견 2건("표 2행 1열")→[적용] "검토 하였음"→"검토하였음"(타 셀 불변).
+  ②AI 패널 상단 라벨 버튼 줄(문서생성/일반/검토) — 숨은 칩·아이콘 제거. ③**탭 겹침 버그**:
+  .canva-rail-body(클래스 display:flex)·.canva-ai-pane-wrap(인라인 display:flex)가 [hidden]을
+  이겨 속성·AI가 동시 표시 → [hidden] 규칙 추가 + 인라인 display를 CSS로 이관. tsc 0·185/185.
 - **캔버스 모드 ② 새 문서 기본 여백 0 (P0-1)** — **보류** (2026-07-12 사용자 지시).
   일단 여백 0 구현·커밋했으나, 준하 님: "캔버스 모드도 여백은 문서모드처럼 동일해야해"로
   방향 수정. 코드 롤백(main.ts setPageDef 제거) → 새 문서 여백 30/30/20/15 유지. 

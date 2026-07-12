@@ -54,3 +54,7 @@ Tailwind 유틸리티명과 겹치는 클래스명.
   `#dc3545`(부트스트랩 빨강) — KRDS 계열(`#DE3412`)로 교정 필요 (다음 UI 작업 때, 실측 검증 포함).
 - `rhwp-studio/src/styles/base.css`의 `--ui-danger-strong: #dc3545`는 krds-theme.css가 덮으므로
   실렌더는 KRDS — 단 임포트 순서 의존이니 base를 직접 참조하지 말 것.
+- 2026-07-12 발견: `canva-ai-review-ui.ts`의 diff "추가" 강조에 초록 `#e6f4ea`/`#1a7f37` 인라인
+  — KRDS 팔레트에 성공/추가 초록 토큰이 없어 신규 도입. **정본에 초록 계열 추가 필요**(문서
+  검토 diff·향후 성공 상태용). 추가 후 이 인라인을 CSS 변수로 교체. (UI 에이전트가 카탈로그
+  미러 미동기화로 보고한 항목.)

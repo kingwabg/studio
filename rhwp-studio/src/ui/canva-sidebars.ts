@@ -38,8 +38,8 @@ export function mountCanvaSidebars(services: CanvaServices): void {
 
   // 우: [속성] 인스펙터 + [AI] 탭 — buildRail이 만든 body를 인스펙터 창으로 재사용(잉여 노드 방지)
   const inspectorPane = right.body;
+  // ⚠ 레이아웃은 CSS 클래스로 — 인라인 display:flex는 [hidden] 규칙을 이겨 AI 탭이 안 숨는다.
   const aiPane = mkEl('div', 'canva-ai-pane-wrap');
-  aiPane.style.cssText = 'flex:1;display:flex;min-height:0;';
   aiPane.hidden = true;
   right.content.append(aiPane);
 

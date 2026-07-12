@@ -8,6 +8,8 @@ import type { CanvaServices } from './canva-services';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
 import { callMiniMax, aiErrorHint } from './canva-ai-client';
 import { mkEl, mkButton } from './canva-dom';
+import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
+import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
 const SYSTEM_PROMPT =
   '당신은 한국어 문서(HWPX) 편집을 돕는 작성 도우미입니다. ' +
   '사용자의 요청에 따라 문서에 바로 넣을 수 있는 깔끔한 한국어 본문 텍스트를 작성하세요. ' +
@@ -30,7 +32,9 @@ export class CanvaAiPanel {
   private modelBadge!: HTMLElement;
   private busy = false;
   private genMode = true; // 캔버스식 문서 생성 모드 (기본 ON — 캔버스 탭의 작성법)
-  private modeChip!: HTMLButtonElement;
+  // 상단 기능 버튼 줄: 문서 생성 ↔ 일반 글쓰기(모드 토글) + 문서 검토(실행)
+  private genBtn!: HTMLButtonElement;
+  private plainBtn!: HTMLButtonElement;
 
   constructor(private root: HTMLElement, private services: CanvaServices) {
     this.render();
@@ -39,19 +43,33 @@ export class CanvaAiPanel {
   private render(): void {
     const pane = mkEl('div', 'canva-ai-pane');
 
+    // ── 상단 기능 버튼 줄 (라벨로 기능이 한눈에 보이게 — 문서 생성/일반은 모드 토글, 검토는 실행) ──
+    const modes = mkEl('div', 'canva-ai-modes');
+    this.genBtn = mkButton('canva-ai-modebtn', {
+      text: '문서 생성',
+      title: '캔버스식 문서 생성: 지면에 제목·본문·표를 배치합니다',
+    });
+    this.plainBtn = mkButton('canva-ai-modebtn', {
+      text: '일반 글쓰기',
+      title: '일반 글쓰기: 텍스트 답변을 커서 위치에 삽입합니다',
+    });
+    this.genBtn.addEventListener('click', () => { this.genMode = true; this.syncMode(); });
+    this.plainBtn.addEventListener('click', () => { this.genMode = false; this.syncMode(); });
+    // 문서 검토 — 프롬프트가 아니라 버튼 동작(수집→동의→검토→findings)이라 모드가 아닌 실행 버튼.
+    const reviewBtn = mkButton('canva-ai-modebtn canva-ai-modebtn-action', {
+      title: '문서 전체 검토 (표현·오탈자)',
+      html: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>문서 검토</span>',
+    });
+    reviewBtn.addEventListener('click', () => void this.reviewFlow());
+    modes.append(this.genBtn, this.plainBtn, reviewBtn);
+    pane.appendChild(modes);
+
     this.log = mkEl('div', 'canva-ai-log');
     pane.appendChild(this.log);
 
-    this.pushMsg({ role: 'ai', text: '안녕하세요! 만들 문서를 말씀해 주세요 — 지면 위에 제목·본문·표를 배치해 드립니다.\n예) "주간 회의록 만들어줘", "출장 보고서 양식"\n(칩을 눌러 일반 글쓰기 모드로 바꿀 수 있어요)' });
+    this.pushMsg({ role: 'ai', text: '안녕하세요! 위 버튼으로 기능을 고르세요.\n· 문서 생성 — 지면에 제목·본문·표를 배치\n· 일반 글쓰기 — 텍스트를 커서 위치에 삽입\n· 문서 검토 — 문서 전체의 표현·오탈자를 점검' });
 
     const bar = mkEl('div', 'canva-ai-input-bar');
-    // 문서 생성(배치) ↔ 일반 글쓰기 모드 칩
-    this.modeChip = mkButton('canva-ai-mode');
-    this.modeChip.addEventListener('click', () => {
-      this.genMode = !this.genMode;
-      this.syncModeChip();
-    });
-    bar.appendChild(this.modeChip);
     this.input = document.createElement('textarea');
     this.input.rows = 1;
     this.input.placeholder = '무엇을 써 드릴까요?';
@@ -66,7 +84,7 @@ export class CanvaAiPanel {
     this.sendBtn.addEventListener('click', () => void this.send());
     bar.append(this.input, this.sendBtn);
     pane.appendChild(bar);
-    this.syncModeChip();
+    this.syncMode();
 
     this.root.appendChild(pane);
 
@@ -90,12 +108,9 @@ export class CanvaAiPanel {
     return el;
   }
 
-  private syncModeChip(): void {
-    this.modeChip.textContent = this.genMode ? '문서 생성' : '일반';
-    this.modeChip.classList.toggle('is-gen', this.genMode);
-    this.modeChip.title = this.genMode
-      ? '캔버스식 문서 생성: 지면에 제목·본문·표를 배치합니다 (클릭해 일반 글쓰기로 전환)'
-      : '일반 글쓰기: 텍스트 답변을 받아 커서 위치에 삽입합니다 (클릭해 문서 생성으로 전환)';
+  private syncMode(): void {
+    this.genBtn.classList.toggle('is-active', this.genMode);
+    this.plainBtn.classList.toggle('is-active', !this.genMode);
     this.input.placeholder = this.genMode ? '어떤 문서를 만들까요?' : '무엇을 써 드릴까요?';
   }
 
@@ -165,6 +180,55 @@ export class CanvaAiPanel {
     copy.addEventListener('click', () => { void navigator.clipboard?.writeText(text); });
     actions.append(insert, copy);
     msgEl.appendChild(actions);
+  }
+
+  // 로그에 빈 컨테이너 버블 하나 추가 (검토 UI가 여기에 렌더) — pushMsg는 텍스트 전용이라 별도.
+  private pushPanel(): HTMLElement {
+    const el = mkEl('div', 'canva-ai-msg ai');
+    const bubble = mkEl('div', 'bubble');
+    el.appendChild(bubble);
+    this.log.appendChild(el);
+    this.log.scrollTop = this.log.scrollHeight;
+    return bubble;
+  }
+
+  // 문서 전체 검토 흐름: 수집 → 전송 동의 → 검토 → findings 리스트(각 적용=스냅샷).
+  // 검토는 문서 전체를 보내는 기능이라, 전송 전 "보낼 내용"을 명시하고 동의를 받는다(원칙 2).
+  private async reviewFlow(): Promise<void> {
+    if (this.busy || this.services.wasm.pageCount === 0) return;
+    const elements = gatherTextElements(this.services);
+    if (!elements.length) {
+      this.pushMsg({ role: 'ai', text: '검토할 텍스트가 없습니다. 먼저 글상자나 표를 만들어 주세요.' });
+      return;
+    }
+    const chars = elements.reduce((s, e) => s + e.text.length, 0);
+    const card = this.pushPanel();
+    renderSendPreview(card, { count: elements.length, chars }, {
+      onCancel: () => card.remove(),
+      onConfirm: () => void this.runReview(card),
+    });
+  }
+
+  private async runReview(card: HTMLElement): Promise<void> {
+    card.remove();
+    this.setBusy(true);
+    const thinking = this.pushMsg({ role: 'ai', text: '문서 검토 중…' });
+    try {
+      const result = await runDocReview(this.services);
+      thinking.remove();
+      const list = this.pushPanel();
+      renderReviewFindings(list, result, {
+        onApply: (f) => { applyFinding(this.services, f, result.elements); },
+        onIgnore: () => { /* UI에서 행 상태만 갱신 */ },
+        onJumpTo: (f) => { jumpToElement(this.services, f, result.elements); },
+      });
+    } catch (e) {
+      thinking.remove();
+      const detail = e instanceof Error ? e.message : String(e);
+      this.pushMsg({ role: 'ai', err: true, text: `문서 검토에 실패했습니다.\n${detail}${aiErrorHint(detail)}` });
+    } finally {
+      this.setBusy(false);
+    }
   }
 
   private async callModel(userText: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {

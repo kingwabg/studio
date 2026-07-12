@@ -30,7 +30,9 @@
     "serialize-javascript": "7.0.5"
   },
   "dependencies": {
+    "@types/diff": "^7.0.2",
     "canvaskit-wasm": "^0.41.1",
+    "diff": "^9.0.0",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0"
   }
