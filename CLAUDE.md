@@ -20,7 +20,8 @@
 - **세션 시작 = 운영 프로토콜**: 이 파일 다음에 `docs/playbooks/agent-protocol.md`를 읽고 거기
   부팅 순서를 따른다(모든 모델 공통 — 낮은 모델일수록 필수). 플레이북은 필요할 때만 로드:
   `traps.md`(함정 사전 — 증상 grep) · `verify.md`(검증 매트릭스+완료 게이트) ·
-  `browser-drive.md`(rhwp 실구동 레시피) · `debugging.md`(낯선 버그 = 창의적 디버깅 절차서).
+  `browser-drive.md`(rhwp 실구동 레시피) · `debugging.md`(낯선 버그 = 창의적 디버깅 절차서) ·
+  `parity-audit.md`(영역 단위 "경쟁 제품과 동일하게" → 갭 감사, 법 경계 포함).
   역사·상세는 `docs/rhwp-adoption.md`를 grep으로. **규칙 문서를 고치면 `playbooks/CHANGELOG.md`
   맨 위에 항목 필수**(날짜·무엇·왜·쉽게 말하면 — 초보자용 이력, 2026-07-12 신설).
   제품 방향·로드맵 정본 = `docs/product-spec.md`, 기술 선택(라이브러리) 정본 = `docs/tech-choices.md`
