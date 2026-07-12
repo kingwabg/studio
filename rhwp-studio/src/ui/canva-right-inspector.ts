@@ -259,6 +259,8 @@ export class CanvaRightInspector {
     } else if (this.ctx === 'picture') {
       const sec = this.section('그림');
       sec.appendChild(fullBtn('그림 속성…', 'format:object-properties', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>'));
+      // [캔버스 한컴 포크] 복제 (단일·다중 모두)
+      sec.appendChild(fullBtn('복제 (Ctrl+D)', 'object:duplicate', '<rect x="8" y="8" width="12" height="12" rx="1"/><path d="M4 16V4h12"/>'));
       host.appendChild(sec);
       // [캔버스 한컴 포크] 다중 선택(2개 이상)일 때만 개체 정렬 노출
       if (this.lastMulti) {

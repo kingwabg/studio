@@ -18,6 +18,15 @@ function alignCmd(id: string, label: string, mode: AlignMode, shortcutLabel?: st
 }
 
 export const objectCommands: CommandDef[] = [
+  {
+    id: 'object:duplicate',
+    label: '개체 복제',
+    shortcutLabel: 'Ctrl+D',
+    canExecute: (ctx) => ctx.hasDocument && ctx.inPictureObjectSelection,
+    execute(services) {
+      services.getInputHandler()?.duplicateSelectedObjects();
+    },
+  },
   alignCmd('object:align-left', '개체 왼쪽 정렬', 'left'),
   alignCmd('object:align-hcenter', '개체 가로 가운데 정렬', 'hcenter'),
   alignCmd('object:align-right', '개체 오른쪽 정렬', 'right'),

@@ -635,6 +635,52 @@ export function alignSelectedObjects(this: any, mode: AlignMode): void {
   this.renderPictureObjectSelection(); // 새 위치로 선택 핸들 갱신
 }
 
+// ─── [캔버스 한컴 포크] 개체 복제 (Ctrl+D) ─────────────────
+
+/**
+ * 다중/단일 선택 개체를 복제한다(캔바 Ctrl+D). copyControl+pasteControl(내부 클립보드)로
+ * 원본 전부(글자·서식·이미지)를 그대로 복사하며, pasteControl이 자동으로 살짝 오프셋해 준다.
+ * 여러 개면 문단 삽입으로 인덱스가 밀리므로 ppi 내림차순으로 처리하고, 앞서 만든 복제본
+ * ref는 이후 삽입 위치(res.paraIdx) 이상이면 한 칸 보정한다. 한 스냅샷=Ctrl+Z 한 번 취소.
+ * 셀 안 개체(cellPath)·표는 제외(표 통합은 별도 로드맵). ⚠ 내부 개체 클립보드는 덮어써진다.
+ */
+export function duplicateSelectedObjects(this: any): void {
+  const refs: PictureObjectRef[] = this.cursor.getSelectedPictureRefs();
+  if (!refs || refs.length === 0) return;
+  const sources = refs.filter((r) => !hasCellPath(r)); // 본문 배치 개체만
+  if (sources.length === 0) return;
+  const ordered = [...sources].sort((a, b) => b.ppi - a.ppi); // ppi 내림차순
+
+  const newRefs: PictureObjectRef[] = [];
+  this.executeOperation({
+    kind: 'snapshot',
+    operationType: 'duplicateObject',
+    operation: () => {
+      for (const ref of ordered) {
+        try {
+          this.wasm.copyControl(ref.sec, ref.ppi, ref.ci, ''); // 브릿지 순서 (sec,para,ci,cellPathJson)
+          const res = JSON.parse(this.wasm.pasteControl(ref.sec, ref.ppi, 0));
+          if (!res.ok) continue;
+          // 이번 삽입(res.paraIdx)으로 기존 수집 복제본들이 한 칸 밀린다
+          for (const nr of newRefs) if (nr.ppi >= res.paraIdx) nr.ppi += 1;
+          newRefs.push({ sec: ref.sec, ppi: res.paraIdx, ci: res.controlIdx, type: ref.type });
+        } catch (err) {
+          console.warn('[InputHandler] 개체 복제 실패:', err);
+        }
+      }
+      return this.cursor.getPosition();
+    },
+  });
+  if (newRefs.length === 0) return;
+
+  // 복제본을 선택 상태로 (원본 → 복제본으로 선택 이동, 연속 Ctrl+D로 계단식 복제 가능)
+  this.cursor.exitPictureObjectSelectionIfNeeded?.();
+  this.cursor.enterPictureObjectSelectionDirect(newRefs[0].sec, newRefs[0].ppi, newRefs[0].ci, newRefs[0].type);
+  for (let k = 1; k < newRefs.length; k++) this.cursor.togglePictureObjectSelection(newRefs[k]);
+  this.renderPictureObjectSelection();
+  this.eventBus.emit('picture-object-selection-changed', true);
+}
+
 // ─── 핸들 드래그 리사이즈 ─────────────────────────
 
 /** 1 page px = 7200/96 = 75 HWPUNIT */

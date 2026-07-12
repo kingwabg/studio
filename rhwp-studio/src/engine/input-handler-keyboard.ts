@@ -810,6 +810,12 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
       // paste 이벤트에서 처리되도록 폴스루 (preventDefault 하지 않음)
       return;
     }
+    // [캔버스 한컴 포크] Ctrl+D → 개체 복제 (캔바 손맛, 복제본을 선택 상태로)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault();
+      this.duplicateSelectedObjects();
+      return;
+    }
     // 방향키 → 개체 위치 이동, Shift+방향키 → 개체 크기 조절 (#1231 한컴 정합)
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
         e.key === 'ArrowLeft' || e.key === 'ArrowRight') {

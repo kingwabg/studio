@@ -1456,6 +1456,11 @@ export class InputHandler {
     _picture.alignSelectedObjects.call(this, mode);
   }
 
+  /** [캔버스 한컴 포크] 선택 개체 복제 (Ctrl+D) — 커맨드/키보드에서 호출 */
+  duplicateSelectedObjects(): void {
+    _picture.duplicateSelectedObjects.call(this);
+  }
+
   /** [캔버스 한컴 포크] 마퀴(러버밴드) 선택 — 빈 지면 드래그 시작/갱신/종료 */
   private startMarquee(e: MouseEvent, pageIdx: number, startPageX: number, startPageY: number): void {
     _marquee.startMarquee.call(this, e, pageIdx, startPageX, startPageY);
