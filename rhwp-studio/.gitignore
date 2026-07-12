@@ -2,6 +2,9 @@ node_modules/
 dist/
 *.local
 
+# e2e 실행 산출물 (스크린샷 — 회귀 스크립트만 추적)
+e2e/screenshots/
+
 # 측정용 샘플 심볼릭 링크 (e2e 로컬 실행 시 추가, 환경별 setup)
 public/samples/exam_kor.hwp
 public/samples/hwpctl_Action_Table__v1.1.hwp
