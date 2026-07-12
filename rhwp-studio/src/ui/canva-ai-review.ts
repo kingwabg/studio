@@ -23,17 +23,40 @@ const REVIEW_PROMPT =
   '규칙: 개체(elementId)당 finding은 최대 1개. suggestion은 그 개체의 수정된 "전체" 텍스트(부분 교체 아님). ' +
   '문제 없는 개체는 findings에서 아예 제외. reason은 한 줄. 설명·코드펜스 없이 JSON만 출력합니다.';
 
+interface RawCtrl {
+  type: string;
+  secIdx?: number; paraIdx?: number; controlIdx?: number;
+  cells?: Array<{ row: number; col: number; cellIdx: number }>;
+}
+
 /**
- * 전 페이지를 스캔해 텍스트 글상자(type:'shape')만 수집한다.
- * 이미지/표/수식/그룹/선/OLE는 제외 — readShapeText는 "글상자=1×1 무테두리 표" 셀 API를
- * 전제하므로 다른 컨트롤엔 적용되지 않는다(실패하면 그 개체는 조용히 건너뜀).
- * 같은 개체가 여러 페이지 스캔에 중복 등장할 수 있어 sec/ppi/ci로 중복 제거한다.
+ * 전 페이지를 스캔해 검토 가능한 텍스트를 모두 수집한다:
+ *  - 글상자(type:'shape') — 셀 1개(cellIdx 0)
+ *  - 표(type:'table') — 각 셀(cellIdx별)을 개별 요소로 (⚠ 이전엔 표를 통째로 건너뛰어
+ *    표 안 텍스트가 검토 대상에서 빠졌음 — 이 함수가 그 원인이었다)
+ * 이미지·수식·선 등 텍스트 없는 개체는 readShapeText가 빈 문자열/예외라 자동 제외(버그 아님 —
+ * 검토할 '표현·오탈자'가 없다). sec/ppi/ci/cellIdx로 중복 제거.
  */
 export function gatherTextElements(services: CanvaServices): DocTextElement[] {
   const wasm = services.wasm;
   const elements: DocTextElement[] = [];
   const seen = new Set<string>();
   const pageCount = Math.max(0, wasm.pageCount ?? 0);
+
+  // 하나의 셀(글상자든 표셀이든)을 읽어 비어있지 않으면 요소로 추가.
+  const pushCell = (ref: ShapeRef, context?: string) => {
+    const key = `${ref.sec}:${ref.ppi}:${ref.ci}:${ref.cellIdx ?? 0}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    let text = '';
+    try {
+      text = readShapeText(wasm, ref);
+    } catch {
+      return; // 셀 API가 안 먹는 컨트롤(이미지 등) — 제외
+    }
+    if (!text.trim()) return; // 빈 셀은 검토 대상 아님
+    elements.push({ id: elements.length, ref, text, context });
+  };
 
   for (let pg = 0; pg < pageCount; pg++) {
     let layout: { controls: unknown[] } | undefined;
@@ -43,24 +66,18 @@ export function gatherTextElements(services: CanvaServices): DocTextElement[] {
       continue; // 페이지 조회 실패 — 다음 페이지로
     }
     for (const raw of layout?.controls ?? []) {
-      const ctrl = raw as { type: string; secIdx?: number; paraIdx?: number; controlIdx?: number };
-      if (ctrl.type !== 'shape') continue; // 텍스트 글상자만 (이미지 도형 제외)
+      const ctrl = raw as RawCtrl;
       if (ctrl.paraIdx === undefined || ctrl.controlIdx === undefined) continue;
+      const base = { sec: ctrl.secIdx ?? 0, ppi: ctrl.paraIdx, ci: ctrl.controlIdx };
 
-      const ref: ShapeRef = { sec: ctrl.secIdx ?? 0, ppi: ctrl.paraIdx, ci: ctrl.controlIdx };
-      const key = `${ref.sec}:${ref.ppi}:${ref.ci}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      let text = '';
-      try {
-        text = readShapeText(wasm, ref);
-      } catch {
-        continue; // 셀 API가 안 먹는 컨트롤(글상자 아닌 것으로 판단) — 제외
+      if (ctrl.type === 'shape') {
+        pushCell({ ...base }, '글상자'); // cellIdx 생략 = 0
+      } else if (ctrl.type === 'table' && Array.isArray(ctrl.cells)) {
+        for (const cell of ctrl.cells) {
+          pushCell({ ...base, cellIdx: cell.cellIdx }, `표 ${cell.row + 1}행 ${cell.col + 1}열`);
+        }
       }
-      if (!text.trim()) continue; // 빈 글상자는 검토 대상에서 제외
-
-      elements.push({ id: elements.length, ref, text });
+      // 그 외(이미지·선 등)는 텍스트가 없어 건너뜀
     }
   }
   return elements;
@@ -169,9 +186,10 @@ export function jumpToElement(
   if (!el) return;
   const ih = services.getInputHandler() as any;
   if (!ih) return;
+  const isTable = (el.context ?? '').startsWith('표'); // 표 셀은 개체 종류가 'table'
   try {
     ih.moveCursorTo?.({ sectionIndex: el.ref.sec, paragraphIndex: el.ref.ppi, charOffset: 0 });
-    ih.selectPictureObject?.(el.ref.sec, el.ref.ppi, el.ref.ci, 'shape');
+    ih.selectPictureObject?.(el.ref.sec, el.ref.ppi, el.ref.ci, isTable ? 'table' : 'shape');
   } catch {
     // no-op — 이동/선택 실패는 검토 흐름을 막을 이유가 아니다.
   }

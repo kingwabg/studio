@@ -76,7 +76,7 @@ export function renderSendPreview(
   const summary = mkEl(
     'div',
     'canva-review-send-summary',
-    `글상자 ${sentSummary.count}개 · 총 ${sentSummary.chars}자`,
+    `텍스트 영역 ${sentSummary.count}곳 · 총 ${sentSummary.chars}자`,
   );
   summary.style.cssText = 'font-size:13px;font-weight:600;color:var(--ui-text);';
   card.appendChild(summary);
@@ -84,7 +84,7 @@ export function renderSendPreview(
   const hint = mkEl(
     'div',
     'canva-review-send-hint',
-    '문서 안의 글상자 텍스트가 검토를 위해 AI로 전송됩니다. 계속하시겠습니까?',
+    '문서 안의 텍스트(글상자·표 셀)가 검토를 위해 AI로 전송됩니다. 계속하시겠습니까?',
   );
   hint.style.cssText = 'font-size:11.5px;color:var(--ui-text-hint);line-height:1.5;';
   card.appendChild(hint);
@@ -124,7 +124,7 @@ export function renderReviewFindings(
   const summary = mkEl(
     'div',
     'canva-review-summary',
-    `전송 글상자 ${result.sentSummary.count}개 · 총 ${result.sentSummary.chars}자 · 발견 ${result.findings.length}건`,
+    `전송 텍스트 ${result.sentSummary.count}곳 · 총 ${result.sentSummary.chars}자 · 발견 ${result.findings.length}건`,
   );
   summary.style.cssText = 'font-size:11.5px;color:var(--ui-text-hint);padding:2px 2px 10px;';
   container.appendChild(summary);
@@ -144,12 +144,14 @@ export function renderReviewFindings(
   const list = mkEl('div', 'canva-review-list');
   list.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
   for (const finding of result.findings) {
-    list.appendChild(buildFindingRow(finding, handlers));
+    // 위치 맥락(예: "표 2행 3열")은 요소에 있으므로 findings의 elementId로 역참조.
+    const context = result.elements.find((e) => e.id === finding.elementId)?.context;
+    list.appendChild(buildFindingRow(finding, context, handlers));
   }
   container.appendChild(list);
 }
 
-function buildFindingRow(finding: ReviewFinding, handlers: ReviewFindingsHandlers): HTMLElement {
+function buildFindingRow(finding: ReviewFinding, context: string | undefined, handlers: ReviewFindingsHandlers): HTMLElement {
   let status: 'pending' | 'applied' | 'ignored' = 'pending';
 
   const row = mkEl('div', 'canva-review-row');
@@ -165,7 +167,14 @@ function buildFindingRow(finding: ReviewFinding, handlers: ReviewFindingsHandler
   const statusLabel = mkEl('span', 'canva-review-status');
   statusLabel.style.cssText = 'font-size:10.5px;font-weight:700;color:var(--ui-text-hint);flex-shrink:0;';
   statusLabel.hidden = true;
-  header.append(badge, reason, statusLabel);
+  // 위치 맥락 칩 (표 몇 행 몇 열 / 글상자) — 어디를 고치는지 한눈에
+  if (context) {
+    const ctx = mkEl('span', 'canva-review-ctx', context);
+    ctx.style.cssText = 'font-size:10.5px;color:var(--ui-text-hint);flex-shrink:0;background:var(--ui-bg-light);border-radius:10px;padding:1px 7px;';
+    header.append(badge, ctx, reason, statusLabel);
+  } else {
+    header.append(badge, reason, statusLabel);
+  }
 
   // before/after 대조 (단어 단위 diff)
   const diffBox = buildDiffView(finding.original, finding.suggestion);

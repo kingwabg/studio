@@ -198,7 +198,7 @@ export class CanvaAiPanel {
     if (this.busy || this.services.wasm.pageCount === 0) return;
     const elements = gatherTextElements(this.services);
     if (!elements.length) {
-      this.pushMsg({ role: 'ai', text: '검토할 글상자가 없습니다. 먼저 글상자를 만들어 주세요.' });
+      this.pushMsg({ role: 'ai', text: '검토할 텍스트가 없습니다. 먼저 글상자나 표를 만들어 주세요.' });
       return;
     }
     const chars = elements.reduce((s, e) => s + e.text.length, 0);
