@@ -16,6 +16,17 @@ const ALIGN_ICONS: Record<string, string> = {
   right: '<path d="M3 5h18M9 10h12M3 15h18M9 20h12"/>',
   justify: '<path d="M3 5h18M3 10h18M3 15h18M3 20h18"/>',
 };
+// [캔버스 한컴 포크] 다중 선택 개체 정렬 아이콘 (개체를 기준선에 붙이는 형상)
+const OBJ_ALIGN: { cmd: string; title: string; icon: string }[] = [
+  { cmd: 'object:align-left', title: '왼쪽 정렬', icon: '<path d="M4 3v18"/><rect x="7" y="6" width="10" height="4"/><rect x="7" y="14" width="6" height="4"/>' },
+  { cmd: 'object:align-hcenter', title: '가로 가운데', icon: '<path d="M12 3v18"/><rect x="7" y="6" width="10" height="4"/><rect x="9" y="14" width="6" height="4"/>' },
+  { cmd: 'object:align-right', title: '오른쪽 정렬', icon: '<path d="M20 3v18"/><rect x="7" y="6" width="10" height="4"/><rect x="11" y="14" width="6" height="4"/>' },
+  { cmd: 'object:align-top', title: '위쪽 정렬', icon: '<path d="M3 4h18"/><rect x="6" y="7" width="4" height="10"/><rect x="14" y="7" width="4" height="6"/>' },
+  { cmd: 'object:align-vcenter', title: '세로 가운데', icon: '<path d="M3 12h18"/><rect x="6" y="7" width="4" height="10"/><rect x="14" y="9" width="4" height="6"/>' },
+  { cmd: 'object:align-bottom', title: '아래쪽 정렬', icon: '<path d="M3 20h18"/><rect x="6" y="7" width="4" height="10"/><rect x="14" y="11" width="4" height="6"/>' },
+  { cmd: 'object:distribute-h', title: '가로 간격 분배', icon: '<rect x="3" y="7" width="3" height="10"/><rect x="10.5" y="7" width="3" height="10"/><rect x="18" y="7" width="3" height="10"/>' },
+  { cmd: 'object:distribute-v', title: '세로 간격 분배', icon: '<rect x="7" y="3" width="10" height="3"/><rect x="7" y="10.5" width="10" height="3"/><rect x="7" y="18" width="10" height="3"/>' },
+];
 const COLORS = ['#000000', '#dc3545', '#f59e0b', '#16a34a', '#256ef4', '#7c3aed', '#6b7280', '#ffffff'];
 
 function svg(inner: string): string {
@@ -25,6 +36,8 @@ function svg(inner: string): string {
 export class CanvaRightInspector {
   private ctx: Ctx = 'none';
   private painted = false;
+  /** [캔버스 한컴 포크] 그림 컨텍스트 내 다중 선택 여부 — 단일↔다중 전환 시 정렬 섹션 재렌더 */
+  private lastMulti = false;
 
   private banner!: HTMLElement;
   private fmtPane!: HTMLElement;
@@ -177,9 +190,12 @@ export class CanvaRightInspector {
     else if (ih.isInTableObjectSelection?.()) ctx = 'table';
     else if (ih.isInTable?.()) ctx = 'cell';
     else ctx = 'body';
-    if (ctx === this.ctx && this.painted) return;
+    // [캔버스 한컴 포크] 그림 컨텍스트 안에서도 다중 선택 전환이면 다시 그린다(정렬 섹션 노출)
+    const multi = ctx === 'picture' && !!ih.isMultiPictureSelection?.();
+    if (ctx === this.ctx && this.painted && multi === this.lastMulti) return;
     this.painted = true;
     this.ctx = ctx;
+    this.lastMulti = multi;
     this.applyContext();
   }
 
@@ -238,6 +254,18 @@ export class CanvaRightInspector {
       const sec = this.section('그림');
       sec.appendChild(fullBtn('그림 속성…', 'format:object-properties', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>'));
       host.appendChild(sec);
+      // [캔버스 한컴 포크] 다중 선택(2개 이상)일 때만 개체 정렬 노출
+      if (this.lastMulti) {
+        const alignSec = this.section('개체 정렬');
+        const row = mkEl('div', 'canva-btn-row');
+        for (const a of OBJ_ALIGN) {
+          const b = mkButton('canva-icon-btn', { title: a.title, html: svg(a.icon) });
+          b.addEventListener('mousedown', disp(a.cmd));
+          row.appendChild(b);
+        }
+        alignSec.appendChild(row);
+        host.appendChild(alignSec);
+      }
     }
   }
 }

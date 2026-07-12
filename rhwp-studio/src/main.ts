@@ -20,6 +20,7 @@ import { tableCommands } from '@/command/commands/table';
 import { pageCommands } from '@/command/commands/page';
 import { toolCommands } from '@/command/commands/tool';
 import { aiCommands } from '@/command/commands/ai';
+import { objectCommands } from '@/command/commands/object'; // [캔버스 한컴 포크] 개체 정렬
 import { installPwaFileHandling, type FileHandlingWindowLike } from '@/command/pwa-file-handling';
 import { ContextMenu } from '@/ui/context-menu';
 import { CommandPalette } from '@/ui/command-palette';
@@ -150,6 +151,7 @@ registry.registerAll(tableCommands);
 registry.registerAll(pageCommands);
 registry.registerAll(toolCommands);
 registry.registerAll(aiCommands); // [캔버스 한컴 포크] AI에게 수정하기
+registry.registerAll(objectCommands); // [캔버스 한컴 포크] 개체 정렬(다중 선택)
 
 // 상태 바 요소
 const sbMessage = () => document.getElementById('sb-message')!;

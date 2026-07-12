@@ -4,6 +4,8 @@
 import { MovePictureCommand, MoveShapeCommand, ResizeObjectCommand } from './command';
 import type { ObjectResizeTarget } from './command';
 import { computeArrowResize, MIN_SIZE_HWP, type ArrowKey } from './picture-resize';
+// [캔버스 한컴 포크] 다중 선택 개체 정렬 (순수 정렬 수학)
+import { computeObjectAlignment, type AlignMode } from './object-align';
 import type { CellPathLike } from '@/core/types';
 // [캔버스 한컴 포크] 캔바식 이동 스냅 가이드 (합체 4단계)
 import { buildSnapContext, computeSnap, snapLayerFor, type SnapContext } from './canvas-snap';
@@ -577,6 +579,60 @@ export function resizeSelectedPicture(this: any, key: ArrowKey): void {
   } catch (err) {
     console.warn('[InputHandler] 개체 크기 조절 실패:', err);
   }
+}
+
+// ─── [캔버스 한컴 포크] 다중 선택 개체 정렬 ─────────────────
+
+/**
+ * 다중 선택된 개체(그림/글상자/도형)를 그룹 기준으로 정렬한다(캔바 손맛).
+ * 순수 계산(object-align.ts)으로 새 offset을 구하고, 한 스냅샷 안에서 일괄 적용해
+ * Ctrl+Z 한 번으로 되돌린다. treat_as_char(본문 흐름) 개체는 이동 불가라 제외한다.
+ * 표는 별도 선택 경로(selectedTableRef)라 이 다중 선택에 포함되지 않는다(로드맵 후속).
+ */
+export function alignSelectedObjects(this: any, mode: AlignMode): void {
+  const refs: PictureObjectRef[] = this.cursor.getSelectedPictureRefs();
+  if (!refs || refs.length < 2) return; // 정렬은 2개 이상에서만 의미
+
+  // 1단계: 조회만 — 이동 가능 개체와 현재 박스를 모은다 (문서 무변경)
+  const movable: { r: PictureObjectRef; props: any }[] = [];
+  try {
+    for (const r of refs) {
+      const props = getObjectProperties.call(this, r);
+      if (!props || props.treatAsChar) continue; // 본문 배치 개체는 offset 이동 불가
+      movable.push({ r, props });
+    }
+  } catch (err) {
+    console.warn('[InputHandler] 개체 정렬 조회 실패:', err);
+    return;
+  }
+  if (movable.length < 2) return;
+
+  const boxes = movable.map(({ props }) => ({
+    horzOffset: props.horzOffset,
+    vertOffset: props.vertOffset,
+    width: props.width,
+    height: props.height,
+  }));
+  const results = computeObjectAlignment(boxes, mode);
+  if (!results.some(Boolean)) return; // 전부 무변경 → Undo 기록하지 않음
+
+  // 2단계: 한 스냅샷 안에서 일괄 적용 (드래그 배치 실체화와 동일하게 단일 Undo)
+  this.executeOperation({
+    kind: 'snapshot',
+    operationType: 'alignObjects',
+    operation: () => {
+      results.forEach((res, i) => {
+        if (!res) return;
+        setObjectProperties.call(this, movable[i].r, {
+          horzOffset: res.horzOffset,
+          vertOffset: res.vertOffset,
+        });
+      });
+      try { this.wasm.updateConnectorsInSection(movable[0].r.sec); } catch { /* 연결선 없으면 무시 */ }
+      return this.cursor.getPosition();
+    },
+  });
+  this.renderPictureObjectSelection(); // 새 위치로 선택 핸들 갱신
 }
 
 // ─── 핸들 드래그 리사이즈 ─────────────────────────
