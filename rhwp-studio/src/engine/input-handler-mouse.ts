@@ -1327,6 +1327,9 @@ export function onClick(this: any, e: MouseEvent): void {
       this.caret.hide();
       this.selectionRenderer.clear();
       this.textarea.focus();
+      // [캔버스 한컴 포크] 빈 지면에서 드래그하면 마퀴(러버밴드) 선택 시작.
+      // 드래그 없이 클릭만이면 위 해제로 끝(finishMarquee가 moved=false면 무동작).
+      this.startMarquee(e, pageIdx, pageX, pageY);
       return;
     }
 
@@ -1563,6 +1566,12 @@ export function onContextMenu(this: any, e: MouseEvent): void {
 }
 
 export function onMouseMove(this: any, e: MouseEvent): void {
+  // [캔버스 한컴 포크] 마퀴(러버밴드) 드래그 중 — 사각형 갱신
+  if (this.marqueeState) {
+    this.updateMarqueeDrag(e);
+    return;
+  }
+
   // 연결선 드로잉 모드: 연결점 오버레이 + 프리뷰
   if (this.connectorDrawingMode) {
     const sc = this.container.querySelector('#scroll-content');
@@ -2069,6 +2078,12 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
 }
 
 export function onMouseUp(this: any, _e: MouseEvent): void {
+  // [캔버스 한컴 포크] 마퀴(러버밴드) 종료 → 걸린 개체 다중 선택
+  if (this.marqueeState) {
+    this.finishMarquee(_e);
+    return;
+  }
+
   // 그림 배치 모드 마우스업 → 삽입 실행
   if (this.imagePlacementMode && this.imagePlacementDrag && this.imagePlacementData) {
     this.finishImagePlacement(_e);

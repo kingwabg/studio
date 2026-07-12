@@ -37,6 +37,7 @@ import * as _table from './input-handler-table';
 import * as _keyboard from './input-handler-keyboard';
 import * as _text from './input-handler-text';
 import * as _picture from './input-handler-picture';
+import * as _marquee from './input-handler-marquee'; // [캔버스 한컴 포크] 마퀴 선택
 import type { AlignMode } from './object-align'; // [캔버스 한컴 포크] 개체 정렬 모드
 import { computeHangingIndentPx } from './hanging-indent';
 import { isPageLocalTextEditCommand, type PageLocalTextEditOptions } from './input-edit-invalidation';
@@ -1453,6 +1454,17 @@ export class InputHandler {
   /** [캔버스 한컴 포크] 다중 선택 개체 정렬 (좌/중/우/상/중/하/간격분배) — 커맨드에서 호출 */
   alignSelectedObjects(mode: AlignMode): void {
     _picture.alignSelectedObjects.call(this, mode);
+  }
+
+  /** [캔버스 한컴 포크] 마퀴(러버밴드) 선택 — 빈 지면 드래그 시작/갱신/종료 */
+  private startMarquee(e: MouseEvent, pageIdx: number, startPageX: number, startPageY: number): void {
+    _marquee.startMarquee.call(this, e, pageIdx, startPageX, startPageY);
+  }
+  private updateMarqueeDrag(e: MouseEvent): void {
+    _marquee.updateMarqueeDrag.call(this, e);
+  }
+  private finishMarquee(e: MouseEvent): void {
+    _marquee.finishMarquee.call(this, e);
   }
 
   /** 마우스 드래그로 표 이동 — 드래그 중 갱신 */
