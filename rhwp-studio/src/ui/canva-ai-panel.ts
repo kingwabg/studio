@@ -32,7 +32,9 @@ export class CanvaAiPanel {
   private modelBadge!: HTMLElement;
   private busy = false;
   private genMode = true; // 캔버스식 문서 생성 모드 (기본 ON — 캔버스 탭의 작성법)
-  private modeChip!: HTMLButtonElement;
+  // 상단 기능 버튼 줄: 문서 생성 ↔ 일반 글쓰기(모드 토글) + 문서 검토(실행)
+  private genBtn!: HTMLButtonElement;
+  private plainBtn!: HTMLButtonElement;
 
   constructor(private root: HTMLElement, private services: CanvaServices) {
     this.render();
@@ -41,26 +43,33 @@ export class CanvaAiPanel {
   private render(): void {
     const pane = mkEl('div', 'canva-ai-pane');
 
+    // ── 상단 기능 버튼 줄 (라벨로 기능이 한눈에 보이게 — 문서 생성/일반은 모드 토글, 검토는 실행) ──
+    const modes = mkEl('div', 'canva-ai-modes');
+    this.genBtn = mkButton('canva-ai-modebtn', {
+      text: '문서 생성',
+      title: '캔버스식 문서 생성: 지면에 제목·본문·표를 배치합니다',
+    });
+    this.plainBtn = mkButton('canva-ai-modebtn', {
+      text: '일반 글쓰기',
+      title: '일반 글쓰기: 텍스트 답변을 커서 위치에 삽입합니다',
+    });
+    this.genBtn.addEventListener('click', () => { this.genMode = true; this.syncMode(); });
+    this.plainBtn.addEventListener('click', () => { this.genMode = false; this.syncMode(); });
+    // 문서 검토 — 프롬프트가 아니라 버튼 동작(수집→동의→검토→findings)이라 모드가 아닌 실행 버튼.
+    const reviewBtn = mkButton('canva-ai-modebtn canva-ai-modebtn-action', {
+      title: '문서 전체 검토 (표현·오탈자)',
+      html: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>문서 검토</span>',
+    });
+    reviewBtn.addEventListener('click', () => void this.reviewFlow());
+    modes.append(this.genBtn, this.plainBtn, reviewBtn);
+    pane.appendChild(modes);
+
     this.log = mkEl('div', 'canva-ai-log');
     pane.appendChild(this.log);
 
-    this.pushMsg({ role: 'ai', text: '안녕하세요! 만들 문서를 말씀해 주세요 — 지면 위에 제목·본문·표를 배치해 드립니다.\n예) "주간 회의록 만들어줘", "출장 보고서 양식"\n(칩을 눌러 일반 글쓰기 모드로 바꿀 수 있어요)' });
+    this.pushMsg({ role: 'ai', text: '안녕하세요! 위 버튼으로 기능을 고르세요.\n· 문서 생성 — 지면에 제목·본문·표를 배치\n· 일반 글쓰기 — 텍스트를 커서 위치에 삽입\n· 문서 검토 — 문서 전체의 표현·오탈자를 점검' });
 
     const bar = mkEl('div', 'canva-ai-input-bar');
-    // 문서 전체 검토 버튼 — 프롬프트가 아니라 버튼 동작(수집→동의→검토→findings 리스트)이라 별도 진입점.
-    const reviewBtn = mkButton('canva-ai-review-btn', {
-      title: '문서 전체 검토 (표현·오탈자)',
-      html: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
-    });
-    reviewBtn.addEventListener('click', () => void this.reviewFlow());
-    bar.appendChild(reviewBtn);
-    // 문서 생성(배치) ↔ 일반 글쓰기 모드 칩
-    this.modeChip = mkButton('canva-ai-mode');
-    this.modeChip.addEventListener('click', () => {
-      this.genMode = !this.genMode;
-      this.syncModeChip();
-    });
-    bar.appendChild(this.modeChip);
     this.input = document.createElement('textarea');
     this.input.rows = 1;
     this.input.placeholder = '무엇을 써 드릴까요?';
@@ -75,7 +84,7 @@ export class CanvaAiPanel {
     this.sendBtn.addEventListener('click', () => void this.send());
     bar.append(this.input, this.sendBtn);
     pane.appendChild(bar);
-    this.syncModeChip();
+    this.syncMode();
 
     this.root.appendChild(pane);
 
@@ -99,12 +108,9 @@ export class CanvaAiPanel {
     return el;
   }
 
-  private syncModeChip(): void {
-    this.modeChip.textContent = this.genMode ? '문서 생성' : '일반';
-    this.modeChip.classList.toggle('is-gen', this.genMode);
-    this.modeChip.title = this.genMode
-      ? '캔버스식 문서 생성: 지면에 제목·본문·표를 배치합니다 (클릭해 일반 글쓰기로 전환)'
-      : '일반 글쓰기: 텍스트 답변을 받아 커서 위치에 삽입합니다 (클릭해 문서 생성으로 전환)';
+  private syncMode(): void {
+    this.genBtn.classList.toggle('is-active', this.genMode);
+    this.plainBtn.classList.toggle('is-active', !this.genMode);
     this.input.placeholder = this.genMode ? '어떤 문서를 만들까요?' : '무엇을 써 드릴까요?';
   }
 

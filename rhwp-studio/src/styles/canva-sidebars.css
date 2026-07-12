@@ -116,6 +116,12 @@
 }
 .canva-pane { display: flex; flex-direction: column; gap: 14px; }
 .canva-pane[hidden] { display: none; }
+/* [캔버스 한컴 포크] 탭 전환 시 hidden 처리 — display:flex 클래스가 [hidden] 기본값을 덮어
+   속성 인스펙터와 AI 패널이 동시에 뜨던 버그 수정(속성/AI 탭이 서로를 안 가림).
+   AI 래퍼 레이아웃도 여기서(인라인 display였으면 [hidden]을 이겨 안 숨음). */
+.canva-ai-pane-wrap { flex: 1; display: flex; min-height: 0; }
+.canva-rail-body[hidden],
+.canva-ai-pane-wrap[hidden] { display: none; }
 
 /* ── 좌: 삽입 팔레트 ── */
 .canva-palette-grid {
@@ -378,23 +384,45 @@
 }
 .canva-ai-send:disabled { opacity: 0.5; cursor: default; }
 .canva-ai-send svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
-/* 문서 전체 검토 버튼 — 중립(테두리) 아이콘 버튼, 보내기(강조)와 구분 */
-.canva-ai-review-btn {
+/* ── 상단 기능 버튼 줄 (문서 생성/일반=모드 토글, 문서 검토=실행) ── */
+.canva-ai-modes {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  display: flex;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.canva-ai-modebtn {
+  flex: 1 1 0;
+  height: 32px;
+  border-radius: 7px;
   border: 1px solid var(--ui-border);
   background: var(--ui-surface);
-  color: var(--ui-link);
+  color: var(--ui-text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
 }
-.canva-ai-review-btn:hover { background: var(--ui-accent-bg-light); }
-.canva-ai-review-btn:disabled { opacity: 0.5; cursor: default; }
-.canva-ai-review-btn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
+.canva-ai-modebtn:hover { background: var(--ui-hover); color: var(--ui-text); }
+.canva-ai-modebtn.is-active {
+  background: var(--ui-accent-bg);
+  border-color: var(--ui-note-border);
+  color: var(--ui-link);
+}
+/* 검토는 모드가 아니라 실행 — 아이콘+라벨, 항상 강조색(활성 토글이 아님) */
+.canva-ai-modebtn-action {
+  flex: 0 0 auto;
+  padding: 0 10px;
+  color: var(--ui-link);
+  border-color: var(--ui-note-border);
+}
+.canva-ai-modebtn-action:hover { background: var(--ui-accent-bg-light); color: var(--ui-link); }
+.canva-ai-modebtn-action svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
 .canva-ai-model {
   font-size: 10px;
   font-weight: 700;
