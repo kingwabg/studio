@@ -40,6 +40,7 @@ import { recoveryFileName } from '@/recovery/recovery-format';
 import { showAutosaveRecoveryDialog } from '@/recovery/recovery-ui';
 import { CellSelectionRenderer } from '@/engine/cell-selection-renderer';
 import { TableObjectRenderer } from '@/engine/table-object-renderer';
+import { TableHoverHandles } from '@/engine/table-hover-handles';
 import { TableResizeRenderer } from '@/engine/table-resize-renderer';
 import { Ruler } from '@/view/ruler';
 import type { CanvasKitLayerRenderer } from '@/view/canvaskit-renderer';
@@ -307,6 +308,10 @@ async function initialize(): Promise<void> {
     );
     inputHandler.setTableObjectRenderer(
       new TableObjectRenderer(container, canvasView.getVirtualScroll()),
+    );
+    // [캔버스 한컴 포크] 표 hover 핸들 — Alt 없이 표 선택 + 리사이즈(캔버스 모드)
+    inputHandler.setTableHoverHandles(
+      new TableHoverHandles(container, wasm, canvasView.getVirtualScroll(), inputHandler),
     );
     inputHandler.setTableResizeRenderer(
       new TableResizeRenderer(container, canvasView.getVirtualScroll()),

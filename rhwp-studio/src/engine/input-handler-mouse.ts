@@ -107,7 +107,8 @@ function isCanvasEditingHit(self: any, hit: any): boolean {
   return ref.sec === hit.sectionIndex && ref.ppi === hit.parentParaIndex && ref.ci === hit.controlIndex;
 }
 
-function selectTableObject(this: any, tableRef: { sec: number; ppi: number; ci: number }): void {
+// [캔버스 한컴 포크] 표 hover 핸들(table-hover-handles)에서도 재사용하므로 export.
+export function selectTableObject(this: any, tableRef: { sec: number; ppi: number; ci: number }): void {
   hideProtectedCellHover(this);
   this.cursor.clearSelection();
   this.cursor.exitCellSelectionMode();

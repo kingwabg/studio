@@ -28,6 +28,7 @@ import type { ContextMenu, ContextMenuItem } from '@/ui/context-menu';
 import type { CommandPalette } from '@/ui/command-palette';
 import type { CellSelectionRenderer } from './cell-selection-renderer';
 import type { TableObjectRenderer } from './table-object-renderer';
+import type { TableHoverHandles } from './table-hover-handles';
 import type { TableResizeRenderer, BorderEdge } from './table-resize-renderer';
 import type { CellBbox, CellPathLike } from '@/core/types';
 import { showConfirm } from '@/ui/confirm-dialog';
@@ -265,6 +266,7 @@ export class InputHandler {
   private commandPalette: CommandPalette | null = null;
   private cellSelectionRenderer: CellSelectionRenderer | null = null;
   private tableObjectRenderer: TableObjectRenderer | null = null;
+  private tableHoverHandles: TableHoverHandles | null = null;
   private tableResizeRenderer: TableResizeRenderer | null = null;
   private pictureObjectRenderer: TableObjectRenderer | null = null;
   /** 마지막 rhwp-studio 내부 복사의 시스템 클립보드 marker token */
@@ -3129,6 +3131,7 @@ export class InputHandler {
     this.selectionRenderer.dispose();
     this.cellSelectionRenderer?.dispose();
     this.tableObjectRenderer?.dispose();
+    this.tableHoverHandles?.dispose();
     this.tableResizeRenderer?.dispose();
     this.protectedCellHoverEl?.remove();
     this.contextMenu?.dispose();
@@ -3351,6 +3354,32 @@ export class InputHandler {
 
   /** 표 객체 선택 렌더러를 주입한다 (main.ts에서 호출) */
   setTableObjectRenderer(r: TableObjectRenderer): void { this.tableObjectRenderer = r; }
+
+  /** [캔버스 한컴 포크] 표 hover 핸들 오버레이 주입 (main.ts에서 호출) */
+  setTableHoverHandles(h: TableHoverHandles): void { this.tableHoverHandles = h; }
+
+  /** hover 핸들 호스트 API — 현재 배율 */
+  getZoom(): number { return this.viewportManager.getZoom(); }
+
+  /** 표 hover 핸들을 지금 보여도 되는가 (캔버스 모드·개체 미선택·드래그/리사이즈 아님) */
+  canShowTableHoverHandles(): boolean {
+    return this.canvasMode
+      && !this.cursor.isInTableObjectSelection()
+      && !this.cursor.isInPictureObjectSelection()
+      && !this.isMoveDragging
+      && !this.isTableHandleResizing;
+  }
+
+  /** hover 핸들 잡음 → 표 전체 선택(+ e/s/se면 기존 리사이즈 시작). 클릭=선택·드래그=리사이즈. */
+  onTableHoverHandleGrab(
+    ref: { sec: number; ppi: number; ci: number },
+    dir: string, pageX: number, pageY: number, pageIndex: number,
+  ): void {
+    _mouse.selectTableObject.call(this, ref);
+    if (dir === 'e' || dir === 's' || dir === 'se') {
+      this.startTableHandleResize(dir, pageX, pageY, ref, pageIndex);
+    }
+  }
 
   /** 그림 객체 선택 렌더러를 주입한다 (main.ts에서 호출) */
   setPictureObjectRenderer(r: TableObjectRenderer): void { this.pictureObjectRenderer = r; }
