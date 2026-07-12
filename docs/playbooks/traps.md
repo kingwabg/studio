@@ -45,6 +45,16 @@
 - **.env.local만 gitignore(*.local)** — .env.example에 실키 넣는 사고 발생했음(회수). 예시 파일엔
   플레이스홀더만.
 - **vite.config 수정 = 서버 자동 재시작이지만 env는 시작 시 1회 로드** — 키 추가 후 재시작 필수.
+- **문서편집기(root 5173) dev가 "@wasm/rhwp.js could not be resolved"로 죽음** — root vite의
+  optimizeDeps 기본 스캔이 모든 `**/*.html`을 크롤해 `rhwp-studio/index.html`까지 물고, 거기
+  딸린 rhwp 소스의 `@wasm` 별칭(rhwp-studio 설정 전용)을 root 문맥에서 못 풀어 최적화가 터진다
+  (재최적화 트리거 시 = 캐시 무효화·config 변경). → 해법: root `vite.config.js`에
+  `optimizeDeps.entries: ['index.html']`로 스캔을 루트 진입점만으로 제한 +
+  `server.watch.ignored: ['**/rhwp-studio/**']`. 캐시 오염 시 `node_modules/.vite` 삭제 후 재시작.
+- **vite 6 dev 서버는 TTY(대화형 터미널) 없이 실행하면 시작 직후 종료** — 백그라운드·분리
+  프로세스·일부 미리보기 도구로 띄우면 "VITE ready" 후 에러 없이 사라진다(CI=true로 단축키를
+  꺼도 동일). vite 8은 무관. 실터미널(포그라운드)에선 유지. 자동화 검증 시 bash 세션 안
+  `npm run dev & sleep N; curl` 로 그 호출 동안 붙여서 확인.
 - **devcontainer.json은 JSONC**(주석 허용) — 도구로 파싱 검증 시 주석 제거 후 JSON.parse.
 - **npm 11 lock을 npm 10 `npm ci`가 거부** (실사고 2026-07-12: CI 첫 4런 전멸, "Missing: X from
   lock file") — 로컬 npm 11이 일부 전이 의존성(@types/node·@emnapi 등)을 lock에서 생략, CI의
