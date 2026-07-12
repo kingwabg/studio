@@ -1453,12 +1453,106 @@ export function handleCtrlKey(this: any, e: KeyboardEvent): void {
   }
 }
 
+// [캔버스 한컴 포크] 문서 전체 선택 (셀 밖 기본 동작 — 문서 시작→끝)
+function selectWholeDoc(self: any): void {
+  self.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 0, charOffset: 0 });
+  self.cursor.setAnchor();
+  self.cursor.moveToDocumentEnd();
+  self.updateCaret();
+}
+
+// [캔버스 한컴 포크] 현재 셀의 텍스트 전체를 선택 (셀 처음→끝). 성공 시 true.
+function selectCurrentCellText(self: any): boolean {
+  const cur = self.cursor;
+  const pos = cur.getPosition();
+  const { sectionIndex, parentParaIndex, controlIndex, cellIndex } = pos;
+  if (parentParaIndex === undefined || controlIndex === undefined || cellIndex === undefined) return false;
+  try {
+    const n = self.wasm.getCellParagraphCount(sectionIndex, parentParaIndex, controlIndex, cellIndex);
+    if (!(n > 0)) return false;
+    const lastLen = self.wasm.getCellParagraphLength(sectionIndex, parentParaIndex, controlIndex, cellIndex, n - 1);
+    // 셀 내부 위치 구성 — 컨테이너 안에선 cellParaIndex가 실제 문단 인덱스(cursor.ts 참조),
+    // 중첩 표면 cellPath 마지막 항목의 cellParaIndex도 맞춰야 한다.
+    const mk = (cpi: number, off: number): any => {
+      const p: any = { ...pos, cellParaIndex: cpi, paragraphIndex: cpi, charOffset: off };
+      if (pos.cellPath?.length) {
+        p.cellPath = pos.cellPath.map((e: any, i: number) =>
+          i < pos.cellPath.length - 1 ? e : { ...e, cellParaIndex: cpi });
+      }
+      return p;
+    };
+    cur.moveTo(mk(0, 0));
+    cur.setAnchor();
+    cur.moveTo(mk(n - 1, lastLen));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// [캔버스 한컴 포크] 현재 셀의 텍스트가 이미 통째로 선택된 상태인가 (확장 선택 판정용, 무상태).
+function isCurrentCellFullySelected(self: any): boolean {
+  const cur = self.cursor;
+  if (!cur.hasSelection()) return false;
+  const sel = cur.getSelectionOrdered();
+  if (!sel) return false;
+  const pos = cur.getPosition();
+  if (pos.parentParaIndex === undefined || pos.controlIndex === undefined || pos.cellIndex === undefined) return false;
+  const sameCell = (p: any) =>
+    p.parentParaIndex === pos.parentParaIndex && p.controlIndex === pos.controlIndex && p.cellIndex === pos.cellIndex;
+  if (!sameCell(sel.start) || !sameCell(sel.end)) return false;
+  try {
+    const n = self.wasm.getCellParagraphCount(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex);
+    const lastLen = self.wasm.getCellParagraphLength(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, n - 1);
+    return (sel.start.cellParaIndex ?? 0) === 0 && sel.start.charOffset === 0
+        && (sel.end.cellParaIndex ?? 0) === (n - 1) && sel.end.charOffset === lastLen;
+  } catch {
+    return false;
+  }
+}
+
+// [캔버스 한컴 포크] Ctrl+A = 한컴식 확장 선택. 셀 안: ①현재 셀 텍스트 → ②표 전체 셀 → ③문서 전체.
+// (이전 버그: 셀 안에서도 무조건 문서 시작으로 튀어 표 밖으로 선택됐음.)
 export function handleSelectAll(this: any): void {
-  // anchor를 문서 시작, focus를 문서 끝으로 설정
-  this.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 0, charOffset: 0 });
-  this.cursor.setAnchor();
-  this.cursor.moveToDocumentEnd();
-  this.updateCaret();
+  const cur = this.cursor;
+
+  // 셀 밖(본문/글상자): 기존대로 문서 전체
+  if (!cur.isInCell() || cur.isInTextBox()) {
+    selectWholeDoc(this);
+    return;
+  }
+
+  // 이미 표 셀 선택 모드면 — 전체 셀이면 ③문서 전체로, 아니면 ②전체 셀로 확장
+  if (cur.isInCellSelectionMode()) {
+    if (cur.getCellSelectionPhase() >= 3) {
+      cur.exitCellSelectionMode();
+      this.updateCellSelection();       // 셀 하이라이트 제거
+      selectWholeDoc(this);
+    } else {
+      while (cur.getCellSelectionPhase() < 3) cur.advanceCellSelectionPhase();
+      this.updateCellSelection();
+      this.updateCaret();
+    }
+    return;
+  }
+
+  // ② 현재 셀 텍스트가 이미 통째 선택됨 → 표 전체 셀 선택
+  if (isCurrentCellFullySelected(this)) {
+    cur.clearSelection();
+    if (cur.enterCellSelectionMode('manual')) {
+      while (cur.getCellSelectionPhase() < 3) cur.advanceCellSelectionPhase();
+      this.updateCellSelection();
+    }
+    this.updateCaret();
+    return;
+  }
+
+  // ① 현재 셀 텍스트 전체 선택 (실패 시 안전 폴백=문서 전체)
+  if (selectCurrentCellText(this)) {
+    this.updateCaret();
+  } else {
+    selectWholeDoc(this);
+  }
 }
 
 export function onCopy(this: any, e: ClipboardEvent): void {

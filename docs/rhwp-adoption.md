@@ -134,6 +134,14 @@
   **⭐ 실측**: 2×3 표 hover→외곽선+8핸들(방향별 커서) / nw클릭→선택(hover숨김) / se드래그→
   559×34→619×74(델타 +60·+40) / 셀 안쪽 클릭→elementFromPoint=CANVAS·표선택 안됨·커서 셀 안.
   tsc 0·185/185. (절제판=모서리만은 노이즈 보이면 후속.)
+- **표 Ctrl+A = 한컴식 확장 선택** ✅ (2026-07-12, 사용자 보고 "셀 안 Ctrl+A가 표 밖으로 튐").
+  원인: handleSelectAll이 컨텍스트 무시하고 무조건 문서 시작→끝 선택. 수정(input-handler-keyboard.ts):
+  셀 안이면 **①현재 셀 텍스트 → ②표 전체 셀 → ③문서 전체** 3단계 확장. 무상태 판정(반복 카운터
+  없이 현재 선택 상태 비교 — isCurrentCellFullySelected + isInCellSelectionMode/phase). 기존
+  원시함수 재사용: enterCellSelectionMode·advanceCellSelectionPhase(→selectAllCells)·updateCellSelection.
+  ⚠ 셀 텍스트 선택은 cellParaIndex/paragraphIndex 둘 다 설정 + 중첩표는 cellPath 마지막 항목도 갱신
+  (cursor.ts 위치 구성 규약). **⭐ 실측**: 셀 클릭 후 Ctrl+A 1회→셀 텍스트만(다른 셀·문서 안 튐)·
+  2회→전체 셀(phase3)·3회→문서 전체. tsc 0·197/197. 표 패리티 감사(B)의 첫 갭 수정.
 - **4단계 캔버스 UX ②-수정: 외곽 핸들 = 전체 "비례" 스케일** ✅ (2026-07-11, 사용자 보고 이미지
   — 표 늘리면 아래 행 하나만 거대해짐). 초판이 마지막 행/열에만 델타를 몰아넣은 게 근본 오류.
   전면 재작성: e(너비 전체)·s(높이 전체)·se(대각 전체) 모두 **모든 셀을 같은 비율 sx/sy로 스케일**
