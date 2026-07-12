@@ -28,19 +28,19 @@
   — 완료 보고 시 다음 기능 제안, 새 기능 전 라이브러리 검토가 의무(agent-protocol §4, 2026-07-12).
   슬래시 명령: `/boot`(세션 부팅) · `/done`(완료 게이트) — `.claude/commands/`.
 
-## 편집 표면 구조 (Strangler Fig — 2단계 진화 중)
-라우팅: `/` = 기존 앱(DocumentStudio, 무손상) · `/studio` = 모듈형 캔버스 · rhwp-studio = 독립
-앱(7700, `/studio/rhwp`에서 iframe 임베드). 스택: Vite+react-router / TS(점진) / Tailwind(신규만) /
-Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
-- **1단계(완료)**: 흐름 에디터(`/`) → 모듈형 자유배치 캔버스(`/studio`). 블록이 mm 좌표(x/y/w/h)
-  직접 소유. `src/modules/document/model.ts` · `src/modules/canvas/` · `src/components/editor-shell/`.
-  검증된 HWPX 내보내기/가져오기 파이프라인(`src/hwpx/`)이 여기 있음 — **영구 자산**.
-- **2단계(진행 중)**: rhwp-studio 입양본이 차기 제품 표면. `/studio` 캔버스의 UX 자산(팔레트·
-  인스펙터·스냅·텍스트 도구)을 rhwp 위로 이식하는 중. `src/hwpx/` 지식(매핑·검증)은 그대로 유효.
-- **데이터 병합**(`src/modules/merge/`, `/studio` 소속): 진실은 {{열이름}} 토큰, 화면은 칩.
-  엑셀/CSV 업로드(CSV는 UTF-8→EUC-KR 폴백 디코딩 필수 — SheetJS에 바이트로 주면 한글 깨짐) →
-  열 알약 드롭 → 일괄 생성(개별 ZIP / 한 파일 N쪽=el.page). rhwp 쪽 이식은 로드맵 후보.
-- Tailwind는 **utilities만**(preflight 제외) — 기존 앱 스타일 보호. TS는 `allowJs`+`checkJs:false`.
+## 편집 표면 구조 (2026-07-13 레거시 제거 후 — Strangler Fig 종료)
+**제품 에디터 = rhwp-studio(7700, 독립 앱).** 레거시 DocumentStudio(`/`)와 `/studio` 모듈형
+캔버스는 삭제됨(git 히스토리에 보존, 커밋 27dfa3e). root 5173 앱은 **판매용 임베드 에디터
+전용 사이트**로 축소. 스택: Vite+react-router / TS(점진) / Tailwind(utilities만) / Vercel.
+- **root 5173 앱 (남은 것)**: 라우팅 `/`=임베드 에디터(StudioEmbed) · `/studio/embed`(동일) ·
+  `/studio/rhwp`(rhwp iframe 임베드). 보존 자산: **`src/hwpx/`(HWPX 내보내기 코어·지식 — 영구
+  자산, 임베드 내보내기에 사용)** · 임베드 에디터(`src/modules/embed/EmbedEditor.tsx` +
+  richtext·document{model,fonts,assets,export}·table-king·merge). ⚠ **merge는 삭제 금지** —
+  richtext 칩 렌더(render.tsx)에 값으로 묶여 있어 지우면 임베드 에디터가 깨진다.
+- **데이터 병합**(`src/modules/merge/`): 진실은 {{열이름}} 토큰, 화면은 칩. 엑셀/CSV 업로드
+  (CSV는 UTF-8→EUC-KR 폴백 디코딩 필수). 지금은 임베드 에디터에 딸린 형태로만 남음.
+- ⚠ table-king.css는 EmbedEditor.tsx가 직접 import(레거시 제거로 전역 로드처가 사라져 재배선).
+- Tailwind는 **utilities만**(preflight 제외). TS는 `allowJs`+`checkJs:false`.
 
 ## rhwp-studio = "캔버스 한컴" (현 주력)
 입양본(MIT, 6만 줄 vanilla TS HWP/HWPX 에디터). 원칙과 규약:
@@ -137,8 +137,12 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   `src/command/commands/`(커맨드 25종+, ai.ts 포함) · `vite.config.ts`(AI 프록시 /api/ai).
   진행 로그·함정·검증법의 정본: `docs/rhwp-adoption.md`.
 - `src/routes/StudioRhwp.tsx` — rhwp-studio iframe 임베드(@rhwp/editor, 7700 프로브→github.io 폴백).
-- `src/DocumentStudio.jsx` — 레거시 메인 앱(동결). 홈 대시보드 → 캔버스 워크스페이스.
-- `src/table-king/` — `/studio` 캔버스의 표 엔진 (github.com/kingwabg/table-king-Custom 이식본).
+- `src/routes/StudioEmbed.tsx` — **판매용 임베드 에디터 제품 페이지**(root `/` = 이것). 히어로 +
+  라이브 데모(EmbedEditor) + HWPX 다운로드 + `@upmu24/editor` 통합 스니펫.
+- `src/modules/embed/EmbedEditor.tsx` — 판매용 임베드 리치텍스트 에디터(블록 스택형: 텍스트=richtext
+  코어·이미지=assets·표=table-king). 내보내기=DOM 실측→exportHwpx. (레거시 제거 후 남은 제품 자산.)
+  ⚠ (`src/DocumentStudio.jsx`·`src/modules/canvas/`·`src/components/editor-shell/`는 2026-07-13 삭제됨.)
+- `src/table-king/` — 표 엔진 (github.com/kingwabg/table-king-Custom 이식본) — 이제 임베드 에디터가 사용.
   `TableKingBlock.jsx`만 우리 래퍼, `table/`·`hooks/`·`components/`는 원본 그대로.
   표 데이터 모델: { cells:[[{text,style}]], widths(행별), cellHeights(셀별), merges }.
   문서를 통째로 갈아끼울 땐(AI 적용) key(docRev)로 리마운트해 시드를 갱신한다.
@@ -203,9 +207,9 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
   우리 래퍼(TableKingBlock.jsx)는 래칫 대상. 예외 디렉터리 안이라도 **신규 파일은 예산 적용**.
   단 rhwp-studio 안에서도 우리가 새로 만드는 파일은 예산 정신(500줄)을 지킬 것.
 - **`[size-override]`는 사용자가 그 커밋에서 명시적으로 지시했을 때만.** 에이전트가 "불가피"를
-  자가 판정해 붙이는 것 금지. 레거시(DocumentStudio.jsx)는 분리 대상이 아니라 동결.
-  ⚠ 현재 예산 초과 부채 6종(2026-07-12 [size-override]로 반입): TableKingBlock.jsx·
-  CanvasBlock.tsx·LeftPanel.tsx·exportCore.js·CanvasStage.tsx·store.ts — 분리 리팩토링 대기.
+  자가 판정해 붙이는 것 금지.
+  ⚠ 예산 초과 부채: 이제 **TableKingBlock.jsx·exportCore.js 2종**만 남음(2026-07-13 레거시
+  제거로 CanvasBlock·LeftPanel·CanvasStage·store 4종 자동 소멸) — 분리 리팩토링 대기.
 
 ## 다음 과제 (정본 = docs/product-spec.md 로드맵 — 어긋나면 spec이 이김. 아래는 스냅샷)
 **rhwp 캔버스 한컴 트랙 (주력)** — 로드맵은 위 rhwp-studio 섹션:
@@ -216,9 +220,9 @@ Zustand / dnd-kit / Supabase(Phase 2~) / Vercel.
 5. AI 확장: 표 셀 선택에도 우클릭 AI 수정 · 수정 전/후 단어 diff · 자료(엑셀/CSV) 읽어 채우기
 6. Vercel 배포 시 AI 프록시를 서버리스 함수로 이관 (현재 dev 전용)
 
-**`/studio` 캔버스 트랙 (완료분 유지·이관 판단)**: 한글 미리보기 ✅ · 다중 페이지 ✅ ·
-스타일 반영 ✅ · HWPX 가져오기 ✅ (셀 크기 HWPUNIT÷75, 행별 반올림 금지 — 1px 유령 열).
-이미지 요소·Undo/Redo는 rhwp 트랙이 자체 보유하므로 신규 투자 전 이관 여부 판단.
+**`/studio` 캔버스 트랙 — 2026-07-13 삭제됨** (rhwp가 전부 대체). 한글 미리보기·다중 페이지·
+스타일·가져오기 노하우는 `src/hwpx/` 지식과 git 히스토리에 보존. 임베드 에디터(판매용)는
+별도 자산으로 유지(위 편집 표면 구조 참조).
 
 ## 실행/검증 명령
 - 문서편집기: `npm run dev` (로컬 5173 / Codespaces는 postAttach가 5175로 자동 실행)
