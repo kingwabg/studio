@@ -345,6 +345,7 @@ export const insertCommands: CommandDef[] = [
             }]
           : undefined
       );
+      if (ref.type === 'table') return; // [캔버스 한컴 포크] 표는 그림 속성 대상 아님(표 속성 별도)
       picturePropsDialog.open(
         ref.sec, ref.ppi, ref.ci, ref.type, ref.headerFooter,
         cellPath, cellPath ? ref.ci : undefined,

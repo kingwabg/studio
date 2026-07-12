@@ -7,7 +7,8 @@ type PictureSelectionRef = {
   sec: number;
   ppi: number;
   ci: number;
-  type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole';
+  // [캔버스 한컴 포크] 'table' — 표를 개체 다중 선택에 통합 (정렬/복제가 표에도 적용)
+  type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' | 'table';
   cellIdx?: number;
   cellParaIdx?: number;
   outerTableControlIdx?: number;
@@ -1455,7 +1456,7 @@ export class CursorState {
    * [Task #825] `headerFooter` — 머리말/꼬리말 안 그림일 때 outer 위치 marker 보존. */
   enterPictureObjectSelectionDirect(
     sec: number, ppi: number, ci: number,
-    type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' = 'image',
+    type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' | 'table' = 'image',
     cellIdx?: number, cellParaIdx?: number,
     headerFooter?: { kind: 'header' | 'footer'; outerParaIdx: number; outerControlIdx: number },
     outerTableControlIdx?: number,
@@ -1470,12 +1471,12 @@ export class CursorState {
 
   /** Shift+클릭: 개체를 다중 선택에 추가/제거 (토글) */
   togglePictureObjectSelection(ref: PictureSelectionRef): void;
-  togglePictureObjectSelection(sec: number, ppi: number, ci: number, type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole'): void;
+  togglePictureObjectSelection(sec: number, ppi: number, ci: number, type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' | 'table'): void;
   togglePictureObjectSelection(
     refOrSec: PictureSelectionRef | number,
     ppi?: number,
     ci?: number,
-    type?: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole',
+    type?: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' | 'table',
   ): void {
     this.exitTableObjectSelection();
     this._pictureObjectSelected = true;

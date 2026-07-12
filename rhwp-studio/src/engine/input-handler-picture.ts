@@ -14,7 +14,8 @@ type PictureObjectRef = {
   sec: number;
   ppi: number;
   ci: number;
-  type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole';
+  // [캔버스 한컴 포크] 'table' — 표를 개체 다중 선택/정렬에 통합
+  type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' | 'table';
   cellIdx?: number;
   cellParaIdx?: number;
   outerTableControlIdx?: number;
@@ -268,9 +269,27 @@ export function findPictureAtClick(this: any,
 
 /** 선택된 개체의 bbox를 페이지 레이아웃에서 찾는다. */
 export function findPictureBbox(this: any,
-  ref: { sec: number; ppi: number; ci: number; type?: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole'; cellIdx?: number; cellParaIdx?: number; cellPath?: CellPathLike; noteRef?: any },
+  ref: { sec: number; ppi: number; ci: number; type?: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' | 'table'; cellIdx?: number; cellParaIdx?: number; cellPath?: CellPathLike; noteRef?: any },
 ): { pageIndex: number; x: number; y: number; w: number; h: number; x1?: number; y1?: number; x2?: number; y2?: number } | null {
   const matchType = ref.type ?? 'image';
+  // [캔버스 한컴 포크] 표는 getPageControlLayout에 없다 → 셀 bbox 합집합으로 개체 bbox 계산
+  // (renderTableObjectSelection과 동일 방식). 다중 선택 외곽선·정렬 렌더에 쓰인다.
+  if (matchType === 'table') {
+    try {
+      const cells: any[] = (ref.cellPath && ref.cellPath.length > 1)
+        ? this.wasm.getTableCellBboxesByPath(ref.sec, ref.ppi, JSON.stringify(ref.cellPath))
+        : this.wasm.getTableCellBboxes(ref.sec, ref.ppi, ref.ci);
+      if (!cells || cells.length === 0) return null;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let pageIndex = cells[0].pageIndex ?? 0;
+      for (const c of cells) {
+        pageIndex = c.pageIndex ?? pageIndex;
+        minX = Math.min(minX, c.x); minY = Math.min(minY, c.y);
+        maxX = Math.max(maxX, c.x + c.w); maxY = Math.max(maxY, c.y + c.h);
+      }
+      return { pageIndex, x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    } catch { return null; }
+  }
   // line은 shape의 하위 타입 → layout에서 'line'으로 반환됨
   const layoutType = matchType === 'line' ? 'line' : matchType;
   try {
@@ -453,6 +472,19 @@ export function isShapeBorderClick(this: any,
 
 /** 개체 속성을 타입에 따라 조회한다. */
 export function getObjectProperties(this: any, ref: PictureObjectRef): any {
+  // [캔버스 한컴 포크] 표 — 그림과 같은 위치 모델(horzOffset/vertOffset + 크기)로 정규화해
+  // 정렬/이동이 표에도 그대로 적용되게 한다. 크기는 tableWidth/tableHeight를 width/height로 노출.
+  if (ref.type === 'table') {
+    const t = this.wasm.getTableProperties(ref.sec, ref.ppi, ref.ci);
+    return {
+      horzOffset: t.horzOffset ?? 0,
+      vertOffset: t.vertOffset ?? 0,
+      width: t.tableWidth ?? 0,
+      height: t.tableHeight ?? 0,
+      treatAsChar: t.treatAsChar ?? false,
+      _table: t, // 원본 보존(setObjectProperties에서 기준 유지에 참고)
+    };
+  }
   if (ref.type === 'shape' || ref.type === 'line' || ref.type === 'group' || ref.type === 'ole') {
     if (hasCellPath(ref)) {
       return this.wasm.getCellShapePropertiesByPath(ref.sec, ref.ppi, ref.cellPath, ref.ci);
@@ -476,6 +508,15 @@ export function getObjectProperties(this: any, ref: PictureObjectRef): any {
 
 /** 개체 속성을 타입에 따라 변경한다. */
 export function setObjectProperties(this: any, ref: PictureObjectRef, props: Record<string, unknown>): void {
+  // [캔버스 한컴 포크] 표 — 위쪽 이동이 조용히 클램프되는 moveTableOffset 대신 검증된 절대배치
+  // (vertRelTo/horzRelTo='Paper' + offset)로 위치를 지정한다(rhwp-adoption.md 함정 회피).
+  if (ref.type === 'table') {
+    const tprops: Record<string, unknown> = { horzRelTo: 'Paper', vertRelTo: 'Paper', treatAsChar: false };
+    if (props.horzOffset !== undefined) tprops.horzOffset = props.horzOffset;
+    if (props.vertOffset !== undefined) tprops.vertOffset = props.vertOffset;
+    this.wasm.setTableProperties(ref.sec, ref.ppi, ref.ci, tprops);
+    return;
+  }
   if (ref.type === 'shape' || ref.type === 'line' || ref.type === 'group' || ref.type === 'ole') {
     if (hasCellPath(ref)) {
       this.wasm.setCellShapePropertiesByPath(ref.sec, ref.ppi, ref.cellPath, ref.ci, props);
