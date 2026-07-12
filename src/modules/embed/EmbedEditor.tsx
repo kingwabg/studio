@@ -15,7 +15,24 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
+
+// [A4 룩 2026-07-13] 리본+A4 페이지 프레젠테이션 래퍼. 모듈 레벨이라 참조가 안정적 →
+// contentEditable 리마운트 없음. a4=false면 그대로 통과(유연한 임베드 유지).
+function EditorPage({ a4, children }: { a4: boolean; children: ReactNode }) {
+  if (!a4) return <>{children}</>;
+  return (
+    <div className="overflow-y-auto bg-canvas px-6 py-7 flex justify-center" style={{ maxHeight: 640 }}>
+      <div
+        className="bg-surface shrink-0 w-full"
+        style={{ maxWidth: 794, minHeight: 1123, padding: "76px 84px", boxShadow: "0 2px 22px rgba(16,24,40,.14)" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 import {
   type Block,
   type ParaListType,
@@ -57,6 +74,8 @@ export interface EmbedEditorHandle {
 export interface EmbedEditorProps {
   placeholder?: string;
   minHeight?: number;
+  /** true면 리본 + A4 페이지 룩(문서 에디터). 기본 false = 유연한 임베드(폼에 붙는 흐름형). */
+  a4?: boolean;
   className?: string;
   onChange?: (blocks: EmbedBlock[]) => void;
 }
@@ -195,7 +214,7 @@ function EmbedTableBlock({
 
 // ── 블록 스택 컨테이너 ──
 export const EmbedEditor = forwardRef<EmbedEditorHandle, EmbedEditorProps>(function EmbedEditor(
-  { placeholder = "내용을 입력하세요…", minHeight = 220, className, onChange },
+  { placeholder = "내용을 입력하세요…", minHeight = 220, a4 = false, className, onChange },
   ref
 ) {
   const [blocks, setBlocks] = useState<EmbedBlock[]>(() => [
@@ -295,9 +314,9 @@ export const EmbedEditor = forwardRef<EmbedEditorHandle, EmbedEditorProps>(funct
   const HIGHLIGHTS = ["#FDF3B4", "#DBEAFE", ""];
 
   return (
-    <div className={`border border-line rounded-xl bg-surface overflow-hidden ${className ?? ""}`}>
-      {/* ── 고정 툴바 ── */}
-      <div className="flex items-center gap-px flex-wrap px-2 py-1.5 border-b border-line bg-paper/60">
+    <div className={`border border-line rounded-xl overflow-hidden ${a4 ? "bg-canvas" : "bg-surface"} ${className ?? ""}`}>
+      {/* ── 고정 툴바(리본) ── */}
+      <div className={`flex items-center gap-px flex-wrap px-2 py-1.5 border-b border-line ${a4 ? "bg-surface" : "bg-paper/60"}`}>
         <button className="w-7 h-7 rounded-md flex items-center justify-center text-inksoft hover:bg-paper font-bold" title="실행취소" onClick={() => h()?.undo()} disabled={!focusedIsText}>↶</button>
         <button className="w-7 h-7 rounded-md flex items-center justify-center text-inksoft hover:bg-paper font-bold" title="재실행" onClick={() => h()?.redo()} disabled={!focusedIsText}>↷</button>
         <span className="w-px h-4 bg-line mx-1" />
@@ -344,7 +363,8 @@ export const EmbedEditor = forwardRef<EmbedEditorHandle, EmbedEditorProps>(funct
         <button className="h-7 px-2 rounded-md text-[12px] font-semibold text-inksoft hover:bg-paper hover:text-ink flex items-center gap-1.5" title="표 삽입" onClick={insertTable}><IcTable size={14} /> 표</button>
       </div>
 
-      {/* ── 블록 스택 ── */}
+      {/* ── 블록 스택 (a4면 A4 페이지 안에) ── */}
+      <EditorPage a4={a4}>
       <div ref={contentRef} className="relative" style={{ minHeight }} onPointerDownCapture={(e) => {
         // 빈 곳 클릭 → 마지막 텍스트 블록에 포커스
         if (e.target === contentRef.current) {
@@ -392,6 +412,7 @@ export const EmbedEditor = forwardRef<EmbedEditorHandle, EmbedEditorProps>(funct
           </div>
         ))}
       </div>
+      </EditorPage>
     </div>
   );
 });
