@@ -1020,6 +1020,19 @@ export function onClick(this: any, e: MouseEvent): void {
       return;
     }
 
+    // [캔버스 한컴 포크] Shift+클릭으로 표(셀)를 개체 다중 선택에 추가/제거 — 그림과 혼합 정렬.
+    // 그림이 이미 개체 선택된 상태에서만 가로챈다. 비Shift/표 단독 클릭은 아래 셀 편집 동작 보존.
+    if (e.shiftKey && this.cursor.isInPictureObjectSelection()
+        && hit.parentParaIndex !== undefined && hit.controlIndex !== undefined && !hit.isTextBox) {
+      this.cursor.togglePictureObjectSelection({ sec: hit.sectionIndex, ppi: hit.parentParaIndex, ci: hit.controlIndex, type: 'table' });
+      this.caret.hide();
+      this.selectionRenderer.clear();
+      this.renderPictureObjectSelection();
+      this.eventBus.emit('picture-object-selection-changed', this.cursor.isInPictureObjectSelection());
+      this.textarea.focus();
+      return;
+    }
+
     // 표 경계선 클릭 감지 → 표 객체 선택 (셀 내부에서 외곽 클릭)
     if (hit.parentParaIndex !== undefined && hit.controlIndex !== undefined && !hit.isTextBox) {
       if (this.isTableBorderClick(pageX, pageY, hit.sectionIndex, hit.parentParaIndex, hit.controlIndex)) {
