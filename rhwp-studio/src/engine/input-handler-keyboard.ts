@@ -13,6 +13,7 @@ import {
 } from './navigation-keymap';
 import type { DocumentPosition, CellBbox, CellPathLike } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
+import { buildCellGrid, gridToTsv, gridToHtml } from './cell-copy';
 
 const RHWP_CLIPBOARD_MARKER_RE = /<!--\s*rhwp-studio-clipboard:([A-Za-z0-9._:-]+)\s*-->/;
 
@@ -1584,6 +1585,29 @@ export function onCopy(this: any, e: ClipboardEvent): void {
       }
     }
     return;
+  }
+
+  // [캔버스 한컴 포크] F5/드래그 셀 범위(다중 셀) 선택 모드 → 표 구조 그대로 복사 (G1).
+  // hasSelection()은 텍스트 앵커만 검사해 셀 선택 모드를 못 본다 — 그 이른 반환에 걸려
+  // 죽지 않도록 여기서 먼저 분기한다. 내부 클립보드 marker는 쓰지 않는다(cell-copy.ts 참조) —
+  // 일반 HTML 표로 내보내면 기존 onPaste의 pasteHtml 분기가 표로 붙여넣어 준다(왕복이 공짜).
+  if (this.cursor.isInCellSelectionMode()) {
+    const range = this.cursor.getSelectedCellRange();
+    const ctx = this.cursor.getCellTableContext();
+    if (range && ctx) {
+      e.preventDefault();
+      try {
+        const excluded = this.cursor.getExcludedCells();
+        const grid = buildCellGrid(this.wasm, ctx, range, excluded);
+        if (e.clipboardData) {
+          e.clipboardData.setData('text/plain', gridToTsv(grid));
+          e.clipboardData.setData('text/html', gridToHtml(grid));
+        }
+      } catch (err) {
+        console.warn('[InputHandler] 셀 범위 복사 실패:', err);
+      }
+      return;
+    }
   }
 
   if (!this.cursor.hasSelection()) return;
