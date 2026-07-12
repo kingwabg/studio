@@ -134,6 +134,14 @@
   **⭐ 실측**: 2×3 표 hover→외곽선+8핸들(방향별 커서) / nw클릭→선택(hover숨김) / se드래그→
   559×34→619×74(델타 +60·+40) / 셀 안쪽 클릭→elementFromPoint=CANVAS·표선택 안됨·커서 셀 안.
   tsc 0·185/185. (절제판=모서리만은 노이즈 보이면 후속.)
+- **표 셀 범위 복사 부활 (parity G1)** ✅ (2026-07-12, 병렬 배치 A구역 에이전트). 원인: onCopy가
+  텍스트 앵커만 검사해 F5/드래그 셀 선택 복사가 죽은 경로였음. 수정: 신규 engine/cell-copy.ts
+  (buildCellGrid → gridToTsv/gridToHtml — 병합 rowspan/colspan 보존, 제외 셀 빈칸 근사, 중첩 표는
+  cellPath 마지막 세그먼트 교체 규약(cursor.ts moveToCellByIndex 참고) 준수) + onCopy에 셀선택
+  모드 분기(hasSelection 이른 반환 앞). 내부 마커 미사용 — 일반 HTML `<table>`이라 기존 onPaste
+  pasteHtml 분기로 왕복 공짜. **⭐ 실측**: 2×2 선택 → TSV `이름\t직위\n홍길동\t주무관`+HTML,
+  기존 셀 텍스트 복사("이름") 무손상, Ctrl+A 2단계→Ctrl+C 조합 동작. tsc 0·**208/208**(신규 11).
+  잔여(백로그): 다른 표 셀 안 붙여넣기 의미론 — 한컴 확인 대기(parity/table.md G1 잔여).
 - **표 Ctrl+A = 한컴식 확장 선택** ✅ (2026-07-12, 사용자 보고 "셀 안 Ctrl+A가 표 밖으로 튐").
   원인: handleSelectAll이 컨텍스트 무시하고 무조건 문서 시작→끝 선택. 수정(input-handler-keyboard.ts):
   셀 안이면 **①현재 셀 텍스트 → ②표 전체 셀 → ③문서 전체** 3단계 확장. 무상태 판정(반복 카운터
