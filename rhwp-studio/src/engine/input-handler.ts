@@ -37,6 +37,7 @@ import * as _table from './input-handler-table';
 import * as _keyboard from './input-handler-keyboard';
 import * as _text from './input-handler-text';
 import * as _picture from './input-handler-picture';
+import type { AlignMode } from './object-align'; // [캔버스 한컴 포크] 개체 정렬 모드
 import { computeHangingIndentPx } from './hanging-indent';
 import { isPageLocalTextEditCommand, type PageLocalTextEditOptions } from './input-edit-invalidation';
 
@@ -1442,6 +1443,11 @@ export class InputHandler {
   /** 그림 객체 선택 모드에서 Shift+방향키로 개체 크기 조절 (#1231) */
   private resizeSelectedPicture(key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
     _picture.resizeSelectedPicture.call(this, key);
+  }
+
+  /** [캔버스 한컴 포크] 다중 선택 개체 정렬 (좌/중/우/상/중/하/간격분배) — 커맨드에서 호출 */
+  alignSelectedObjects(mode: AlignMode): void {
+    _picture.alignSelectedObjects.call(this, mode);
   }
 
   /** 마우스 드래그로 표 이동 — 드래그 중 갱신 */
