@@ -12,6 +12,11 @@ import { showConfirm } from '@/ui/confirm-dialog';
 import { showCellClearChoice } from '@/ui/cell-clear-dialog';
 
 const MIN_TABLE_CELL_SIZE_HWP = 200;
+// [캔버스 한컴 포크] 표 리사이즈 최소 크기 — 행/열 분리(이전엔 단일 200 HWPUNIT=0.7mm라 무한 찌부러짐).
+// 리서치(한컴·Word): 최소는 "한 줄 높이+안여백"(행)·"셀 좌우 안여백+최소 글자폭"(열)이 기준.
+const MIN_ROW_HEIGHT_HWP = 1276; // ≈4.5mm — 기본 한 줄(10pt) + 위/아래 안여백
+const MIN_COL_WIDTH_HWP = 1417;  // ≈5.0mm — 셀 좌우 안여백 3.6mm + 최소 글자폭
+const minCellSizeHwp = (t: 'row' | 'col'): number => (t === 'col' ? MIN_COL_WIDTH_HWP : MIN_ROW_HEIGHT_HWP);
 
 // [캔버스 한컴 포크] 내부 경계선 조절 스냅 (합체 4단계-③)
 // "① 셀 경계선 조절"은 표 크기를 유지한 채 옆 셀과 재분배한다. 여기에만 스냅을 건다 —
@@ -52,7 +57,7 @@ function computeResizePositionBounds(
   singleCellTarget?: { cellIdx: number; side: 'start' | 'end' } | null,
   bboxes?: CellBbox[],
 ): { min: number; max: number } {
-  const minSizePx = MIN_TABLE_CELL_SIZE_HWP / 75;
+  const minSizePx = minCellSizeHwp(edge.type) / 75;
   if (singleCellTarget && bboxes) {
     const targetBox = bboxes.find(b => b.cellIdx === singleCellTarget.cellIdx);
     if (targetBox) {
@@ -111,7 +116,7 @@ function computeAffectedResizePositionBounds(
   affectedCellIndices: number[],
   bboxes: CellBbox[],
 ): { min: number; max: number } | null {
-  const minSizePx = MIN_TABLE_CELL_SIZE_HWP / 75;
+  const minSizePx = minCellSizeHwp(edge.type) / 75;
   const minX = Math.min(...bboxes.map(b => b.x));
   const maxX = Math.max(...bboxes.map(b => b.x + b.w));
   const minY = Math.min(...bboxes.map(b => b.y));
@@ -427,11 +432,11 @@ function clampSingleCellResizeDelta(
     if (!Number.isFinite(targetSize) || !Number.isFinite(neighborSize)) return requestedDelta;
 
     if (requestedDelta > 0) {
-      const maxDelta = Math.max(0, Math.round(neighborSize - MIN_TABLE_CELL_SIZE_HWP));
+      const maxDelta = Math.max(0, Math.round(neighborSize - minCellSizeHwp(edge.type)));
       return Math.min(requestedDelta, maxDelta);
     }
 
-    const maxDelta = Math.max(0, Math.round(targetSize - MIN_TABLE_CELL_SIZE_HWP));
+    const maxDelta = Math.max(0, Math.round(targetSize - minCellSizeHwp(edge.type)));
     return -Math.min(Math.abs(requestedDelta), maxDelta);
   } catch {
     return requestedDelta;
@@ -439,16 +444,17 @@ function clampSingleCellResizeDelta(
 }
 
 function clampSingleCellDisplayDelta(
+  edge: BorderEdge,
   targetDisplaySize: number,
   neighborDisplaySize: number | null,
   requestedDelta: number,
 ): number {
   if (neighborDisplaySize === null || requestedDelta === 0) return requestedDelta;
   if (requestedDelta > 0) {
-    const maxDelta = Math.max(0, Math.round(neighborDisplaySize - MIN_TABLE_CELL_SIZE_HWP));
+    const maxDelta = Math.max(0, Math.round(neighborDisplaySize - minCellSizeHwp(edge.type)));
     return Math.min(requestedDelta, maxDelta);
   }
-  const maxDelta = Math.max(0, Math.round(targetDisplaySize - MIN_TABLE_CELL_SIZE_HWP));
+  const maxDelta = Math.max(0, Math.round(targetDisplaySize - minCellSizeHwp(edge.type)));
   return -Math.min(Math.abs(requestedDelta), maxDelta);
 }
 
@@ -556,14 +562,14 @@ function clampCompensatedResizeDelta(
       const targetProps = wasm.getCellProperties(tableRef.sec, tableRef.ppi, tableRef.ci, pair.targetCellIdx);
       const targetSize = edge.type === 'col' ? targetProps.width : targetProps.height;
       if (requestedDelta < 0 && Number.isFinite(targetSize)) {
-        finiteLimits.push(Math.max(0, Math.round(targetSize - MIN_TABLE_CELL_SIZE_HWP)));
+        finiteLimits.push(Math.max(0, Math.round(targetSize - minCellSizeHwp(edge.type))));
       }
 
       if (pair.neighborCellIdx !== null) {
         const neighborProps = wasm.getCellProperties(tableRef.sec, tableRef.ppi, tableRef.ci, pair.neighborCellIdx);
         const neighborSize = edge.type === 'col' ? neighborProps.width : neighborProps.height;
         if (requestedDelta > 0 && Number.isFinite(neighborSize)) {
-          finiteLimits.push(Math.max(0, Math.round(neighborSize - MIN_TABLE_CELL_SIZE_HWP)));
+          finiteLimits.push(Math.max(0, Math.round(neighborSize - minCellSizeHwp(edge.type))));
         }
       }
     } catch {
@@ -589,11 +595,11 @@ function clampCompensatedDisplayDelta(
     if (requestedDelta > 0) {
       if (!pair.neighborBox) continue;
       finiteLimits.push(
-        Math.max(0, getCellDisplaySize(pair.neighborBox, edge) - MIN_TABLE_CELL_SIZE_HWP),
+        Math.max(0, getCellDisplaySize(pair.neighborBox, edge) - minCellSizeHwp(edge.type)),
       );
     } else {
       finiteLimits.push(
-        Math.max(0, getCellDisplaySize(pair.targetBox, edge) - MIN_TABLE_CELL_SIZE_HWP),
+        Math.max(0, getCellDisplaySize(pair.targetBox, edge) - minCellSizeHwp(edge.type)),
       );
     }
   }
@@ -832,7 +838,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
     const targetDisplaySize = getCellDisplaySize(targetBox, state.edge);
     const neighborDisplaySize = neighborBox ? getCellDisplaySize(neighborBox, state.edge) : null;
     const delta = neighborBox
-      ? clampSingleCellDisplayDelta(targetDisplaySize, neighborDisplaySize, requestedDelta)
+      ? clampSingleCellDisplayDelta(state.edge, targetDisplaySize, neighborDisplaySize, requestedDelta)
       : clampSingleCellResizeDelta(
         this.wasm,
         state.tableRef,
@@ -851,7 +857,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       state.tableRef.ci,
       state.singleCellTarget.cellIdx,
     );
-    const targetDesiredSize = Math.max(MIN_TABLE_CELL_SIZE_HWP, targetDisplaySize + delta);
+    const targetDesiredSize = Math.max(minCellSizeHwp(state.edge.type), targetDisplaySize + delta);
     const targetModelDelta = state.edge.type === 'col'
       ? targetDesiredSize - getCellModelSize(targetProps, state.edge)
       : 0;
@@ -876,7 +882,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       neighborIdx,
     );
     const neighborDesiredSize = Math.max(
-      MIN_TABLE_CELL_SIZE_HWP,
+      minCellSizeHwp(state.edge.type),
       getCellDisplaySize(neighborBox, state.edge) - delta,
       );
       const neighborModelDelta = state.edge.type === 'col'
@@ -1012,7 +1018,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
           pair.targetCellIdx,
         );
         const targetDesiredSize = Math.max(
-          MIN_TABLE_CELL_SIZE_HWP,
+          minCellSizeHwp(state.edge.type),
           getCellDisplaySize(pair.targetBox, state.edge) + delta,
         );
         pushLocalResizeDisplayHint(
@@ -1032,7 +1038,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
             pair.neighborCellIdx,
           );
           const neighborDesiredSize = Math.max(
-            MIN_TABLE_CELL_SIZE_HWP,
+            minCellSizeHwp(state.edge.type),
             getCellDisplaySize(pair.neighborBox, state.edge) - delta,
           );
           pushLocalResizeDisplayHint(
@@ -1595,9 +1601,10 @@ export function startTableHandleResize(
       } catch { /* 모델 폭 조회 실패 시 표시 폭으로 근사 */ }
       cells.push({ cellIdx: b.cellIdx, modelW, dispHhwp: Math.max(1, Math.round(b.h * 75)) });
     }
-    // 최소 셀 크기(200 HWPUNIT) 유지: 가장 작은 셀이 바닥에 닿는 스케일이 하한
-    const minSx = Math.min(1, Math.max(...cells.map((c) => MIN_TABLE_CELL_SIZE_HWP / c.modelW)));
-    const minSy = Math.min(1, Math.max(...cells.map((c) => MIN_TABLE_CELL_SIZE_HWP / c.dispHhwp)));
+    // [캔버스 한컴 포크] 최소 크기 유지: 열=MIN_COL_WIDTH, 행=MIN_ROW_HEIGHT. 가장 작은 셀이
+    // 최소에 닿는 스케일이 하한 → 표를 비례 축소해도 어느 열/행도 기준 밑으로 안 내려간다.
+    const minSx = Math.min(1, Math.max(...cells.map((c) => MIN_COL_WIDTH_HWP / c.modelW)));
+    const minSy = Math.min(1, Math.max(...cells.map((c) => MIN_ROW_HEIGHT_HWP / c.dispHhwp)));
     this.tableHandleResizeState = {
       dir, ref, pageIndex, cells,
       startPageX: pageX, startPageY: pageY,
@@ -1675,8 +1682,8 @@ export function finishTableHandleResize(this: any, e: MouseEvent): void {
       operation: (wasm: any) => {
         for (const c of state.cells as HandleCell[]) {
           const props: { width?: number; height?: number } = {};
-          if (wantX) props.width = Math.max(MIN_TABLE_CELL_SIZE_HWP, Math.round(c.modelW * s.sx));
-          if (wantY) props.height = Math.max(MIN_TABLE_CELL_SIZE_HWP, Math.round(c.dispHhwp * s.sy));
+          if (wantX) props.width = Math.max(MIN_COL_WIDTH_HWP, Math.round(c.modelW * s.sx));
+          if (wantY) props.height = Math.max(MIN_ROW_HEIGHT_HWP, Math.round(c.dispHhwp * s.sy));
           wasm.setCellProperties(state.ref.sec, state.ref.ppi, state.ref.ci, c.cellIdx, props);
         }
         wasm.reflowLinesegs?.();
