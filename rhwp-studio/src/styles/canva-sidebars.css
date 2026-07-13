@@ -212,6 +212,22 @@
 .canva-icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
 .canva-icon-btn i { font-style: normal; }
 
+/* [캔버스 한컴 포크] 행·열 추가 = 방향키 십자 배치 (위/아래=줄, 좌/우=칸) */
+.canva-cross {
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  gap: 6px;
+  justify-content: center;
+  margin-top: 2px;
+}
+.canva-cross .canva-icon-btn { flex: none; height: 34px; }
+.canva-cross-up     { grid-column: 2; grid-row: 1; }
+.canva-cross-left   { grid-column: 1; grid-row: 2; }
+.canva-cross-center { grid-column: 2; grid-row: 2; display: flex; align-items: center; justify-content: center; }
+.canva-cross-right  { grid-column: 3; grid-row: 2; }
+.canva-cross-down   { grid-column: 2; grid-row: 3; }
+.canva-cross-center svg { width: 16px; height: 16px; stroke: var(--ui-text-secondary); fill: none; opacity: 0.4; }
+
 .canva-stepper {
   display: flex;
   align-items: center;

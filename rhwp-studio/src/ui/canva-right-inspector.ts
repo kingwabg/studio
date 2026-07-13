@@ -232,17 +232,23 @@ export class CanvaRightInspector {
 
     if (this.ctx === 'cell') {
       const sec = this.section('표 편집');
-      const row1 = mkEl('div', 'canva-btn-row');
-      const mk = (title: string, cmd: string, inner: string) => {
-        const b = mkButton('canva-icon-btn', { title, html: svg(inner) });
+      // [캔버스 한컴 포크] 행·열 추가 4버튼을 십자(방향키) 배치 — 위=위에 줄·아래=아래 줄·
+      // 좌/우=왼쪽/오른쪽 칸. 버튼 방향이 곧 삽입 위치라 직관적(가운데는 표 아이콘 장식).
+      const cross = mkEl('div', 'canva-cross');
+      const mk = (title: string, cmd: string, inner: string, pos: string) => {
+        const b = mkButton(`canva-icon-btn canva-cross-${pos}`, { title, html: svg(inner) });
         b.addEventListener('mousedown', disp(cmd));
         return b;
       };
-      row1.appendChild(mk('위에 줄 추가', 'table:insert-row-above', '<path d="M12 20V8M6 14l6-6 6 6"/>'));
-      row1.appendChild(mk('아래에 줄 추가', 'table:insert-row-below', '<path d="M12 4v12M6 10l6 6 6-6"/>'));
-      row1.appendChild(mk('왼쪽에 칸 추가', 'table:insert-col-left', '<path d="M20 12H8M14 6l-6 6 6 6"/>'));
-      row1.appendChild(mk('오른쪽에 칸 추가', 'table:insert-col-right', '<path d="M4 12h12M10 6l6 6-6 6"/>'));
-      sec.appendChild(row1);
+      cross.appendChild(mk('위에 줄 추가', 'table:insert-row-above', '<path d="M12 20V8M6 14l6-6 6 6"/>', 'up'));
+      cross.appendChild(mk('왼쪽에 칸 추가', 'table:insert-col-left', '<path d="M20 12H8M14 6l-6 6 6 6"/>', 'left'));
+      const ctr = mkEl('div', 'canva-cross-center');
+      ctr.setAttribute('aria-hidden', 'true');
+      ctr.innerHTML = svg('<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 10h16M10 5v14"/>');
+      cross.appendChild(ctr);
+      cross.appendChild(mk('오른쪽에 칸 추가', 'table:insert-col-right', '<path d="M4 12h12M10 6l6 6-6 6"/>', 'right'));
+      cross.appendChild(mk('아래에 줄 추가', 'table:insert-row-below', '<path d="M12 4v12M6 10l6 6 6-6"/>', 'down'));
+      sec.appendChild(cross);
       sec.appendChild(fullBtn('표/셀 속성…', 'table:cell-props', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18"/>'));
       host.appendChild(sec);
     } else if (this.ctx === 'table') {
