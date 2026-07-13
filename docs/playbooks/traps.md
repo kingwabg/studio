@@ -11,6 +11,14 @@
   → 해법: `setTableProperties({vertRelTo:'Paper', horzRelTo:'Paper', horzOffset, vertOffset})` 절대
     지정 + 렌더 잔차(표 바깥여백 ≈1mm=283HWPUNIT) 스캔 보정 1회.
 
+- **셀 경계를 모델로 옮겼는데 그 셀만 화면이 안 따라옴 (getCellProperties.width는 +로 바뀜)**
+  → 그 셀에 예전 `localResize`(renderWidth/Height override)가 wasm에 남아, 순수 모델 `widthDelta`를
+    화면이 무시(override가 이김). 실사고 2026-07-14: Shift 단일셀 localResize 후 Alt 모델 통째가 그
+    행만 빼먹음. 흡착으로 표시상 정렬돼도 override는 살아있음.
+  → 해법: 가로 단일셀 리사이즈는 **순수 모델**(target +delta/neighbor −delta, 셀별 독립 → 자국 안
+    남김·Alt와 합성). 세로 행높이는 반대로 renderHeight만 먹힘(모델 높이=자동확장 최소값). ⚠ 검증은
+    반드시 **모델·표시 둘 다** 측정(숫자가 모델만 맞을 수 있다).
+
 - **표 여러 개를 좌표대로 만들었는데 위치가 서로 밀림**
   → 인라인 컨트롤 삽입이 앞 표의 흐름 위치를 민다(생성→즉시 이동 반복 금지).
   → 해법: 2-phase — 전부 생성·채움 후, getPageControlLayout(type:'table')로 재발견(크기+헤더셀
@@ -36,6 +44,10 @@
   클릭 처리 필요. 깨끗한 시작 = IndexedDB `rhwpStudioAutosave` 삭제.
 - **stale rect 캐시**: 변경된 기존 노드의 getBoundingClientRect가 옛 값 — 검사는 wasm API·fiber·
   elementFromPoint로.
+- **synthetic keydown dispatch가 리로드 누적 후 사망**(실사고 2026-07-14: 방금 붙인 spy 리스너에도
+  무반응) + **스크린샷·`computer` 입력 30초 타임아웃**(CanvasKit 렌더러 미응답). → keydown 검증 전
+  spy로 dispatch 도달을 먼저 확인, 죽으면 하드 리로드/미검증. `ih.resizeXxx()` 직접 호출은 로직만
+  (실이벤트 아님). 인스펙터·사이드바 등 **일반 DOM은 정상 측정 가능**. 계층별 규칙 = verify.md §4.
 
 ## dev 서버/설정
 

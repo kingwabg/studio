@@ -27,7 +27,13 @@ const po = ih.virtualScroll.getPageOffset(0);
 
 - `mousedown`/`mousemove` → **canvas 요소에** (`#scroll-content canvas`) — 리스너가 container 등록.
 - `mouseup` → document에 (once 리스너).
-- 키보드 → `ih.textarea`에 keydown 디스패치 (focus 먼저).
+- 키보드 → `ih.textarea`에 keydown 디스패치 (focus 먼저). ⚠ **dispatch가 리로드 누적 후 죽는다**
+  (실사고 2026-07-14: 방금 붙인 spy 리스너에도 안 닿음) — keydown으로 검증하기 전 `spy` 리스너로
+  **dispatch 도달을 먼저 확인**, 죽었으면 하드 리로드, 그래도 죽으면 그 경로 "미검증"(verify.md §4
+  L0). `ih.resizeXxx()` 직접 호출은 **로직 확인이지 실이벤트 검증이 아니다.**
+- ⚠ **스크린샷·`computer` 클릭/키 입력이 30초 타임아웃**(CanvasKit 렌더러 미응답)이면 시각·실입력
+  검증 불가 — §3 wasm 실측으로 대체하고 남는 건 "미검증"으로 명시(verify.md §4 L4). 단 인스펙터·
+  사이드바 등 **일반 DOM은 정상 측정 가능**(getBoundingClientRect·computed style로 레이아웃 실증).
 - 더블클릭 = mousedown/up ×2 + `dblclick` 이벤트. ⚠ 리로드 직후 첫 시퀀스는 무시될 수 있음 —
   결과(개체 수) 확인 후 재시도.
 - 드래그 갱신이 안 먹으면 RAF 스로틀: `ih.dragRafId = 0; ih.updatePictureMoveDrag(evt)` 처럼
@@ -40,6 +46,7 @@ const po = ih.virtualScroll.getPageOffset(0);
 | 페이지 수/문서 존재 | `wasm.pageCount` |
 | 페이지 위 개체(글상자/표/그림) | `wasm.getPageControlLayout(pg).controls` — {type,x,y,w,h,paraIdx,controlIdx} (px) |
 | 표 크기/셀 | `wasm.getTableDimensions(0,ppi,ci)` · `wasm.getTableCellBboxes(0,ppi,ci)` (cellIdx 중복 제거 후 사용) |
+| 셀 **모델** 크기(vs 표시 bbox) | `wasm.getCellProperties(0,ppi,ci,cellIdx).width/height` (모델 HWPUNIT) — bbox(표시 px)와 **따로** 재라(모델만 바뀌고 화면 고정인 localResize 함정 잡기, verify.md §4 L1) |
 | 셀/글상자 텍스트 | `wasm.getCellParagraphLength(0,ppi,ci,cellIdx,cpi)` → `wasm.getTextInCell(0,ppi,ci,cellIdx,cpi,0,len)` |
 | 본문 텍스트 | `wasm.getTextRange(0, para, 0, count)` |
 | 표 속성(위치·treatAsChar 등) | `wasm.getTableProperties(0,ppi,ci)` / 도형: `wasm.getShapeProperties(0,ppi,ci)` |

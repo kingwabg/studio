@@ -6,8 +6,8 @@
 
 | 바꾼 것 | 반드시 실행 | 통과 기준 |
 |---|---|---|
-| rhwp-studio 소스 (모든 포크) | `cd rhwp-studio && npx tsc --noEmit && npm test` | tsc 0에러 · **185+/185+ 전부 통과** |
-| rhwp UI 동작(클릭·드래그·모드) | browser-drive.md 레시피로 실구동 | 상태 API 실측값이 기대와 일치 |
+| rhwp-studio 소스 (모든 포크) | `cd rhwp-studio && npx tsc --noEmit && npm test` | tsc 0에러 · **208+/208+ 전부 통과** |
+| rhwp UI 동작(클릭·드래그·모드) | browser-drive.md 레시피로 실구동 (§4 3층 검증) | 상태 API 실측값 일치 · **직접호출은 로직만·실이벤트는 별도·시각 불가면 미검증** |
 | src/hwpx (export/import 코어) | `npm run verify:hwpx` | ①~⑦ 게이트 전부 ✓ |
 | /studio 캔버스 UI | 브라우저 실구동 + 관련 하네스 | 실측 일치 |
 | vite.config·devcontainer·설정 | 서버 재시작 로그 확인 + 해당 기능 1회 실호출 | restarted + 200/기대 응답 |
@@ -35,5 +35,28 @@
 - **API가 ok인데 결과 불변** → 성공 코드 믿지 말고 상태를 되읽어라(속성 get, 스캔). traps.md에
   같은 증상 있는지 grep. (실사고: moveTableOffset ok:true·렌더 불변 — vertOffset만 음수 누적)
 - **같은 가설로 2회 실패** → 가설 폐기, 계측을 늘려서(중간값 로깅·되읽기) 원인을 좁힌 뒤 재시도.
-- **검증 도구 자체가 안 먹음**(스크린샷 타임아웃·rect stale 등) → 도구를 우회(browser-drive.md의
-  wasm 실측·fiber·elementFromPoint) — "검증 생략"으로 넘어가지 않는다.
+- **검증 도구 자체가 안 먹음**(스크린샷 타임아웃·rect stale·이벤트 dispatch 무반응 등) → 도구를
+  우회(browser-drive.md의 wasm 실측·fiber·elementFromPoint). **우회조차 죽으면**(예: keydown
+  dispatch가 내가 방금 붙인 spy 리스너에도 안 닿음) 그 경로는 "미검증"으로 명시하고 ①사용자
+  수동 확인 요청 ②Node 단위 테스트(mock wasm)로 로직 이관 — "한 번 됐으니 됨"으로 넘어가지 않는다.
+
+## 4. rhwp 캔버스(CanvasKit) 동작 검증은 3층 — 하나로 "완료" 금지
+
+CanvasKit 캔버스는 화면 검증이 막힐 때가 많다(스크린샷·`computer` 입력 30초 타임아웃, synthetic
+keydown dispatch가 리로드 누적 후 사망 — 새로 붙인 spy 리스너조차 무반응). "됐다"의 근거를 층으로
+나눠 각각 명시한다. **직접 호출로 숫자가 맞은 것을 "사용자가 키를 눌러도 된다"로 착각하지 말 것**
+(실사고 2026-07-14: 표 키보드 리사이즈를 직접호출·프로그램선택으로 "실 keydown 검증"이라 보고).
+
+- **L0 하네스 능력 선확인**: keydown 검증 전 `ta.addEventListener('keydown',spy); ta.dispatchEvent(…)`
+  로 **spy가 실제 불리는지** 먼저 확인. 안 불리면 그 세션의 이벤트 검증은 전부 무효 → 하드 리로드,
+  그래도 죽어있으면 L2를 "미검증"으로.
+- **L1 로직(신뢰 가능)**: `ih.resizeXxx()` 직접 호출 + 실측. ⚠ **모델·표시 둘 다** 재라 — 모델은
+  `getCellProperties(...).width/height`(HWPUNIT), 표시는 `getTableCellBboxes`의 bbox(px). 숫자가
+  모델만 맞고 화면은 고정일 수 있다(localResize override, traps 참조). 직접 호출은 **로직 확인일
+  뿐 실사용 경로가 아니다.**
+- **L2 실이벤트 경로**: L0 통과 시에만 `ta.focus()` 후 keydown dispatch. before/after를 **한 세션
+  연속**으로(별도 실행 숫자를 조합해 보고 금지). isTrusted 실입력은 `computer`가 살아있을 때만.
+- **L3 Node 단위 테스트(영속·CI)**: 브라우저가 못 하는 캔버스 로직은 mock wasm 단위 테스트로 CI에
+  박는다. 이게 "하네스가 죽어 검증 못 함"의 근본 해결책 — 리사이즈 수학·클램프·합성은 여기서.
+- **L4 시각/실입력이 하네스로 불가면 = 미검증**: 완료 게이트 "미검증" 칸에 "화면 렌더=사용자 수동
+  확인 필요"로 적는다. 절대 "검증됨"으로 뭉개지 않는다.
