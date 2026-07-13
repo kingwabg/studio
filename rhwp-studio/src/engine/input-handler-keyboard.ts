@@ -970,20 +970,13 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
       }
       return;
     }
-    // Ctrl/Cmd/Alt+방향키: 셀 크기 조절
-    if ((e.ctrlKey || e.metaKey || e.altKey) && (
-        e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
-        e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-      e.preventDefault();
-      const phase = this.cursor.getCellSelectionPhase();
-      if (phase === 3) {
-        // phase 3: 전체 표 비율 리사이즈 (모든 셀에 동일 delta)
-        this.resizeTableProportional(e.key as 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight');
-      } else {
-        // phase 1, 2: 선택 셀 크기 조절 (이웃 셀 반대 delta)
-        this.resizeCellByKeyboard(e.key as 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight');
-      }
-      return;
+    // [캔버스 한컴 포크] 셀 선택 상태 방향키 리사이즈 — 마우스 드래그와 동일하게:
+    //  Ctrl/Cmd = 전체 표 비율 · Alt = 경계선 전체 이동(이웃 보상, 표 유지) · Shift = 단일 셀만
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const arrow = e.key as 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight';
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.resizeTableProportional(arrow); return; }
+      if (e.altKey) { e.preventDefault(); this.resizeCellBoundaryWhole(arrow); return; }
+      if (e.shiftKey) { e.preventDefault(); this.resizeCellBoundarySingle(arrow); return; }
     }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
         e.key === 'ArrowLeft' || e.key === 'ArrowRight') {

@@ -1460,9 +1460,14 @@ export class InputHandler {
     _table.finishMoveDrag.call(this);
   }
 
-  /** 셀 선택 모드에서 Ctrl+방향키로 셀 크기 조절 */
-  private resizeCellByKeyboard(key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
-    _table.resizeCellByKeyboard.call(this, key);
+  /** [캔버스 한컴 포크] 셀 선택 Alt+방향키 = 경계선 전체 이동(이웃 보상, 표 유지) */
+  private resizeCellBoundaryWhole(key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
+    _table.resizeCellBoundaryWhole.call(this, key);
+  }
+
+  /** [캔버스 한컴 포크] 셀 선택 Shift+방향키 = 단일 셀 경계만 이동(가로=모델·세로=localResize) */
+  private resizeCellBoundarySingle(key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
+    _table.resizeCellBoundarySingle.call(this, key);
   }
 
   private resizeTableProportional(key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {

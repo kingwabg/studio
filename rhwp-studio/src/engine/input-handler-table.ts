@@ -11,12 +11,13 @@ import { snapLayerFor as _snapLayerFor } from './canvas-snap'; // [캔버스 한
 import { showConfirm } from '@/ui/confirm-dialog';
 import { showCellClearChoice } from '@/ui/cell-clear-dialog';
 
-const MIN_TABLE_CELL_SIZE_HWP = 200;
 // [캔버스 한컴 포크] 표 리사이즈 최소 크기 — 행/열 분리(이전엔 단일 200 HWPUNIT=0.7mm라 무한 찌부러짐).
 // 리서치(한컴·Word): 최소는 "한 줄 높이+안여백"(행)·"셀 좌우 안여백+최소 글자폭"(열)이 기준.
 const MIN_ROW_HEIGHT_HWP = 1276; // ≈4.5mm — 기본 한 줄(10pt) + 위/아래 안여백
 const MIN_COL_WIDTH_HWP = 1417;  // ≈5.0mm — 셀 좌우 안여백 3.6mm + 최소 글자폭
 const minCellSizeHwp = (t: 'row' | 'col'): number => (t === 'col' ? MIN_COL_WIDTH_HWP : MIN_ROW_HEIGHT_HWP);
+// [캔버스 한컴 포크] 키보드 리사이즈 1스텝 ≈1mm (Alt/Shift+방향키).
+const KBD_RESIZE_STEP_HWP = 283;
 
 // [캔버스 한컴 포크] 내부 경계선 조절 스냅 (합체 4단계-③)
 // "① 셀 경계선 조절"은 표 크기를 유지한 채 옆 셀과 재분배한다. 여기에만 스냅을 건다 —
@@ -1477,53 +1478,149 @@ export function finishMoveDrag(this: any): void {
   }
 }
 
-export function resizeCellByKeyboard(this: any, key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
+// [캔버스 한컴 포크] 키보드 리사이즈 흡착 — 스텝 이동 후 경계가 "같은 경계 인덱스의 다른(어긋난)
+// 세그먼트" 위치에 1스텝(≈1mm) 이내로 가까우면 그 위치로 딱 붙여 재정렬한다. ⚠ 핵심: '현재 위치와
+// 같은(정렬된) 경계'는 흡착 대상에서 제외(ALIGN_TOL)한다 — 안 그러면 정렬 상태에서 떼어내려 해도
+// 제자리로 도로 붙어 이동이 막힌다. 결과: 정렬돼 있으면 자유 이동, 어긋난 걸 되돌릴 때만 흡착.
+function snapKbdBoundaryDelta(edge: BorderEdge, targetBox: CellBbox, bboxes: CellBbox[], delta: number): number {
+  if (delta === 0) return 0;
+  const isHoriz = edge.type === 'col';
+  const boundaryLine = isHoriz ? targetBox.col + targetBox.colSpan : targetBox.row + targetBox.rowSpan;
+  const origPx = isHoriz ? targetBox.x + targetBox.w : targetBox.y + targetBox.h;
+  const newPx = origPx + delta / 75; // delta(HWPUNIT) → px (75 HWPUNIT = 1px)
+  const SNAP_PX = KBD_RESIZE_STEP_HWP / 75;
+  const ALIGN_TOL = 1.5; // 이 이내면 "현재와 정렬됨" 간주 → 흡착 제외 (findAligned 1px + 여유)
+  let best: number | null = null;
+  let bestDist = SNAP_PX + 0.01;
+  for (const b of bboxes) {
+    const bLine = isHoriz ? b.col + b.colSpan : b.row + b.rowSpan;
+    if (bLine !== boundaryLine || b.cellIdx === targetBox.cellIdx) continue;
+    const p = isHoriz ? b.x + b.w : b.y + b.h;
+    if (Math.abs(p - origPx) < ALIGN_TOL) continue; // 현재 위치와 같은(정렬된) 경계는 제외
+    const dist = Math.abs(newPx - p);
+    if (dist < bestDist) { bestDist = dist; best = p; }
+  }
+  return best === null ? delta : Math.round((best - origPx) * 75);
+}
+
+// [캔버스 한컴 포크] 셀 선택 상태 Alt+방향키 = 경계선 "위치(정렬)"가 같은 셀들만 통째 이동.
+// findAlignedLogicalResizeAffectedCells로 열/행 인덱스가 아니라 실제 경계 좌표가 같은 그룹만 고른다
+// → Shift로 어긋난 세그먼트는 빠지고, 정렬된 것들만 함께 이동(반대편 보상, 표 크기 유지). 이동 후
+// 어긋난 세그먼트에 가까우면 흡착해 재정렬.
+export function resizeCellBoundaryWhole(this: any, key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
   const ctx = this.cursor.getCellTableContext();
   const range = this.cursor.getSelectedCellRange();
   if (!ctx || !range) return;
-
-  const DELTA = 300; // 1 키스트로크 당 300 HWPUNIT (~1mm)
-  let bboxes: CellBbox[];
-  try {
-    bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci);
-  } catch { return; }
-
-  // 선택 범위 내 셀 bbox 추출
-  const selectedBboxes = bboxes
-    .filter(b => b.row >= range.startRow && b.row <= range.endRow
-              && b.col >= range.startCol && b.col <= range.endCol);
-  if (selectedBboxes.length === 0) return;
-
-  const updates: Array<{ cellIdx: number; widthDelta?: number; heightDelta?: number }> = [];
-  const updatedCells = new Set<number>();
   const isHoriz = (key === 'ArrowLeft' || key === 'ArrowRight');
-  const delta = (key === 'ArrowRight' || key === 'ArrowDown') ? DELTA : -DELTA;
-
-  // 선택 블록 내부 이웃에 반대 delta를 넣으면 전체 선택에서 첫 행/열만 변한다.
-  // 한컴처럼 선택된 셀들은 모두 같은 방향으로 크기를 조정한다.
-  for (const bbox of selectedBboxes) {
-    if (updatedCells.has(bbox.cellIdx)) continue;
-    updatedCells.add(bbox.cellIdx);
-    if (isHoriz) {
-      updates.push({ cellIdx: bbox.cellIdx, widthDelta: delta });
-    } else {
-      updates.push({ cellIdx: bbox.cellIdx, heightDelta: delta });
+  const step = (key === 'ArrowRight' || key === 'ArrowDown') ? KBD_RESIZE_STEP_HWP : -KBD_RESIZE_STEP_HWP;
+  let bboxes: CellBbox[];
+  try { bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci); } catch { return; }
+  const edge: BorderEdge = { type: isHoriz ? 'col' : 'row', index: 0, pageIndex: 0 };
+  const line = isHoriz ? range.endCol : range.endRow;
+  // 선택 far edge에 닿는 선택 셀 하나 = 정렬 그룹 기준
+  const targetBox = bboxes.find(b =>
+    b.row >= range.startRow && b.row <= range.endRow && b.col >= range.startCol && b.col <= range.endCol &&
+    (isHoriz ? b.col + b.colSpan - 1 === line : b.row + b.rowSpan - 1 === line));
+  if (!targetBox) return;
+  // 경계 좌표가 같은(정렬된) 셀들만
+  const alignedIdxs = findAlignedLogicalResizeAffectedCells(edge, { cellIdx: targetBox.cellIdx, side: 'end' }, bboxes);
+  if (alignedIdxs.length === 0) return;
+  const pairs: Array<{ targetCellIdx: number; neighborCellIdx: number | null }> = alignedIdxs.map(idx => {
+    const b = bboxes.find(x => x.cellIdx === idx) as CellBbox;
+    return { targetCellIdx: idx, neighborCellIdx: findResizeCompensationNeighbor(edge, b, bboxes) };
+  });
+  let delta = snapKbdBoundaryDelta(edge, targetBox, bboxes, step); // 흡착(어긋난 세그먼트 재정렬)
+  delta = clampCompensatedResizeDelta(this.wasm, ctx, edge, pairs, delta);
+  if (delta === 0) return;
+  const updates: Array<{ cellIdx: number; widthDelta?: number; heightDelta?: number }> = [];
+  const added = new Set<number>();
+  for (const p of pairs) {
+    updates.push(isHoriz ? { cellIdx: p.targetCellIdx, widthDelta: delta } : { cellIdx: p.targetCellIdx, heightDelta: delta });
+    if (p.neighborCellIdx !== null && !added.has(p.neighborCellIdx)) {
+      added.add(p.neighborCellIdx);
+      updates.push(isHoriz ? { cellIdx: p.neighborCellIdx, widthDelta: -delta } : { cellIdx: p.neighborCellIdx, heightDelta: -delta });
     }
   }
-
   try {
-    this.executeOperation({
-      kind: 'snapshot',
-      operationType: 'resizeCellByKeyboard',
-      operation: (wasm: any) => {
-        wasm.resizeTableCells(ctx.sec, ctx.ppi, ctx.ci, updates);
-        return this.cursor.getPosition();
-      },
-    });
+    this.executeOperation({ kind: 'snapshot', operationType: 'resizeTableCells',
+      operation: (wasm: any) => { wasm.resizeTableCells(ctx.sec, ctx.ppi, ctx.ci, updates); return this.cursor.getPosition(); } });
     this.updateCellSelection();
-  } catch (err) {
-    console.warn('[InputHandler] resizeCellByKeyboard 실패:', err);
+  } catch (err) { console.warn('[InputHandler] Alt 경계선 리사이즈 실패:', err); }
+}
+
+// [캔버스 한컴 포크] 셀 선택 상태 Shift+방향키 = 선택 셀의 "단일 경계"만 이동(localResize).
+// 마우스 Shift+드래그와 동일 — 선택 셀(과 같은 행/열 이웃)만 변하고 다른 행/열의 같은 경계는
+// 그대로(정렬이 깨진 로컬 리사이즈). 대상 = 선택 블록 안에서 far edge에 닿는 셀들.
+export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
+  const ctx = this.cursor.getCellTableContext();
+  const range = this.cursor.getSelectedCellRange();
+  if (!ctx || !range) return;
+  const isHoriz = (key === 'ArrowLeft' || key === 'ArrowRight');
+  const requestedDelta = (key === 'ArrowRight' || key === 'ArrowDown') ? KBD_RESIZE_STEP_HWP : -KBD_RESIZE_STEP_HWP;
+  let bboxes: CellBbox[];
+  try { bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci); } catch { return; }
+  const edge: BorderEdge = { type: isHoriz ? 'col' : 'row', index: 0, pageIndex: 0 };
+  const line = isHoriz ? range.endCol : range.endRow;
+  const targets: CellBbox[] = [];
+  const seen = new Set<number>();
+  for (const b of bboxes) {
+    const inSel = b.row >= range.startRow && b.row <= range.endRow && b.col >= range.startCol && b.col <= range.endCol;
+    const endLine = isHoriz ? b.col + b.colSpan - 1 : b.row + b.rowSpan - 1;
+    if (!inSel || endLine !== line || seen.has(b.cellIdx)) continue;
+    seen.add(b.cellIdx);
+    targets.push(b);
   }
+  if (targets.length === 0) return;
+  const updates: Array<{ cellIdx: number; widthDelta?: number; heightDelta?: number; localResize?: boolean; renderWidth?: number; renderHeight?: number }> = [];
+  const doneLines = new Set<number>(); // 이미 처리한 행(가로)/열(세로) — 한 세그먼트만
+  for (const target of targets) {
+    const lineKey = isHoriz ? target.row : target.col;
+    if (doneLines.has(lineKey)) continue;
+    doneLines.add(lineKey);
+    const neighborIdx = findResizeCompensationNeighbor(edge, target, bboxes);
+    if (isHoriz) {
+      // [캔버스 한컴 포크] 가로(열 폭)는 순수 모델 리사이즈(target +delta / neighbor -delta).
+      // 예전엔 localResize(render override)를 썼는데 그 자국이 wasm에 남아, 이후 Alt(모델 경계 통째
+      // 이동)가 그 셀에만 안 먹었다 — Shift로 어긋냈다 흡착 복귀시켜도 Alt가 그 열만 빼먹는 버그였다
+      // (실측 2026-07-14: 모델만 +283해도 그 열 경계만 이동·자국 無, Alt와 정상 합성). 모델
+      // widthDelta는 셀별 독립이라 그 행의 경계만 움직이며(=Shift 의도) override를 안 남긴다.
+      let delta = snapKbdBoundaryDelta(edge, target, bboxes, requestedDelta); // 흡착(정렬 그룹에 재정렬)
+      delta = clampSingleCellResizeDelta(this.wasm, ctx, edge, target.cellIdx, neighborIdx, delta);
+      if (delta === 0) continue;
+      updates.push({ cellIdx: target.cellIdx, widthDelta: delta });
+      if (neighborIdx !== null) updates.push({ cellIdx: neighborIdx, widthDelta: -delta });
+    } else {
+      // [캔버스 한컴 포크] 세로(행 높이)는 모델 행 높이가 자동확장 최소값이라 모델 델타가 안 먹는다
+      // → 마우스 Shift+드래그와 동일하게 localResize(renderHeight)로 표시 높이만 강제(단일 셀).
+      const neighborBox = neighborIdx === null ? null : bboxes.find(b => b.cellIdx === neighborIdx) ?? null;
+      const targetDisplay = getCellDisplaySize(target, edge);
+      const snapped = snapKbdBoundaryDelta(edge, target, bboxes, requestedDelta); // 흡착(정렬 그룹에 재정렬)
+      let applied = Math.max(minCellSizeHwp(edge.type), targetDisplay + snapped) - targetDisplay;
+      if (neighborBox) {
+        const nDisplay = getCellDisplaySize(neighborBox, edge);
+        applied = nDisplay - Math.max(minCellSizeHwp(edge.type), nDisplay - applied); // 이웃 최소 클램프
+      }
+      if (applied === 0) continue;
+      const tFinal = targetDisplay + applied;
+      pushLocalResizeHeightHint(updates, target.cellIdx, tFinal, 0);
+      if (neighborBox) {
+        const nFinal = getCellDisplaySize(neighborBox, edge) - applied;
+        pushLocalResizeHeightHint(updates, neighborBox.cellIdx, nFinal, 0);
+      }
+      // 같은 열의 나머지 셀은 현재 높이로 보존(localResize)
+      for (const b of bboxes) {
+        if (b.col !== lineKey) continue;
+        if (b.cellIdx === target.cellIdx || b.cellIdx === neighborIdx) continue;
+        pushLocalResizeHeightHint(updates, b.cellIdx, getCellDisplaySize(b, edge));
+      }
+    }
+  }
+  if (updates.length === 0) return;
+  try {
+    this.executeOperation({ kind: 'snapshot', operationType: 'resizeTableCells',
+      operation: (wasm: any) => { wasm.resizeTableCells(ctx.sec, ctx.ppi, ctx.ci, updates); return this.cursor.getPosition(); } });
+    this.updateCellSelection();
+  } catch (err) { console.warn('[InputHandler] Shift 단일 셀 리사이즈 실패:', err); }
 }
 
 /** 전체 표 비율 리사이즈 (phase 3, Ctrl+방향키) */
