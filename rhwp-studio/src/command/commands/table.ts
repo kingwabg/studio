@@ -223,12 +223,19 @@ function applyTableDeleteRowColumn(
 
 export const tableCommands: CommandDef[] = [
   { id: 'table:create', label: '표 만들기', icon: 'icon-table',
-    canExecute: (ctx) => ctx.hasDocument && !ctx.inTable,
+    // [캔버스 한컴 포크] 표 안에서도 새 표를 만들 수 있게(예전엔 !inTable로 막아, 표 만든 뒤
+    // 커서가 셀 안이라 두 번째 표를 못 만들었다). 표 안이면 execute에서 본문으로 나간 뒤 생성.
+    canExecute: (ctx) => ctx.hasDocument,
     execute(services, params) {
       const ih = services.getInputHandler();
       if (!ih) return;
-      const pos = ih.getCursorPosition();
-      if (pos.parentParaIndex !== undefined) return;
+      let pos = ih.getCursorPosition();
+      if (pos.parentParaIndex !== undefined) {
+        // [캔버스 한컴 포크] 표 안 커서 → 본문(표 뒤 문단)으로 빼고 새 표 생성.
+        ih.exitTableToBody();
+        pos = ih.getCursorPosition();
+        if (pos.parentParaIndex !== undefined) return; // 여전히 표 안이면 안전 중단
+      }
       const dialog = new TableCreateDialog();
       dialog.onApply = (rows, cols, options?: TableCreateOptions) => {
         const ih2 = services.getInputHandler();

@@ -2898,7 +2898,8 @@ export class InputHandler {
         }
         pageBboxes.push({ pageIndex, x: minX, y: minY, width: maxX - minX, height: maxY - minY });
       }
-      this.tableObjectRenderer.renderMultiPage(pageBboxes, zoom);
+      // [캔버스 한컴 포크] 표 개체 선택 시 hover "전체 잡기" 강조를 상시 표시(wholeHighlight)
+      this.tableObjectRenderer.renderMultiPage(pageBboxes, zoom, false, true);
     } catch (e) {
       console.warn('[InputHandler] renderTableObjectSelection 실패:', e);
       this.tableObjectRenderer.clear();
@@ -3379,12 +3380,13 @@ export class InputHandler {
   /** hover 핸들 잡음 → 표 전체 선택(+ e/s/se면 기존 리사이즈 시작). 클릭=선택·드래그=리사이즈. */
   onTableHoverHandleGrab(
     ref: { sec: number; ppi: number; ci: number },
-    dir: string, pageX: number, pageY: number, pageIndex: number,
+    _dir: string, _pageX: number, _pageY: number, _pageIndex: number,
   ): void {
+    // [캔버스 한컴 포크] 선택 전 핸들 잡기 = "표 전체 개체 선택"만 한다. 리사이즈(늘리기/줄이기)는
+    // 표가 선택된 다음에만 — 선택된 표의 핸들을 다시 드래그하면 startTableHandleResize가 동작한다
+    // (input-handler-mouse.ts 선택 상태 mousedown). 이전엔 e/s/se 잡는 순간 선택과 동시에 즉시
+    // 리사이즈가 시작돼, "선택 → 그 후 크기 조절" 단계 없이 곧바로 크기가 바뀌었다.
     _mouse.selectTableObject.call(this, ref);
-    if (dir === 'e' || dir === 's' || dir === 'se') {
-      this.startTableHandleResize(dir, pageX, pageY, ref, pageIndex);
-    }
   }
 
   /** 그림 객체 선택 렌더러를 주입한다 (main.ts에서 호출) */
@@ -3476,6 +3478,10 @@ export class InputHandler {
 
   /** 현재 커서 위치를 반환한다 */
   getCursorPosition(): DocumentPosition { return this.cursor.getPosition(); }
+
+  /** [캔버스 한컴 포크] 표 안 커서를 본문으로 빼낸다 — '표 안에서 표 만들기'(table.ts)가
+   *  두 번째 표를 본문에 만들 수 있게 한다(커서가 셀 안이면 표 생성이 막히던 버그). */
+  exitTableToBody(): boolean { return this.cursor.exitTableToBody(); }
 
   /** 커서를 지정 위치로 이동하고 캐럿을 표시한다. 성공하면 true 반환. */
   moveCursorTo(pos: DocumentPosition): boolean {

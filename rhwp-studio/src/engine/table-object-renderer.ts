@@ -198,6 +198,7 @@ export class TableObjectRenderer {
     bboxes: { pageIndex: number; x: number; y: number; width: number; height: number }[],
     zoom: number,
     locked: boolean = false,
+    wholeHighlight: boolean = false,
   ): void {
     this.clear();
     this.ensureAttached();
@@ -216,13 +217,24 @@ export class TableObjectRenderer {
       const width = tableBBox.width * zoom;
       const height = tableBBox.height * zoom;
 
-      // 외곽선 — HWP 스타일 (검은색 실선)
       const border = document.createElement('div');
-      border.style.cssText =
-        `position:absolute;` +
-        `left:${left}px;top:${top}px;` +
-        `width:${width}px;height:${height}px;` +
-        `border:1px solid #000;box-sizing:border-box;pointer-events:none;`;
+      if (wholeHighlight) {
+        // [캔버스 한컴 포크] 표 개체 선택 = hover "전체 표 잡기" 강조와 동일하게(accent 채움+2px 테두리).
+        // "표가 잡혔다"를 hover 때와 같은 시각으로 상시 표시 — canvas-snap.ts TableHoverLayer와 스타일 일치.
+        border.style.cssText =
+          `position:absolute;box-sizing:border-box;pointer-events:none;` +
+          `left:${left - 1.5 * zoom}px;top:${top - 1.5 * zoom}px;` +
+          `width:${width + 3 * zoom}px;height:${height + 3 * zoom}px;` +
+          `border:2px solid var(--ui-menu-open,#256ef4);` +
+          `background:color-mix(in srgb, var(--ui-menu-open,#256ef4) 8%, transparent);`;
+      } else {
+        // 외곽선 — HWP 스타일 (검은색 실선)
+        border.style.cssText =
+          `position:absolute;` +
+          `left:${left}px;top:${top}px;` +
+          `width:${width}px;height:${height}px;` +
+          `border:1px solid #000;box-sizing:border-box;pointer-events:none;`;
+      }
       this.layer.appendChild(border);
       this.borders.push(border);
     }

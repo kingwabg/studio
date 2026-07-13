@@ -982,6 +982,19 @@ export class CursorState {
     this.updateRect();
   }
 
+  /** [캔버스 한컴 포크] 표 안 캐럿을 본문으로 빼낸다(표 뒤 문단, 없으면 앵커 문단).
+   *  '표 안에서 표 만들기'가 새 표를 본문에 만들 수 있게 하는 공개 진입점(private exitTable 래핑).
+   *  @returns 본문 위치가 되면 true (이미 본문이면 그대로 true). */
+  exitTableToBody(): boolean {
+    const { sectionIndex: sec, parentParaIndex: ppi } = this.position;
+    if (ppi === undefined) return true; // 이미 본문
+    const paraCount = this.wasm.getParagraphCount(sec);
+    const targetPara = ppi + 1 < paraCount ? ppi + 1 : ppi; // 표 뒤 문단 우선, 없으면 앵커
+    this.position = { sectionIndex: sec, paragraphIndex: targetPara, charOffset: 0 };
+    this.updateRect();
+    return this.position.parentParaIndex === undefined;
+  }
+
   // ─── 캐럿 좌표 갱신 ───────────────────────────────────
 
   /** WASM에서 캐럿 좌표를 갱신한다 */

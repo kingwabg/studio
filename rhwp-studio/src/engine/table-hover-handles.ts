@@ -27,10 +27,9 @@ interface VScroll {
 
 type Dir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 const HANDLE = 8; // px
-const CURSORS: Record<Dir, string> = {
-  nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize',
-  n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
-};
+// [캔버스 한컴 포크] 선택 전 핸들은 "표 전체 잡기(=선택)" 신호 — 리사이즈 커서가 아니라 move(잡기).
+// 리사이즈 커서/동작은 선택 후에만(선택 상태 hover가 방향별 resize 커서를 준다).
+const GRAB_CURSOR = 'move';
 // 표 좌상단 기준 8핸들의 상대 위치(0~1)
 const POS: Array<{ dir: Dir; fx: number; fy: number }> = [
   { dir: 'nw', fx: 0, fy: 0 }, { dir: 'n', fx: 0.5, fy: 0 }, { dir: 'ne', fx: 1, fy: 0 },
@@ -114,7 +113,7 @@ export class TableHoverHandles {
       el.style.cssText =
         `position:absolute;width:${HANDLE}px;height:${HANDLE}px;box-sizing:border-box;` +
         `left:${left + p.fx * w - HANDLE / 2}px;top:${top + p.fy * h - HANDLE / 2}px;` +
-        `background:#fff;border:1px solid #256EF4;pointer-events:auto;cursor:${CURSORS[p.dir]};`;
+        `background:#fff;border:1px solid #256EF4;pointer-events:auto;cursor:${GRAB_CURSOR};`;
       el.addEventListener('mousedown', (ev) => this.grab(ev, p.dir));
       this.layer.appendChild(el);
       this.handles.push(el);
