@@ -49,11 +49,14 @@ export function RhwpEmbed({
           fetch(url, { method: "HEAD", mode: "cors" }).then((r) => r.ok).catch(() => false);
         const envUrl = import.meta.env.VITE_RHWP_STUDIO_URL as string | undefined;
         const LOCAL = "http://127.0.0.1:7700/";
-        let studioUrl = envUrl ?? ((await probe(LOCAL)) ? LOCAL : undefined);
-        // 임베드 모드(?embed=1) — 우리 rhwp-studio 포크가 크롬을 숨기고 리본만 노출.
-        // (github.io 기본 폴백엔 이 모드가 없어 studioUrl이 있을 때만 붙인다.)
-        if (embedChrome && studioUrl) studioUrl += studioUrl.includes("?") ? "&embed=1" : "?embed=1";
-        const editor = await createEditor(host, { height, ...(studioUrl ? { studioUrl } : {}) });
+        // [캔버스 한컴 포크] self-host한 우리 포크 빌드(public/rhwp-app, `npm run build:rhwp-app`).
+        // 업스트림 github.io 폴백을 이걸로 대체 — 배포·7700 없이도 항상 우리 커스텀(캔버스 모드·
+        // 표 UX·?embed=1·AI)이 나온다. 같은 출처라 CORS도 없음.
+        const SELF = "/rhwp-app/";
+        let studioUrl = envUrl ?? ((await probe(LOCAL)) ? LOCAL : SELF);
+        // 임베드 모드(?embed=1) — 우리 포크가 크롬을 숨기고 리본만 노출(SELF·7700 모두 지원).
+        if (embedChrome) studioUrl += studioUrl.includes("?") ? "&embed=1" : "?embed=1";
+        const editor = await createEditor(host, { height, studioUrl });
         if (disposed) {
           editor?.destroy?.();
           return;

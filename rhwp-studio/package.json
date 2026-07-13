@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:embed": "vite build --base=./ --outDir ../public/rhwp-app --emptyOutDir",
     "preview": "vite preview",
     "test": "node --test tests/*.test.ts",
     "e2e": "node e2e/text-flow.test.mjs",

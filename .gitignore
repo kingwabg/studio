@@ -15,3 +15,5 @@ dist
 rhwp-studio/node_modules
 rhwp-studio/dist
 /pkg
+# self-host한 rhwp 포크 빌드 (npm run build:rhwp-app 생성물 — 17MB WASM, 커밋 X. 배포 시 prebuild가 재생성)
+public/rhwp-app
