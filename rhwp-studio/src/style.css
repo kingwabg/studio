@@ -26,3 +26,5 @@
 /* [캔버스 한컴 포크] KRDS 룩 — 반드시 마지막(캐스케이드 승리). 업스트림 diff 최소화 원칙. */
 @import './styles/krds-theme.css';
 @import './styles/canva-sidebars.css';
+/* [캔버스 한컴 포크] 임베드 모드(?embed=1) — 크롬 숨기고 리본만 */
+@import './styles/embed.css';
