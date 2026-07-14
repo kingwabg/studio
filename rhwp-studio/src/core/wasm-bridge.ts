@@ -1056,6 +1056,31 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).createTableEx(JSON.stringify(options)));
   }
 
+  /**
+   * [캔버스 한컴 포크] 새 표 기본 테두리를 진한 검은 실선(0.2mm)으로 통일한다.
+   * 엔진 기본 테두리(0.12mm, index 1)는 렌더에서 너무 얇아 흐리게(회색처럼) 보이고,
+   * 리사이즈의 renderHeight override가 있어야 진하게 그려지는 업스트림 렌더 특성이 있다
+   * (실측 2026-07-14: 0.12mm 최암 243=거의 안 보임 → 0.2mm 최암 93=진한 실선). 표 생성 직후
+   * 전 셀에 적용 — 생성 명령의 executeOperation 스냅샷 안에서 호출해 Ctrl+Z 한 번에 함께 취소.
+   */
+  applyDefaultTableBorders(sec: number, parentPara: number, controlIdx: number): void {
+    if (!this.doc) return;
+    try {
+      const bboxes = this.getTableCellBboxes(sec, parentPara, controlIdx);
+      const border = { type: 1, width: 3, color: '#000000' }; // type1=실선, width3(index)=0.2mm
+      const seen = new Set<number>();
+      for (const b of bboxes) {
+        if (seen.has(b.cellIdx)) continue;
+        seen.add(b.cellIdx);
+        this.setCellProperties(sec, parentPara, controlIdx, b.cellIdx, {
+          borderLeft: border, borderRight: border, borderTop: border, borderBottom: border,
+        });
+      }
+    } catch {
+      // 테두리 적용 실패해도 표 생성 자체는 유지
+    }
+  }
+
   evaluateTableFormula(sec: number, parentPara: number, controlIdx: number,
     targetRow: number, targetCol: number, formula: string, writeResult: boolean): string {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');

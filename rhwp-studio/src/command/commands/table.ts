@@ -255,6 +255,8 @@ export const tableCommands: CommandDef[] = [
                 })
               : wasm.createTable(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, rows, cols);
             if (result.ok) {
+              // [캔버스 한컴 포크] 새 표 기본 테두리를 진한 검은 실선으로(엔진 기본 0.12mm가 흐림)
+              wasm.applyDefaultTableBorders(pos.sectionIndex, result.paraIdx, result.controlIdx);
               return {
                 sectionIndex: pos.sectionIndex,
                 paragraphIndex: 0,

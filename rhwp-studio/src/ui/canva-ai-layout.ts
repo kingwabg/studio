@@ -120,6 +120,8 @@ function createAndFillTable(wasm: any, el: AiTableEl): void {
   if (!res.ok) throw new Error('표 생성 실패');
   const ppi = res.paraIdx;
   const ci = res.controlIdx;
+  // [캔버스 한컴 포크] AI 생성 표도 기본 테두리를 진한 검은 실선으로(엔진 기본 0.12mm가 흐림)
+  wasm.applyDefaultTableBorders(0, ppi, ci);
   const bb: any[] = wasm.getTableCellBboxes(0, ppi, ci);
   const seen = new Set<number>();
   for (const b of bb) {
