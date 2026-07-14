@@ -599,6 +599,8 @@ export class InputHandler {
     // 표 객체 선택 변경 시 렌더링
     eventBus.on('table-object-selection-changed', (selected) => {
       if (selected) {
+        // [캔버스 한컴 포크] 표 개체 선택 시, 미선택 상태에서 떠 있던 hover 핸들 잔상 제거
+        this.tableHoverHandles?.hide();
         this.renderTableObjectSelection();
       } else {
         this.tableObjectRenderer?.clear();
@@ -612,6 +614,9 @@ export class InputHandler {
       this.protectedCellHitCache = null;
       this.protectedCellHoverEl?.remove();
       this.protectedCellHoverEl = null;
+      // [캔버스 한컴 포크] 문서 변경(표 이동·리사이즈)으로 bbox가 바뀌면 옛 위치의 hover 핸들
+      // 잔상을 즉시 감춘다(다음 mousemove가 새 위치에서 canShow 판정 후 재표시).
+      this.tableHoverHandles?.hide();
       requestAnimationFrame(() => {
         if (this.cursor.isInPictureObjectSelection()) {
           this.renderPictureObjectSelection();
@@ -2862,6 +2867,9 @@ export class InputHandler {
 
   /** 표 객체 선택 시 외곽선 + 핸들을 렌더링한다 */
   private renderTableObjectSelection(): void {
+    // [캔버스 한컴 포크] 재배치(이동·리사이즈·문서변경)로 선택 오버레이를 다시 그릴 때, 옛 bbox에
+    // 남은 "전체 표 잡기" 호버 강조(accent)를 먼저 지운다 — 안 지우면 이동 전 위치에 잔상이 남는다.
+    _tableHoverFor(this.container).clear();
     if (!this.tableObjectRenderer) return;
     const ref = this.cursor.getSelectedTableRef();
     if (!ref) {

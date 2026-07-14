@@ -7,7 +7,7 @@ import type { CellBbox } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { BorderEdge } from './table-resize-renderer';
 import { showToast } from '@/ui/toast';
-import { snapLayerFor as _snapLayerFor } from './canvas-snap'; // [캔버스 한컴 포크]
+import { snapLayerFor as _snapLayerFor, tableHoverFor as _tableHoverFor } from './canvas-snap'; // [캔버스 한컴 포크]
 import { showConfirm } from '@/ui/confirm-dialog';
 import { showCellClearChoice } from '@/ui/cell-clear-dialog';
 
@@ -1349,6 +1349,9 @@ export function startTableHandleResize(
   pageIndex: number,
 ): boolean {
   if (dir !== 'e' && dir !== 's' && dir !== 'se') return false; // 아래/오른쪽/대각만
+  // [캔버스 한컴 포크] 리사이즈 드래그 시작 시 hover 강조(accent)를 즉시 지운다 —
+  // updateTableHandleResize는 renderTableObjectSelection을 안 불러 드래그 중 옛 크기에 얼어붙는다.
+  _tableHoverFor(this.container).clear();
   try {
     const bboxes: CellBbox[] = this.wasm.getTableCellBboxes(ref.sec, ref.ppi, ref.ci);
     if (!bboxes?.length) return false;
