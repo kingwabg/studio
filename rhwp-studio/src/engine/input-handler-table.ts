@@ -764,7 +764,13 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
         neighborBox: CellBbox | null;
       } => pair.targetBox !== undefined);
     const hasLocalHistory = hasLocalResizeHistory(this, state.tableRef);
-    const delta = hasLocalHistory
+    // [캔버스 한컴 포크] 행(높이)은 모델 높이가 자동확장 최소값(≈282 ≪ MIN 1276)이라 model 클램프가
+    // 항상 delta=0 → 이력 없는 표에서 행 경계 조절이 무동작이었다(실측 2026-07-14: 모델 클램프
+    // maxDelta=max(0,282-1276)=0). 행은 이력 무관하게 display 기반으로 통일 — 콘텐츠로 커진 행
+    // 축소 등이 정상 동작(display 크기로 클램프·renderHeight override). 열은 model==display이고
+    // 순수 model이라야 Alt(모델 통째)와 합성되므로(2026-07-14 fix) 이력 없으면 현행 model 유지.
+    const useDisplayPath = hasLocalHistory || state.edge.type === 'row';
+    const delta = useDisplayPath
       ? clampCompensatedDisplayDelta(state.edge, pairBoxes, deltaHwpUnit)
       : clampCompensatedResizeDelta(
         this.wasm,
@@ -778,7 +784,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       return;
     }
     updates = [];
-    if (hasLocalHistory) {
+    if (useDisplayPath) {
       const updatedCells = new Set<number>();
       for (const pair of pairBoxes) {
         const targetProps = this.wasm.getCellProperties(
