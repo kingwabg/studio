@@ -1407,6 +1407,18 @@ export class TableCellPropsDialog extends ModalDialog {
       outerBottom: mmToHwp16(parseFloat(this.marginOuterInputs['bottom'].value) || 0),
     };
 
+    // [officex] 글자처럼취급 해제 시 위치 붕괴 방지(구 OBJECT_PLACEMENT_PATCH를 소스로 이관).
+    // 오프셋을 한 번도 준 적 없는 표를 인라인 해제하면 vertRelTo가 Paper가 되어 표가 쪽 맨 위로
+    // 튕기고(위치 이상 이동), 그 깨진 레이아웃 때문에 셀 배경색까지 렌더에서 사라진다. 문단
+    // 기준(Para)으로 두면 제자리에 남는다. 사용자가 오프셋을 직접 준 표는 건드리지 않는다.
+    if (
+      !newTableProps.treatAsChar &&
+      newTableProps.vertOffset === 0 &&
+      newTableProps.horzOffset === 0
+    ) {
+      newTableProps.vertRelTo = 'Para';
+    }
+
     // 캡션 속성 (가운데 = 캡션 없음)
     const activeCapBtn = this.captionPosBtns.find(b => b.classList.contains('active'));
     const capDir = activeCapBtn ? parseInt(activeCapBtn.dataset.dir!, 10) : -1;
