@@ -1379,6 +1379,13 @@ export class TableCellPropsDialog extends ModalDialog {
       }
     }
 
+    // [officex fix] 셀 배경색 손실은 여기서가 아니라 applyProps 에서 사후 복원한다.
+    // 이유: setTableProperties(테두리/글자처럼취급 변경)의 borderFill 재빌드가 표의 모든
+    // 셀 배경색을 날린다(헤드리스 실측). newCellProps 에 fill 을 미리 실어 setCellProperties
+    // 로 넣어도 "직후" setTableProperties 가 다시 지운다 — 그래서 표 속성 적용 뒤에 전 셀
+    // fill 을 재적용해야만 한다(applyProps 참고). 활성 셀이 배경 탭에서 명시적으로 정한
+    // fill(newCellProps.fillType 존재)은 그 값이 복원에 우선한다.
+
     // 표 속성 수정
     const pbValue = parseInt(this.tablePageBreakSelect.value, 10);
     const newTableProps: Record<string, unknown> = {
@@ -1450,8 +1457,24 @@ export class TableCellPropsDialog extends ModalDialog {
     }
 
     const applyProps = () => {
+      // [officex fix] borderFill 재빌드로 인한 전 셀 배경색 손실을 상쇄한다.
+      // ① 변경 전 모든 셀의 fill 을 스냅샷 → ② 원래 속성 적용(setCell/setTable) →
+      // ③ 표 속성 적용으로 날아간 셀 배경색을 재적용. 활성 셀은 이 대화상자가 명시한
+      // fill(newCellProps)을 우선한다.
+      const desiredFills = this.captureCellFills(sec, ppi, ci);
+      if (newCellProps.fillType !== undefined) {
+        desiredFills.set(this.cellIdx, {
+          fillType: newCellProps.fillType as string,
+          fillColor: newCellProps.fillColor as string | undefined,
+          patternColor: newCellProps.patternColor as string | undefined,
+          patternType: newCellProps.patternType as number | undefined,
+        });
+      }
       this.wasm.setCellProperties(sec, ppi, ci, this.cellIdx, newCellProps as Partial<CellProperties>);
       this.wasm.setTableProperties(sec, ppi, ci, newTableProps as Partial<TableProperties>);
+      for (const [idx, fill] of desiredFills) {
+        this.wasm.setCellProperties(sec, ppi, ci, idx, fill);
+      }
     };
     // 표/셀 속성 변경도 undo 대상이다 — 편집 라우터를 통과시켜 스냅샷으로
     // 기록한다 (#1320 계약, picture-props-dialog(#2027)와 동일 패턴).
@@ -1470,6 +1493,38 @@ export class TableCellPropsDialog extends ModalDialog {
       applyProps();
       this.eventBus.emit('document-changed');
     }
+  }
+
+  /**
+   * [officex fix] 표의 모든 셀 배경(fill)을 cellIdx→fill 로 스냅샷한다.
+   * setTableProperties(테두리/글자처럼취급 변경)의 borderFill 재빌드가 전 셀 배경색을
+   * 통째로 날리는 엔진 함정(헤드리스 실측: 빨/노/파/초 4칸이 백지가 됨 — borderFill 공유
+   * 모델)을 상쇄하려고, 변경 전 fill 을 저장했다가 표 속성 적용 뒤 재적용한다.
+   * 배경이 없는(none) 셀은 복원할 필요가 없으므로 제외한다.
+   */
+  private captureCellFills(sec: number, ppi: number, ci: number): Map<number, Partial<CellProperties>> {
+    const fills = new Map<number, Partial<CellProperties>>();
+    let cellIdxs: number[] = [];
+    try {
+      const bboxes = this.wasm.getTableCellBboxes(sec, ppi, ci);
+      cellIdxs = [...new Set(bboxes.map((b) => b.cellIdx))];
+    } catch {
+      return fills; // 셀 열거 실패 시 복원 없이 진행(기존 동작과 동일 — 더 나빠지지 않음)
+    }
+    for (const idx of cellIdxs) {
+      try {
+        const cp = this.wasm.getCellProperties(sec, ppi, ci, idx);
+        if (cp && cp.fillType && cp.fillType !== 'none') {
+          fills.set(idx, {
+            fillType: cp.fillType,
+            fillColor: cp.fillColor,
+            patternColor: cp.patternColor,
+            patternType: cp.patternType,
+          });
+        }
+      } catch { /* 개별 셀 조회 실패는 무시 — 그 셀만 복원 대상에서 빠진다 */ }
+    }
+    return fills;
   }
 
   // ─── "모두(A)" 일괄 여백 스피너 ─────────────────────
