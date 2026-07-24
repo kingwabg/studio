@@ -4007,6 +4007,79 @@ export class InputHandler {
   /** 선택된 표의 참조 정보 반환 */
   getSelectedTableRef() { return this.cursor.getSelectedTableRef(); }
 
+  /**
+   * 선택 셀의 보호 속성을 문서에 기록한다.
+   * 표 개체 선택은 표 전체, F5 셀 선택은 선택 범위, 일반 커서는 현재 셀에 적용한다.
+   */
+  setSelectedCellsProtected(enabled: boolean): { count: number; message: string } {
+    const tableRef = this.cursor.getSelectedTableRef();
+    const ctx = tableRef ?? this.cursor.getCellTableContext();
+    if (!ctx) throw new Error('먼저 표 셀 또는 표 전체를 선택해 주세요.');
+    if (ctx.cellPath && ctx.cellPath.length > 1) {
+      throw new Error('중첩 표 잠금은 아직 지원하지 않습니다. 표 속성 창을 이용해 주세요.');
+    }
+
+    const cells = [...new Map(
+      this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci)
+        .map((cell) => [cell.cellIdx, cell] as const),
+    ).values()];
+    const range = tableRef ? null : this.cursor.getSelectedCellRange();
+    const excluded = this.cursor.getExcludedCells();
+    const currentCellIdx = this.cursor.getPosition().cellIndex;
+    const targets = tableRef
+      ? cells
+      : range
+        ? cells.filter((cell) => (
+            cell.row >= range.startRow && cell.row <= range.endRow &&
+            cell.col >= range.startCol && cell.col <= range.endCol &&
+            !excluded.has(`${cell.row},${cell.col}`)
+          ))
+        : cells.filter((cell) => cell.cellIdx === currentCellIdx);
+
+    if (targets.length === 0) throw new Error('잠금을 적용할 셀을 찾지 못했습니다.');
+    this.executeOperation({
+      kind: 'snapshot',
+      operationType: enabled ? 'protectTableCells' : 'unprotectTableCells',
+      operation: (wasm) => {
+        for (const cell of targets) {
+          wasm.setCellProperties(ctx.sec, ctx.ppi, ctx.ci, cell.cellIdx, { cellProtect: enabled });
+        }
+        return this.cursor.getPosition();
+      },
+    });
+    return {
+      count: targets.length,
+      message: `${targets.length}개 셀의 잠금을 ${enabled ? '설정' : '해제'}했습니다.`,
+    };
+  }
+
+  /**
+   * 선택 표를 글자처럼 취급해 앵커 문단에 고정하고 드래그 이동을 막는다.
+   * HWP 표 속성에 직접 저장되므로 내보낸 원본에서도 유지된다.
+   */
+  setSelectedTablePositionFixed(enabled: boolean): { fixed: boolean; message: string } {
+    const ref = this.cursor.getSelectedTableRef() ?? this.cursor.getCellTableContext();
+    if (!ref) throw new Error('먼저 고정할 표를 선택해 주세요.');
+    if (ref.cellPath && ref.cellPath.length > 1) {
+      throw new Error('중첩 표 위치 고정은 아직 지원하지 않습니다. 표 속성 창을 이용해 주세요.');
+    }
+
+    this.executeOperation({
+      kind: 'snapshot',
+      operationType: enabled ? 'fixTablePosition' : 'unfixTablePosition',
+      operation: (wasm) => {
+        wasm.setTableProperties(ref.sec, ref.ppi, ref.ci, enabled
+          ? { treatAsChar: true, keepWithAnchor: true, restrictInPage: true }
+          : { treatAsChar: false });
+        return this.cursor.getPosition();
+      },
+    });
+    return {
+      fixed: enabled,
+      message: `표 위치 고정을 ${enabled ? '설정' : '해제'}했습니다.`,
+    };
+  }
+
   /** 표 객체 선택 해제 + 재렌더링 */
   exitTableObjectSelection(): void {
     this.cursor.exitTableObjectSelection();

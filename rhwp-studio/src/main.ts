@@ -1203,6 +1203,18 @@ window.addEventListener('message', async (e) => {
         await initPromise;
         reply(JSON.parse(wasm.exportHwpVerify()));
         break;
+      case 'protectSelectedCells': {
+        await initPromise;
+        if (!inputHandler) throw new Error('RHWP 편집기가 준비되지 않았습니다.');
+        reply(inputHandler.setSelectedCellsProtected(Boolean(params?.enabled)));
+        break;
+      }
+      case 'fixSelectedTablePosition': {
+        await initPromise;
+        if (!inputHandler) throw new Error('RHWP 편집기가 준비되지 않았습니다.');
+        reply(inputHandler.setSelectedTablePositionFixed(Boolean(params?.enabled)));
+        break;
+      }
       default:
         reply(undefined, `Unknown method: ${method}`);
     }
