@@ -3,6 +3,7 @@
 
 import { MoveTableCommand, MovePictureCommand, MoveShapeCommand } from './command';
 import { getObjectProperties, setObjectProperties } from './input-handler-picture';
+import { marginClampRange, clampToMargin } from './canvas-snap';
 import type { CellBbox } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { BorderEdge } from './table-resize-renderer';
@@ -1185,23 +1186,40 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
     this.moveDragState.hasMoved = true;
   }
 
-  // 이전 위치와의 차이를 HWPUNIT으로 변환 (1px = 7200/96 = 75 HWPUNIT)
-  const deltaXpx = px - this.moveDragState.lastPageX;
-  const deltaYpx = py - this.moveDragState.lastPageY;
+  // 이전 위치와의 차이(px). lastPage 는 항상 현재 마우스로 갱신해 프레임 증분을 유지한다
+  // (여백에서 멈춰도 마우스가 되돌아오면 즉시 다시 따라오도록).
+  let deltaXpx = px - this.moveDragState.lastPageX;
+  let deltaYpx = py - this.moveDragState.lastPageY;
+  this.moveDragState.lastPageX = px;
+  this.moveDragState.lastPageY = py;
+
+  const ref = this.moveDragState.tableRef;
+
+  // [officex] 여백(인쇄영역) 하드 클램프 — floating 표 bbox 가 여백 상자를 넘지 못하게.
+  // 현재 bbox 기준으로 이번 프레임 이동분을 잘라, 좌상단이 여백 밖으로 못 나가게 한다.
+  try {
+    const bb = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
+    const pageWpx = this.virtualScroll.getPageWidth(pi) / zoom;
+    const pageHpx = this.virtualScroll.getPageHeight(pi) / zoom;
+    const range = marginClampRange(this.wasm, pageWpx, pageHpx, bb.width, bb.height, ref.sec);
+    if (range) {
+      const c = clampToMargin(bb.x + deltaXpx, bb.y + deltaYpx, range);
+      deltaXpx = c.x - bb.x;
+      deltaYpx = c.y - bb.y;
+    }
+  } catch { /* bbox/여백 조회 실패 시 클램프 없이 원래 이동 */ }
+
   const deltaH = Math.round(deltaXpx * 75);
   const deltaV = Math.round(deltaYpx * 75);
 
   if (deltaH === 0 && deltaV === 0) return;
 
   try {
-    const ref = this.moveDragState.tableRef;
     const result = this.wasm.moveTableOffset(ref.sec, ref.ppi, ref.ci, deltaH, deltaV);
     if (result.ppi !== ref.ppi || result.ci !== ref.ci) {
       this.moveDragState.tableRef = { sec: ref.sec, ppi: result.ppi, ci: result.ci };
       this.cursor.updateSelectedTableRef(ref.sec, result.ppi, result.ci);
     }
-    this.moveDragState.lastPageX = px;
-    this.moveDragState.lastPageY = py;
     this.moveDragState.totalDeltaH += deltaH;
     this.moveDragState.totalDeltaV += deltaV;
     this.eventBus.emit('document-changed');

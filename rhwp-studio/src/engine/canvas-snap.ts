@@ -25,6 +25,76 @@ type WasmLike = {
 
 const HWP_PER_PX = 75;
 
+// ── [officex] 여백(인쇄영역) 하드 클램프 ────────────────────────────────────
+// floating 개체(글자처럼취급 해제 표 등)의 이동/위치를 A4 여백 상자 안으로 강제한다.
+// 스냅(computeSnap)은 ±5px 자석일 뿐 경계를 넘게 두므로, 그 위에 하드 경계를 얹는다.
+// 좌표계: 페이지 로컬 px (HWPUNIT/75). 렌더 restrictInPage 와 별개인 studio측 상호작용 클램프.
+
+export type MarginClampRange = { minX: number; minY: number; maxX: number; maxY: number };
+type PageDefWasm = { getPageDef(sectionIdx: number): {
+  width: number; height: number;
+  marginLeft: number; marginRight: number; marginTop: number; marginBottom: number;
+  marginHeader: number; marginFooter: number;
+} };
+
+/**
+ * 개체 좌상단이 놓일 수 있는 허용 범위(px)를 계산한다.
+ * 여백 상자: 좌=marginLeft, 우=pageW-marginRight, 상=marginTop+marginHeader,
+ * 하=pageH-(marginBottom+marginFooter). 개체 폭/높이를 빼서 우·하 한계를 얻는다.
+ * 개체가 여백폭보다 크면 max<min 이 되어(아래 Math.max) 좌상단을 여백에 붙이는 폴백이 된다.
+ */
+export function marginClampRange(
+  wasm: PageDefWasm,
+  pageWpx: number,
+  pageHpx: number,
+  bboxW: number,
+  bboxH: number,
+  sectionIdx = 0,
+): MarginClampRange | null {
+  try {
+    const pd = wasm.getPageDef(sectionIdx);
+    const minX = pd.marginLeft / HWP_PER_PX;
+    const minY = (pd.marginTop + pd.marginHeader) / HWP_PER_PX;
+    const maxX = Math.max(minX, pageWpx - pd.marginRight / HWP_PER_PX - bboxW);
+    const maxY = Math.max(minY, pageHpx - (pd.marginBottom + pd.marginFooter) / HWP_PER_PX - bboxH);
+    return { minX, minY, maxX, maxY };
+  } catch {
+    return null;
+  }
+}
+
+/** 좌상단(x,y)을 여백 허용범위로 하드 클램프한다. */
+export function clampToMargin(x: number, y: number, r: MarginClampRange): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(x, r.minX), r.maxX),
+    y: Math.min(Math.max(y, r.minY), r.maxY),
+  };
+}
+
+type FloatingClampWasm = PageDefWasm & {
+  getTableBBox(sec: number, ppi: number, ci: number): { x: number; y: number; width: number; height: number };
+  moveTableOffset(sec: number, ppi: number, ci: number, deltaH: number, deltaV: number): unknown;
+};
+
+/**
+ * floating 표를 여백 상자 안으로 되돌린다 — 위치 입력(표속성 다이얼로그 offset 적용)·
+ * 글자처럼취급 해제 직후 등 "위치 확정" 경로용. 현재 bbox 가 여백 밖이면 moveTableOffset
+ * 으로 안쪽으로 당긴다. 인라인/조회 실패 시 무동작. 페이지 dim 은 getPageDef 로 직접 얻어
+ * virtualScroll 없이도 쓸 수 있다(HWPUNIT/75 = 페이지 로컬 px).
+ */
+export function clampFloatingTableToMargin(wasm: FloatingClampWasm, sec: number, ppi: number, ci: number): void {
+  try {
+    const pd = wasm.getPageDef(sec);
+    const bb = wasm.getTableBBox(sec, ppi, ci);
+    const range = marginClampRange(wasm, pd.width / HWP_PER_PX, pd.height / HWP_PER_PX, bb.width, bb.height, sec);
+    if (!range) return;
+    const t = clampToMargin(bb.x, bb.y, range);
+    const deltaH = Math.round((t.x - bb.x) * HWP_PER_PX);
+    const deltaV = Math.round((t.y - bb.y) * HWP_PER_PX);
+    if (deltaH !== 0 || deltaV !== 0) wasm.moveTableOffset(sec, ppi, ci, deltaH, deltaV);
+  } catch { /* 조회 실패 시 클램프 생략 */ }
+}
+
 /** 드래그 시작 시 1회: 스냅 타겟(지면·여백·타 개체)과 이동 개체 합집합 bbox 수집 */
 export function buildSnapContext(
   wasm: WasmLike,

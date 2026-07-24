@@ -1,5 +1,6 @@
 import { ModalDialog } from './dialog';
 import { appendSvgMarkup } from './dom-utils';
+import { clampFloatingTableToMargin } from '@/engine/canvas-snap';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { CellProperties, TableProperties } from '@/core/types';
 import type { EventBus } from '@/core/event-bus';
@@ -1474,6 +1475,12 @@ export class TableCellPropsDialog extends ModalDialog {
       this.wasm.setTableProperties(sec, ppi, ci, newTableProps as Partial<TableProperties>);
       for (const [idx, fill] of desiredFills) {
         this.wasm.setCellProperties(sec, ppi, ci, idx, fill);
+      }
+      // [officex] 위치 확정 클램프 — floating(글자처럼취급 해제) 표는 여백(인쇄영역) 안에만.
+      // 다이얼로그에서 여백 밖 offset 을 넣거나 글자처럼취급을 막 해제한 순간의 초기 위치가
+      // 여백을 벗어나면 인쇄영역 안으로 되돌린다(드래그 클램프와 동일 경계).
+      if (newTableProps.treatAsChar === false) {
+        clampFloatingTableToMargin(this.wasm, sec, ppi, ci);
       }
     };
     // 표/셀 속성 변경도 undo 대상이다 — 편집 라우터를 통과시켜 스냅샷으로
