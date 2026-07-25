@@ -108,6 +108,8 @@ export class TableCellPropsDialog extends ModalDialog {
   private horzAlignSelect!: HTMLSelectElement;
   private horzOffsetInput!: HTMLInputElement;
   private vertRelSelect!: HTMLSelectElement;
+  /** 이번 다이얼로그에서 사용자가 세로 기준을 직접 골랐는가 — 아래 위치붕괴 방지 가드의 판단 근거 */
+  private vertRelUserPicked = false;
   private vertAlignSelect!: HTMLSelectElement;
   private vertOffsetInput!: HTMLInputElement;
   private posGroup!: HTMLDivElement;
@@ -536,6 +538,9 @@ export class TableCellPropsDialog extends ModalDialog {
     this.vertRelSelect = this.selectOptions([
       ['Paper', '종이'], ['Page', '쪽'], ['Para', '문단'],
     ]);
+    // 사용자가 세로 기준을 직접 고른 순간을 기억한다 — 위치붕괴 방지 가드(applyTable)가
+    // 기본값만 덮고 사용자 선택은 존중하려면 이 구분이 있어야 한다.
+    this.vertRelSelect.addEventListener('change', () => { this.vertRelUserPicked = true; });
     vRow.appendChild(this.vertRelSelect);
     vRow.appendChild(this.unit('의'));
     this.vertAlignSelect = this.selectOptions([
@@ -1288,6 +1293,9 @@ export class TableCellPropsDialog extends ModalDialog {
     this.horzRelSelect.value = tp.horzRelTo ?? 'Paper';
     this.horzAlignSelect.value = tp.horzAlign ?? 'Left';
     this.horzOffsetInput.value = hwpunitToMm(tp.horzOffset ?? 0).toFixed(1);
+    // 값을 주입하는 이 대입은 change 이벤트를 발생시키지 않는다. 그래도 다이얼로그를 다시 열
+    // 때마다 직전 세션의 선택이 남아있으면 안 되므로 명시적으로 되돌린다.
+    this.vertRelUserPicked = false;
     this.vertRelSelect.value = tp.vertRelTo ?? 'Paper';
     this.vertAlignSelect.value = tp.vertAlign ?? 'Top';
     this.vertOffsetInput.value = hwpunitToMm(tp.vertOffset ?? 0).toFixed(1);
@@ -1419,10 +1427,13 @@ export class TableCellPropsDialog extends ModalDialog {
     // 오프셋을 한 번도 준 적 없는 표를 인라인 해제하면 vertRelTo가 Paper가 되어 표가 쪽 맨 위로
     // 튕기고(위치 이상 이동), 그 깨진 레이아웃 때문에 셀 배경색까지 렌더에서 사라진다. 문단
     // 기준(Para)으로 두면 제자리에 남는다. 사용자가 오프셋을 직접 준 표는 건드리지 않는다.
+    // 단, 사용자가 이번에 세로 기준을 직접 골랐다면 그 선택이 이긴다 — 안 그러면 "종이 기준"을
+    // 지정해도 조용히 문단 기준으로 바뀌어, 다이얼로그가 거짓말을 하는 꼴이 된다(능력지도 S5).
     if (
       !newTableProps.treatAsChar &&
       newTableProps.vertOffset === 0 &&
-      newTableProps.horzOffset === 0
+      newTableProps.horzOffset === 0 &&
+      !this.vertRelUserPicked
     ) {
       newTableProps.vertRelTo = 'Para';
     }
