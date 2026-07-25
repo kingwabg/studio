@@ -11,6 +11,67 @@ import { showToast } from '@/ui/toast';
 import type { ShapeType } from '@/ui/shape-picker';
 import type { CellPathLike } from '@/core/types';
 
+/** 캡션 기본 크기 — insert:caption-toggle 과 같은 값(30mm / 3mm)을 쓴다. */
+const CAPTION_DEFAULT_WIDTH = Math.round(30 * 283.46);
+const CAPTION_DEFAULT_SPACING = Math.round(3 * 283.46);
+
+/**
+ * 캡션 위치 프리셋 커맨드. direction=null 이면 "캡션 없음"(해제).
+ *
+ * 캡션이 이미 있으면 방향·정렬만 바꾸고 폭·간격은 그대로 둔다 — 사용자가 손으로 조정한
+ * 값을 프리셋 한 번에 기본값으로 되돌리면 안 되기 때문(표 폭 복원 사고와 같은 부류).
+ * vertAlign 은 Left/Right 캡션에서만 의미가 있어 Top/Bottom 일 땐 보내지 않는다.
+ */
+function captionPreset(
+  id: string,
+  label: string,
+  direction: 'Top' | 'Bottom' | 'Left' | 'Right' | null,
+  vertAlign?: 'Top' | 'Center' | 'Bottom',
+): CommandDef {
+  return {
+    id,
+    label,
+    canExecute: (ctx) => ctx.inPictureObjectSelection,
+    execute(services) {
+      const ih = services.getInputHandler();
+      if (!ih) return;
+      const ref = ih.getSelectedPictureRef();
+      // 수식·그룹은 캡션 대상이 아니다(caption-toggle 과 같은 가드).
+      if (!ref || ref.type === 'equation' || ref.type === 'group') return;
+
+      let props: any;
+      try {
+        props = getProps(services, ref);
+      } catch { return; }
+      if (!props) return;
+
+      try {
+        if (direction === null) {
+          if (!props.hasCaption) return;   // 이미 없으면 문서를 건드리지 않는다
+          setProps(services, ref, { hasCaption: false });
+        } else {
+          const next: Record<string, unknown> = {
+            hasCaption: true,
+            captionDirection: direction,
+          };
+          if (vertAlign) next.captionVertAlign = vertAlign;
+          // 새로 다는 캡션에만 기본 크기를 준다(기존 캡션의 손조정 폭·간격 보존).
+          if (!props.hasCaption) {
+            next.captionWidth = CAPTION_DEFAULT_WIDTH;
+            next.captionSpacing = CAPTION_DEFAULT_SPACING;
+            next.captionIncludeMargin = false;
+          }
+          setProps(services, ref, next);
+        }
+        services.eventBus.emit('document-mutated', 'caption-preset');
+        services.eventBus.emit('document-changed');
+      } catch (err) {
+        console.warn(`[${id}] 캡션 위치 적용 실패:`, err);
+      }
+    },
+  };
+}
+
 /** 스텁 커맨드 생성 헬퍼 */
 function stub(id: string, label: string, icon?: string, shortcut?: string): CommandDef {
   return {
@@ -198,15 +259,15 @@ export const insertCommands: CommandDef[] = [
       fieldInsertDialog.show();
     },
   },
-  stub('insert:caption-top', '캡션 - 위'),
-  stub('insert:caption-lt', '캡션 - 왼쪽 위'),
-  stub('insert:caption-lm', '캡션 - 왼쪽 가운데'),
-  stub('insert:caption-lb', '캡션 - 왼쪽 아래'),
-  stub('insert:caption-rt', '캡션 - 오른쪽 위'),
-  stub('insert:caption-rm', '캡션 - 오른쪽 가운데'),
-  stub('insert:caption-rb', '캡션 - 오른쪽 아래'),
-  stub('insert:caption-bottom', '캡션 - 아래'),
-  stub('insert:caption-none', '캡션 없음'),
+  captionPreset('insert:caption-top', '캡션 - 위', 'Top'),
+  captionPreset('insert:caption-lt', '캡션 - 왼쪽 위', 'Left', 'Top'),
+  captionPreset('insert:caption-lm', '캡션 - 왼쪽 가운데', 'Left', 'Center'),
+  captionPreset('insert:caption-lb', '캡션 - 왼쪽 아래', 'Left', 'Bottom'),
+  captionPreset('insert:caption-rt', '캡션 - 오른쪽 위', 'Right', 'Top'),
+  captionPreset('insert:caption-rm', '캡션 - 오른쪽 가운데', 'Right', 'Center'),
+  captionPreset('insert:caption-rb', '캡션 - 오른쪽 아래', 'Right', 'Bottom'),
+  captionPreset('insert:caption-bottom', '캡션 - 아래', 'Bottom'),
+  captionPreset('insert:caption-none', '캡션 없음', null),
   stub('insert:para-band', '문단 띠'),
   stub('insert:comment', '주석', 'icon-comment'),
   {
