@@ -3,7 +3,7 @@
 
 import { MoveTableCommand, MovePictureCommand, MoveShapeCommand } from './command';
 import { getObjectProperties, setObjectProperties } from './input-handler-picture';
-import { marginClampRange, clampToMargin } from './canvas-snap';
+import { pageClampRange, clampToPage } from './canvas-snap';
 import type { CellBbox } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { BorderEdge } from './table-resize-renderer';
@@ -1195,19 +1195,18 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
 
   const ref = this.moveDragState.tableRef;
 
-  // [officex] 여백(인쇄영역) 하드 클램프 — floating 표 bbox 가 여백 상자를 넘지 못하게.
-  // 현재 bbox 기준으로 이번 프레임 이동분을 잘라, 좌상단이 여백 밖으로 못 나가게 한다.
+  // [officex] 용지 경계 하드 클램프 — floating 표 bbox 가 용지를 벗어나지 못하게.
+  // 현재 bbox 기준으로 이번 프레임 이동분을 잘라, 좌상단이 용지 밖으로 못 나가게 한다.
+  // 여백 안쪽은 자유롭게 이동 가능하다 — 여백 상자로 묶으면 아래 여백으로 내려갈 수 없다.
   try {
     const bb = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
     const pageWpx = this.virtualScroll.getPageWidth(pi) / zoom;
     const pageHpx = this.virtualScroll.getPageHeight(pi) / zoom;
-    const range = marginClampRange(this.wasm, pageWpx, pageHpx, bb.width, bb.height, ref.sec);
-    if (range) {
-      const c = clampToMargin(bb.x + deltaXpx, bb.y + deltaYpx, range);
-      deltaXpx = c.x - bb.x;
-      deltaYpx = c.y - bb.y;
-    }
-  } catch { /* bbox/여백 조회 실패 시 클램프 없이 원래 이동 */ }
+    const range = pageClampRange(pageWpx, pageHpx, bb.width, bb.height);
+    const c = clampToPage(bb.x + deltaXpx, bb.y + deltaYpx, range);
+    deltaXpx = c.x - bb.x;
+    deltaYpx = c.y - bb.y;
+  } catch { /* bbox 조회 실패 시 클램프 없이 원래 이동 */ }
 
   const deltaH = Math.round(deltaXpx * 75);
   const deltaV = Math.round(deltaYpx * 75);
