@@ -1214,13 +1214,38 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
   if (deltaH === 0 && deltaV === 0) return;
 
   try {
+    const bbBefore = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
     const result = this.wasm.moveTableOffset(ref.sec, ref.ppi, ref.ci, deltaH, deltaV);
     if (result.ppi !== ref.ppi || result.ci !== ref.ci) {
       this.moveDragState.tableRef = { sec: ref.sec, ppi: result.ppi, ci: result.ci };
       this.cursor.updateSelectedTableRef(ref.sec, result.ppi, result.ci);
     }
-    this.moveDragState.totalDeltaH += deltaH;
-    this.moveDragState.totalDeltaV += deltaV;
+    let appliedH = deltaH;
+    let appliedV = deltaV;
+    // [officex 2026-07-27] 화면=모델 동기 불변식. 엔진이 restrictInPage 등으로 렌더 위치를
+    // 클램프해도 모델 오프셋은 무제한 축적됐다 — 실측: 본문 하단에 걸린 뒤 계속 끌면
+    // vertOffset 이 78000까지 쌓이고, 되돌릴 때 그 관성을 다 소진할 때까지 화면이
+    // 죽어 있다(-120px 드래그 동안 부동). 프레임마다 실제 bbox 이동을 재보고,
+    // 흡수되지 않은 요청분은 즉시 역이동으로 반납해 관성을 없앤다.
+    // 페이지가 바뀐 프레임은 좌표계가 달라 비교 불능 — 종전 동작 유지.
+    const cur = this.moveDragState.tableRef;
+    const bbAfter = this.wasm.getTableBBox(cur.sec, cur.ppi, cur.ci);
+    if (bbBefore.pageIndex === bbAfter.pageIndex) {
+      const absorbedH = Math.round((bbAfter.x - bbBefore.x) * 75);
+      const absorbedV = Math.round((bbAfter.y - bbBefore.y) * 75);
+      const excessH = deltaH - absorbedH;
+      const excessV = deltaV - absorbedV;
+      // 1px(75HU) 이하는 반올림 노이즈 — 미세 떨림 방지.
+      const rollH = Math.abs(excessH) > 75 ? excessH : 0;
+      const rollV = Math.abs(excessV) > 75 ? excessV : 0;
+      if (rollH !== 0 || rollV !== 0) {
+        this.wasm.moveTableOffset(cur.sec, cur.ppi, cur.ci, -rollH, -rollV);
+        appliedH = deltaH - rollH;
+        appliedV = deltaV - rollV;
+      }
+    }
+    this.moveDragState.totalDeltaH += appliedH;
+    this.moveDragState.totalDeltaV += appliedV;
     this.eventBus.emit('document-changed');
     this.renderTableObjectSelection();
   } catch (err) {
