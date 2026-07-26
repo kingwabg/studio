@@ -180,15 +180,13 @@ export class CanvasView {
     // Canvas를 DOM에 추가하고 위치를 설정한다
     canvas.style.top = `${this.virtualScroll.getPageOffset(pageIdx)}px`;
 
-    // 그리드 모드: 고정 left 좌표, 단일 열: CSS 중앙 정렬
+    // 그리드 모드: 고정 left 좌표, 단일 열: 중앙 정렬.
+    // [officex 2026-07-27] 어느 쪽이든 최종 left 를 물리 픽셀 격자(1/dpr)에 스냅한다 —
+    // CSS 50%+translateX(-50%) 중앙정렬은 부모 폭에 따라 소수 좌표에 앉아 캔버스 전체가
+    // 서브픽셀 리샘플되며 텍스트가 전면적으로 흐려졌다(실측 x물리 320.19px). 위치는
+    // renderCanvas 와 viewport-resize 재스냅(snapCanvasLeft) 두 곳에서만 정한다.
     const pageLeft = this.virtualScroll.getPageLeft(pageIdx);
-    if (pageLeft >= 0) {
-      canvas.style.left = `${pageLeft}px`;
-      canvas.style.transform = 'none';
-    } else {
-      canvas.style.left = '50%';
-      canvas.style.transform = 'translateX(-50%)';
-    }
+    this.applySnappedLeft(canvas, pageLeft);
 
     // WASM이 Canvas 크기를 자동 설정한다 (물리 픽셀 = 페이지크기 × zoom × DPR)
     let renderResult = { needsTextEditStaticLayerVerification: false };
@@ -214,6 +212,38 @@ export class CanvasView {
   }
 
   /** 뷰포트 리사이즈 처리 */
+  /** [officex] 캔버스 left 를 물리 픽셀 격자에 스냅해 서브픽셀 블러를 막는다. */
+  private applySnappedLeft(canvas: HTMLCanvasElement, pageLeft: number): void {
+    const dpr = window.devicePixelRatio || 1;
+    if (pageLeft >= 0) {
+      canvas.style.left = `${Math.round(pageLeft * dpr) / dpr}px`;
+      canvas.style.transform = 'none';
+      return;
+    }
+    const parent = canvas.parentElement;
+    const cssW = parseFloat(canvas.style.width) || canvas.width / dpr;
+    if (!parent || !Number.isFinite(cssW)) {
+      canvas.style.left = '50%';
+      canvas.style.transform = 'translateX(-50%)';
+      return;
+    }
+    const left = Math.round(((parent.clientWidth - cssW) / 2) * dpr) / dpr;
+    canvas.style.left = `${left}px`;
+    canvas.style.transform = 'none';
+  }
+
+  /** [officex] viewport 리사이즈 후 가시 캔버스들의 left 재스냅 (재렌더 없이 위치만). */
+  private resnapVisibleCanvases(): void {
+    const canvases = this.scrollContent.querySelectorAll('canvas');
+    canvases.forEach((c, idx) => {
+      const el = c as HTMLCanvasElement;
+      if (el.id === 'h-ruler' || el.id === 'v-ruler') return;
+      // 그리드 모드 페이지는 renderCanvas 가 다시 돌며 left 를 정하므로 중앙정렬만 재계산
+      if (!this.virtualScroll.isGridMode()) this.applySnappedLeft(el, -1);
+      void idx;
+    });
+  }
+
   private onViewportResize(): void {
     if (this.pages.length === 0) {
       this.updateVisiblePages();
@@ -233,6 +263,7 @@ export class CanvasView {
       this.pageRenderer.cancelAll();
     }
     this.updateVisiblePages();
+    this.resnapVisibleCanvases();
   }
 
   /** 줌 변경 처리 */

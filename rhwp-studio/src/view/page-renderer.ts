@@ -120,8 +120,12 @@ export class PageRenderer {
     }
 
     const pageInfo = this.wasm.getPageInfo(pageIdx);
-    canvas.width = Math.max(1, Math.floor(pageInfo.width * renderScale));
-    canvas.height = Math.max(1, Math.floor(pageInfo.height * renderScale));
+    // [officex 2026-07-27] 백킹을 짝수로 스냅 — 홀수 백킹(예: A4×2=1587)은 CSS 크기가
+    // 793.5px(소수)가 되고, 중앙정렬과 결합해 캔버스가 물리 픽셀 격자에서 어긋나
+    // 전면 서브픽셀 보간(텍스트 흐림)을 만든다(실측: x물리 오프셋 0.19px). DPR 2에서
+    // 짝수 백킹 = 정수 CSS 크기. 마지막 1px 는 페이지 여백이라 잘림 무해.
+    canvas.width = Math.max(2, 2 * Math.floor((pageInfo.width * renderScale) / 2));
+    canvas.height = Math.max(2, 2 * Math.floor((pageInfo.height * renderScale) / 2));
 
     const tree = this.wasm.getPageLayerTreeObject(pageIdx, this.renderProfile);
     try {
