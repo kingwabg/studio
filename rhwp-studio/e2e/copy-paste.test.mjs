@@ -35,25 +35,32 @@ runTest('복사/붙여넣기 테스트 (Task 227)', async ({ page }) => {
   await page.evaluate(() => new Promise(r => setTimeout(r, 300)));
   console.log('  [3] 전체 선택 (Ctrl+A)');
 
-  // 4. 복사 (Ctrl+C)
-  await page.keyboard.down('Control');
-  await page.keyboard.press('c');
-  await page.keyboard.up('Control');
+  // 4. 복사 — headless 는 Ctrl+C 합성이 네이티브 copy 이벤트를 못 일으킨다(CDP 한계).
+  // task-871 e2e 와 같은 패턴: execCommand('copy')로 앱 onCopy 경로를 통과시킨다.
+  const copyOk = await page.evaluate(() => document.execCommand('copy'));
+  assert(copyOk, "document.execCommand('copy') 이벤트 발생");
   await page.evaluate(() => new Promise(r => setTimeout(r, 300)));
-  console.log('  [4] 복사 (Ctrl+C)');
+  console.log('  [4] 복사 (execCommand copy)');
 
   // 5. End 키로 선택 해제 + 줄 끝으로 이동
   await page.keyboard.press('End');
   await page.evaluate(() => new Promise(r => setTimeout(r, 300)));
   console.log('  [5] End 키 (선택 해제)');
 
-  // 6. 붙여넣기 (Ctrl+V)
-  await page.keyboard.down('Control');
-  await page.keyboard.press('v');
-  await page.keyboard.up('Control');
+  // 6. 붙여넣기 — headless 에선 Ctrl+V 합성이 네이티브 paste 를 못 일으킨다
+  // (클립보드 권한을 줘도 CDP 키 이벤트는 클립보드 액션과 분리 — 2026-07-26 실측).
+  // task-871 e2e 와 같은 방식: 앱 내부 클립보드 텍스트를 ClipboardEvent 로 직접 주입해
+  // 앱의 onPaste 경로를 통과시킨다. Ctrl+C(위 [4])의 onCopy 경로 검증은 그대로 유효.
+  await page.evaluate(() => {
+    const text = window.__wasm?.getClipboardText?.() ?? '';
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true });
+    (document.activeElement || document.body).dispatchEvent(event);
+  });
   await page.evaluate(() => new Promise(r => setTimeout(r, 500)));
   await screenshot(page, 'cp-02-pasted');
-  console.log('  [6] 붙여넣기 (Ctrl+V)');
+  console.log('  [6] 붙여넣기 (내부 클립보드 → ClipboardEvent 주입)');
 
   // 7. 검증
   const pageCount = await getPageCount(page);

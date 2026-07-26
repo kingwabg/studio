@@ -140,6 +140,14 @@ export async function createPage(browser, width, height) {
   if (!browser._testPages) browser._testPages = [];
 
   if (MODE === 'headless') {
+    // headless 는 클립보드 권한이 기본 거부라 Ctrl+C/V 계열 검증이 조용히 빈손이 된다
+    // (copy-paste e2e "이어 붙여짐" 실측, 2026-07-26). 대상 오리진에 명시 부여한다.
+    try {
+      await browser.defaultBrowserContext().overridePermissions(
+        VITE_URL,
+        ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write'],
+      );
+    } catch { /* 권한 이름 미지원 브라우저는 무시 — 해당 테스트가 스스로 실패로 알림 */ }
     const page = await browser.newPage();
     await page.setViewport({ width: width || 1280, height: height || 900 });
     browser._testPages.push(page);
@@ -218,9 +226,26 @@ export async function waitForCanvas(page, timeout = 10000) {
 
 /** 새 빈 문서 생성 + 캔버스 대기 */
 export async function createNewDocument(page) {
-  await page.evaluate(() => window.__eventBus?.emit('create-new-document'));
+  // [2026-07-26 진단] networkidle2+지연만으로는 headless 콜드 부팅의 WASM init 경주에 져서
+  // create-new-document 가 "hwpdocument_createEmpty undefined" 로 조용히 죽고, 이후의
+  // 모든 입력 검증이 부팅 자동 문서 위에서 헛돌았다. 부팅 자동 생성(main.ts — 한컴독스처럼
+  // 빈 A4)이 끝났음을 문서 존재로 확인한 뒤에 새 문서를 요청한다.
+  await page.waitForFunction(
+    () => { try { return window.__wasm?.hasLoadedDocument?.() === true; } catch { return false; } },
+    { timeout: 30000 },
+  );
+  // skipUnsavedGuard: 직전 케이스가 남긴 dirty 문서 때문에 미저장 가드 다이얼로그가 뜨면
+  // 생성이 조용히 막히고, 이후의 모든 키 입력을 다이얼로그가 먹는다 — 옛 문서 텍스트 덕에
+  // fixture 단언은 통과해 버려서 "콤보만 안 먹는" 것처럼 위장된다(2026-07-26 진단).
+  await page.evaluate(() => window.__eventBus?.emit('create-new-document', { skipUnsavedGuard: true }));
   await page.waitForSelector(CANVAS_SELECTOR, { timeout: 10000 });
-  await page.evaluate(() => new Promise(r => setTimeout(r, 1000)));
+  // [2026-07-26 진단] 기본 부팅 모드가 캔버스(캔바 손맛)로 바뀌어, 편집 컨텍스트 없는
+  // 타이핑은 설계상 무시된다(input-handler-text.ts onInput 첫 가드 — textarea 비우고 끝).
+  // 텍스트 흐름 e2e 는 한글 커서 시맨틱을 검증하므로 문서 모드로 명시 전환한다
+  // (우상단 "문서" 토글 버튼과 동일한 호출). 캔버스 모드 자체를 검증하는 테스트는
+  // 각자 setCanvasMode(true) 로 되켠다.
+  await page.evaluate(() => window.__inputHandler?.setCanvasMode?.(false));
+  await page.evaluate(() => new Promise(r => setTimeout(r, 300)));
 }
 
 /** HWP 파일을 fetch하여 문서 로드 + 캔버스 대기 */
