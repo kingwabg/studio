@@ -943,3 +943,67 @@
 /* 계산식 오류 표시 */
 .formula-error { margin-top: 8px; padding: 8px 12px; background: var(--ui-warning-bg); border: 1px solid var(--ui-warning-border); border-radius: 4px; color: var(--ui-warning-text); font-size: var(--font-size-base); }
 .formula-input-error { border-color: var(--ui-danger-strong) !important; box-shadow: 0 0 0 2px var(--ui-danger-soft) !important; }
+
+/* ── [본문 위치·위치 미리보기] 표/셀 속성 다이얼로그 ─────────────────────
+   설정을 바꾸면 표(파란 상자)와 글 줄(회색 막대)이 transition 으로 움직이며
+   새 배치를 즉시 보여준다 — 기준/배치 용어를 몰라도 그림으로 이해되게. */
+.pos-preview {
+  margin: 8px 0 2px;
+  display: flex;
+  justify-content: center;
+}
+.pos-preview .pp-paper {
+  position: relative;
+  width: 172px;
+  height: 118px;
+  background: var(--dlg-bg, #fff);
+  border: 1.5px solid #c6c9d0;
+  border-radius: 3px;
+  transition: border-color 0.35s, box-shadow 0.35s;
+}
+.pos-preview .pp-paper.pp-active {
+  border-color: #4a7dff;
+  box-shadow: 0 0 0 2px rgba(74, 125, 255, 0.15);
+}
+.pos-preview .pp-body {
+  position: absolute;
+  inset: 12px 16px;
+  border: 1px dashed #d8dbe2;
+  border-radius: 2px;
+  transition: border-color 0.35s;
+}
+.pos-preview .pp-body.pp-active {
+  border-color: #4a7dff;
+}
+.pos-preview .pp-line {
+  position: absolute;
+  height: 5px;
+  border-radius: 2px;
+  background: #d3d6dd;
+  transition: left 0.35s, width 0.35s, top 0.35s, opacity 0.35s;
+}
+.pos-preview .pp-line.pp-dim {
+  opacity: 0.25;
+}
+.pos-preview .pp-table {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #fff;
+  background: #4a7dff;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: left 0.35s, top 0.35s, width 0.35s, height 0.35s, transform 0.35s;
+}
+.pos-preview .pp-table.pp-tac {
+  background: #8aa4e8;
+}
+.pos-help {
+  margin: 4px 2px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--dlg-help, #6b7280);
+  min-height: 16px;
+}

@@ -502,6 +502,8 @@ export interface TableProperties {
   treatAsChar?: boolean;
   /** 본문과의 배치 */
   textWrap?: string;
+  /** 본문 위치(어울림일 때 글이 흐르는 쪽): BothSides|LeftOnly|RightOnly|LargestOnly */
+  textFlow?: string;
   /** 세로 위치 기준 */
   vertRelTo?: string;
   /** 세로 정렬 */

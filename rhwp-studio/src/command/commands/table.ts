@@ -257,6 +257,20 @@ export const tableCommands: CommandDef[] = [
             if (result.ok) {
               // [캔버스 한컴 포크] 새 표 기본 테두리를 진한 검은 실선으로(엔진 기본 0.12mm가 흐림)
               wasm.applyDefaultTableBorders(pos.sectionIndex, result.paraIdx, result.controlIdx);
+              // [기본 배치] 가로 기준을 "종이"로 — 드래그가 용지 전체에서 자유로워진다
+              // (사용자 지정 기본값 2026-07-27). 오프셋을 왼쪽 여백으로 줘 화면상 위치는
+              // 지금과 동일(본문 왼쪽 시작). 세로는 문단 기준 유지(본문 흐름을 따라감).
+              // 글자처럼취급 표는 배치 개념이 없으므로 건드리지 않는다.
+              if (!(options?.treatAsChar)) {
+                try {
+                  const pd = wasm.getPageDef(pos.sectionIndex);
+                  wasm.setTableProperties(pos.sectionIndex, result.paraIdx, result.controlIdx, {
+                    horzRelTo: 'Paper',
+                    horzAlign: 'Left',
+                    horzOffset: pd.marginLeft ?? 0,
+                  });
+                } catch { /* 페이지 정의 조회 실패 시 엔진 기본(단) 유지 */ }
+              }
               return {
                 sectionIndex: pos.sectionIndex,
                 paragraphIndex: 0,

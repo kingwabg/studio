@@ -113,6 +113,14 @@ export class TableCellPropsDialog extends ModalDialog {
   private vertAlignSelect!: HTMLSelectElement;
   private vertOffsetInput!: HTMLInputElement;
   private posGroup!: HTMLDivElement;
+  // [본문 위치] 어울림일 때 글이 표의 어느 쪽에 흐르나 (한컴 정본: 양쪽/왼쪽/오른쪽/큰 쪽)
+  private textFlowBtns: HTMLButtonElement[] = [];
+  private textFlowValues = ['BothSides', 'LeftOnly', 'RightOnly', 'LargestOnly'];
+  private flowRow!: HTMLDivElement;
+  // 위치 미리보기(라이브 도식) + 초보자 도움 문구
+  private posPreviewEl!: HTMLDivElement;
+  private posHelpEl!: HTMLDivElement;
+  private previewGeom: { colW: number; tblW: number } | null = null;
   private restrictInPageCheck!: HTMLInputElement;
   private allowOverlapCheck!: HTMLInputElement;
   private keepWithAnchorCheck!: HTMLInputElement;
@@ -488,7 +496,10 @@ export class TableCellPropsDialog extends ModalDialog {
     this.treatAsCharCheck = this.checkbox('글자처럼 취급');
     tacRow.appendChild(this.treatAsCharCheck.parentElement!);
     posSection.appendChild(tacRow);
-    this.treatAsCharCheck.addEventListener('change', () => this.updatePositionVisibility());
+    this.treatAsCharCheck.addEventListener('change', () => {
+      this.updatePositionVisibility();
+      this.updatePosPreview();
+    });
 
     // ── 본문과의 배치 그룹 (글자처럼 취급 해제 시 활성) ──
     this.posGroup = document.createElement('div');
@@ -506,12 +517,43 @@ export class TableCellPropsDialog extends ModalDialog {
       btn.type = 'button';
       btn.className = 'dialog-btn';
       btn.textContent = text;
-      btn.addEventListener('click', () => this.selectWrap(i));
+      btn.addEventListener('click', () => { this.selectWrap(i); this.updatePosPreview(); });
       wrapGroup.appendChild(btn);
       this.wrapBtns.push(btn);
     });
     wrapRow.appendChild(wrapGroup);
     this.posGroup.appendChild(wrapRow);
+
+    // 본문 위치 (어울림일 때만) — 글이 표의 어느 쪽에 흐르나
+    this.flowRow = this.row();
+    this.flowRow.appendChild(this.label('본문 위치'));
+    const flowGroup = document.createElement('div');
+    flowGroup.className = 'dialog-btn-group';
+    const flowLabels = ['양쪽', '왼쪽', '오른쪽', '큰 쪽'];
+    flowLabels.forEach((text, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dialog-btn';
+      btn.textContent = text;
+      btn.addEventListener('click', () => { this.selectFlow(i); this.updatePosPreview(); });
+      flowGroup.appendChild(btn);
+      this.textFlowBtns.push(btn);
+    });
+    this.flowRow.appendChild(flowGroup);
+    this.posGroup.appendChild(this.flowRow);
+
+    // ── 라이브 미리보기: 설정을 바꾸면 표(파란 상자)와 글(회색 줄)이 어떻게 놓이는지
+    //    그 자리에서 움직여 보여준다. 초보자용 — 기준/배치 용어를 몰라도 그림으로 이해.
+    this.posPreviewEl = document.createElement('div');
+    this.posPreviewEl.className = 'pos-preview';
+    this.posPreviewEl.innerHTML =
+      '<div class="pp-paper"><div class="pp-body">' +
+      Array.from({ length: 7 }, (_, i) => `<div class="pp-line" data-i="${i}"></div>`).join('') +
+      '<div class="pp-table">표</div></div></div>';
+    this.posGroup.appendChild(this.posPreviewEl);
+    this.posHelpEl = document.createElement('div');
+    this.posHelpEl.className = 'pos-help';
+    this.posGroup.appendChild(this.posHelpEl);
 
     // 가로 위치
     const hRow = this.row();
@@ -553,6 +595,14 @@ export class TableCellPropsDialog extends ModalDialog {
     vRow.appendChild(this.vertOffsetInput);
     vRow.appendChild(this.unit('mm'));
     this.posGroup.appendChild(vRow);
+    for (const el of [
+      this.horzRelSelect, this.horzAlignSelect, this.vertRelSelect, this.vertAlignSelect,
+    ]) {
+      el.addEventListener('change', () => this.updatePosPreview());
+    }
+    for (const el of [this.horzOffsetInput, this.vertOffsetInput]) {
+      el.addEventListener('input', () => this.updatePosPreview());
+    }
 
     // 체크박스 옵션들
     const optRow = this.row();
@@ -650,6 +700,116 @@ export class TableCellPropsDialog extends ModalDialog {
   private getSelectedWrap(): string {
     const idx = this.wrapBtns.findIndex(b => b.classList.contains('active'));
     return idx >= 0 ? this.wrapValues[idx] : 'Square';
+  }
+
+  private selectFlow(idx: number): void {
+    this.textFlowBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
+  }
+
+  private getSelectedFlow(): string {
+    const idx = this.textFlowBtns.findIndex(b => b.classList.contains('active'));
+    return idx >= 0 ? this.textFlowValues[idx] : 'BothSides';
+  }
+
+  /** 기준(종이/쪽/단/문단)의 쉬운 설명 — 한컴 도움말 의미론 그대로. */
+  private static REL_HELP: Record<string, string> = {
+    Paper: '종이: 용지 전체가 기준 — 여백과 상관없이 어디든 놓을 수 있어요',
+    Page: '쪽: 여백을 뺀 본문 영역이 기준이에요',
+    Column: '단: 글이 흐르는 단(칼럼)이 기준이에요',
+    Para: '문단: 표가 붙은 문단을 따라 함께 움직여요',
+  };
+
+  /**
+   * 라이브 미리보기 — 현재 컨트롤 상태를 읽어 도식을 갱신한다.
+   * CSS transition(.35s)이 걸려 있어 값이 바뀔 때마다 표 상자와 글 줄이
+   * "움직이며" 새 배치를 보여준다(하나하나 확인 대신 즉시 체감).
+   */
+  private updatePosPreview(): void {
+    if (!this.posPreviewEl) return;
+    const tac = this.treatAsCharCheck.checked;
+    const wrap = this.getSelectedWrap();
+    const flow = this.getSelectedFlow();
+    const hRel = this.horzRelSelect.value;
+    const hAlign = this.horzAlignSelect.value;
+    const vRel = this.vertRelSelect.value;
+    const paper = this.posPreviewEl.querySelector('.pp-paper') as HTMLElement;
+    const body = this.posPreviewEl.querySelector('.pp-body') as HTMLElement;
+    const tbl = this.posPreviewEl.querySelector('.pp-table') as HTMLElement;
+    const lines = [...this.posPreviewEl.querySelectorAll('.pp-line')] as HTMLElement[];
+    if (!paper || !body || !tbl) return;
+
+    // 이동 가능 영역 하이라이트: 가로 기준이 종이면 용지 전체, 아니면 본문 영역.
+    paper.classList.toggle('pp-active', hRel === 'Paper' || vRel === 'Paper');
+    body.classList.toggle('pp-active', !(hRel === 'Paper' && vRel === 'Paper'));
+
+    // 표 상자 배치 (미리보기 내부 % 좌표 — 실제 좌표의 축소 모형)
+    const narrow = !this.previewGeom || this.previewGeom.tblW < this.previewGeom.colW - 30;
+    tbl.style.width = tac ? '26%' : narrow ? '38%' : '92%';
+    tbl.style.height = tac ? '16%' : '30%';
+    const leftPct = hAlign === 'Center' ? 50 : hAlign === 'Right' || hAlign === 'Outside' ? 88 : 12;
+    tbl.style.left = `${leftPct}%`;
+    tbl.style.top = tac ? '38%' : vRel === 'Paper' ? '30%' : '42%';
+    tbl.style.transform = `translateX(-${hAlign === 'Center' ? 50 : hAlign === 'Right' || hAlign === 'Outside' ? 100 : 0}%)`;
+    tbl.classList.toggle('pp-tac', tac);
+
+    // 글 줄 배치: 배치 방식에 따라 줄들이 표를 피하는 모습을 그린다.
+    const tblTop = tac ? 38 : vRel === 'Paper' ? 30 : 42;
+    const tblBottom = tblTop + (tac ? 16 : 30);
+    lines.forEach((ln, i) => {
+      const y = 8 + i * 13;
+      ln.style.top = `${y}%`;
+      const inBand = y + 8 > tblTop && y < tblBottom;
+      ln.classList.remove('pp-dim');
+      if (tac || !inBand) {
+        ln.style.left = '6%';
+        ln.style.width = '88%';
+      } else if (wrap === 'TopAndBottom') {
+        // 자리 차지: 표 구간엔 글이 못 들어간다
+        ln.style.left = '6%';
+        ln.style.width = '88%';
+        ln.classList.add('pp-dim');
+        ln.style.width = '0%';
+      } else if (wrap === 'BehindText' || wrap === 'InFrontOfText') {
+        ln.style.left = '6%';
+        ln.style.width = '88%';
+        if (wrap === 'BehindText') ln.classList.add('pp-dim');
+      } else {
+        // 어울림: 본문 위치에 따라 좌/우/넓은 쪽
+        const leftSide = hAlign === 'Right' || hAlign === 'Outside';
+        const goLeft = flow === 'LeftOnly' || ((flow === 'LargestOnly' || flow === 'BothSides') && leftSide);
+        if (narrow) {
+          if (goLeft) {
+            ln.style.left = '6%';
+            ln.style.width = hAlign === 'Center' ? '24%' : leftSide ? '48%' : '24%';
+          } else {
+            ln.style.left = hAlign === 'Center' ? '70%' : leftSide ? '6%' : '54%';
+            ln.style.width = hAlign === 'Center' ? '24%' : '40%';
+          }
+        } else {
+          // 표가 단을 거의 채움 — 어울릴 옆 공간이 없다
+          ln.style.left = '6%';
+          ln.style.width = '0%';
+          ln.classList.add('pp-dim');
+        }
+      }
+    });
+
+    // 도움 문구: 기준 설명 + 상태 경고
+    const help: string[] = [];
+    if (tac) {
+      help.push('글자처럼 취급 중 — 표가 글자처럼 줄 안에 흐르므로 아래 위치 설정은 쓰이지 않아요');
+    } else {
+      help.push(TableCellPropsDialog.REL_HELP[hRel] ?? '');
+      if (vRel !== hRel) help.push(TableCellPropsDialog.REL_HELP[vRel] ?? '');
+      if (wrap === 'Square' && !narrow) {
+        help.push('⚠ 표가 단을 거의 채우고 있어 어울릴 옆 공간이 없어요 — 표 폭을 줄이면 글이 옆으로 흘러요');
+      }
+      if (wrap === 'Square' && flow === 'BothSides') {
+        help.push('양쪽 흐름은 아직 넓은 쪽 우선으로 동작해요');
+      }
+    }
+    this.posHelpEl.textContent = help.filter(Boolean).join('  ·  ');
+    this.flowRow.style.display = !tac && wrap === 'Square' ? '' : 'none';
   }
 
   // ─── 여백/캡션 탭 ──────────────────────────
@@ -1296,13 +1456,31 @@ export class TableCellPropsDialog extends ModalDialog {
     // 값을 주입하는 이 대입은 change 이벤트를 발생시키지 않는다. 그래도 다이얼로그를 다시 열
     // 때마다 직전 세션의 선택이 남아있으면 안 되므로 명시적으로 되돌린다.
     this.vertRelUserPicked = false;
-    this.vertRelSelect.value = tp.vertRelTo ?? 'Paper';
+    // 표시=저장 일치: 글자처럼취급(인라인) 표는 attr 비트가 0(Paper)으로 남아 "종이"로
+    // 보였지만, 해제 시 실제 저장은 가드가 Para 로 바꾼다 — 표시도 그 값으로 맞춘다.
+    const vertRelDisplay =
+      (tp.treatAsChar && (tp.vertRelTo === 'Paper' || tp.vertRelTo == null)) ? 'Para' : (tp.vertRelTo ?? 'Para');
+    this.vertRelSelect.value = vertRelDisplay;
     this.vertAlignSelect.value = tp.vertAlign ?? 'Top';
     this.vertOffsetInput.value = hwpunitToMm(tp.vertOffset ?? 0).toFixed(1);
     this.restrictInPageCheck.checked = tp.restrictInPage ?? true;
     this.allowOverlapCheck.checked = tp.allowOverlap ?? false;
     this.keepWithAnchorCheck.checked = tp.keepWithAnchor ?? false;
+    this.selectFlow(Math.max(0, this.textFlowValues.indexOf(tp.textFlow ?? 'BothSides')));
+    // 미리보기용 실측: 단 폭 vs 표 폭 — "어울릴 옆 공간이 있는가" 경고의 근거
+    try {
+      const pageInfo = this.wasm.getPageInfo(0);
+      const colW = pageInfo?.columns?.[0]?.width
+        ?? (pageInfo.width - pageInfo.marginLeft - pageInfo.marginRight);
+      const bb = this.tableCtx
+        ? this.wasm.getTableBBox(this.tableCtx.sec, this.tableCtx.ppi, this.tableCtx.ci)
+        : null;
+      this.previewGeom = bb ? { colW, tblW: bb.width } : null;
+    } catch {
+      this.previewGeom = null;
+    }
     this.updatePositionVisibility();
+    this.updatePosPreview();
 
     // 여백/캡션 탭
     this.marginOuterInputs['left'].value = hwp16ToMm(tp.outerLeft ?? 0).toFixed(1);
@@ -1400,6 +1578,7 @@ export class TableCellPropsDialog extends ModalDialog {
     const newTableProps: Record<string, unknown> = {
       treatAsChar: this.treatAsCharCheck.checked,
       textWrap: this.getSelectedWrap(),
+      textFlow: this.getSelectedFlow(),
       vertRelTo: this.vertRelSelect.value,
       vertAlign: this.vertAlignSelect.value,
       vertOffset: mmToHwpunit(parseFloat(this.vertOffsetInput.value) || 0),

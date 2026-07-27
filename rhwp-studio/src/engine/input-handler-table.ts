@@ -3,7 +3,7 @@
 
 import { MoveTableCommand, MovePictureCommand, MoveShapeCommand } from './command';
 import { getObjectProperties, setObjectProperties } from './input-handler-picture';
-import { pageClampRange, clampToPage } from './canvas-snap';
+import { pageClampRange, clampRangeForRelTo, clampToPage } from './canvas-snap';
 import type { CellBbox } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { BorderEdge } from './table-resize-renderer';
@@ -1200,9 +1200,29 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
   // 여백 안쪽은 자유롭게 이동 가능하다 — 여백 상자로 묶으면 아래 여백으로 내려갈 수 없다.
   try {
     const bb = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
-    const pageWpx = this.virtualScroll.getPageWidth(pi) / zoom;
-    const pageHpx = this.virtualScroll.getPageHeight(pi) / zoom;
-    const range = pageClampRange(pageWpx, pageHpx, bb.width, bb.height);
+    // [기준별 이동 범위] 표의 위치 기준(종이/쪽/단/문단)에 따라 허용 범위가 다르다 —
+    // 종이=용지 전체(여백 무관), 쪽=본문 영역, 단·문단=해당 단. 드래그 시작 후 1회만
+    // 조회해 캐시한다(프레임마다 getTableProperties 는 비용).
+    if (!this.moveDragState.relToCache) {
+      let horzRelTo = 'Paper';
+      let vertRelTo = 'Para';
+      try {
+        const tp = this.wasm.getTableProperties(ref.sec, ref.ppi, ref.ci);
+        horzRelTo = tp.horzRelTo ?? horzRelTo;
+        vertRelTo = tp.vertRelTo ?? vertRelTo;
+      } catch { /* 기본값 유지 */ }
+      let info = null;
+      try { info = this.wasm.getPageInfo(bb.pageIndex ?? pi); } catch { /* 아래 폴백 */ }
+      this.moveDragState.relToCache = { horzRelTo, vertRelTo, info };
+    }
+    const { horzRelTo, vertRelTo, info } = this.moveDragState.relToCache;
+    const range = info
+      ? clampRangeForRelTo(info, horzRelTo, vertRelTo, bb.width, bb.height, bb.x + bb.width / 2)
+      : pageClampRange(
+          this.virtualScroll.getPageWidth(pi) / zoom,
+          this.virtualScroll.getPageHeight(pi) / zoom,
+          bb.width, bb.height,
+        );
     const c = clampToPage(bb.x + deltaXpx, bb.y + deltaYpx, range);
     deltaXpx = c.x - bb.x;
     deltaYpx = c.y - bb.y;

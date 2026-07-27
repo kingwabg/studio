@@ -71,6 +71,70 @@ export function clampToPage(x: number, y: number, r: PageClampRange): { x: numbe
   };
 }
 
+type PageInfoLike = {
+  width: number; height: number;
+  marginLeft: number; marginRight: number; marginTop: number; marginBottom: number;
+  marginHeader?: number; marginFooter?: number;
+  columns?: { x: number; width: number }[];
+};
+
+/**
+ * [기준별 이동 범위] 개체의 위치 기준(종이/쪽/단/문단)에 따라 드래그 허용 범위를 좁힌다
+ * (한컴 도움말 의미론: 종이=용지 전체(여백 무관), 쪽=여백·머리말/꼬리말을 뺀 본문 영역,
+ * 단=글이 흐르는 단, 문단=단과 같은 가로 범위 — 세로는 흐름을 따르므로 용지만 제한).
+ * 축이 독립이므로 가로는 horzRelTo, 세로는 vertRelTo 로 각각 계산한다.
+ */
+export function clampRangeForRelTo(
+  info: PageInfoLike,
+  horzRelTo: string | undefined,
+  vertRelTo: string | undefined,
+  bboxW: number,
+  bboxH: number,
+  bboxCenterX: number,
+): PageClampRange {
+  const bodyTop = info.marginTop + (info.marginHeader ?? 0);
+  const bodyBottom = info.height - info.marginBottom - (info.marginFooter ?? 0);
+  let minX = 0;
+  let maxX = info.width;
+  switch (horzRelTo) {
+    case 'Page':
+      minX = info.marginLeft;
+      maxX = info.width - info.marginRight;
+      break;
+    case 'Column':
+    case 'Para': {
+      // 개체 중심이 속한 단 — 다단이 아니면 본문 영역과 같다
+      const cols = info.columns ?? [];
+      const col = cols.find(c => bboxCenterX >= c.x && bboxCenterX <= c.x + c.width)
+        ?? cols[0];
+      if (col) {
+        minX = col.x;
+        maxX = col.x + col.width;
+      } else {
+        minX = info.marginLeft;
+        maxX = info.width - info.marginRight;
+      }
+      break;
+    }
+    default: // Paper — 용지 전체
+      break;
+  }
+  let minY = 0;
+  let maxY = info.height;
+  if (vertRelTo === 'Page') {
+    minY = bodyTop;
+    maxY = bodyBottom;
+  }
+  // Para(문단)의 세로는 본문 흐름을 따라가는 것이 본질이라 드래그 제한은 용지만 —
+  // "쪽 영역 안으로 제한" 체크는 엔진(restrictInPage)이 따로 지킨다.
+  return {
+    minX,
+    minY,
+    maxX: Math.max(minX, maxX - bboxW),
+    maxY: Math.max(minY, maxY - bboxH),
+  };
+}
+
 type FloatingClampWasm = PageDefWasm & {
   getTableBBox(sec: number, ppi: number, ci: number): { x: number; y: number; width: number; height: number };
   moveTableOffset(sec: number, ppi: number, ci: number, deltaH: number, deltaV: number): unknown;
