@@ -339,7 +339,11 @@ export class CanvasView {
     const renderContext: PageRenderContext =
       reason === 'text-edit'
         ? { reason: 'text-edit', allowStaticOverlayReuse: true }
-        : { reason: 'unknown', allowStaticOverlayReuse: false };
+        : reason === 'table-drag'
+          // 표 이동 프레임: rAF 병합은 text-edit 과 같게, 정적 오버레이 재사용은 끈다
+          // (표가 지나간 자리·밴드가 프레임마다 달라져 재사용하면 잔상이 남는다).
+          ? { reason: 'table-drag', allowStaticOverlayReuse: false }
+          : { reason: 'unknown', allowStaticOverlayReuse: false };
 
     if (!Number.isInteger(pageIndex) || pageIndex < 0) {
       this.cancelPendingTextEditRefresh();
@@ -356,7 +360,9 @@ export class CanvasView {
       return;
     }
 
-    if (renderContext.reason === 'text-edit') {
+    if (renderContext.reason === 'text-edit' || renderContext.reason === 'table-drag') {
+      // table-drag: 표 이동 드래그의 프레임 갱신 — text-edit 과 같은 rAF 병합 경로.
+      // mousemove 폭주를 프레임당 1회 재렌더로 눌러 표+본문이 마우스를 따라오게 한다.
       this.scheduleTextEditPageRefresh(pageIndex, renderContext);
       return;
     }

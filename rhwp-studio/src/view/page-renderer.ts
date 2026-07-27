@@ -15,7 +15,7 @@ interface LayerPlaneSummary {
 }
 
 export interface PageRenderContext {
-  reason?: 'text-edit' | 'unknown';
+  reason?: 'text-edit' | 'table-drag' | 'unknown';
   allowStaticOverlayReuse?: boolean;
 }
 

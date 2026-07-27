@@ -1246,7 +1246,20 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
     }
     this.moveDragState.totalDeltaH += appliedH;
     this.moveDragState.totalDeltaV += appliedV;
-    this.eventBus.emit('document-changed');
+    // [officex] 드래그 중 실시간 반영 — 'document-changed' 는 전 페이지 릴리즈+재렌더라
+    // 매 프레임 쏘면 렌더가 계속 취소돼 "놓은 뒤에야" 그려졌다(사용자 신고: 표가 이동된
+    // 다음에 보인다). 타이핑이 쓰는 경량 경로(해당 페이지만 rAF 병합 재렌더)로 표+본문
+    // 재배치를 프레임마다 보여준다. 페이지가 바뀐 프레임은 양쪽 페이지를 모두 갱신.
+    const dragPage = (typeof bbAfter?.pageIndex === 'number') ? bbAfter.pageIndex
+      : (typeof bbBefore?.pageIndex === 'number' ? bbBefore.pageIndex : null);
+    if (dragPage !== null) {
+      this.eventBus.emit('document-page-invalidated', { pageIndex: dragPage, reason: 'table-drag' });
+      if (typeof bbBefore?.pageIndex === 'number' && bbBefore.pageIndex !== dragPage) {
+        this.eventBus.emit('document-page-invalidated', { pageIndex: bbBefore.pageIndex, reason: 'table-drag' });
+      }
+    } else {
+      this.eventBus.emit('document-changed');
+    }
     this.renderTableObjectSelection();
   } catch (err) {
     console.warn('[InputHandler] 표 이동 드래그 실패:', err);
@@ -1280,6 +1293,9 @@ export function finishMoveDrag(this: any): void {
   if (state?.pendingEnterCellHit && !state.hasMoved && state.totalDeltaH === 0 && state.totalDeltaV === 0) {
     this.cursor.exitTableObjectSelection();
     this.tableObjectRenderer?.clear();
+    // 드래그 종료 정리 — 프레임 갱신은 페이지 단위였으므로 마지막에 전체 정합(쪽수
+    // 변화·다른 페이지 파급)을 한 번 맞춘다.
+    this.eventBus.emit('document-changed');
     this.eventBus.emit('table-object-selection-changed', false);
     this.cursor.clearSelection();
     this.cursor.moveTo(state.pendingEnterCellHit);
