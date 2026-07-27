@@ -82,6 +82,12 @@ export class TableCellPropsDialog extends ModalDialog {
   private borderApplyImmediateCheck!: HTMLInputElement;
   /** 4방향 테두리 편집 상태 */
   private borderEdits!: { type: number; width: number; color: string }[];
+  /** [테두리 회귀 근절] 이번 다이얼로그에서 사용자가 테두리/배경 탭을 실제로 만졌는가.
+   *  false 면 확인 시 border/fill 키를 아예 보내지 않는다 — 엔진 setTableProperties 는
+   *  키 "존재"만으로 전 셀 border_fill_id 를 표 기본 하나로 덮어써(table_ops has_border_
+   *  fill_change), 배치·크기만 바꿔도 셀별 진한 테두리가 회색 기본으로 회귀했다(반복 사고). */
+  private borderTouched = false;
+  private bgTouched = false;
   /** 적용 대상: 'cell' 또는 'table' */
   private borderTarget!: string;
   /** 자동 경계선 설정 필드 */
@@ -1158,6 +1164,7 @@ export class TableCellPropsDialog extends ModalDialog {
 
   /** 현재 선택된 선 종류/굵기/색을 지정 방향에 적용 */
   private applyBorderToDirection(dirIdx: number): void {
+    this.borderTouched = true;
     const lineType = this.borderSelectedLineType;
     const width = parseInt(this.borderWidthSelect.value, 10);
     const color = this.borderColorInput.value;
@@ -1521,6 +1528,17 @@ export class TableCellPropsDialog extends ModalDialog {
     if (this.bgNoneRadio) {
       this.populateBgFromTarget();
     }
+    // [테두리 회귀 근절] 사용자 조작 추적 초기화 + 배경 컨트롤 터치 마킹(1회 부착)
+    this.borderTouched = false;
+    this.bgTouched = false;
+    if (!(this as any)._bgTouchWired && this.bgNoneRadio) {
+      (this as any)._bgTouchWired = true;
+      for (const el of [this.bgNoneRadio, this.bgColorRadio, this.bgColorPicker,
+        this.bgPatternColorPicker, this.bgPatternTypeSelect]) {
+        el?.addEventListener('change', () => { this.bgTouched = true; });
+        el?.addEventListener('input', () => { this.bgTouched = true; });
+      }
+    }
   }
 
   protected onConfirm(): void {
@@ -1549,13 +1567,13 @@ export class TableCellPropsDialog extends ModalDialog {
     newCellProps.editableInForm = this.cellEditableCheck.checked;
 
     // 셀 테두리/배경 (cell 모드에서는 테두리/배경 탭이 없으므로 스킵)
-    if (this.mode === 'table' && this.borderTarget === 'cell' && this.borderEdits) {
+    if (this.mode === 'table' && this.borderTarget === 'cell' && this.borderEdits && this.borderTouched) {
       newCellProps.borderLeft = this.borderEdits[0];
       newCellProps.borderRight = this.borderEdits[1];
       newCellProps.borderTop = this.borderEdits[2];
       newCellProps.borderBottom = this.borderEdits[3];
     }
-    if (this.mode === 'table' && this.bgTarget === 'cell' && this.bgColorRadio) {
+    if (this.mode === 'table' && this.bgTarget === 'cell' && this.bgColorRadio && this.bgTouched) {
       if (this.bgColorRadio.checked) {
         newCellProps.fillType = 'solid';
         newCellProps.fillColor = this.bgColorPicker.value;
@@ -1629,14 +1647,16 @@ export class TableCellPropsDialog extends ModalDialog {
       newTableProps.captionWidth = mmToHwpunit(parseFloat(this.captionWidthInput.value) || 0);
     }
 
-    // 표 테두리/배경 (table 모드에서만 테두리/배경 탭 존재)
-    if (this.mode === 'table' && this.borderTarget === 'table' && this.borderEdits) {
+    // 표 테두리/배경 — **사용자가 이번에 실제로 만졌을 때만** 전송한다.
+    // 항상 실으면 엔진이 키 존재만으로 전 셀 테두리를 표 기본으로 덮어써(위 필드 주석),
+    // 배치/크기 변경만 해도 셀별 테두리가 회색으로 회귀했다.
+    if (this.mode === 'table' && this.borderTarget === 'table' && this.borderEdits && this.borderTouched) {
       newTableProps.borderLeft = this.borderEdits[0];
       newTableProps.borderRight = this.borderEdits[1];
       newTableProps.borderTop = this.borderEdits[2];
       newTableProps.borderBottom = this.borderEdits[3];
     }
-    if (this.mode === 'table' && this.bgTarget === 'table' && this.bgColorRadio) {
+    if (this.mode === 'table' && this.bgTarget === 'table' && this.bgColorRadio && this.bgTouched) {
       if (this.bgColorRadio.checked) {
         newTableProps.fillType = 'solid';
         newTableProps.fillColor = this.bgColorPicker.value;
