@@ -1067,7 +1067,10 @@ export class WasmBridge {
     if (!this.doc) return;
     try {
       const bboxes = this.getTableCellBboxes(sec, parentPara, controlIdx);
-      const border = { type: 1, width: 3, color: '#000000' }; // type1=실선, width3(index)=0.2mm
+      // [사용자 신고 2026-07-28] width3(0.2mm)=0.75px 는 서브픽셀이라 캔버스 AA 로
+      // 회색·굵기 불균일하게 보였다("조금씩 다르고 검정이 아닌 것 같다").
+      // width4(0.25mm)=1.0px 정수 픽셀 — 모든 선이 균일한 또렷한 검정.
+      const border = { type: 1, width: 4, color: '#000000' }; // type1=실선, width4(index)=0.25mm
       const seen = new Set<number>();
       for (const b of bboxes) {
         if (seen.has(b.cellIdx)) continue;

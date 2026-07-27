@@ -462,6 +462,9 @@ export function onClick(this: any, e: MouseEvent): void {
             clickedInsideSelectedTable = true;
             e.preventDefault();
             this.isMoveDragging = true;
+            // [드래그 안정화 2026-07-28] 어울림 재줄바꿈은 드롭에서 확정 — 드래그 중
+            // 재줄바꿈이 host 를 되밀어 톱니 진동(±15px)을 만들던 피드백 루프 차단.
+            try { (this.wasm as any).doc?.setSquareReflowSuppressed?.(true); } catch { /* 구버전 무시 */ }
             this.moveDragState = {
               tableRef: { sec: ref.sec, ppi: ref.ppi, ci: ref.ci },
               startPpi: ref.ppi,

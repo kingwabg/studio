@@ -1304,6 +1304,12 @@ export function finishMoveDrag(this: any): void {
   }
   this.isMoveDragging = false;
   this.moveDragState = null;
+  // [드래그 안정화] 어울림 재줄바꿈 확정 — 억제를 풀면서 1회 재배치. 반드시 **모든**
+  // 드롭 경로(이동·제자리 클릭 공통)에서 실행돼야 한다 — 분기 안에 두면 실제 드래그가
+  // 훅을 건너뛰어 위 문단이 표와 겹친 채 남는다(2026-07-28 실측).
+  try { (this.wasm as any).doc?.setSquareReflowSuppressed?.(false); } catch { /* 구버전 무시 */ }
+  // 드래그 종료 정리 — 프레임 갱신은 페이지 단위였으므로 마지막에 전체 정합을 한 번 맞춘다.
+  this.eventBus.emit('document-changed');
   if (this.dragRafId) {
     cancelAnimationFrame(this.dragRafId);
     this.dragRafId = 0;
@@ -1313,9 +1319,6 @@ export function finishMoveDrag(this: any): void {
   if (state?.pendingEnterCellHit && !state.hasMoved && state.totalDeltaH === 0 && state.totalDeltaV === 0) {
     this.cursor.exitTableObjectSelection();
     this.tableObjectRenderer?.clear();
-    // 드래그 종료 정리 — 프레임 갱신은 페이지 단위였으므로 마지막에 전체 정합(쪽수
-    // 변화·다른 페이지 파급)을 한 번 맞춘다.
-    this.eventBus.emit('document-changed');
     this.eventBus.emit('table-object-selection-changed', false);
     this.cursor.clearSelection();
     this.cursor.moveTo(state.pendingEnterCellHit);
