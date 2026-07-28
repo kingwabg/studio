@@ -1566,6 +1566,20 @@ export function onContextMenu(this: any, e: MouseEvent): void {
 }
 
 export function onMouseMove(this: any, e: MouseEvent): void {
+  // [호버 잔상 2026-07-28] 드래그가 시작되면 아래 분기들이 hover 경로 **앞에서** return 하므로
+  // 경계선 hover 마커(파란 줄)가 누른 자리에 얼어붙는다. 드래그 중엔 hover 표시가 의미 없으니
+  // 한 번 걷어내고, 예약된 hover 프레임도 취소한다(취소 안 하면 걷은 직후 다시 그린다).
+  // 경계선 리사이즈(isResizeDragging)는 제외 — showDragMarker가 자체적으로 clear 후 다시 그린다.
+  if (this.isMoveDragging || this.isPictureMoveDragging || this.isTableHandleResizing ||
+      this.isPictureRotateDragging || this.cellSelectionDragState) {
+    if (this.resizeHoverRafId) {
+      cancelAnimationFrame(this.resizeHoverRafId);
+      this.resizeHoverRafId = 0;
+    }
+    this.tableResizeRenderer?.clear();
+    tableHoverFor(this.container).clear();
+  }
+
   // 연결선 드로잉 모드: 연결점 오버레이 + 프리뷰
   if (this.connectorDrawingMode) {
     const sc = this.container.querySelector('#scroll-content');
