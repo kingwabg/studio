@@ -101,6 +101,7 @@ export class TocDialog extends ModalDialog {
 
   constructor(private services: CommandServices) {
     super('차례 만들기', 460);
+    this.titleIcon = 'list-dashes';
   }
 
   protected createBody(): HTMLElement {

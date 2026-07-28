@@ -23,6 +23,7 @@ export class SnippetDialog extends ModalDialog {
   /** 등록 초기값(선택 텍스트에서 열 때) */
   constructor(private initialText = '') {
     super('상용구', 460);
+    this.titleIcon = 'clipboard-text';
   }
 
   protected createBody(): HTMLElement {

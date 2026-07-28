@@ -1,0 +1,166 @@
+/**
+ * 모달 셸 재설계 (디자인 "rhwp 헤더·리본 재설계" 3a)
+ *
+ * 대화상자 45개가 전부 ModalDialog 를 상속하므로, 이 셸만 바꾸면 45개가 함께 따라온다.
+ * 이 파일은 dialogs.css **뒤에** 적용되어 셸 부분만 덮어쓴다(개별 대화상자 CSS 무간섭).
+ *
+ * 바뀌는 것
+ * - 파란 타이틀바 → 흰 타이틀바 + 아이콘 타일 + 선택 대상 표시, × 는 Phosphor
+ * - 탭: 브라우저 탭 테두리 → 헤더 리본과 같은 칩(선택 시 시안 필)
+ * - 라벨: 오른쪽 정렬(min-width 40px) → 왼쪽 정렬 고정폭 92px (행마다 들쭉날쭉 해소)
+ * - 입력 높이 22 → 28px, 섹션 테두리 박스 → 라벨 + 여백
+ * - 푸터: 취소 → 확인 순서 + 왼쪽에 Enter/Esc 힌트
+ */
+
+.dialog-wrap {
+  --dlg-accent: var(--ui-accent, #00647f);
+  --dlg-fill: var(--ui-accent-soft, #e4f1f6);
+  --dlg-border: var(--ui-border, #d5dbe3);
+  --dlg-fg: var(--ui-fg, #33302e);
+  --dlg-fg-dim: var(--ui-fg-dim, #7a7673);
+
+  border: 1px solid var(--dlg-border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .18);
+}
+
+/* ── 타이틀바 ── */
+.dialog-title {
+  padding: 12px 14px 10px;
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--dlg-border);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--dlg-fg);
+  gap: 10px;
+}
+
+/* 아이콘 타일 — 대화상자가 .dialog-title 앞에 <i class="ph-*"> 를 넣으면 자동 적용 */
+.dialog-title > i[class*='ph-'] {
+  width: 26px; height: 26px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  background: var(--dlg-fill);
+  color: var(--dlg-accent);
+  font-size: 16px;
+}
+
+/* 선택 대상(예: "표 블록 · 3×3 · B2") */
+.dialog-subject {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dlg-fg-dim);
+  margin-left: 2px;
+}
+
+.dialog-close {
+  width: 24px; height: 24px;
+  margin-left: auto;
+  border-radius: 4px;
+  font-size: 16px;
+  color: var(--dlg-fg-dim);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dialog-close:hover { background: var(--dlg-fill); color: var(--dlg-accent); }
+
+/* ── 탭: 브라우저 탭 → 칩 ── */
+.dialog-tabs {
+  gap: 3px;
+  padding: 9px 12px;
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--dlg-border);
+}
+
+.dialog-tab {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 27px; padding: 0 12px;
+  border: 0; border-radius: 100px;
+  background: transparent;
+  color: var(--dlg-fg-dim);
+  margin-bottom: 0;
+  font-size: 12.5px;
+  transition: background .12s ease, color .12s ease;
+}
+.dialog-tab:hover { background: color-mix(in srgb, var(--dlg-fg) 6%, transparent); color: var(--dlg-fg); }
+.dialog-tab.active {
+  background: var(--dlg-fill);
+  color: var(--dlg-accent);
+  border: 0;
+  font-weight: 600;
+}
+.dialog-tab > i[class*='ph-'] { font-size: 15px; }
+
+/* ── 본문 ── */
+.dialog-body { padding: 14px 16px 12px; }
+
+/* 라벨: 왼쪽 정렬 고정폭 — 행마다 들쭉날쭉하던 문제 해소 */
+.dialog-label {
+  min-width: 92px;
+  width: 92px;
+  text-align: left;
+  color: var(--dlg-fg-dim);
+  font-size: 12.5px;
+}
+
+/* 입력 높이 22 → 28 */
+.dialog-input,
+.dialog-select,
+.dialog-body input[type='text'],
+.dialog-body input[type='number'],
+.dialog-body select {
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--dlg-border);
+  padding: 0 8px;
+  font-size: 12.5px;
+}
+.dialog-input:focus,
+.dialog-select:focus,
+.dialog-body input:focus,
+.dialog-body select:focus {
+  outline: none;
+  border-color: var(--dlg-accent);
+  box-shadow: 0 0 0 2px var(--dlg-fill);
+}
+
+/* 섹션: 테두리 박스 대신 라벨 + 여백 */
+.dialog-section {
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 0 14px !important;
+}
+.dialog-section > legend,
+.dialog-section-title {
+  padding: 0 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--dlg-fg-dim);
+}
+
+/* ── 푸터: 취소 → 확인, 왼쪽에 키 힌트 ── */
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--dlg-border);
+  background: var(--color-surface-raised);
+}
+
+/* 키 힌트는 셸이 넣는다 */
+.dialog-keyhint {
+  margin-right: auto;
+  font-size: 11.5px;
+  color: var(--dlg-fg-dim);
+}
+
+/* DOM 순서는 확인 → 취소지만, 화면 순서는 취소 → 확인 */
+.dialog-btn { order: 1; height: 30px; border-radius: 5px; min-width: 72px; font-size: 13px; }
+.dialog-btn-primary { order: 2; background: var(--dlg-accent); border-color: var(--dlg-accent); }
+.dialog-btn-primary:hover { background: color-mix(in srgb, var(--dlg-accent) 85%, #000); }
+
+/* 종속 관계: 끈 항목은 흐려진다(기존 동작 유지, 표현만 통일) */
+.dialog-body .is-disabled,
+.dialog-body [data-dependent-off='1'] { opacity: .45; pointer-events: none; }

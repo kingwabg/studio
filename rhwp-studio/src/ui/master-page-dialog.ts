@@ -25,6 +25,7 @@ export class MasterPageDialog extends ModalDialog {
 
   constructor(private services: CommandServices) {
     super('바탕쪽', 460);
+    this.titleIcon = 'stack-simple';
   }
 
   protected createBody(): HTMLElement {

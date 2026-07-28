@@ -156,6 +156,7 @@ export class TableCellPropsDialog extends ModalDialog {
     services?: CommandServices,
   ) {
     super('표/셀 속성', 480);
+    this.titleIcon = 'table';
     this.wasm = wasm;
     this.eventBus = eventBus;
     this.tableCtx = tableCtx;

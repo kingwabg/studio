@@ -16,6 +16,11 @@ export abstract class ModalDialog {
   private built = false;
   private captureHandler: ((e: KeyboardEvent) => void) | null = null;
 
+  /** 타이틀바 아이콘 (Phosphor 이름, 예: 'table') — 하위 클래스가 설정 */
+  protected titleIcon: string | null = null;
+  /** 선택 대상 표기 (예: '표 블록 · 3×3 · B2') */
+  protected titleSubject: string | null = null;
+
   constructor(title: string, width: number, closeOnOverlayClick = false) {
     this.title = title;
     this.width = width;
@@ -34,13 +39,27 @@ export abstract class ModalDialog {
     this.dialog.style.width = `${this.width}px`;
 
     // 타이틀 바
+    // [모달 셸 재설계 2026-07-29] 파란 타이틀바 → 흰 타이틀바 + 아이콘 타일 + 선택 대상.
     const titleBar = document.createElement('div');
     titleBar.className = 'dialog-title';
-    titleBar.textContent = this.title;
+    if (this.titleIcon) {
+      const tile = document.createElement('i');
+      tile.className = `ph-duotone ph-${this.titleIcon}`;
+      titleBar.appendChild(tile);
+    }
+    const titleText = document.createElement('span');
+    titleText.textContent = this.title;
+    titleBar.appendChild(titleText);
+    if (this.titleSubject) {
+      const sub = document.createElement('span');
+      sub.className = 'dialog-subject';
+      sub.textContent = this.titleSubject;
+      titleBar.appendChild(sub);
+    }
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'dialog-close';
-    closeBtn.textContent = '\u00D7'; // ×
+    closeBtn.innerHTML = '<i class="ph ph-x"></i>';
     closeBtn.addEventListener('click', () => this.hide());
     titleBar.appendChild(closeBtn);
 
@@ -54,6 +73,12 @@ export abstract class ModalDialog {
     // 하단 버튼
     const footer = document.createElement('div');
     footer.className = 'dialog-footer';
+
+    // 키보드 힌트 — 사용자가 버튼 순서를 학습하지 않아도 되게(디자인 3a)
+    const hint = document.createElement('span');
+    hint.className = 'dialog-keyhint';
+    hint.textContent = 'Enter 확인 · Esc 취소';
+    footer.appendChild(hint);
 
     const confirmBtn = document.createElement('button');
     confirmBtn.className = 'dialog-btn dialog-btn-primary';
