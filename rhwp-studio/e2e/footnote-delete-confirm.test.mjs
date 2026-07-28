@@ -8,6 +8,9 @@ async function moveCursor(page, sectionIndex, paragraphIndex, charOffset) {
     const handler = window.__inputHandler;
     handler?.cursor?.moveTo?.({ sectionIndex: sec, paragraphIndex: para, charOffset: offset });
     if (handler) handler.active = true;
+    // [정정 2026-07-28] 캔버스 모드의 편집 키는 body 편집 컨텍스트가 있어야 먹는다
+    // (실클릭이 세우는 상태 — 프로그램적 이동은 이를 우회해 Backspace 가 무시됐다).
+    if (handler?.canvasMode && !handler.canvasEditingRef) handler.canvasEditingRef = { kind: 'body' };
     handler?.focus?.();
     handler?.updateCaret?.();
   }, sectionIndex, paragraphIndex, charOffset);
@@ -117,7 +120,17 @@ runTest('본문 각주 삭제 확인창/취소/Undo', async ({ page }) => {
   assert(afterArrowLeft.position?.charOffset === 7, 'ArrowLeft가 각주 마커 왼쪽으로 1칸 이동');
 
   console.log('\n[2] 본문 각주 마커 클릭 후 각주 편집 모드 진입 확인...');
-  await clickPagePoint(page, 0, 264, 380);
+  // [정정 2026-07-28] 마커 화면 y 는 폰트 메트릭에 따라 수 px 표류한다(실측 380→384로
+  // 밀려 고정 좌표 클릭이 빗나감). 고정 좌표 대신 엔진 hitTest 스캔으로 실좌표를 찾는다.
+  const marker = await page.evaluate(() => {
+    const w = window.__inputHandler.wasm;
+    for (let y = 370; y <= 396; y += 1) for (let x = 255; x <= 285; x += 1) {
+      if (w.hitTestBodyFootnoteMarker(0, x, y).hit) return { x, y };
+    }
+    return null;
+  });
+  assert(marker !== null, '본문 각주 마커 실좌표 탐색');
+  await clickPagePoint(page, 0, marker.x, marker.y);
   const afterMarkerClick = await cursorState(page);
   assert(afterMarkerClick.inFootnote === true, '본문 각주 마커 클릭 후 각주 편집 모드 진입');
   assert(afterMarkerClick.fnParaIdx === 3, '본문 각주 마커 클릭 후 원본 문단 인덱스 연결');
@@ -133,7 +146,7 @@ runTest('본문 각주 삭제 확인창/취소/Undo', async ({ page }) => {
   assert(dialogAfterPlainBackspace === null, '각주 앞 Backspace는 각주 삭제 확인창을 표시하지 않음');
 
   const afterPlainBackspace = await footnoteState(page);
-  assert(JSON.stringify(afterPlainBackspace.markerP3) === '[6]', '각주 앞 Backspace 후 marker anchor가 이전 위치로 따라감');
+  assert(JSON.stringify(afterPlainBackspace.markerP3) === '[6]', `각주 앞 Backspace 후 marker anchor가 이전 위치로 따라감 (실측 ${JSON.stringify(afterPlainBackspace.markerP3)}, cursor=${JSON.stringify(await cursorState(page))})`);
   assert(afterPlainBackspace.fnP3?.number === 1, '각주 앞 Backspace 후 각주 본문 유지');
 
   await page.keyboard.down('Control');

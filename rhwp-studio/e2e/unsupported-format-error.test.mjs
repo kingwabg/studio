@@ -32,15 +32,18 @@ runTest('미지원 HWPML 오류 알림 후 정상 문서 로드', async ({ page 
   });
 
   assert(!unsupportedLoadResult.error, unsupportedLoadResult.error || '미지원 파일 입력 이벤트 처리');
+  // [테스트 정정 2026-07-28] 'UNSUPPORTED_HWPML' 오류 코드는 소스 어디에서도 만들지
+  // 않는다(존재한 적 없는 코드 체계를 기대하던 낡은 계약). 실제 사용자 계약 =
+  // "파일 로드 실패" 문구 + 어떤 버전의 HWPML 이 문제인지가 알림에 담기는 것.
   assert(
     unsupportedLoadResult.statusText.includes('파일 로드 실패')
-      && unsupportedLoadResult.statusText.includes('UNSUPPORTED_HWPML')
-      && unsupportedLoadResult.statusText.includes('HWPML 2.1'),
+      && unsupportedLoadResult.statusText.includes('HWPML')
+      && unsupportedLoadResult.statusText.includes('2.1'),
     `상태 표시줄 오류 알림 (${unsupportedLoadResult.statusText})`,
   );
   assert(
-    unsupportedLoadResult.toastText.includes('UNSUPPORTED_HWPML')
-      && unsupportedLoadResult.toastText.includes('HWPML 2.1'),
+    unsupportedLoadResult.toastText.includes('HWPML')
+      && unsupportedLoadResult.toastText.includes('2.1'),
     `토스트 오류 알림 (${unsupportedLoadResult.toastText})`,
   );
   assert(

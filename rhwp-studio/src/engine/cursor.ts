@@ -1064,9 +1064,14 @@ export class CursorState {
           pos.parentParaIndex, pos.controlIndex, pos.cellIndex, pos.cellParaIndex, e);
         this.rect = { ...pos.cursorRect };
       } else {
-        // 인라인 컨트롤 위치 건너뛰기는 정상 동작 (조판부호 감추기 모드)
+        // 인라인 컨트롤 위치 건너뛰기는 정상 동작 (조판부호 감추기 모드).
+        // [#1273, 2026-07-28] 개체(그림/표) 선택 중에도 정상 — 선택 진입이 커서를 host
+        // 문단(컨트롤 전용, 렌더 텍스트 없음)으로 옮기는데 그 문단은 rect 가 없을 수
+        // 있고, 개체 선택 상태에선 body 캐럿 rect 를 쓰지도 않는다. 경고는 소음.
         const msg = String(e);
-        if (!msg.includes('인라인 컨트롤 위치')) {
+        const objectSelection =
+          this.isInPictureObjectSelection() || this.isInTableObjectSelection();
+        if (!msg.includes('인라인 컨트롤 위치') && !objectSelection) {
           console.warn('[CursorState] updateRect 실패 → rect=null pos=(%d,%d,%d) cell=(%s,%s,%s,%s):',
             pos.sectionIndex, pos.paragraphIndex, pos.charOffset,
             pos.parentParaIndex, pos.controlIndex, pos.cellIndex, pos.cellParaIndex, e);

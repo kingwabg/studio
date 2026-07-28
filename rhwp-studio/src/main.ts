@@ -808,7 +808,11 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
       console.warn('[validation] 감지/보정 실패 (치명적이지 않음):', e);
     }
 
-    await promptLocalFontsIfNeeded(docInfo, displayName);
+    // [복구 인질 2026-07-28] 이 프롬프트를 await 하면 문서 초기화 전체(그리고 그 위의
+    // 자동저장 복구 후처리 — draft 삭제·dirty 마킹)가 **모달 응답에 인질**로 잡힌다
+    // (실측: 폰트 있는 문서 복구 시 draft 잔존·dirty 미표시). 폰트 안내는 문서 사용의
+    // 전제가 아니므로 비차단으로 띄운다.
+    void promptLocalFontsIfNeeded(docInfo, displayName);
 
     if (normalizedDuringLoad) {
       documentState.markDirty('validation-auto-fix');
