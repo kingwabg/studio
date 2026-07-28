@@ -1859,10 +1859,14 @@ export function onMouseMove(this: any, e: MouseEvent): void {
     return;
   }
 
-  // 표 객체 선택 중 hover — [캔버스 한컴 포크] 한컴독스식 2모드:
+  // 표 객체 선택 중 hover — [캔버스 한컴 포크] 2모드:
   //  ① 8핸들(점) 위 → "전체 표 잡기" 호버(표 전체 accent 강조 + 리사이즈 커서)
-  //  ② 그 외 경계선 위 → "경계선 줄 변경" 호버(그 행/열 마커 + row/col-resize 커서)
-  //  ③ 표 내부(선 아님) → move 커서. 이전엔 ②가 1751행 return으로 아예 안 떴다.
+  //  ② 그 외 표 내부(경계선 포함) → move 커서.
+  // ⚠ 경계선 "줄 변경" 호버는 이 상태에서 **띄우지 않는다** — 개체 선택 중 mousedown은
+  //    bbox 안이면 무조건 이동 드래그로 소비되고(:417-470) 경계선 리사이즈 경로(:760)에
+  //    도달하지 못한다. row/col-resize 커서·마커를 띄우면 하지 못할 동작을 약속하는
+  //    거짓 어포던스가 되고, 드래그가 시작되면 그 마커가 제자리에 남는다.
+  //    열/행 폭 조절은 표 편집 상태(셀 안 클릭 = 개체 선택 해제)에서 한다.
   if (this.cursor.isInTableObjectSelection() && this.tableObjectRenderer) {
     const scrollContent = this.container.querySelector('#scroll-content');
     if (!scrollContent) return;
@@ -1906,25 +1910,8 @@ export function onMouseMove(this: any, e: MouseEvent): void {
       const px = (x - pl) / zoom;
       const py = (y - po) / zoom;
       try {
-        // 캐시 워밍(선택 표 1회) — 이후 hover는 재사용해 대형 표 프리즈 회피
-        if (!this.cachedTableRef ||
-            this.cachedTableRef.sec !== ref.sec ||
-            this.cachedTableRef.ppi !== ref.ppi ||
-            this.cachedTableRef.ci !== ref.ci ||
-            !this.cachedCellBboxes?.length) {
-          this.cachedCellBboxes = this.wasm.getTableCellBboxes(ref.sec, ref.ppi, ref.ci);
-          this.cachedTableRef = { sec: ref.sec, ppi: ref.ppi, ci: ref.ci };
-        }
-        const pageBboxes = this.cachedCellBboxes.filter((b: any) => b.pageIndex === pi);
-        const edge = this.tableResizeRenderer?.hitTestBorder(px, py, pageBboxes);
-        if (edge) {
-          // ② 경계선 = 줄 변경 호버
-          this.container.style.cursor = edge.type === 'row' ? 'row-resize' : 'col-resize';
-          this.tableResizeRenderer.showMarker(edge, pageBboxes, zoom);
-          return;
-        }
         this.tableResizeRenderer?.clear();
-        // ③ 표 내부 = move
+        // ② 표 내부 = move (경계선이든 아니든 — 누르면 이동이므로)
         const bbox = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
         this.container.style.cursor =
           (px >= bbox.x && px <= bbox.x + bbox.width && py >= bbox.y && py <= bbox.y + bbox.height) ? 'move' : '';

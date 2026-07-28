@@ -42,16 +42,23 @@ runTest('표 이동 드래그 시작 시 경계선 hover 마커가 사라진다'
     }, { px: pageX, py: pageY });
 
   const b = geom.bbox;
-  // 내부 가로 경계선(1행/2행 사이) 위로 hover → 마커 등장
+  // 내부 가로 경계선(1행/2행 사이) 위로 hover
   const rowLineY = b.y + b.height / 3;
   const hover = await toClient(b.x + b.width / 2, rowLineY);
   await page.mouse.move(hover.x, hover.y);
   await page.evaluate(() => new Promise(r => setTimeout(r, 200)));
 
-  const before = await markerCount(page);
-  assert.ok(before > 0, `hover 마커가 안 떴다(설정 실패) — count=${before}`);
+  // ① 개체 선택 상태에서는 경계선 hover 마커가 **아예 뜨면 안 된다** —
+  //    이 상태의 mousedown은 무조건 이동 드래그라 리사이즈는 불가능(거짓 어포던스 금지).
+  const onHover = await markerCount(page);
+  const cursorOnBorder = await page.evaluate(() =>
+    document.querySelector('#scroll-container')?.style.cursor
+    ?? window.__inputHandler?.container?.style?.cursor ?? '');
+  assert.strictEqual(onHover, 0, `개체 선택 중 경계선 마커가 떴다 — count=${onHover}`);
+  assert.strictEqual(cursorOnBorder, 'move',
+    `개체 선택 중 경계선 커서는 move여야 한다 — cursor=${cursorOnBorder}`);
 
-  // 같은 자리에서 눌러 이동 드래그 시작 → 마커가 걷혀야 한다
+  // ② 같은 자리에서 눌러 이동 드래그 → 드래그 중에도 마커가 없어야 한다
   await page.mouse.down();
   const to = await toClient(b.x + b.width / 2 + 40, rowLineY + 30);
   await page.mouse.move(to.x, to.y);
