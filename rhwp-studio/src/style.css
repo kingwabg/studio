@@ -28,3 +28,10 @@
 @import './styles/canva-sidebars.css';
 /* [캔버스 한컴 포크] 임베드 모드(?embed=1) — 크롬 숨기고 리본만 */
 @import './styles/embed.css';
+
+/* ── 리본 헤더 (디자인 재설계 2a) — Phosphor 아이콘은 public/vendor 로컬 벤더링 ── */
+@import url('/vendor/phosphor/duotone.css');
+@import url('/vendor/phosphor/regular.css');
+@import url('/vendor/phosphor/fill.css');
+@import url('/vendor/phosphor/bold.css');
+@import './styles/ribbon.css';

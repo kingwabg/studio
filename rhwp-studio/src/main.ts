@@ -6,6 +6,7 @@ import { CanvasView } from '@/view/canvas-view';
 import { InputHandler } from '@/engine/input-handler';
 import { Toolbar } from '@/ui/toolbar';
 import { MenuBar } from '@/ui/menu-bar';
+import { RibbonHeader } from '@/ui/ribbon-header';
 import { loadWebFonts } from '@/core/font-loader';
 import { loadExtensionViewerSettings, type ExtensionViewerSettings } from '@/core/extension-settings';
 import { CommandRegistry } from '@/command/registry';
@@ -330,6 +331,36 @@ async function initialize(): Promise<void> {
     );
 
     new MenuBar(document.getElementById('menu-bar')!, eventBus, dispatcher, registry);
+
+    // ── 리본 헤더 (디자인 재설계 2a) — 구 3단 헤더를 대체한다 ──
+    const ribbon = new RibbonHeader(document.getElementById('ribbon-header')!);
+    (window as any).__ribbon = ribbon; // e2e/디버그용
+    // 리본 버튼(data-cmd) → 명령 디스패치. mousedown 으로 잡아 편집 포커스를 뺏지 않는다.
+    document.getElementById('ribbon-header')!.addEventListener('mousedown', (e) => {
+      const btn = (e.target as HTMLElement)?.closest('[data-cmd]') as HTMLElement | null;
+      if (!btn) return;
+      e.preventDefault();
+      const cmd = btn.dataset.cmd;
+      if (cmd) dispatcher.dispatch(cmd, { anchorEl: btn });
+    });
+    // 「⋯」 패널은 body 로 나가므로 별도 위임
+    document.body.addEventListener('mousedown', (e) => {
+      const item = (e.target as HTMLElement)?.closest('.rb-over-item[data-cmd]') as HTMLElement | null;
+      if (!item) return;
+      e.preventDefault();
+      const cmd = item.dataset.cmd;
+      if (cmd) dispatcher.dispatch(cmd, { anchorEl: item });
+    });
+    // 문서 제목·저장 상태를 헤더에 반영
+    const syncRibbonDoc = () => {
+      try {
+        ribbon.setDocumentInfo(wasm.fileName || '새 문서.hwp',
+          documentState.isDirty() ? '저장 안 됨' : '저장됨');
+      } catch { /* 부팅 초기엔 문서가 없을 수 있다 */ }
+    };
+    syncRibbonDoc();
+    eventBus.on('document-dirty-changed', syncRibbonDoc);
+    eventBus.on('document-changed', syncRibbonDoc);
 
     // 툴바 내 data-cmd 버튼 클릭 → 커맨드 디스패치
     document.querySelectorAll('.tb-btn[data-cmd]').forEach(btn => {

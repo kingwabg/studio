@@ -69,7 +69,10 @@ function mountModeToggle(services: CanvaServices): void {
   const bCanvas = mkButton('', { text: '캔버스' });
   const bDoc = mkButton('', { text: '문서' });
   wrap.append(bCanvas, bDoc);
-  menuBar.appendChild(wrap);
+  // [리본 재설계 2026-07-29] 구 #menu-bar 는 이제 숨은 채 '파일' 드롭다운만 겹쳐 그린다.
+  // 모드 토글은 리본 1행의 전용 자리(.rb-mode-slot)로 옮겨 겹침을 없앤다.
+  const ribbonSlot = document.querySelector('.rb-mode-slot');
+  (ribbonSlot ?? menuBar).appendChild(wrap);
 
   const apply = (on: boolean, persist: boolean) => {
     services.getInputHandler()?.setCanvasMode(on);

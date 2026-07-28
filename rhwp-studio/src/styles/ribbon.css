@@ -1,0 +1,222 @@
+/**
+ * 리본 헤더 (디자인 "rhwp 헤더·리본 재설계" 2a — 2행 88px)
+ *
+ * 색은 전부 --ui-* 토큰을 우선 쓰고, 토큰이 없으면 디자인 시안 hex 로 폴백한다.
+ * 시안 팔레트: 시안 액센트 #00647f / 선택 필 #e4f1f6 / 경계 #d5dbe3 / 본문 #33302e
+ */
+
+/* Phosphor 아이콘 폰트 — 로컬 벤더링(외부 CDN 금지: 아동 데이터 문서 편집기) */
+@font-face {
+  font-family: 'Phosphor-Duotone';
+  src: url('/vendor/phosphor/Phosphor-Duotone.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Phosphor';
+  src: url('/vendor/phosphor/Phosphor.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Phosphor-Fill';
+  src: url('/vendor/phosphor/Phosphor-Fill.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Phosphor-Bold';
+  src: url('/vendor/phosphor/Phosphor-Bold.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+
+.ribbon-header {
+  --rb-accent: var(--ui-accent, #00647f);
+  --rb-fill: var(--ui-accent-soft, #e4f1f6);
+  --rb-border: var(--ui-border, #d5dbe3);
+  --rb-fg: var(--ui-fg, #33302e);
+  --rb-fg-dim: var(--ui-fg-dim, #7a7673);
+  --rb-bg: var(--ui-bg, #ffffff);
+
+  display: flex;
+  flex-direction: column;
+  background: var(--rb-bg);
+  user-select: none;
+  flex: none;
+}
+
+.rb-row {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 10px;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.rb-row-tabs { border-bottom: 1px solid var(--rb-border); }
+
+/* ── 브랜드 ── */
+.rb-brand { display: flex; align-items: baseline; gap: 3px; padding-right: 2px; }
+.rb-brand-main { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: var(--rb-fg); }
+.rb-brand-sub { font-size: 12px; color: var(--rb-fg-dim); }
+
+/* ── 파일 버튼 ── */
+.rb-file {
+  height: 26px; padding: 0 12px; border: 0; border-radius: 3px;
+  background: transparent; color: var(--rb-fg);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.rb-file:hover { background: color-mix(in srgb, var(--rb-fg) 8%, transparent); }
+
+/* '파일' 자리 확보 — 실제 버튼은 절대배치된 #menu-bar 가 겹쳐 그린다 */
+.rb-file-slot { width: 52px; flex: none; }
+
+/* ── 작업 흐름 탭(칩) ── */
+.rb-tabs { display: flex; align-items: center; gap: 2px; }
+.rb-tab {
+  height: 26px; padding: 0 13px; border: 0; border-radius: 100px;
+  background: transparent; color: var(--rb-fg-dim);
+  font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+  transition: background .12s ease, color .12s ease;
+}
+.rb-tab:hover { background: color-mix(in srgb, var(--rb-fg) 6%, transparent); color: var(--rb-fg); }
+.rb-tab.is-active { background: var(--rb-fill); color: var(--rb-accent); font-weight: 600; }
+
+/* 캔버스/문서 모드 토글 자리 */
+.rb-mode-slot { display: flex; align-items: center; margin-left: 6px; }
+.rb-mode-slot .canva-mode-toggle { position: static; margin: 0; }
+
+/* ── 문서 제목 ── */
+.rb-doc {
+  margin-left: auto; display: flex; align-items: baseline; gap: 9px;
+  min-width: 0; padding-right: 4px;
+}
+.rb-doc-title {
+  font-size: 13px; color: var(--rb-fg);
+  max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rb-doc-status { font-size: 12px; color: var(--rb-fg-dim); white-space: nowrap; }
+
+/* ── 리본 행 ── */
+/* 총 88px = 44 + 44 (경계선은 box-sizing 안쪽) — 디자인 2a 명세 */
+.rb-row-ribbon { gap: 3px; overflow: hidden; border-bottom: 1px solid var(--rb-border); }
+
+.rb-btn {
+  width: 30px; height: 30px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 3px; background: transparent;
+  color: var(--rb-fg); cursor: pointer; padding: 0;
+  transition: background .12s ease;
+}
+.rb-btn:hover { background: var(--rb-fill); color: var(--rb-accent); }
+.rb-btn:active { background: color-mix(in srgb, var(--rb-accent) 18%, transparent); }
+.rb-btn.is-active { background: var(--rb-fill); color: var(--rb-accent); }
+
+/* 대표 항목은 라벨을 함께 노출 */
+.rb-btn.is-primary { width: auto; gap: 6px; padding: 0 10px 0 8px; }
+.rb-btn-label { font-size: 13px; white-space: nowrap; }
+
+.rb-sep {
+  width: 1px; height: 20px; flex: none;
+  background: var(--rb-border); margin: 0 5px;
+}
+
+.rb-combo {
+  height: 26px; flex: none; display: inline-flex; align-items: center;
+  justify-content: space-between; gap: 6px; padding: 0 8px;
+  border: 1px solid var(--rb-border); border-radius: 3px;
+  background: var(--rb-bg); color: var(--rb-fg);
+  font: inherit; font-size: 12px; cursor: pointer; overflow: hidden;
+}
+.rb-combo:hover { border-color: var(--rb-accent); }
+.rb-combo > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rb-expander {
+  height: 26px; flex: none; display: inline-flex; align-items: center; gap: 4px;
+  padding: 0 8px; border: 0; border-radius: 3px; background: transparent;
+  color: var(--rb-fg-dim); font: inherit; font-size: 12px; cursor: pointer;
+}
+.rb-expander:hover { background: var(--rb-fill); color: var(--rb-accent); }
+
+.rb-icon-btn {
+  width: 28px; height: 28px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 3px; background: transparent;
+  color: var(--rb-fg-dim); cursor: pointer; padding: 0;
+}
+.rb-icon-btn:hover { background: var(--rb-fill); color: var(--rb-accent); }
+
+.rb-more {
+  margin-left: auto; width: 28px; height: 28px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 3px; background: transparent;
+  color: var(--rb-fg-dim); cursor: pointer; padding: 0;
+}
+.rb-more:hover { background: var(--rb-fill); color: var(--rb-accent); }
+
+/* ── 「⋯」 더 보기 패널 ── */
+.rb-overflow {
+  position: fixed; z-index: 200; min-width: 252px; padding: 5px;
+  background: var(--ui-bg, #fff);
+  border: 1px solid var(--ui-border, #d5dbe3);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+}
+.rb-over-item {
+  width: 100%; height: 30px; display: flex; align-items: center; gap: 9px;
+  padding: 0 9px; border: 0; border-radius: 4px; background: transparent;
+  color: var(--ui-fg, #33302e); font: inherit; font-size: 13px;
+  cursor: pointer; text-align: left;
+}
+.rb-over-item:hover { background: var(--ui-accent-soft, #e4f1f6); color: var(--ui-accent, #00647f); }
+.rb-over-label { flex: 1; }
+.rb-over-key { font-size: 11px; color: var(--ui-fg-dim, #8a8683); }
+
+/* ── 다크 ── */
+@media (prefers-color-scheme: dark) {
+  .ribbon-header {
+    --rb-accent: var(--ui-accent, #35b6d8);
+    --rb-fill: var(--ui-accent-soft, #10323c);
+    --rb-border: var(--ui-border, #3b424d);
+    --rb-fg: var(--ui-fg, #e8eaed);
+    --rb-fg-dim: var(--ui-fg-dim, #9aa0a6);
+    --rb-bg: var(--ui-bg, #22262b);
+  }
+}
+:root[data-theme='dark'] .ribbon-header {
+  --rb-accent: var(--ui-accent, #35b6d8);
+  --rb-fill: var(--ui-accent-soft, #10323c);
+  --rb-border: var(--ui-border, #3b424d);
+  --rb-fg: var(--ui-fg, #e8eaed);
+  --rb-fg-dim: var(--ui-fg-dim, #9aa0a6);
+  --rb-bg: var(--ui-bg, #22262b);
+}
+
+/* 좁은 화면: 라벨을 감추고 아이콘만 */
+@media (max-width: 900px) {
+  .rb-btn.is-primary { width: 30px; padding: 0; gap: 0; }
+  .rb-btn-label { display: none; }
+  .rb-doc-title { max-width: 160px; }
+}
+
+/* 구 3단 헤더는 숨기되 DOM 에 남긴다(위 index.html 주석 참조) */
+#legacy-chrome { display: contents; }
+#legacy-chrome #icon-toolbar,
+#legacy-chrome #style-bar { display: none !important; }
+/* 남은 '파일' 외 메뉴 항목은 감춘다 — 기능은 리본 탭이 대신한다 */
+#menu-bar.rb-legacy-menu .menu-item:not([data-menu="file"]) { display: none; }
+
+/* 구 #menu-bar 는 '파일' 드롭다운만 남겨 리본 1행에 흡수한다 —
+   드롭다운 마크업·명령 배선(menu-bar.ts)을 그대로 재사용하기 위함. */
+#menu-bar.rb-legacy-menu {
+  position: absolute; top: 0; left: 74px; height: 44px;
+  display: flex; align-items: center; background: transparent;
+  border: 0; padding: 0; z-index: 30;
+}
+#menu-bar.rb-legacy-menu .menu-title {
+  height: 26px; display: inline-flex; align-items: center; padding: 0 12px;
+  border-radius: 3px; font-size: 13px; color: var(--ui-fg, #33302e);
+}
+#menu-bar.rb-legacy-menu .menu-item:hover .menu-title,
+#menu-bar.rb-legacy-menu .menu-item.open .menu-title {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+#studio-root { position: relative; }

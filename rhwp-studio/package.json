@@ -31,6 +31,7 @@
     "serialize-javascript": "7.0.5"
   },
   "dependencies": {
+    "@phosphor-icons/web": "^2.1.2",
     "@types/diff": "^7.0.2",
     "canvaskit-wasm": "^0.41.1",
     "diff": "^9.0.0",

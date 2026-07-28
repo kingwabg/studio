@@ -15,8 +15,18 @@
 </head>
 <body>
   <div id="studio-root">
+    <!-- ── 리본 헤더 (디자인 "rhwp 헤더·리본 재설계" 2a — 2행 88px) ──
+         화면에 보이는 헤더는 이것 하나다. 마크업은 src/ui/ribbon-header.ts 가 데이터
+         표에서 생성하고, 각 버튼은 기존 data-cmd 를 그대로 물린다. -->
+    <div id="ribbon-header"></div>
+
+    <!-- ⚠ 구 3단 헤더(메뉴바·아이콘 툴바·서식바)는 **숨긴 채 보존**한다.
+         Toolbar(서식 상태 동기)·머리말 도구상자 전환·view:toolbox-* 명령이 이 DOM 을
+         직접 조회하기 때문 — 마크업만 지우면 부팅이 죽는다(실측 2026-07-29).
+         '파일' 드롭다운만 .rb-legacy-menu 로 리본 1행에 겹쳐 보인다. -->
+    <div id="legacy-chrome">
     <!-- 메뉴바 -->
-    <div id="menu-bar">
+    <div id="menu-bar" class="rb-legacy-menu">
       <!-- ── 파일 ── -->
       <div class="menu-item" data-menu="file">
         <span class="menu-title">파일</span>
@@ -592,6 +602,8 @@
       <button class="sb-insert" data-cmd="insert:image" title="그림">이미지</button>
       <button class="sb-insert" data-cmd="insert:shape" title="도형(모양)">모양 ▾</button>
       <button class="sb-insert" data-cmd="insert:hyperlink" title="하이퍼링크(준비 중)">링크</button>
+    </div>
+
     </div>
 
     <!-- 에디터 영역 (눈금자 포함) -->
