@@ -5,27 +5,8 @@
  * 시안 팔레트: 시안 액센트 #00647f / 선택 필 #e4f1f6 / 경계 #d5dbe3 / 본문 #33302e
  */
 
-/* Phosphor 아이콘 폰트 — 로컬 벤더링(외부 CDN 금지: 아동 데이터 문서 편집기) */
-@font-face {
-  font-family: 'Phosphor-Duotone';
-  src: url('/vendor/phosphor/Phosphor-Duotone.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: block;
-}
-@font-face {
-  font-family: 'Phosphor';
-  src: url('/vendor/phosphor/Phosphor.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: block;
-}
-@font-face {
-  font-family: 'Phosphor-Fill';
-  src: url('/vendor/phosphor/Phosphor-Fill.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: block;
-}
-@font-face {
-  font-family: 'Phosphor-Bold';
-  src: url('/vendor/phosphor/Phosphor-Bold.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: block;
-}
+/* Phosphor 아이콘 폰트는 main.ts 의 모듈 import 가 담당한다(경로는 Vite 가 재작성).
+   여기에 @font-face 를 절대 경로로 쓰면 배포 base 아래에서 폰트가 404 난다. */
 
 .ribbon-header {
   /* ⚠ 정본 토큰은 --color-* 다(styles/base.css). --ui-fg 같은 이름은 존재하지 않아

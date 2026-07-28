@@ -29,10 +29,9 @@
 /* [캔버스 한컴 포크] 임베드 모드(?embed=1) — 크롬 숨기고 리본만 */
 @import './styles/embed.css';
 
-/* ── 리본 헤더 (디자인 재설계 2a) — Phosphor 아이콘은 public/vendor 로컬 벤더링 ── */
-@import url('/vendor/phosphor/duotone.css');
-@import url('/vendor/phosphor/regular.css');
-@import url('/vendor/phosphor/fill.css');
-@import url('/vendor/phosphor/bold.css');
+/* ── 리본 헤더 (디자인 재설계 2a) ──
+   ⚠ Phosphor 아이콘 CSS 는 main.ts 에서 **모듈 import** 한다. 여기서 절대 경로
+   (/vendor/...)로 부르면 배포 base(/rhwp-studio/) 아래에서 404 가 난다 —
+   로컬 dev 는 루트라 멀쩡히 보여 놓치기 쉽다(2026-07-29 실사고). */
 @import './styles/ribbon.css';
 @import './styles/dialog-shell.css';

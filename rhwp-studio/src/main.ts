@@ -5,6 +5,13 @@ import { assertRemoteDocumentBytes } from '@/core/document-signature';
 import { CanvasView } from '@/view/canvas-view';
 import { InputHandler } from '@/engine/input-handler';
 import { Toolbar } from '@/ui/toolbar';
+// Phosphor 아이콘 — 번들러가 폰트 URL 을 배포 base(./)에 맞춰 재작성한다.
+// ⚠ CSS 에 절대경로(/vendor/...)를 쓰면 /rhwp-studio/ 하위 배포에서 404 다(2026-07-29 실사고).
+// 사본을 두는 이유: 원본은 woff/ttf/svg 까지 물어 번들이 14MB 로 불어난다 → woff2 만 남김.
+import '@/styles/phosphor/duotone.css';
+import '@/styles/phosphor/regular.css';
+import '@/styles/phosphor/fill.css';
+import '@/styles/phosphor/bold.css';
 import { MenuBar } from '@/ui/menu-bar';
 import { RibbonHeader } from '@/ui/ribbon-header';
 import { loadWebFonts } from '@/core/font-loader';
