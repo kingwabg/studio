@@ -1693,6 +1693,16 @@ export class WasmBridge {
     return (this.doc as any).setNumberingRestart(sec, para, mode, startNum);
   }
 
+  /** 문서 메모 목록 — [{sectionIndex, paragraphIndex, charOffset, memoIndex, text}] */
+  getMemos(): Array<{ sectionIndex: number; paragraphIndex: number; charOffset: number; memoIndex: number; text: string }> {
+    if (!this.doc || typeof (this.doc as any).getMemos !== 'function') return [];
+    try {
+      return JSON.parse((this.doc as any).getMemos());
+    } catch {
+      return [];
+    }
+  }
+
   /**
    * 문서 구조(개요) 트리 — 차례(목차) 생성의 원천.
    * mode: 'auto' | 'outline' | 'clause'. 노드 = {level, kind, marker, heading, section, paragraph, children}.

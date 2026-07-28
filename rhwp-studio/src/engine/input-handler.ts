@@ -2,6 +2,7 @@ import { WasmBridge } from '@/core/wasm-bridge';
 import { EventBus } from '@/core/event-bus';
 import { CursorState } from './cursor';
 import { CaretRenderer } from './caret-renderer';
+import { MemoOverlay } from './memo-overlay';
 import { FieldMarkerRenderer } from './field-marker-renderer';
 import { SelectionRenderer } from './selection-renderer';
 import { CommandHistory } from './history';
@@ -254,6 +255,8 @@ export class InputHandler {
   private cursor: CursorState;
   private caret: CaretRenderer;
   private fieldMarker: FieldMarkerRenderer;
+  /** 메모 말풍선 오버레이(읽기 전용) */
+  private memoOverlay: MemoOverlay;
   private selectionRenderer: SelectionRenderer;
   private history: CommandHistory;
   private textarea: HTMLTextAreaElement;
@@ -483,6 +486,7 @@ export class InputHandler {
     this.cursor = new CursorState(wasm);
     this.caret = new CaretRenderer(container, virtualScroll);
     this.fieldMarker = new FieldMarkerRenderer(container, virtualScroll);
+    this.memoOverlay = new MemoOverlay(container, virtualScroll);
     this.selectionRenderer = new SelectionRenderer(container, virtualScroll);
     this.history = new CommandHistory();
 
@@ -594,6 +598,7 @@ export class InputHandler {
 
     // 문서 변경 후 그림/표 선택 마커 재렌더링
     eventBus.on('document-changed', () => {
+      this.refreshMemoOverlay();
       this.protectedCellHitCache = null;
       this.protectedCellHoverEl?.remove();
       this.protectedCellHoverEl = null;
@@ -640,7 +645,23 @@ export class InputHandler {
    * 용지의 화면 위치가 바뀌는 모든 계기 — 줌 변경, 컨테이너 폭 변경(용지 재중앙화) —
    * 에서 같은 경로를 태워야 오버레이가 용지를 따라간다.
    */
+  /** 메모 말풍선을 다시 그린다 — 문서·레이아웃·줌 변경 시 */
+  refreshMemoOverlay(): void {
+    try {
+      const memos = this.wasm.getMemos();
+      this.memoOverlay.render(memos, this.viewportManager.getZoom(), (m) => {
+        try {
+          const r = this.wasm.getCursorRect(m.sectionIndex, m.paragraphIndex, 0);
+          return r ? { pageIndex: r.pageIndex, x: r.x, y: r.y, height: r.height } : null;
+        } catch {
+          return null;
+        }
+      });
+    } catch { /* 메모 조회 실패는 무시 — 표시용 기능 */ }
+  }
+
   private refreshOverlayPositions(): void {
+    this.refreshMemoOverlay();
     if (this.active) {
       if (this.cursor.getRect()) {
         this.caret.updatePosition(this.viewportManager.getZoom());
