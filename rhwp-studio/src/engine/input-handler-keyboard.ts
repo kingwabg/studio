@@ -1276,6 +1276,17 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
         this.updateCaret();
         break;
       }
+      // [다단계 번호 2026-07-28, 한컴 규약] 번호·글머리표 문단의 **첫 칸**에서 Tab/Shift+Tab
+      // 은 탭 문자가 아니라 수준 증감이다. 그 외 위치는 기존 동작(탭 삽입/내어쓰기) 유지.
+      if (this.cursor.getPosition().charOffset === 0) {
+        try {
+          const props = this.getParaProperties();
+          if (props.headType && props.headType !== 'None') {
+            this.changeOutlineLevel(e.shiftKey ? -1 : 1);
+            break;
+          }
+        } catch { /* 문단모양 조회 실패 시 기존 동작으로 */ }
+      }
       if (e.shiftKey) {
         this.applyHangingIndentAtCursor();
         break;

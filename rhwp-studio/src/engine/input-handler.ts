@@ -4380,7 +4380,20 @@ export class InputHandler {
 
       // 현재 개요 수준 파싱 (개요 1~7)
       const match = currentStyle.name.match(/^개요\s*(\d)$/);
-      if (!match) return; // 개요 스타일이 아니면 무시
+      if (!match) {
+        // [다단계 되살리기 2026-07-28] 스타일명이 "개요 N" 이 아니어도, 번호·글머리표
+        // 문단이면 문단모양의 수준(para_level 0~6)을 직접 증감한다 — 엔진 렌더러는
+        // 이미 수준별 번호 서식을 조판한다(expand_numbering_format). 과거엔 여기서
+        // 그냥 return 해 한컴식 다단계 번호가 전혀 동작하지 않았다.
+        const props = this.getParaProperties();
+        if (!props.headType || props.headType === 'None') return;
+        const cur = props.paraLevel ?? 0;
+        const next = Math.max(0, Math.min(6, cur + delta));
+        if (next === cur) return;
+        this.applyParaFormat({ paraLevel: next } as Partial<import('@/core/types').ParaProperties>);
+        this.focusTextarea();
+        return;
+      }
 
       const currentLevel = parseInt(match[1], 10);
       const targetLevel = currentLevel + delta;
@@ -4413,7 +4426,9 @@ export class InputHandler {
         this.applyParaFormat({
           headType: 'Number',
           numberingId: nid,
-          paraLevel: 0,
+          // [다단계 되살리기 2026-07-28] 0 하드코딩이던 자리 — 엔진은 7수준을 전부
+          // 조판하는데 studio 가 항상 0으로 덮어써 다단계 번호가 사장돼 있었다.
+          paraLevel: props.paraLevel ?? 0,
         } as Partial<import('@/core/types').ParaProperties>);
       }
       this.focusTextarea();
@@ -4435,7 +4450,7 @@ export class InputHandler {
         this.applyParaFormat({
           headType: 'Bullet',
           numberingId: bid,
-          paraLevel: 0,
+          paraLevel: props.paraLevel ?? 0, // 현재 수준 유지(구 0 하드코딩)
         } as Partial<import('@/core/types').ParaProperties>);
       }
       this.focusTextarea();
@@ -4451,7 +4466,7 @@ export class InputHandler {
       this.applyParaFormat({
         headType: 'Bullet',
         numberingId: bid,
-        paraLevel: 0,
+        paraLevel: this.getParaProperties().paraLevel ?? 0, // 현재 수준 유지
       } as Partial<import('@/core/types').ParaProperties>);
       this.focusTextarea();
     } catch (err) {
@@ -4465,7 +4480,7 @@ export class InputHandler {
       this.applyParaFormat({
         headType: 'Number',
         numberingId,
-        paraLevel: 0,
+        paraLevel: this.getParaProperties().paraLevel ?? 0, // 현재 수준 유지
       } as Partial<import('@/core/types').ParaProperties>);
       this.focusTextarea();
     } catch (err) {
