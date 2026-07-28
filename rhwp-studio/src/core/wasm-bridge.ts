@@ -1693,6 +1693,28 @@ export class WasmBridge {
     return (this.doc as any).setNumberingRestart(sec, para, mode, startNum);
   }
 
+  /** 구역의 바탕쪽 목록 — [{index, applyTo, isExtension, overlap, text}] */
+  getMasterPages(sec: number): Array<{ index: number; applyTo: string; isExtension: boolean; overlap: boolean; text: string }> {
+    if (!this.doc || typeof (this.doc as any).getMasterPages !== 'function') return [];
+    try {
+      return JSON.parse((this.doc as any).getMasterPages(sec));
+    } catch {
+      return [];
+    }
+  }
+
+  /** 바탕쪽 본문 교체(줄바꿈=문단) — 원본 헤더를 무효화해 저장에 반영된다 */
+  setMasterPageText(sec: number, mpIndex: number, text: string): { ok: boolean; error?: string } {
+    if (!this.doc || typeof (this.doc as any).setMasterPageText !== 'function') {
+      return { ok: false, error: '엔진이 바탕쪽 편집을 지원하지 않습니다' };
+    }
+    try {
+      return JSON.parse((this.doc as any).setMasterPageText(sec, mpIndex, text));
+    } catch (e) {
+      return { ok: false, error: String(e) };
+    }
+  }
+
   /** 문서 메모 목록 — [{sectionIndex, paragraphIndex, charOffset, memoIndex, text}] */
   getMemos(): Array<{ sectionIndex: number; paragraphIndex: number; charOffset: number; memoIndex: number; text: string }> {
     if (!this.doc || typeof (this.doc as any).getMemos !== 'function') return [];

@@ -4,6 +4,7 @@ import { PageBorderDialog } from '@/ui/page-border-dialog';
 import { SectionSettingsDialog } from '@/ui/section-settings-dialog';
 import { ColumnSettingsDialog } from '@/ui/column-settings-dialog';
 import { NewNumberDialog } from '@/ui/new-number-dialog';
+import { MasterPageDialog } from '@/ui/master-page-dialog';
 
 function stub(id: string, label: string, icon?: string, shortcut?: string): CommandDef {
   return {
@@ -167,6 +168,15 @@ function applyHfTemplate(
 }
 
 export const pageCommands: CommandDef[] = [
+  {
+    // [바탕쪽 2026-07-28] 한컴 [쪽-바탕쪽] — 모든 쪽 뒤에 깔리는 공통 배경 텍스트 편집.
+    id: 'page:masterpage',
+    label: '바탕쪽',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      new MasterPageDialog(services).show();
+    },
+  },
   {
     id: 'page:setup',
     label: '편집 용지',
