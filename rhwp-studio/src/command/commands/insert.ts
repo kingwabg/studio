@@ -5,6 +5,7 @@ import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
 import { SymbolsDialog } from '@/ui/symbols-dialog';
 import { BookmarkDialog } from '@/ui/bookmark-dialog';
 import { SnippetDialog } from '@/ui/snippet-dialog';
+import { TocDialog } from '@/ui/toc-dialog';
 import { userSettings } from '@/core/user-settings';
 import { EndnoteShapeDialog } from '@/ui/endnote-shape-dialog';
 import { FieldInsertDialog } from '@/ui/field-insert-dialog';
@@ -366,6 +367,15 @@ export const insertCommands: CommandDef[] = [
         bookmarkDialog = new BookmarkDialog(services);
       }
       bookmarkDialog.show();
+    },
+  },
+  {
+    // [차례 2026-07-28] 한컴 [도구-차례/색인] — 구조 추출 + 쪽번호로 목차 문단 생성.
+    id: 'insert:toc',
+    label: '차례 만들기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      new TocDialog(services).show();
     },
   },
   {

@@ -1693,6 +1693,19 @@ export class WasmBridge {
     return (this.doc as any).setNumberingRestart(sec, para, mode, startNum);
   }
 
+  /**
+   * 문서 구조(개요) 트리 — 차례(목차) 생성의 원천.
+   * mode: 'auto' | 'outline' | 'clause'. 노드 = {level, kind, marker, heading, section, paragraph, children}.
+   */
+  getStructure(mode: 'auto' | 'outline' | 'clause' = 'outline'): any {
+    if (!this.doc) return { nodes: [] };
+    try {
+      return JSON.parse((this.doc as any).getStructure(mode));
+    } catch {
+      return { nodes: [] };
+    }
+  }
+
   applyParaFormat(sec: number, para: number, propsJson: string): string {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return this.doc.applyParaFormat(sec, para, propsJson);
