@@ -13,11 +13,12 @@
  */
 
 .dialog-wrap {
-  --dlg-accent: var(--ui-accent, #00647f);
-  --dlg-fill: var(--ui-accent-soft, #e4f1f6);
-  --dlg-border: var(--ui-border, #d5dbe3);
-  --dlg-fg: var(--ui-fg, #33302e);
-  --dlg-fg-dim: var(--ui-fg-dim, #7a7673);
+  /* 정본 토큰 = --color-* (styles/base.css) */
+  --dlg-accent: var(--color-primary, #00647f);
+  --dlg-fill: var(--color-accent-bg, #e4f1f6);
+  --dlg-border: var(--color-border, #d5dbe3);
+  --dlg-fg: var(--color-text, #33302e);
+  --dlg-fg-dim: var(--color-text-muted, #7a7673);
 
   border: 1px solid var(--dlg-border);
   border-radius: 8px;

@@ -177,6 +177,11 @@ export class RibbonHeader {
   private activeTab = 'home';
   private weight: IconWeight = 'duotone';
   private overflowPanel: HTMLDivElement | null = null;
+  private themeBtn!: HTMLButtonElement;
+  /** 현재 테마 모드 — system → light → dark 순환 */
+  private themeMode: 'system' | 'light' | 'dark' = 'system';
+  /** 테마 명령 실행 위임 (main.ts 가 디스패처를 물려준다) */
+  onCommand: ((cmd: string) => void) | null = null;
   /** 슬롯 이름 → 옮겨 담을 실제 DOM (탭 전환마다 다시 꽂는다) */
   private adopted = new Map<string, HTMLElement>();
   /** 편집 모드 컨텍스트 리본(머리말/꼬리말·각주) — 켜지면 일반 리본을 덮는다 */
@@ -185,6 +190,30 @@ export class RibbonHeader {
   constructor(root: HTMLElement) {
     this.root = root;
     this.build();
+  }
+
+  /** 부팅 시 저장된 테마 모드를 반영한다 */
+  setThemeMode(mode: 'system' | 'light' | 'dark'): void {
+    this.themeMode = mode;
+    this.renderThemeButton();
+  }
+
+  private renderThemeButton(): void {
+    const spec = {
+      system: { icon: 'circle-half', title: '테마: 시스템 (클릭해 밝게)' },
+      light: { icon: 'sun', title: '테마: 밝게 (클릭해 어둡게)' },
+      dark: { icon: 'moon', title: '테마: 어둡게 (클릭해 시스템)' },
+    }[this.themeMode];
+    this.themeBtn.title = spec.title;
+    this.themeBtn.innerHTML = '';
+    this.themeBtn.appendChild(this.icon(spec.icon, 17));
+  }
+
+  private cycleTheme(): void {
+    const next = { system: 'light', light: 'dark', dark: 'system' } as const;
+    this.themeMode = next[this.themeMode];
+    this.renderThemeButton();
+    this.onCommand?.(`view:theme-${this.themeMode}`);
   }
 
   /**
@@ -270,13 +299,31 @@ export class RibbonHeader {
     docInfo.append(this.titleEl, this.statusEl);
     this.tabRow.appendChild(docInfo);
 
-    const themeBtn = document.createElement('button');
-    themeBtn.className = 'rb-icon-btn';
-    themeBtn.type = 'button';
-    themeBtn.title = '테마 바꾸기';
-    themeBtn.dataset.cmd = 'view:theme-toggle';
-    themeBtn.appendChild(this.icon('sun', 17));
-    this.tabRow.appendChild(themeBtn);
+    // ── 우측 유틸 (구 헤더의 인쇄·도움·테마를 되살린다) ──
+    // ⚠ 테마는 view:theme-{system|light|dark} 3개 명령이다. 'view:theme-toggle' 같은
+    //   단일 명령은 없다(1차 배포에서 없는 명령을 붙여 다크모드가 죽었던 실수, 2026-07-29).
+    const printBtn = document.createElement('button');
+    printBtn.className = 'rb-icon-btn';
+    printBtn.type = 'button';
+    printBtn.title = '인쇄 (Ctrl+P)';
+    printBtn.dataset.cmd = 'file:print';
+    printBtn.appendChild(this.icon('printer', 17));
+    this.tabRow.appendChild(printBtn);
+
+    const helpBtn = document.createElement('button');
+    helpBtn.className = 'rb-icon-btn';
+    helpBtn.type = 'button';
+    helpBtn.title = '제품 정보';
+    helpBtn.dataset.cmd = 'file:about';
+    helpBtn.appendChild(this.icon('question', 17));
+    this.tabRow.appendChild(helpBtn);
+
+    this.themeBtn = document.createElement('button');
+    this.themeBtn.className = 'rb-icon-btn';
+    this.themeBtn.type = 'button';
+    this.tabRow.appendChild(this.themeBtn);
+    this.renderThemeButton();
+    this.themeBtn.addEventListener('click', () => this.cycleTheme());
 
     // ── 2행: 리본 ──
     this.ribbonRow = document.createElement('div');

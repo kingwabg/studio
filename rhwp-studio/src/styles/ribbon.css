@@ -28,12 +28,14 @@
 }
 
 .ribbon-header {
-  --rb-accent: var(--ui-accent, #00647f);
-  --rb-fill: var(--ui-accent-soft, #e4f1f6);
-  --rb-border: var(--ui-border, #d5dbe3);
-  --rb-fg: var(--ui-fg, #33302e);
-  --rb-fg-dim: var(--ui-fg-dim, #7a7673);
-  --rb-bg: var(--ui-bg, #ffffff);
+  /* ⚠ 정본 토큰은 --color-* 다(styles/base.css). --ui-fg 같은 이름은 존재하지 않아
+     다크에서 글자·아이콘이 배경에 묻혔다(2026-07-29 실사고). hex 는 최후 폴백. */
+  --rb-accent: var(--color-primary, #00647f);
+  --rb-fill: var(--color-accent-bg, #e4f1f6);
+  --rb-border: var(--color-border, #d5dbe3);
+  --rb-fg: var(--color-text, #33302e);
+  --rb-fg-dim: var(--color-text-muted, #7a7673);
+  --rb-bg: var(--color-surface-raised, #ffffff);
 
   display: flex;
   flex-direction: column;
@@ -176,41 +178,24 @@
 /* ── 「⋯」 더 보기 패널 ── */
 .rb-overflow {
   position: fixed; z-index: 200; min-width: 252px; padding: 5px;
-  background: var(--ui-bg, #fff);
-  border: 1px solid var(--ui-border, #d5dbe3);
+  background: var(--color-surface-raised, #fff);
+  border: 1px solid var(--color-border, #d5dbe3);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
 }
 .rb-over-item {
   width: 100%; height: 30px; display: flex; align-items: center; gap: 9px;
   padding: 0 9px; border: 0; border-radius: 4px; background: transparent;
-  color: var(--ui-fg, #33302e); font: inherit; font-size: 13px;
+  color: var(--color-text, #33302e); font: inherit; font-size: 13px;
   cursor: pointer; text-align: left;
 }
-.rb-over-item:hover { background: var(--ui-accent-soft, #e4f1f6); color: var(--ui-accent, #00647f); }
+.rb-over-item:hover { background: var(--color-accent-bg, #e4f1f6); color: var(--color-primary, #00647f); }
 .rb-over-label { flex: 1; }
-.rb-over-key { font-size: 11px; color: var(--ui-fg-dim, #8a8683); }
+.rb-over-key { font-size: 11px; color: var(--color-text-muted, #8a8683); }
 
-/* ── 다크 ── */
-@media (prefers-color-scheme: dark) {
-  .ribbon-header {
-    --rb-accent: var(--ui-accent, #35b6d8);
-    --rb-fill: var(--ui-accent-soft, #10323c);
-    --rb-border: var(--ui-border, #3b424d);
-    --rb-fg: var(--ui-fg, #e8eaed);
-    --rb-fg-dim: var(--ui-fg-dim, #9aa0a6);
-    --rb-bg: var(--ui-bg, #22262b);
-  }
-}
-:root[data-theme='dark'] .ribbon-header {
-  --rb-accent: var(--ui-accent, #35b6d8);
-  --rb-fill: var(--ui-accent-soft, #10323c);
-  --rb-border: var(--ui-border, #3b424d);
-  --rb-fg: var(--ui-fg, #e8eaed);
-  --rb-fg-dim: var(--ui-fg-dim, #9aa0a6);
-  --rb-bg: var(--ui-bg, #22262b);
-}
-
+/* ── 다크 ──
+   ⚠ 정본 선택자는 :root[data-theme-effective='dark'] 다(core/theme.ts applyTheme).
+   prefers-color-scheme 단독 판정은 "시스템은 다크지만 사용자가 밝게 선택" 을 어긴다. */
 /* 좁은 화면: 라벨을 감추고 아이콘만 */
 @media (max-width: 900px) {
   .rb-btn.is-primary { width: 30px; padding: 0; gap: 0; }
@@ -234,7 +219,7 @@
 }
 #menu-bar.rb-legacy-menu .menu-title {
   height: 26px; display: inline-flex; align-items: center; padding: 0 12px;
-  border-radius: 3px; font-size: 13px; color: var(--ui-fg, #33302e);
+  border-radius: 3px; font-size: 13px; color: var(--color-text, #33302e);
 }
 #menu-bar.rb-legacy-menu .menu-item:hover .menu-title,
 #menu-bar.rb-legacy-menu .menu-item.open .menu-title {

@@ -335,6 +335,10 @@ async function initialize(): Promise<void> {
     // ── 리본 헤더 (디자인 재설계 2a) — 구 3단 헤더를 대체한다 ──
     const ribbon = new RibbonHeader(document.getElementById('ribbon-header')!);
     (window as any).__ribbon = ribbon; // e2e/디버그용
+    ribbon.onCommand = (cmd: string) => dispatcher.dispatch(cmd);
+    // 저장된 테마 모드를 버튼 아이콘에 반영
+    try { ribbon.setThemeMode(getThemeMode() as 'system' | 'light' | 'dark'); }
+    catch { /* 조회 실패 시 기본(system) */ }
     // 리본 버튼(data-cmd) → 명령 디스패치. mousedown 으로 잡아 편집 포커스를 뺏지 않는다.
     document.getElementById('ribbon-header')!.addEventListener('mousedown', (e) => {
       const btn = (e.target as HTMLElement)?.closest('[data-cmd]') as HTMLElement | null;
