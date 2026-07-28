@@ -36,8 +36,8 @@ export class SelectionRenderer {
 
     for (const rect of rects) {
       const pageOffset = this.virtualScroll.getPageOffset(rect.pageIndex);
-      const pageDisplayWidth = this.virtualScroll.getPageWidth(rect.pageIndex);
-      const pageLeft = (contentWidth - pageDisplayWidth) / 2;
+      // [H4 2026-07-28] 중앙 정렬 정본 = VirtualScroll (폭 미확정 폴백 포함)
+      const pageLeft = this.virtualScroll.getPageLeftResolved(rect.pageIndex, contentWidth);
       layouts.push([
         pageLeft + rect.x * zoom,
         pageOffset + rect.y * zoom,

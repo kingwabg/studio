@@ -104,7 +104,19 @@ export class CanvasView {
 
     // 그리드 모드 CSS 클래스 토글
     this.scrollContent.classList.toggle('grid-mode', this.virtualScroll.isGridMode());
+
+    // [부팅 캐럿 2026-07-28] 여기서 용지의 화면 위치(중앙 정렬 기준)가 확정된다.
+    // 부팅 첫 recalc 전에 배치된 DOM 오버레이(캐럿)는 폭 미확정 상태의 좌표를 들고
+    // 있어 용지 밖에서 깜빡였다 — 레이아웃이 정해질 때마다 따라오게 알린다.
+    const pageLeft = this.virtualScroll.getPageLeftResolved(0, this.scrollContent.clientWidth);
+    if (pageLeft !== this.lastNotifiedPageLeft) {
+      this.lastNotifiedPageLeft = pageLeft;
+      this.eventBus.emit('page-layout-changed');
+    }
   }
+
+  /** 마지막으로 알린 용지 가로 위치 — 같은 값이면 오버레이를 다시 그리지 않는다 */
+  private lastNotifiedPageLeft = Number.NaN;
 
   /** 스크롤/리사이즈 시 보이는 페이지를 갱신한다 */
   private updateVisiblePages(): void {

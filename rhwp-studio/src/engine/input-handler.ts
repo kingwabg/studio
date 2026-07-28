@@ -571,6 +571,8 @@ export class InputHandler {
     // 용지가 오른쪽에 있다가 중앙으로 온다"). 부팅 중 사이드바가 뒤늦게 마운트되며
     // clientWidth 가 줄어드는 경우가 대표적 — 줌 변경과 같은 재도색을 태운다.
     eventBus.on('viewport-resize', () => this.refreshOverlayPositions());
+    // 용지 가로 위치가 확정/변경되는 순간(부팅 첫 레이아웃 포함) — 가장 확실한 신호
+    eventBus.on('page-layout-changed', () => this.refreshOverlayPositions());
 
     eventBus.on('document-view-changed', () => {
       if (!this.active) return;

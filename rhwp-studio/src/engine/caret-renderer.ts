@@ -61,6 +61,14 @@ export class CaretRenderer {
   updatePosition(zoom: number): void {
     if (!this.currentRect) return;
     const { pageIndex } = this.currentRect;
+    // [부팅 캐럿 2026-07-28] 용지 폭이 아직 없으면 화면 위치를 알 수 없다 — 이때 좌표를
+    // 억지로 찍으면(옛 코드: contentWidth/2, 그 다음 판: 0) 캐럿이 용지 밖에서 깜빡인다.
+    // 위치를 정하지 않고 기다렸다가 'page-layout-changed' 신호에 다시 그린다.
+    if (!(this.virtualScroll.getPageWidth(pageIndex) > 0)) {
+      this.caretEl.style.display = 'none';
+      return;
+    }
+    this.caretEl.style.display = this.isCompMode ? 'none' : 'block';
     const { x, y, height } = this.clampCaretRect(this.currentRect, zoom);
     const pageOffset = this.virtualScroll.getPageOffset(pageIndex);
     const pageLeft = this.calcPageLeft(pageIndex);
@@ -178,13 +186,12 @@ export class CaretRenderer {
 
   /** 페이지의 화면 X 좌표를 계산한다 (그리드/단일 열 공통) */
   private calcPageLeft(pageIndex: number): number {
-    const gridLeft = this.virtualScroll.getPageLeft(pageIndex);
-    if (gridLeft >= 0) return gridLeft;
-    // 단일 열: CSS 중앙 정렬 보정
+    // [H4 2026-07-28] 중앙 정렬 계산은 VirtualScroll 한 곳 — 여기 사본이 따로 있어서
+    // 폭 미확정 시 contentWidth/2 로 튀는 부팅 버그를 그대로 갖고 있었다(캐럿만 용지
+    // 밖에서 깜빡임). getPageLeftResolved 가 폭 폴백까지 책임진다.
     const scrollContent = this.container.querySelector('#scroll-content');
     const contentWidth = scrollContent?.clientWidth ?? 0;
-    const pageDisplayWidth = this.virtualScroll.getPageWidth(pageIndex);
-    return (contentWidth - pageDisplayWidth) / 2;
+    return this.virtualScroll.getPageLeftResolved(pageIndex, contentWidth);
   }
 
   /** 캐럿 엘리먼트가 DOM에 없으면 재부착한다 (loadDocument 후 컨테이너 교체 대응) */
