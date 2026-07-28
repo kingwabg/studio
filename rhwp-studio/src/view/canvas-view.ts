@@ -5,7 +5,6 @@ import { VirtualScroll } from './virtual-scroll';
 import { CanvasPool } from './canvas-pool';
 import { PageRenderer, type PageRenderContext } from './page-renderer';
 import { ViewportManager } from './viewport-manager';
-import { CoordinateSystem } from './coordinate-system';
 import type { CanvasKitLayerRenderer } from './canvaskit-renderer';
 import { clampRenderScale, type RenderBackend } from './render-backend';
 import type { LayerRenderProfile } from '@/core/types';
@@ -19,7 +18,6 @@ export class CanvasView {
   private canvasPool: CanvasPool;
   private pageRenderer: PageRenderer;
   private viewportManager: ViewportManager;
-  private coordinateSystem: CoordinateSystem;
 
   private scrollContent: HTMLElement;
   private pages: PageInfo[] = [];
@@ -41,7 +39,6 @@ export class CanvasView {
     this.canvasPool = new CanvasPool();
     this.pageRenderer = new PageRenderer(wasm, renderBackend, renderProfile, canvaskitRenderer);
     this.viewportManager = new ViewportManager(eventBus);
-    this.coordinateSystem = new CoordinateSystem(this.virtualScroll);
 
     this.scrollContent = container.querySelector('#scroll-content')!;
     this.viewportManager.attachTo(container);
@@ -591,7 +588,4 @@ export class CanvasView {
     return this.pageRenderer.getBackend();
   }
 
-  getCoordinateSystem(): CoordinateSystem {
-    return this.coordinateSystem;
-  }
 }

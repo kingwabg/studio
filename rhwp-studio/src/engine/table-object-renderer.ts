@@ -112,8 +112,9 @@ export class TableObjectRenderer {
     const scrollContent = this.container.querySelector('#scroll-content');
     const contentWidth = scrollContent?.clientWidth ?? 0;
     const pageOffset = this.virtualScroll.getPageOffset(tableBBox.pageIndex);
-    const pageDisplayWidth = this.virtualScroll.getPageWidth(tableBBox.pageIndex);
-    const pageLeft = (contentWidth - pageDisplayWidth) / 2;
+    // [H4 2026-07-28] 중앙 정렬 정본 = getPageLeftResolved — 단일컬럼 공식 사본은
+    // 그리드 모드(zoom≤0.5 다열)에서 마커·핸들이 엉뚱한 열 위치에 그려졌다.
+    const pageLeft = this.virtualScroll.getPageLeftResolved(tableBBox.pageIndex, contentWidth);
 
     const left = pageLeft + tableBBox.x * zoom;
     const top = pageOffset + tableBBox.y * zoom;
@@ -209,8 +210,9 @@ export class TableObjectRenderer {
 
     for (const tableBBox of bboxes) {
       const pageOffset = this.virtualScroll.getPageOffset(tableBBox.pageIndex);
-      const pageDisplayWidth = this.virtualScroll.getPageWidth(tableBBox.pageIndex);
-      const pageLeft = (contentWidth - pageDisplayWidth) / 2;
+      // [H4 2026-07-28] 중앙 정렬 정본 = getPageLeftResolved — 단일컬럼 공식 사본은
+      // 그리드 모드(zoom≤0.5 다열)에서 마커·핸들이 엉뚱한 열 위치에 그려졌다.
+      const pageLeft = this.virtualScroll.getPageLeftResolved(tableBBox.pageIndex, contentWidth);
 
       const left = pageLeft + tableBBox.x * zoom;
       const top = pageOffset + tableBBox.y * zoom;
@@ -315,8 +317,9 @@ export class TableObjectRenderer {
     const scrollContent = this.container.querySelector('#scroll-content');
     const contentWidth = scrollContent?.clientWidth ?? 0;
     const pageOffset = this.virtualScroll.getPageOffset(lineBBox.pageIndex);
-    const pageDisplayWidth = this.virtualScroll.getPageWidth(lineBBox.pageIndex);
-    const pageLeft = (contentWidth - pageDisplayWidth) / 2;
+    // [H4 2026-07-28] 중앙 정렬 정본 = getPageLeftResolved — 단일컬럼 공식 사본은
+    // 그리드 모드(zoom≤0.5 다열)에서 마커·핸들이 엉뚱한 열 위치에 그려졌다.
+    const pageLeft = this.virtualScroll.getPageLeftResolved(lineBBox.pageIndex, contentWidth);
 
     const sx = pageLeft + lineBBox.x1 * zoom;
     const sy = pageOffset + lineBBox.y1 * zoom;
@@ -418,8 +421,9 @@ export class TableObjectRenderer {
     const scrollContent = this.container.querySelector('#scroll-content');
     const contentWidth = scrollContent?.clientWidth ?? 0;
     const pageOffset = this.virtualScroll.getPageOffset(bbox.pageIndex);
-    const pageDisplayWidth = this.virtualScroll.getPageWidth(bbox.pageIndex);
-    const pageLeft = (contentWidth - pageDisplayWidth) / 2;
+    // [H4 2026-07-28] 중앙 정렬 정본 = getPageLeftResolved — 단일컬럼 공식 사본은
+    // 그리드 모드(zoom≤0.5 다열)에서 마커·핸들이 엉뚱한 열 위치에 그려졌다.
+    const pageLeft = this.virtualScroll.getPageLeftResolved(bbox.pageIndex, contentWidth);
 
     const left = pageLeft + bbox.x * zoom;
     const top = pageOffset + bbox.y * zoom;

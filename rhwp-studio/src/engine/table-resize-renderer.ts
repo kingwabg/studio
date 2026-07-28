@@ -164,8 +164,9 @@ export class TableResizeRenderer {
     const scrollContent = this.container.querySelector('#scroll-content');
     const contentWidth = scrollContent?.clientWidth ?? 0;
     const pageOffset = this.virtualScroll.getPageOffset(edge.pageIndex);
-    const pageDisplayWidth = this.virtualScroll.getPageWidth(edge.pageIndex);
-    const pageLeft = (contentWidth - pageDisplayWidth) / 2;
+    // [H4 2026-07-28] 중앙 정렬 정본 = getPageLeftResolved — 단일컬럼 공식 사본은
+    // 그리드 모드(zoom≤0.5 다열)에서 마커·핸들이 엉뚱한 열 위치에 그려졌다.
+    const pageLeft = this.virtualScroll.getPageLeftResolved(edge.pageIndex, contentWidth);
 
     const t = TableResizeRenderer.MARKER_THICKNESS;
     const el = document.createElement('div');
@@ -215,8 +216,9 @@ export class TableResizeRenderer {
     const scrollContent = this.container.querySelector('#scroll-content');
     const contentWidth = scrollContent?.clientWidth ?? 0;
     const pageOffset = this.virtualScroll.getPageOffset(pageIndex);
-    const pageDisplayWidth = this.virtualScroll.getPageWidth(pageIndex);
-    const pageLeft = (contentWidth - pageDisplayWidth) / 2;
+    // [H4 2026-07-28] 중앙 정렬 정본 = getPageLeftResolved — 단일컬럼 공식 사본은
+    // 그리드 모드(zoom≤0.5 다열)에서 마커·핸들이 엉뚱한 열 위치에 그려졌다.
+    const pageLeft = this.virtualScroll.getPageLeftResolved(pageIndex, contentWidth);
 
     const t = TableResizeRenderer.MARKER_THICKNESS;
     const el = document.createElement('div');
