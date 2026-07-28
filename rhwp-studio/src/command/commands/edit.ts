@@ -1,4 +1,7 @@
 import type { CommandDef } from '../types';
+import { SpellDialog } from '@/ui/spell-dialog';
+
+let spellDialog: SpellDialog | null = null;
 import { FieldEditDialog } from '@/ui/field-edit-dialog';
 import { FindDialog } from '@/ui/find-dialog';
 import { GotoDialog } from '@/ui/goto-dialog';
@@ -17,6 +20,17 @@ let compareDialogInstance: CompareDialog | null = null;
 let compareSessionStore: CompareSessionStore | null = null;
 
 export const editCommands: CommandDef[] = [
+  {
+    // [맞춤법 2026-07-28] 규칙 기반·전량 로컬. 외부 API 경로를 붙이지 말 것(아동 데이터).
+    id: 'edit:spellcheck',
+    label: '맞춤법 검사',
+    shortcutLabel: 'F8',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      if (!spellDialog) spellDialog = new SpellDialog(services);
+      spellDialog.show();
+    },
+  },
   {
     id: 'edit:undo',
     label: '되돌리기',

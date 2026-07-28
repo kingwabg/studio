@@ -60,6 +60,9 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   [{ key: '-', ctrl: true }, 'view:zoom-out'],
   [{ key: '0', ctrl: true }, 'view:zoom-100'],
 
+  // 맞춤법 검사 (한컴: F8)
+  [{ key: 'f8' }, 'edit:spellcheck'],
+
   // 상용구 (한컴: Ctrl+F3 목록, Alt+I 준말 확장)
   [{ key: 'f3', ctrl: true }, 'insert:snippet'],
   [{ key: 'i', alt: true }, 'insert:snippet-expand'],
