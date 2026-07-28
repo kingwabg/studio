@@ -1319,18 +1319,18 @@ export function onClick(this: any, e: MouseEvent): void {
     //   통과시켜 셀 글영역 편집·셀 드래그가 살아나게 한다 (사용자 피드백: 표는 글 넣기가 우선).
     if (this.canvasMode && hit.parentParaIndex === undefined && !hit.isTextBox
         && this.canvasEditingRef?.kind !== 'body') {
-      this.canvasEditingRef = null;
-      this.cursor.clearSelection();
+      // [본문 클릭 2026-07-28, 한컴독스식 확정] 과거엔 여기서 캐럿 없이 return —
+      // 그런데 body 편집으로 진입시키는 코드가 어디에도 없어 캔버스 모드의 본문
+      // 텍스트 클릭이 **영구 무시**됐다(kind:'body'는 타입에만 있던 미완성 설계).
+      // 개체 선택 해제는 유지하고, 본문 편집 컨텍스트로 진입해 아래 일반
+      // 캐럿 배치 경로로 계속 간다(단일 클릭 = 캐럿, 문서 편집기 관례).
       this.exitPictureObjectSelectionIfNeeded();
       if (this.cursor.isInTableObjectSelection()) {
         this.cursor.exitTableObjectSelection();
         this.tableObjectRenderer?.clear();
         this.eventBus.emit('table-object-selection-changed', false);
       }
-      this.caret.hide();
-      this.selectionRenderer.clear();
-      this.textarea.focus();
-      return;
+      this.canvasEditingRef = { kind: 'body' };
     }
 
     if (e.shiftKey) {
