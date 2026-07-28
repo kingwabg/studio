@@ -19,22 +19,35 @@ runTest('성능 기준선', async ({ page }) => {
     const view = window.__canvasView;
     const target = Math.floor(view.virtualScroll.pageCount / 2);
     const off = view.virtualScroll.getPageOffset(target);
+    // ⚠ 측정 신호 교정(2026-07-28): 캔버스 '개수' 변화는 釋放 N + 신규 N 이면 불변이라
+    // 3초 폴링을 헛돌게 했다(구 4.5초 수치는 이 아티팩트). 신호 = **대상 페이지의 캔버스**가
+    // DOM 에 실존(style.top 일치)하는 순간.
+    const topPx = `${off}px`;
     const t0 = performance.now();
     document.querySelector('#scroll-container').scrollTop = off;
-    await new Promise((r) => setTimeout(r, 50));
-    // 렌더 완료 = 해당 페이지 캔버스 존재까지 폴링
-    for (let i = 0; i < 100; i++) {
-      if (view.canvasPool?.has?.(target)) break;
-      await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 400; i++) {
+      // CSS 는 top 을 반올림 직렬화("200044px" vs 200043.79…) — 근사 매치가 정답
+      const hit = [...document.querySelectorAll('#scroll-content canvas')]
+        .some((c) => Math.abs(parseFloat(c.style.top) - off) < 2);
+      if (hit) break;
+      await new Promise((r) => setTimeout(r, 15));
     }
     return Math.round(performance.now() - t0);
   });
   console.log(`  [2] 중간 페이지 점프→렌더: ${renderMs}ms`);
 
-  // ③ 중형 문서 로드 (5.6MB)
-  t0 = Date.now();
-  const mid = await loadHwpFile(page, '3-09월_교육_통합_2024-격자기준종이.hwp');
-  console.log(`  [3] 중형 로드(5.6MB, ${mid.pageCount}쪽): ${Date.now() - t0 - 1500}ms`);
+  // ③ 중형 문서 로드 (5.6MB) — 파싱+뷰 로드의 **동기 블로킹 시간**을 직접 잰다
+  //   (loadHwpFile 경유 측정은 이전 문서 캔버스에 waitForSelector 가 매치돼 오염됐다)
+  const midMs = await page.evaluate(async () => {
+    const resp = await fetch('/samples/' + encodeURIComponent('3-09월_교육_통합_2024-격자기준종이.hwp'));
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    const t0 = performance.now();
+    window.__wasm.loadDocument(buf, 'mid.hwp');
+    window.__canvasView.loadDocument();
+    return Math.round(performance.now() - t0);
+  });
+  console.log(`  [3] 중형 로드 동기 블로킹(5.6MB): ${midMs}ms`);
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 1500)));
 
   // ④ 타이핑 레이턴시 — insertText → document-changed 처리 완료까지
   await createNewDocument(page);

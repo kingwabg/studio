@@ -612,30 +612,35 @@ export class PageRenderer {
     this.cancelReRender(pageIdx);
     this.imageRetryCounts.set(pageIdx, retryKey);
 
-    const delays = [200, 600, 1500];
+    // [점프 먹통 수리 2026-07-28] 구 방식 = 맹목 타이머 3발(200/600/1500ms) + decode
+    // 안전망 1발 → 이미지 페이지 1장이 **최대 5회 렌더**(재렌더 1회 실측 560ms). 점프 시
+    // 3장이면 ~9초치 메인스레드 작업이 몰려 스크롤·입력이 먹통이었다(longtask 실측).
+    // decode() await(prefetchLayerImages)가 **정확한 완료 신호**이므로 그것 1회를 정본으로,
+    // prefetch 가 조용히 실패하는 경우(#1154 원취지)만 백업 타이머 1발로 커버한다.
+    let precisePassDone = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
+    const backup = setTimeout(() => {
+      if (!precisePassDone && canvas.parentElement) {
+        this.reRenderPageCanvases(pageIdx, canvas, renderScale, policy);
+      }
+    }, 1500);
+    timers.push(backup);
 
-    for (const delay of delays) {
-      const timer = setTimeout(() => {
-        if (canvas.parentElement) {
-          this.reRenderPageCanvases(pageIdx, canvas, renderScale, policy);
-        }
-      }, delay);
-      timers.push(timer);
-    }
-
-    // 안전망: 1500ms 시점에서도 큰 이미지가 디코드 안 끝났을 수 있으므로,
-    // 페이지의 image base64 들을 자체 prefetch (Image.decode()) 한 후
-    // 모두 완료되면 한 번 더 렌더링한다. setTimeout 과 별개로 동작.
-    queueMicrotask(() => {
+    // ⚠ queueMicrotask 였다 — 마이크로태스크는 페인트를 막아, 최초 렌더가 화면에 나가기
+    //   전에 디코드+재렌더(0.7s)까지 한 덩어리로 붙었다(첫 화면 1.55s 실측). 매크로태스크로
+    //   미뤄 "글자 먼저, 이미지는 반 박자 뒤" 순서를 보장한다.
+    const precise = setTimeout(() => {
       this.prefetchLayerImages(pageIdx)
         .then(() => {
+          precisePassDone = true;
+          clearTimeout(backup);
           if (canvas.parentElement) {
             this.reRenderPageCanvases(pageIdx, canvas, renderScale, policy);
           }
         })
-        .catch(() => {});
-    });
+        .catch(() => {}); // 실패 시 백업 타이머가 1회 커버
+    }, 50);
+    timers.push(precise);
 
     this.reRenderTimers.set(pageIdx, timers);
   }

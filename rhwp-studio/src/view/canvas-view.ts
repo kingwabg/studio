@@ -120,6 +120,7 @@ export class CanvasView {
 
   /** 스크롤/리사이즈 시 보이는 페이지를 갱신한다 */
   private updateVisiblePages(): void {
+    this.lastScrollAt = performance.now();
     const scrollY = this.viewportManager.getScrollY();
     const { height: vpHeight } = this.viewportManager.getViewportSize();
 
@@ -139,12 +140,20 @@ export class CanvasView {
       }
     }
 
-    // 새로 보이는 페이지 렌더링
+    // 새로 보이는 페이지 렌더링 — [점프 4.6초 수리 2026-07-28]
+    // 페이지 1장 렌더가 대형 문서에서 750~800ms(동기)라, 보이는 것+프리페치를 한 번에
+    // 돌리면 점프 시 2초대 메인스레드 잭이 났다(실측 3장×~770ms). **보이는 페이지만 즉시**
+    // 그리고, 화면 밖 프리페치는 프레임당 1장씩 rAF 로 미룬다 — 첫 화면은 1장 비용만 낸다.
+    const visibleSet = new Set(visiblePages);
     for (const pageIdx of prefetchPages) {
-      if (!this.canvasPool.has(pageIdx)) {
+      if (this.canvasPool.has(pageIdx)) continue;
+      if (visibleSet.has(pageIdx)) {
         this.renderPage(pageIdx);
+      } else {
+        this.deferredPrefetch.add(pageIdx);
       }
     }
+    this.pumpDeferredPrefetch();
 
     // 현재 페이지 번호 갱신
     if (visiblePages.length > 0) {
@@ -169,6 +178,36 @@ export class CanvasView {
     if (!this.renderCanvas(pageIdx, canvas)) {
       this.canvasPool.release(pageIdx);
     }
+  }
+
+  /** [점프 수리] 화면 밖 프리페치 대기열 — 프레임당 1장씩 소비 */
+  private deferredPrefetch = new Set<number>();
+  private prefetchRafId = 0;
+
+  /** 마지막 스크롤/점프 시각 — 이웃 프리페치는 이 뒤 500ms 정지 상태에서만 돈다 */
+  private lastScrollAt = 0;
+
+  private pumpDeferredPrefetch(): void {
+    if (this.prefetchRafId || this.deferredPrefetch.size === 0) return;
+    // wasm 페이지 렌더(0.7s)+이미지 재렌더(0.6s)는 중단 불가라, rAF/rIC 로 미뤄도 결국
+    // 연속 점유했다(longtask 실측 — rIC 는 headless·실기 모두 즉시 소진). 유일하게 먹는
+    // 전략 = **사용자가 멈춘 뒤에만** 1장씩. 스크롤이 이어지면 계속 뒤로 미룬다.
+    this.prefetchRafId = window.setTimeout(() => {
+      this.prefetchRafId = 0;
+      if (performance.now() - this.lastScrollAt < 500) {
+        this.pumpDeferredPrefetch(); // 아직 움직이는 중 — 재대기
+        return;
+      }
+      const it = this.deferredPrefetch.values().next();
+      if (it.done) return;
+      const pageIdx = it.value;
+      this.deferredPrefetch.delete(pageIdx);
+      // 스크롤이 더 진행돼 이미 그려졌거나 범위 밖이면 건너뜀 — 다음 uvp 가 다시 판단
+      if (!this.canvasPool.has(pageIdx) && pageIdx >= 0 && pageIdx < this.pages.length) {
+        this.renderPage(pageIdx);
+      }
+      this.pumpDeferredPrefetch();
+    }, 500);
   }
 
   /** 기존 canvas를 유지한 채 페이지 내용을 다시 그린다. */
@@ -472,6 +511,12 @@ export class CanvasView {
     this.pageRenderer.removeAllPageLayers(this.scrollContent);
     this.removeAllGridOverlays();
     this.canvasPool.releaseAll();
+    // [점프 수리] 전체 해제 시 대기 중이던 프리페치도 무효 — 옛 문서/옛 줌의 페이지다
+    this.deferredPrefetch.clear();
+    if (this.prefetchRafId) {
+      clearTimeout(this.prefetchRafId);
+      this.prefetchRafId = 0;
+    }
   }
 
   private refreshGridOverlays(): void {
