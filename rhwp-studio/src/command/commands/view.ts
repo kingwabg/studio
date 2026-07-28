@@ -300,9 +300,11 @@ export const viewCommands: CommandDef[] = [
     let visible: boolean | null = null;
     return {
       id: 'view:toolbox-basic',
-      label: '기본',
+      label: '리본 접기/펴기',
       execute() {
-        const el = document.getElementById('icon-toolbar');
+        // [리본 재설계 2026-07-29] 구 아이콘 툴바는 숨은 채 보존돼 토글해도 안 보인다.
+        // 현대 대응 = 리본 2행 접기/펴기.
+        const el = document.querySelector<HTMLElement>('.rb-row-ribbon');
         if (!el) return;
         if (visible === null) visible = getComputedStyle(el).display !== 'none';
         visible = !visible;
@@ -317,9 +319,11 @@ export const viewCommands: CommandDef[] = [
     let visible: boolean | null = null;
     return {
       id: 'view:toolbox-format',
-      label: '서식',
+      label: '서식 도구(홈 탭)',
       execute() {
-        const el = document.getElementById('style-bar');
+        // 서식바는 홈 탭이 흡수했다 — 이 명령은 홈 탭으로 이동시킨다.
+        (window as unknown as { __ribbon?: { setActiveTab(id: string): void } }).__ribbon?.setActiveTab('home');
+        const el = document.querySelector<HTMLElement>('.rb-row-ribbon');
         if (!el) return;
         if (visible === null) visible = getComputedStyle(el).display !== 'none';
         visible = !visible;

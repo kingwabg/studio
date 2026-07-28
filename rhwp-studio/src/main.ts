@@ -351,6 +351,14 @@ async function initialize(): Promise<void> {
       const cmd = item.dataset.cmd;
       if (cmd) dispatcher.dispatch(cmd, { anchorEl: item });
     });
+    // [잔여 닫기 2026-07-29] 글꼴·크기 콤보를 리본으로 **옮긴다**(복제 아님).
+    // Toolbar 는 생성 시 잡아 둔 엘리먼트 참조로 동작하므로, DOM 을 옮겨도
+    // 상태 동기(updateState)·change 리스너가 그대로 살아 있다.
+    for (const [slotName, sel] of [['font-name', '#font-name'], ['font-size', '#font-size']] as const) {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (el) ribbon.adopt(slotName, el);
+    }
+
     // 문서 제목·저장 상태를 헤더에 반영
     const syncRibbonDoc = () => {
       try {
@@ -736,6 +744,20 @@ function setupEventListeners(): void {
 
   eventBus.on('headerFooterModeChanged', (mode) => {
     const isActive = (mode as string) !== 'none';
+    // [잔여 닫기 2026-07-29] 컨텍스트 도구는 리본 행으로 — 구 아이콘 툴바는 숨어 있어
+    // .tb-headerfooter-group 을 켜도 화면에 안 보인다.
+    (window as any).__ribbon?.setContext(isActive ? {
+      label: (mode as string) === 'footer' ? '꼬리말 편집' : '머리말 편집',
+      icon: (mode as string) === 'footer' ? 'arrow-line-down' : 'arrow-line-up',
+      items: [
+        { icon: 'caret-left', label: '이전', cmd: 'page:headerfooter-prev' },
+        { icon: 'caret-right', label: '다음', cmd: 'page:headerfooter-next' },
+        { icon: 'hash', label: '쪽 번호', cmd: 'page:insert-field-pagenum' },
+        { icon: 'list-numbers', label: '총 쪽수', cmd: 'page:insert-field-totalpage' },
+        { icon: 'trash', label: '지우기', cmd: 'page:headerfooter-delete' },
+        { icon: 'x', label: '닫기', cmd: 'page:headerfooter-close' },
+      ],
+    } : null);
     // 도구상자 전환
     if (hfGroup) {
       hfGroup.style.display = isActive ? '' : 'none';
@@ -758,6 +780,14 @@ function setupEventListeners(): void {
   });
 
   eventBus.on('footnoteModeChanged', (active) => {
+    (window as any).__ribbon?.setContext(active ? {
+      label: '각주/미주 편집',
+      icon: 'note',
+      items: [
+        { icon: 'note', label: '각주 모양', cmd: 'insert:endnote-shape' },
+        { icon: 'x', label: '닫기', cmd: 'insert:note-close' },
+      ],
+    } : null);
     const isActive = active as boolean;
     noteToolbarActive = isActive;
     if (noteGroup) {

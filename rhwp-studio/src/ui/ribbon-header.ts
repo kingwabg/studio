@@ -16,6 +16,8 @@ export type RibbonItem =
   | { kind: 'btn'; icon: string; label: string; cmd?: string; primary?: boolean }
   | { kind: 'gap' }
   | { kind: 'combo'; label: string; width: number; cmd?: string }
+  /** 기존 Toolbar 가 소유한 실제 컨트롤(#font-name 등)을 이 자리로 옮겨 담는다 */
+  | { kind: 'slot'; slot: string; width: number }
   | { kind: 'expander'; label: string; cmd?: string }
   | { kind: 'over'; icon: string; label: string; key?: string; cmd?: string };
 
@@ -26,6 +28,7 @@ const PP = (icon: string, label: string, cmd?: string): RibbonItem =>
 const gap = (): RibbonItem => ({ kind: 'gap' });
 const combo = (label: string, width: number, cmd?: string): RibbonItem =>
   ({ kind: 'combo', label, width, cmd });
+const slot = (name: string, width: number): RibbonItem => ({ kind: 'slot', slot: name, width });
 const O = (icon: string, label: string, key?: string, cmd?: string): RibbonItem =>
   ({ kind: 'over', icon, label, key, cmd });
 
@@ -43,8 +46,9 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('clipboard-text', '붙이기', 'edit:paste'),
       P('paint-brush', '모양 복사', 'edit:format-copy'),
       gap(),
-      combo('함초롬바탕', 108),
-      combo('10.0 pt', 72),
+      // 글꼴·크기는 Toolbar 가 소유한 실제 컨트롤을 옮겨 온다(상태 동기·이벤트 유지)
+      slot('font-name', 132),
+      slot('font-size', 68),
       gap(),
       P('text-b', '굵게', 'format:bold'),
       P('text-italic', '기울임', 'format:italic'),
@@ -173,10 +177,31 @@ export class RibbonHeader {
   private activeTab = 'home';
   private weight: IconWeight = 'duotone';
   private overflowPanel: HTMLDivElement | null = null;
+  /** 슬롯 이름 → 옮겨 담을 실제 DOM (탭 전환마다 다시 꽂는다) */
+  private adopted = new Map<string, HTMLElement>();
+  /** 편집 모드 컨텍스트 리본(머리말/꼬리말·각주) — 켜지면 일반 리본을 덮는다 */
+  private contextRow: HTMLDivElement | null = null;
 
   constructor(root: HTMLElement) {
     this.root = root;
     this.build();
+  }
+
+  /**
+   * 기존 컨트롤을 리본 슬롯으로 입양한다.
+   * DOM 이동은 이벤트 리스너·객체 참조를 보존하므로 Toolbar 의 상태 동기가 그대로 산다.
+   */
+  adopt(slotName: string, el: HTMLElement): void {
+    this.adopted.set(slotName, el);
+    el.classList.add('rb-adopted');
+    this.placeAdopted();
+  }
+
+  private placeAdopted(): void {
+    for (const [name, el] of this.adopted) {
+      const host = this.ribbonRow.querySelector<HTMLElement>(`.rb-slot[data-slot="${name}"]`);
+      if (host && el.parentElement !== host) host.appendChild(el);
+    }
   }
 
   /** 아이콘 굵기 변경 (디자인 2b Tweaks) */
@@ -261,6 +286,50 @@ export class RibbonHeader {
     this.setActiveTab('home');
   }
 
+  /**
+   * 컨텍스트 리본을 켠다 — 머리말/꼬리말·각주 편집처럼 "이 모드에서만 쓰는" 명령용.
+   * 구 아이콘 툴바의 .tb-headerfooter-group / .tb-note-group 이 하던 일을 대신한다.
+   * @param spec null 이면 끄고 일반 리본으로 돌아간다
+   */
+  setContext(spec: { label: string; icon: string; items: Array<{ icon: string; label: string; cmd: string }> } | null): void {
+    this.contextRow?.remove();
+    this.contextRow = null;
+    if (!spec) { this.ribbonRow.style.display = ''; return; }
+
+    const row = document.createElement('div');
+    row.className = 'rb-row rb-row-ribbon rb-row-context';
+
+    const badge = document.createElement('span');
+    badge.className = 'rb-ctx-badge';
+    badge.appendChild(this.icon(spec.icon, 16));
+    const bl = document.createElement('span');
+    bl.textContent = spec.label;
+    badge.appendChild(bl);
+    row.appendChild(badge);
+
+    const sep = document.createElement('span');
+    sep.className = 'rb-sep';
+    row.appendChild(sep);
+
+    for (const it of spec.items) {
+      const b = document.createElement('button');
+      b.className = 'rb-btn is-primary';
+      b.type = 'button';
+      b.title = it.label;
+      b.dataset.cmd = it.cmd;
+      b.appendChild(this.icon(it.icon));
+      const l = document.createElement('span');
+      l.className = 'rb-btn-label';
+      l.textContent = it.label;
+      b.appendChild(l);
+      row.appendChild(b);
+    }
+
+    this.ribbonRow.style.display = 'none';
+    this.root.appendChild(row);
+    this.contextRow = row;
+  }
+
   setActiveTab(id: string): void {
     this.activeTab = id;
     for (const b of Array.from(this.tabRow.querySelectorAll<HTMLElement>('.rb-tab'))) {
@@ -295,6 +364,14 @@ export class RibbonHeader {
         c.innerHTML = `<span>${item.label}</span>`;
         c.appendChild(this.icon('caret-down', 12));
         this.ribbonRow.appendChild(c);
+        continue;
+      }
+      if (item.kind === 'slot') {
+        const host = document.createElement('span');
+        host.className = 'rb-slot';
+        host.dataset.slot = item.slot;
+        host.style.width = `${item.width}px`;
+        this.ribbonRow.appendChild(host);
         continue;
       }
       if (item.kind === 'expander') {
@@ -334,6 +411,8 @@ export class RibbonHeader {
       });
       this.ribbonRow.appendChild(more);
     }
+
+    this.placeAdopted();
   }
 
   private closeOverflow(): void {

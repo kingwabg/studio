@@ -80,6 +80,27 @@
 .rb-tab:hover { background: color-mix(in srgb, var(--rb-fg) 6%, transparent); color: var(--rb-fg); }
 .rb-tab.is-active { background: var(--rb-fill); color: var(--rb-accent); font-weight: 600; }
 
+/* 컨텍스트 리본 — 머리말/꼬리말·각주 편집 모드 */
+.rb-row-context { background: var(--rb-fill); }
+.rb-ctx-badge {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  height: 26px; padding: 0 11px; border-radius: 100px;
+  background: var(--rb-bg); color: var(--rb-accent);
+  font-size: 12.5px; font-weight: 600;
+}
+
+/* 입양 슬롯 — Toolbar 가 소유한 실제 컨트롤이 여기로 옮겨 온다 */
+.rb-slot { flex: none; display: inline-flex; align-items: center; }
+.rb-slot > .rb-adopted {
+  width: 100%; height: 26px; box-sizing: border-box;
+  border: 1px solid var(--rb-border); border-radius: 3px;
+  background: var(--rb-bg); color: var(--rb-fg);
+  font: inherit; font-size: 12px; padding: 0 6px;
+  min-width: 0; margin: 0;
+}
+.rb-slot > .rb-adopted:focus { outline: none; border-color: var(--rb-accent); }
+.rb-slot > select.rb-adopted { padding-right: 2px; }
+
 /* 캔버스/문서 모드 토글 자리 */
 .rb-mode-slot { display: flex; align-items: center; margin-left: 6px; }
 .rb-mode-slot .canva-mode-toggle { position: static; margin: 0; }
