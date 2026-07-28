@@ -4,6 +4,8 @@ import { EquationEditorDialog } from '@/ui/equation-editor-dialog';
 import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
 import { SymbolsDialog } from '@/ui/symbols-dialog';
 import { BookmarkDialog } from '@/ui/bookmark-dialog';
+import { SnippetDialog } from '@/ui/snippet-dialog';
+import { userSettings } from '@/core/user-settings';
 import { EndnoteShapeDialog } from '@/ui/endnote-shape-dialog';
 import { FieldInsertDialog } from '@/ui/field-insert-dialog';
 import { showShapePicker } from '@/ui/shape-picker';
@@ -364,6 +366,72 @@ export const insertCommands: CommandDef[] = [
         bookmarkDialog = new BookmarkDialog(services);
       }
       bookmarkDialog.show();
+    },
+  },
+  {
+    // [상용구 2026-07-28] 한컴 [입력-상용구] — 목록에서 골라 커서에 삽입, 등록/삭제도 여기서.
+    id: 'insert:snippet',
+    label: '상용구',
+    shortcutLabel: 'Ctrl+F3',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      const ih = services.getInputHandler();
+      if (!ih) return;
+      // 선택 텍스트가 있으면 '내용'에 미리 채워 등록을 한 번에 끝낸다
+      let initial = '';
+      try {
+        const sel = (ih as any).cursor?.getSelectionOrdered?.();
+        if (sel) {
+          initial = (ih as any).wasm.copySelection(
+            sel.start.sectionIndex, sel.start.paragraphIndex, sel.start.charOffset,
+            sel.end.paragraphIndex, sel.end.charOffset,
+          ) ?? '';
+        }
+      } catch { /* 선택 없거나 표/글상자 안이면 빈 값으로 연다 */ }
+      const dlg = new SnippetDialog(initial);
+      dlg.onInsert = (text) => { (ih as any).insertPlainTextAtCursor(text); };
+      dlg.show();
+    },
+  },
+  {
+    // 커서 앞 준말 → 상용구 확장 (한컴 Alt+I 대응)
+    id: 'insert:snippet-expand',
+    label: '상용구 준말 확장',
+    shortcutLabel: 'Alt+I',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      const ih = services.getInputHandler() as any;
+      if (!ih) return;
+      try {
+        const pos = ih.cursor.getPosition();
+        if (pos.parentParaIndex !== undefined || pos.charOffset === 0) return;
+        // 커서 앞 최대 12자에서 가장 긴 준말 일치를 찾는다
+        const from = Math.max(0, pos.charOffset - 12);
+        const before: string = ih.wasm.getTextRange(
+          pos.sectionIndex, pos.paragraphIndex, from, pos.charOffset - from,
+        ) ?? '';
+        const snippets = userSettings.getSnippets().filter((s) => s.abbrev);
+        let hit: { abbrev: string; text: string } | null = null;
+        for (const s of snippets) {
+          if (before.endsWith(s.abbrev) && (!hit || s.abbrev.length > hit.abbrev.length)) {
+            hit = { abbrev: s.abbrev, text: s.text };
+          }
+        }
+        if (!hit) return;
+        // 준말을 지우고 그 자리에 조각을 넣는다 — 되돌리기는 두 연산 모두 스택에 쌓인다
+        ih.wasm.replaceText(
+          pos.sectionIndex, pos.paragraphIndex,
+          pos.charOffset - hit.abbrev.length, hit.abbrev.length, '',
+        );
+        ih.cursor.moveTo({
+          sectionIndex: pos.sectionIndex,
+          paragraphIndex: pos.paragraphIndex,
+          charOffset: pos.charOffset - hit.abbrev.length,
+        });
+        ih.insertPlainTextAtCursor(hit.text);
+      } catch (err) {
+        console.warn('[snippet] 준말 확장 실패:', err);
+      }
     },
   },
   {

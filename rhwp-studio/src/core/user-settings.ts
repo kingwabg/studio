@@ -62,6 +62,16 @@ export interface AutosaveSettings {
   idleDelaySeconds: number;
 }
 
+/** 상용구(자주 쓰는 문구) — 한컴 [입력-상용구] 대응. 평문만 저장한다(서식 포함은 v2). */
+export interface Snippet {
+  /** 목록에 보이는 이름 */
+  name: string;
+  /** 준말 — 본문에 치고 확장 단축키를 누르면 이 조각으로 바뀐다(빈 값 허용) */
+  abbrev: string;
+  /** 본문 (줄바꿈 포함) */
+  text: string;
+}
+
 /** 전체 설정 구조 */
 export interface AppSettings {
   version: number;
@@ -70,6 +80,8 @@ export interface AppSettings {
   dialog: DialogSettings;
   view: ViewSettings;
   autosave: AutosaveSettings;
+  /** 상용구 목록 */
+  snippets: Snippet[];
 }
 
 /** 언어 인덱스 상수 (HWP 7개 언어) */
@@ -141,6 +153,7 @@ function defaultSettings(): AppSettings {
       idleSaveEnabled: true,
       idleDelaySeconds: 10,
     },
+    snippets: [],
   };
 }
 
@@ -207,6 +220,9 @@ class UserSettingsService {
             defaults.view.showControlCodes,
           ),
         },
+        snippets: Array.isArray(parsed.snippets) ? parsed.snippets.filter(
+          (x): x is Snippet => !!x && typeof x.name === 'string' && typeof x.text === 'string',
+        ) : defaults.snippets,
         autosave: {
           ...defaults.autosave,
           ...autosave,
@@ -302,6 +318,33 @@ class UserSettingsService {
   }
 
   /** 복구용 자동저장 설정 반환 */
+  /** 상용구 목록(사본) */
+  getSnippets(): Snippet[] {
+    return this.data.snippets.map((s) => ({ ...s }));
+  }
+
+  /** 상용구 추가 — 같은 이름이 있으면 덮어쓴다(한컴도 같은 이름은 갱신) */
+  addSnippet(snippet: Snippet): void {
+    const i = this.data.snippets.findIndex((s) => s.name === snippet.name);
+    if (i >= 0) this.data.snippets[i] = { ...snippet };
+    else this.data.snippets.push({ ...snippet });
+    this.save();
+  }
+
+  removeSnippet(name: string): boolean {
+    const i = this.data.snippets.findIndex((s) => s.name === name);
+    if (i < 0) return false;
+    this.data.snippets.splice(i, 1);
+    this.save();
+    return true;
+  }
+
+  /** 준말로 상용구 찾기(확장용) */
+  findSnippetByAbbrev(abbrev: string): Snippet | null {
+    if (!abbrev) return null;
+    return this.data.snippets.find((s) => s.abbrev === abbrev) ?? null;
+  }
+
   getAutosaveSettings(): AutosaveSettings {
     return this.data.autosave;
   }
