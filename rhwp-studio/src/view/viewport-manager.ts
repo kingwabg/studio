@@ -28,6 +28,11 @@ export class ViewportManager {
       this.eventBus.emit('viewport-resize', this.viewportWidth, this.viewportHeight);
     });
     this.resizeObserver.observe(container);
+    // [부팅 점프 2026-07-28] 용지 중앙 정렬의 기준은 바깥 컨테이너가 아니라
+    // #scroll-content 의 clientWidth 다 — 스크롤바가 사라지면 바깥 크기는 그대로인 채
+    // 안쪽만 바뀐다(실측 820→834). 안쪽도 관찰해야 그때 캐럿이 용지를 따라간다.
+    const content = container.querySelector('#scroll-content');
+    if (content) this.resizeObserver.observe(content);
     this.updateViewportSize();
   }
 

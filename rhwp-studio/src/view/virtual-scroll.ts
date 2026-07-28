@@ -198,7 +198,12 @@ export class VirtualScroll {
   getPageLeftResolved(pageIdx: number, containerWidth: number): number {
     const pl = this.pageLefts[pageIdx] ?? -1;
     if (pl >= 0) return pl;
-    const pw = this.pageWidths[pageIdx] ?? 0;
+    // [부팅 점프 2026-07-28] 폭이 아직 안 정해진 페이지에 0 을 쓰면 중앙이
+    // containerWidth/2 로 튄다(실측: 부팅 87ms 용지 x=606 → 143ms 216, **390px 점프**).
+    // 그 사이 배치된 DOM 오버레이(캐럿)가 용지 밖에 남아 "여백 밖에서 깜빡임"이 됐다.
+    // 알려진 다른 페이지 폭 → 최대 페이지 폭 순으로 폴백해 점프 자체를 없앤다.
+    const pw = this.pageWidths[pageIdx] || this.pageWidths.find((w) => w > 0) || this.maxPageWidth;
+    if (!pw) return 0; // 아직 어떤 페이지도 없다 — 중앙 계산이 무의미
     return (containerWidth - pw) / 2;
   }
 

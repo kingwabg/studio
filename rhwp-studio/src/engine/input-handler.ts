@@ -563,33 +563,14 @@ export class InputHandler {
     this.textarea.addEventListener('paste', this.onPasteBound);
 
     // 줌 변경 시 캐럿/선택 마커 위치 갱신
-    eventBus.on('zoom-changed', () => {
-      if (this.active) {
-        const rect = this.cursor.getRect();
-        if (rect) {
-          this.caret.updatePosition(this.viewportManager.getZoom());
-        }
-        // 필드 마커도 줌에 맞게 갱신
-        if (this.fieldMarker.isVisible) {
-          this.updateFieldMarkers();
-        }
-      }
-      // 텍스트 블럭 선택 줌 동기화
-      if (this.cursor.hasSelection()) {
-        this.updateSelection();
-      }
-      // F5 셀 선택 줌 동기화
-      if (this.cursor.isInCellSelectionMode()) {
-        this.updateCellSelection();
-      }
-      // 도형/표 선택 핸들 줌 동기화
-      if (this.cursor.isInPictureObjectSelection()) {
-        this.renderPictureObjectSelection();
-      }
-      if (this.cursor.isInTableObjectSelection()) {
-        this.renderTableObjectSelection();
-      }
-    });
+    eventBus.on('zoom-changed', () => this.refreshOverlayPositions());
+
+    // [용지 재중앙화 2026-07-28] 컨테이너 폭이 바뀌면 용지가 가로로 재중앙 정렬되는데
+    // (getPageLeftResolved = (clientWidth - pageWidth)/2), 캔버스만 재배치되고 DOM
+    // 오버레이는 옛 좌표에 남아 캐럿이 여백 밖에서 깜빡였다(사용자 보고: "새로고침하면
+    // 용지가 오른쪽에 있다가 중앙으로 온다"). 부팅 중 사이드바가 뒤늦게 마운트되며
+    // clientWidth 가 줄어드는 경우가 대표적 — 줌 변경과 같은 재도색을 태운다.
+    eventBus.on('viewport-resize', () => this.refreshOverlayPositions());
 
     eventBus.on('document-view-changed', () => {
       if (!this.active) return;
@@ -650,6 +631,34 @@ export class InputHandler {
       // 서식바 조작으로 빠진 포커스를 항상 복원
       this.focusTextarea();
     });
+  }
+
+  /**
+   * 캐럿·선택·핸들 등 **DOM 오버레이의 화면 좌표만** 다시 계산한다(문서 변경 아님).
+   * 용지의 화면 위치가 바뀌는 모든 계기 — 줌 변경, 컨테이너 폭 변경(용지 재중앙화) —
+   * 에서 같은 경로를 태워야 오버레이가 용지를 따라간다.
+   */
+  private refreshOverlayPositions(): void {
+    if (this.active) {
+      if (this.cursor.getRect()) {
+        this.caret.updatePosition(this.viewportManager.getZoom());
+      }
+      if (this.fieldMarker.isVisible) {
+        this.updateFieldMarkers();
+      }
+    }
+    if (this.cursor.hasSelection()) {
+      this.updateSelection();
+    }
+    if (this.cursor.isInCellSelectionMode()) {
+      this.updateCellSelection();
+    }
+    if (this.cursor.isInPictureObjectSelection()) {
+      this.renderPictureObjectSelection();
+    }
+    if (this.cursor.isInTableObjectSelection()) {
+      this.renderTableObjectSelection();
+    }
   }
 
   /** 클릭 이벤트 처리 — hitTest로 커서 배치 */
