@@ -103,14 +103,17 @@ export class TableBorderSection {
   // ── 그리기 ──────────────────────────────────────
 
   private render(): void {
+    // ⚠ host.className 을 덮어쓰면 자리(.canva-props-host)의 스크롤 설정까지 날아간다.
+    // 내 것은 안쪽 래퍼에만 건다.
     this.host.innerHTML = '';
-    this.host.className = 'tbs';
-    this.host.appendChild(this.buildPresets());
-    this.host.appendChild(this.buildStyleBar());
-    this.host.appendChild(this.buildPreview());
-    this.host.appendChild(this.buildImmediate());
-    this.host.appendChild(this.buildSpacing());
-    this.host.appendChild(this.buildFill());
+    const box = mkEl('div', 'tbs');
+    this.host.appendChild(box);
+    box.appendChild(this.buildPresets());
+    box.appendChild(this.buildStyleBar());
+    box.appendChild(this.buildPreview());
+    box.appendChild(this.buildImmediate());
+    box.appendChild(this.buildSpacing());
+    box.appendChild(this.buildFill());
   }
 
   private buildPresets(): HTMLElement {

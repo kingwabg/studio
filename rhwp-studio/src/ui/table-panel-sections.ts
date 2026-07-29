@@ -68,10 +68,12 @@ export class TablePanelSections {
     } catch {
       return false;
     }
-    host.innerHTML = '';
-    host.className = 'tps';
     const build = (tab === 'table' ? this.tableSections() : this.cellSections())[section];
     if (!build) return false;
+    // ⚠ host.className 을 덮어쓰면 자리(.canva-props-host)의 스크롤 설정까지 날아간다.
+    host.innerHTML = '';
+    this.host = mkEl('div', 'tps');
+    host.appendChild(this.host);
     build();
     return true;
   }
