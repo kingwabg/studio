@@ -107,41 +107,45 @@ export class TablePanelSections {
   /** 표 위치 — 글자처럼 취급 / 배치 / 가로·세로 기준 / 겹침 규칙 */
   private buildPosition(): void {
     const inline = this.tp.treatAsChar ?? false;
-    // 글자처럼 취급이면 아래 배치 컨트롤은 의미가 없다 — 통째로 흐려 끈다
-    const dep = mkEl('div', 'tps-dep');
-    dep.classList.toggle('is-off', inline);
+    // 글자처럼 취급이면 배치 컨트롤은 의미가 없다 — 흐려 끈다.
+    // ⚠ 미리보기는 여기 넣지 않는다: '글자처럼 취급'이 무엇을 하는지 설명하는 게 바로
+    //   미리보기인데, 켜는 순간 같이 흐려져 안 보였다(사용자 신고 2026-07-29).
+    //   컨트롤이 아니라 설명이므로 항상 또렷하게 둔다.
+    const depSeg = mkEl('div', 'tps-dep');
+    const depRest = mkEl('div', 'tps-dep');
+    for (const d of [depSeg, depRest]) d.classList.toggle('is-off', inline);
+
     this.host.appendChild(this.switchRow('글자처럼 취급', inline, (v) => {
       this.patchTable({ treatAsChar: v });
-      dep.classList.toggle('is-off', v);
+      for (const d of [depSeg, depRest]) d.classList.toggle('is-off', v);
       this.refreshPos();
     }));
 
     // 본문 위치는 '어울림'일 때만 의미가 있다
     const flowRow = this.segRow('본문 위치', FLOW, this.tp.textFlow ?? 'BothSides',
       (v) => { this.patchTable({ textFlow: v }); this.refreshPos(); });
-    dep.appendChild(this.segRow('본문과의 배치', WRAP, this.tp.textWrap ?? 'Square', (v) => {
+    depSeg.appendChild(this.segRow('본문과의 배치', WRAP, this.tp.textWrap ?? 'Square', (v) => {
       this.patchTable({ textWrap: v });
       flowRow.classList.toggle('is-off', v !== 'Square');
       this.refreshPos();
     }));
     flowRow.classList.toggle('is-off', (this.tp.textWrap ?? 'Square') !== 'Square');
-    dep.appendChild(flowRow);
-    dep.appendChild(this.posPreview());
+    depSeg.appendChild(flowRow);
+    this.host.append(depSeg, this.posPreview(), depRest);
 
-    dep.appendChild(this.composeRow('가로', 'arrows-horizontal',
+    depRest.appendChild(this.composeRow('가로', 'arrows-horizontal',
       H_REL, this.tp.horzRelTo ?? 'Column', (v) => this.patchTable({ horzRelTo: v }),
       H_ALIGN, this.tp.horzAlign ?? 'Left', (v) => this.patchTable({ horzAlign: v }),
       toMm(this.tp.horzOffset), (v) => this.patchTable({ horzOffset: fromMm(v) })));
-    dep.appendChild(this.composeRow('세로', 'arrows-vertical',
+    depRest.appendChild(this.composeRow('세로', 'arrows-vertical',
       V_REL, this.tp.vertRelTo ?? 'Para', (v) => this.patchTable({ vertRelTo: v }),
       V_ALIGN, this.tp.vertAlign ?? 'Top', (v) => this.patchTable({ vertAlign: v }),
       toMm(this.tp.vertOffset), (v) => this.patchTable({ vertOffset: fromMm(v) })));
-    dep.appendChild(mkEl('div', 'tps-help', '단: 글이 흐르는 단(칼럼)이 기준이에요 · 쪽: 여백을 뺀 본문 영역이 기준이에요'));
+    depRest.appendChild(mkEl('div', 'tps-help', '단: 글이 흐르는 단(칼럼)이 기준이에요 · 쪽: 여백을 뺀 본문 영역이 기준이에요'));
 
-    dep.appendChild(this.switchRow('쪽 영역 안으로 제한', this.tp.restrictInPage ?? true, (v) => this.patchTable({ restrictInPage: v })));
-    dep.appendChild(this.switchRow('서로 겹침 허용', this.tp.allowOverlap ?? false, (v) => this.patchTable({ allowOverlap: v })));
-    dep.appendChild(this.switchRow('개체와 조판부호를 항상 같은 쪽에 놓기', this.tp.keepWithAnchor ?? false, (v) => this.patchTable({ keepWithAnchor: v })));
-    this.host.appendChild(dep);
+    depRest.appendChild(this.switchRow('쪽 영역 안으로 제한', this.tp.restrictInPage ?? true, (v) => this.patchTable({ restrictInPage: v })));
+    depRest.appendChild(this.switchRow('서로 겹침 허용', this.tp.allowOverlap ?? false, (v) => this.patchTable({ allowOverlap: v })));
+    depRest.appendChild(this.switchRow('개체와 조판부호를 항상 같은 쪽에 놓기', this.tp.keepWithAnchor ?? false, (v) => this.patchTable({ keepWithAnchor: v })));
   }
 
   /** 표 크기 — 엔진이 셀 크기의 합으로 계산하므로 읽기 전용 */

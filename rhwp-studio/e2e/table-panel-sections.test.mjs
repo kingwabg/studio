@@ -91,6 +91,19 @@ runTest('표/셀 패널 섹션 — 10종 렌더 + 저장 왕복', async ({ page 
     saved.pos = { before: capBefore, after: host.querySelector('.tps-pos-cap').textContent,
                   pieces: host.querySelectorAll('.tps-pos-stage > *').length };
 
+    // '글자처럼 취급'을 켜도 **미리보기는 흐려지면 안 된다** — 그 설정이 무엇을 하는지
+    // 설명하는 게 미리보기다(사용자 신고 2026-07-29: 켜면 안 보였다).
+    const tac = [...host.querySelectorAll('.tps-switch-row')]
+      .find((l) => l.textContent.includes('글자처럼 취급')).querySelector('input');
+    tac.checked = true; tac.dispatchEvent(new Event('change'));
+    const pos = host.querySelector('.tps-pos');
+    saved.previewWhenInline = {
+      dimmed: !!pos.closest('.is-off'),
+      opacity: getComputedStyle(pos).opacity,
+      cap: host.querySelector('.tps-pos-cap').textContent,
+      segDimmed: !!host.querySelector('.tps-seg')?.closest('.is-off'),
+    };
+
     // 모르는 섹션은 false 로 폴백을 알려야 한다
     const unknown = ps.mount(host, w, services, ctx, 0, 'table', '테두리·배경');
 
@@ -115,6 +128,10 @@ runTest('표/셀 패널 섹션 — 10종 렌더 + 저장 왕복', async ({ page 
   assert.ok(r.saved.pos.after.length > 0, '배치 미리보기 설명이 있음');
   assert.notStrictEqual(r.saved.pos.after, r.saved.pos.before, '배치를 바꾸면 미리보기도 바뀜');
   assert.ok(r.saved.pos.pieces > 3, '미리보기에 글줄·표가 그려짐');
+  assert.strictEqual(r.saved.previewWhenInline.dimmed, false, '글자처럼 취급을 켜도 미리보기는 흐려지지 않는다');
+  assert.strictEqual(r.saved.previewWhenInline.opacity, '1', '미리보기는 항상 또렷하게');
+  assert.ok(r.saved.previewWhenInline.cap.includes('글자처럼 취급'), '미리보기 설명이 그 상태를 말해줌');
+  assert.strictEqual(r.saved.previewWhenInline.segDimmed, true, '배치 컨트롤은 정상적으로 흐려짐');
   assert.strictEqual(r.unknown, false, '테두리·배경은 이 모듈이 맡지 않는다(폴백 신호)');
 
   assert.deepStrictEqual(errors, [], `페이지 오류 발생: ${JSON.stringify(errors)}`);
