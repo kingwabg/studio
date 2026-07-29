@@ -44,6 +44,8 @@ export class CanvaRightInspector {
   private emptyEl!: HTMLElement;
   private extrasHost!: HTMLElement;
   private biu: Record<'bold' | 'italic' | 'underline' | 'strike', HTMLButtonElement> = {} as any;
+  private fontNameBtn!: HTMLButtonElement;
+  private lineSpacingBtn!: HTMLButtonElement;
   private aligns: Record<string, HTMLButtonElement> = {};
   private sizeInput!: HTMLInputElement;
   private swatches: HTMLButtonElement[] = [];
@@ -101,6 +103,15 @@ export class CanvaRightInspector {
     });
     stepper.append(dec, inp, inc);
     this.sizeInput = inp;
+    // [디자인 2c] 글꼴 이름과 크기 스테퍼를 한 줄에
+    sizeRow.classList.add('canva-font-row');
+    this.fontNameBtn = mkButton('canva-font-name', { title: '글꼴' });
+    this.fontNameBtn.innerHTML = '<span>함초롬바탕</span><i class="ph ph-caret-down"></i>';
+    this.fontNameBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      this.services.dispatcher.dispatch('format:char-shape');
+    });
+    sizeRow.insertBefore(this.fontNameBtn, sizeRow.firstChild);
     sizeRow.appendChild(stepper);
     biuSec.appendChild(sizeRow);
     this.fmtPane.appendChild(biuSec);
@@ -115,6 +126,17 @@ export class CanvaRightInspector {
       alignRow.appendChild(b);
     }
     alignSec.appendChild(alignRow);
+    // [디자인 2c] 줄 간격 — 정렬과 같은 섹션에
+    const lsRow = mkEl('div', 'canva-line-row');
+    const lsLabel = mkEl('span', 'canva-line-label', '줄 간격');
+    this.lineSpacingBtn = mkButton('canva-line-value', { title: '줄 간격' });
+    this.lineSpacingBtn.innerHTML = '<span>160%</span><i class="ph ph-caret-down"></i>';
+    this.lineSpacingBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      this.services.dispatcher.dispatch('format:line-spacing');
+    });
+    lsRow.append(lsLabel, this.lineSpacingBtn);
+    alignSec.appendChild(lsRow);
     this.fmtPane.appendChild(alignSec);
 
     // 글자색
@@ -132,6 +154,24 @@ export class CanvaRightInspector {
       sw.appendChild(b);
     }
     colorSec.appendChild(sw);
+    // [디자인 2c] 나머지 색은 '팔레트'로, 형광펜 4색을 같은 섹션에
+    const paletteBtn = mkButton('canva-chip', { title: '더 많은 색' });
+    paletteBtn.innerHTML = '<i class="ph-duotone ph-palette"></i><span>팔레트</span>';
+    paletteBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault(); this.services.dispatcher.dispatch('format:char-shape');
+    });
+    const hlRow = mkEl('div', 'canva-swatches canva-highlights');
+    for (const c of ['#fff59d', '#a5d6a7', '#90caf9', '#f48fb1']) {
+      const b = mkButton('canva-swatch canva-swatch--hl', { title: `형광펜 ${c}` });
+      b.style.background = c;
+      b.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this.services.eventBus.emit('format-char', { shadeColor: c } as CharProperties);
+      });
+      hlRow.appendChild(b);
+    }
+    const hlLabel = mkEl('div', 'canva-sub-label', '형광펜');
+    colorSec.append(paletteBtn, hlLabel, hlRow);
     this.fmtPane.appendChild(colorSec);
 
     // 전체 글자 모양 다이얼로그
@@ -140,6 +180,13 @@ export class CanvaRightInspector {
     });
     full.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:char-shape'); });
     this.fmtPane.appendChild(full);
+
+    // [디자인 2c] 문단 모양 자세히 — 글자 모양과 짝으로 항상 함께 노출
+    const fullPara = mkButton('canva-full-btn', {
+      html: svg('<path d="M4 6h16M4 12h10M4 18h13"/>') + '<span>문단 모양 자세히…</span>',
+    });
+    fullPara.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:para-shape'); });
+    this.fmtPane.appendChild(fullPara);
 
     // 컨텍스트 추가(표/그림) 영역
     this.extrasHost = mkEl('div', 'canva-pane');
@@ -174,6 +221,11 @@ export class CanvaRightInspector {
     this.biu.underline?.classList.toggle('is-active', !!p.underline);
     this.biu.strike?.classList.toggle('is-active', !!p.strikethrough);
     if (p.fontSize !== undefined) this.sizeInput.value = String(p.fontSize / 100);
+    const fam = (p as any).fontFamily ?? (p as any).fontFamilies?.[0];
+    if (fam && this.fontNameBtn) {
+      const sp = this.fontNameBtn.querySelector('span');
+      if (sp) sp.textContent = String(fam);
+    }
     if (p.textColor) {
       const hex = p.textColor.toLowerCase();
       this.swatches.forEach((s) => s.classList.toggle('is-active', (s.style.background || '').length > 0 && rgbToHex(s.style.background) === hex));
@@ -183,6 +235,11 @@ export class CanvaRightInspector {
   private reflectPara(p: ParaProperties): void {
     const a = p.alignment;
     for (const key of Object.keys(this.aligns)) this.aligns[key].classList.toggle('is-active', a === key);
+    const ls = (p as any).lineSpacing;
+    if (ls !== undefined && this.lineSpacingBtn) {
+      const sp = this.lineSpacingBtn.querySelector('span');
+      if (sp) sp.textContent = `${ls}%`;
+    }
   }
 
   private refreshContext(): void {
