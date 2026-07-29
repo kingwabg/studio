@@ -891,13 +891,14 @@
 .tps-link:hover { border-color: var(--color-primary); }
 .tps-link.is-on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 
-.tps-stage-body { position: relative; width: 100%; height: 148px; }
+.tps-stage-body { position: relative; width: 100%; height: 162px; }
+/* 알약은 자기가 조절하는 변 위에 걸터앉는다 — 어느 값이 어느 여백인지 그림으로 읽힌다 */
 .tps-stage-region {
-  position: absolute; left: 52px; right: 52px; top: 32px; bottom: 32px;
+  position: absolute; left: 42px; right: 42px; top: 30px; bottom: 30px;
   border-radius: 10px; border: 1px dashed rgba(214, 0, 108, .45); background: rgba(214, 0, 108, .07);
 }
 .tps-stage-obj {
-  position: absolute; inset: 11px; border-radius: 7px;
+  position: absolute; inset: 26px; border-radius: 7px;
   display: flex; align-items: center; justify-content: center;
   font-size: 10.5px; font-weight: 600;
 }
@@ -912,19 +913,19 @@
   height: 26px; padding: 0 3px; border-radius: 100px;
   background: var(--color-surface-raised); box-shadow: 0 1px 3px rgba(32, 30, 29, .12);
 }
-.tps-pill-top { left: 50%; top: 0; transform: translateX(-50%); }
-.tps-pill-bottom { left: 50%; bottom: 0; transform: translateX(-50%); }
-.tps-pill-left { left: 0; top: 50%; transform: translateY(-50%); }
-.tps-pill-right { right: 0; top: 50%; transform: translateY(-50%); }
+.tps-pill-top { left: 50%; top: 30px; transform: translate(-50%, -50%); }
+.tps-pill-bottom { left: 50%; bottom: 30px; transform: translate(-50%, 50%); }
+.tps-pill-left { left: 42px; top: 50%; transform: translate(-50%, -50%); }
+.tps-pill-right { right: 42px; top: 50%; transform: translate(50%, -50%); }
 .tps-pill-btn {
-  width: 22px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 100px; background: transparent;
   color: var(--color-text-muted); cursor: pointer; padding: 0;
 }
 .tps-pill-btn:hover { background: var(--color-accent-bg); color: var(--color-primary); }
 .tps-pill-btn i { font-size: 10px; }
 .tps-pill-val {
-  width: 38px; height: 20px; padding: 0; border: 0; background: transparent;
+  width: 34px; height: 20px; padding: 0; border: 0; background: transparent;
   text-align: center; font: inherit; font-size: 12px; font-weight: 600;
   font-variant-numeric: tabular-nums; color: var(--color-text);
 }
