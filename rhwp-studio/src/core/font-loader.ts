@@ -13,6 +13,9 @@ interface FontEntry {
   format?: 'woff2' | 'woff';
   /** CSS unicode-range — 지정 시 해당 코드포인트만 매칭, 다운로드도 해당 영역 사용 시에만 발생 */
   unicodeRange?: string;
+  /** font-weight. 미지정 = normal. ⚠ 캔버스는 웹폰트에 가짜 볼드를 합성하지 않으므로
+   *  볼드 얼굴이 없으면 'bold 13px …' 지정이 그냥 레귤러로 그려진다(실사고 2026-07-30). */
+  weight?: 'bold';
 }
 
 export interface WebFontLoadOptions {
@@ -37,6 +40,12 @@ const FONT_LIST: FontEntry[] = [
   { name: '한컴산뜻돋움', file: CDN_HAMCHOD_R, format: 'woff' },
   { name: '새돋움', file: CDN_HAMCHOD_R, format: 'woff' },
   { name: '새바탕', file: CDN_HAMCHOB_R, format: 'woff' },
+  // 바탕 계열 볼드 얼굴 — 이것이 없으면 캔버스에서 굵게가 무시된다(위 weight 주석).
+  // CDN 에 돋움(HANDotum*) 볼드는 없어 바탕 계열만 실굵기, 돋움은 합성 불가로 남는다.
+  { name: '함초롬바탕', file: CDN_HAMCHOB_B, format: 'woff', weight: 'bold' },
+  { name: '함초롱바탕', file: CDN_HAMCHOB_B, format: 'woff', weight: 'bold' },
+  { name: '한컴바탕', file: CDN_HAMCHOB_B, format: 'woff', weight: 'bold' },
+  { name: '새바탕', file: CDN_HAMCHOB_B, format: 'woff', weight: 'bold' },
   // === 한컴 HY 폰트 → 오픈소스 대체 ===
   { name: 'HY헤드라인M', file: 'fonts/NotoSansKR-Bold.woff2' },
   { name: 'HYHeadLine M', file: 'fonts/NotoSansKR-Bold.woff2' },
@@ -160,7 +169,8 @@ function registerFontFaces(options?: WebFontLoadOptions): void {
   style.textContent = selectableFontList(options).map(f => {
     const fmt = f.format ?? 'woff2';
     const ur = f.unicodeRange ? ` unicode-range: ${f.unicodeRange};` : '';
-    return `@font-face { font-family: "${f.name}"; src: url("${f.file}") format("${fmt}"); font-display: swap;${ur} }`;
+    const fw = f.weight ? ` font-weight: ${f.weight};` : '';
+    return `@font-face { font-family: "${f.name}"; src: url("${f.file}") format("${fmt}"); font-display: swap;${fw}${ur} }`;
   }).join('\n');
   fontFaceRegistrationMode = mode;
 }
@@ -267,7 +277,8 @@ export async function loadWebFonts(
         const names = fileToNames.get(f.file) ?? [f.name];
         const fmt = f.format ?? 'woff2';
         for (const name of names) {
-          const face = new FontFace(name, `url(${f.file}) format('${fmt}')`);
+          const face = new FontFace(name, `url(${f.file}) format('${fmt}')`,
+            f.weight ? { weight: f.weight } : undefined);
           const result = await face.load();
           document.fonts.add(result);
         }
