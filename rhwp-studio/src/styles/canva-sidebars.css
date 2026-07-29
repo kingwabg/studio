@@ -46,7 +46,8 @@
    손잡이는 레일 밖(absolute)이라 overflow:visible로 남겨 다시 펼칠 수 있게 한다. */
 .canva-rail.is-collapsed { width: 0; min-width: 0; flex-basis: 0; border: none; overflow: visible; }
 .canva-rail.is-collapsed > * { display: none; }
-.canva-rail.is-collapsed > .canva-rail-handle { display: flex; }
+.canva-rail.is-collapsed > .canva-rail-handle,
+.canva-rail.is-collapsed > .canva-rail-grip { display: flex; }
 
 /* 접기/펼치기 손잡이 (레일 바깥 가장자리에 얇게) */
 .canva-rail-handle {
@@ -676,16 +677,27 @@
 }
 
 /* 가변 폭 손잡이 — 우측 패널 왼쪽 가장자리 (디자인 2c 갱신) */
+/* 손잡이 하나로 폭 조절 + 접기 — 보이는 손잡이여야 잡을 수 있다(디자인 2c) */
 .canva-rail-grip {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 8px;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
+  display: flex; align-items: center; justify-content: center;
   cursor: col-resize; z-index: 5;
 }
-.canva-rail-grip::after {
-  content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px;
-  background: transparent; border-radius: 2px;
+.canva-rail-grip:hover { background: var(--color-accent-bg); }
+.canva-grip-line {
+  position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 100px;
+  background: var(--color-border);
 }
-.canva-rail-grip:hover::after { background: var(--color-primary); }
-.canva-rail.is-collapsed .canva-rail-grip { display: none; }
+.canva-grip-dots {
+  position: relative; width: 3px; height: 3px; border-radius: 100px;
+  background: var(--color-text-muted);
+  box-shadow: 0 -6px 0 var(--color-text-muted), 0 6px 0 var(--color-text-muted);
+}
+.canva-rail-grip:hover .canva-grip-line,
+.canva-rail-grip:hover .canva-grip-dots { background: var(--color-primary); }
+.canva-rail-grip:hover .canva-grip-dots { box-shadow: 0 -6px 0 var(--color-primary), 0 6px 0 var(--color-primary); }
+/* 접혀도 손잡이는 남는다 — 이게 유일한 펼치기 수단이다(폭 0 레일의 왼쪽 가장자리) */
+.canva-rail--right.is-collapsed .canva-rail-grip { left: -10px; }
 
 /* 표/셀 탭의 섹션 스트립 — 대화상자 탭을 패널 안 아이콘 줄로 */
 .canva-sec-strip {

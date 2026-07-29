@@ -98,5 +98,39 @@ runTest('우측 속성 패널 2c — 284px·컨텍스트 헤더·표 조작 섹�
     ['위치', '크기', '여백', '쪽 넘김', '테두리·배경', '캡션'], '표 탭 섹션 스트립');
   assert.ok(tabsAndResize.after > tabsAndResize.before + 30,
     `왼쪽으로 끌면 넓어져야 함 (${tabsAndResize.before} → ${tabsAndResize.after})`);
+
+  // [디자인 2c] 손잡이 하나가 둘을 다 한다 — 끌면 폭, 그냥 누르면 접기/펼치기.
+  // 옛 접기 버튼(.canva-rail-handle)은 우측에서 사라져야 한다.
+  const grip = await page.evaluate(() => {
+    const rail = document.querySelector('.canva-rail--right');
+    const g = rail.querySelector('.canva-rail-grip');
+    const r = g.getBoundingClientRect();
+    return {
+      line: !!g.querySelector('.canva-grip-line'), dots: !!g.querySelector('.canva-grip-dots'),
+      oldHandle: !!rail.querySelector('.canva-rail-handle'),
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+    };
+  });
+  assert.ok(grip.line && grip.dots, '손잡이가 눈에 보여야 함(선 + 점 3개)');
+  assert.ok(!grip.oldHandle, '우측 레일의 옛 접기 버튼은 사라짐');
+
+  await page.mouse.click(grip.x, grip.y);
+  await new Promise(r => setTimeout(r, 350));
+  const folded = await page.evaluate(() => ({
+    on: document.querySelector('.canva-rail--right').classList.contains('is-collapsed'),
+    gripDisplay: getComputedStyle(document.querySelector('.canva-rail--right .canva-rail-grip')).display,
+  }));
+  assert.ok(folded.on, '끌지 않고 누르면 접힌다');
+  assert.notStrictEqual(folded.gripDisplay, 'none', '접혀도 손잡이는 남는다(유일한 펼치기 수단)');
+
+  const p2 = await page.evaluate(() => {
+    const r = document.querySelector('.canva-rail--right .canva-rail-grip').getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+  });
+  await page.mouse.click(p2.x, p2.y);
+  await new Promise(r => setTimeout(r, 350));
+  const reopened = await page.evaluate(() => !document.querySelector('.canva-rail--right').classList.contains('is-collapsed'));
+  assert.ok(reopened, '다시 누르면 펼쳐진다');
+
   await screenshot(page, 'right-panel');
 });

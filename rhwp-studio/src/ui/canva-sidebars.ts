@@ -148,22 +148,31 @@ function buildRail(side: 'left' | 'right'): RailParts {
   rail.appendChild(handle);
   setChevron();
 
-  // [디자인 2c 갱신 2026-07-29] 우측 패널은 **가변 폭** — 왼쪽 가장자리를 끌어 조절한다.
+  // [디자인 2c] 우측 패널은 **가변 폭** — 왼쪽 가장자리 손잡이 하나가 전부 한다:
+  // 끌면 폭 조절, 그냥 누르면(3px 미만 이동) 접기/펼치기. 손잡이가 둘이면 어느 쪽을
+  // 눌러야 하는지 매번 헷갈린다.
   if (side === 'right') {
+    handle.remove();
     const grip = mkEl('div', 'canva-rail-grip');
-    grip.title = '드래그해서 패널 폭 조절';
+    grip.title = '드래그해서 폭 조절 · 클릭해서 접기';
+    grip.innerHTML = '<i class="canva-grip-line"></i><i class="canva-grip-dots"></i>';
     grip.addEventListener('mousedown', (e) => {
       e.preventDefault();
       const startX = (e as MouseEvent).clientX;
       const startW = rail.getBoundingClientRect().width;
+      let moved = false;
       const move = (ev: MouseEvent) => {
         // 왼쪽 가장자리를 끌므로 왼쪽으로 갈수록 넓어진다
-        const w = Math.max(240, Math.min(560, startW + (startX - ev.clientX)));
-        rail.style.width = `${w}px`;
+        const dx = startX - ev.clientX;
+        if (Math.abs(dx) > 3) moved = true;
+        if (!moved) return;
+        rail.classList.remove('is-collapsed');
+        rail.style.width = `${Math.max(220, Math.min(420, startW + dx))}px`;
       };
       const up = () => {
         document.removeEventListener('mousemove', move);
         document.removeEventListener('mouseup', up);
+        if (!moved) { rail.classList.toggle('is-collapsed'); return; }
         try { localStorage.setItem('rhwp:right-rail-width', String(Math.round(rail.getBoundingClientRect().width))); } catch { /* 저장 실패 무시 */ }
       };
       document.addEventListener('mousemove', move);
@@ -173,7 +182,7 @@ function buildRail(side: 'left' | 'right'): RailParts {
     // 지난 폭 복원
     try {
       const saved = Number(localStorage.getItem('rhwp:right-rail-width'));
-      if (saved >= 240 && saved <= 560) rail.style.width = `${saved}px`;
+      if (saved >= 220 && saved <= 420) rail.style.width = `${saved}px`;
     } catch { /* 무시 */ }
   }
 
