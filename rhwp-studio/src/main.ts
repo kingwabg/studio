@@ -5,6 +5,18 @@ import { assertRemoteDocumentBytes } from '@/core/document-signature';
 import { CanvasView } from '@/view/canvas-view';
 import { InputHandler } from '@/engine/input-handler';
 import { Toolbar } from '@/ui/toolbar';
+// [배포 반영 2026-07-29] 서비스워커가 새 버전을 잡으면 **한 번만** 자동 새로고침한다.
+// skipWaiting 만으로는 이미 열린 페이지가 옛 캐시 화면을 그대로 들고 있어, 사용자가
+// 새로고침을 두 번 눌러야 새 배포가 보였다("안 보인다" 실사고 반복, 2026-07-29).
+if ('serviceWorker' in navigator) {
+  let reloadedForUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadedForUpdate) return;
+    reloadedForUpdate = true;
+    window.location.reload();
+  });
+}
+
 // Phosphor 아이콘 — 번들러가 폰트 URL 을 배포 base(./)에 맞춰 재작성한다.
 // ⚠ CSS 에 절대경로(/vendor/...)를 쓰면 /rhwp-studio/ 하위 배포에서 404 다(2026-07-29 실사고).
 // 사본을 두는 이유: 원본은 woff/ttf/svg 까지 물어 번들이 14MB 로 불어난다 → woff2 만 남김.
