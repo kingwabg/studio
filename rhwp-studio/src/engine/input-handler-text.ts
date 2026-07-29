@@ -610,6 +610,9 @@ export function onInput(this: any, e?: InputEvent): void {
     return;
   }
   this.executeOperation({ kind: 'command', command: new InsertTextCommand(insertPos, text) });
+  // 대기 서식(선택 없이 고른 굵게·크기 등)을 방금 넣은 글자에 — 일반 타이핑 경로.
+  // IME 조합 경로는 insertTextAtRaw 쪽에서 매 조합마다 다시 입힌다.
+  this.applyPendingToInserted?.(insertPos, text.length);
   if (refreshClickHereGuide) {
     this.refreshClickHereAfterFirstInput?.();
   }

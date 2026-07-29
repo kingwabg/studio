@@ -634,6 +634,9 @@ export class InputHandler {
       if (this.editMode === 'form') return;
       if (this.cursor.hasSelection()) {
         this.applyCharFormat(props as Partial<CharProperties>);
+      } else {
+        // 선택이 없으면 다음 글자에 걸어 둔다 — 빈 문단에서 크기·색을 먼저 고르는 흐름
+        this.setPendingCharFormat(props as Partial<CharProperties>);
       }
       // 서식바 조작으로 빠진 포커스를 항상 복원
       this.focusTextarea();
@@ -1995,7 +1998,17 @@ export class InputHandler {
 
   /** 토글 서식 적용 (상호 배타 처리 포함) */
   private applyToggleFormat(prop: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'emboss' | 'engrave' | 'outline' | 'superscript' | 'subscript'): void {
-    if (!this.cursor.hasSelection()) return;
+    // 선택이 없으면 **다음에 칠 글자**에 걸어 둔다(워드·한컴과 같은 기대).
+    // 예전엔 그냥 무시돼, 빈 문단에서 B 를 눌러도 아무 일도 안 났다(사용자 신고 2026-07-30).
+    if (!this.cursor.hasSelection()) {
+      // outline 만 값이 숫자(outlineType) — 나머지는 불리언 토글
+      const cur = this.getPendingOrCurrentChar() as Record<string, unknown>;
+      const next: Partial<CharProperties> = prop === 'outline'
+        ? ({ outlineType: (cur.outlineType as number ?? 0) ? 0 : 1 } as Partial<CharProperties>)
+        : ({ [prop]: !cur[prop] } as Partial<CharProperties>);
+      this.setPendingCharFormat(next);
+      return;
+    }
     const current = this.getCharPropertiesAtCursor();
 
     if (prop === 'emboss') {
@@ -2024,6 +2037,66 @@ export class InputHandler {
     } else {
       this.applyCharFormat({ [prop]: !current[prop] });
     }
+  }
+
+  /**
+   * 대기 서식 — 선택 없이 지정한 글자 서식. 다음 삽입 때 그 범위에 입혀지고 비워진다.
+   * 커서가 다른 곳으로 가면 무효(한컴·워드와 같은 수명).
+   */
+  private pendingChar: Partial<CharProperties> | null = null;
+  private pendingAt: string | null = null;
+
+  private posKey(): string {
+    const p = this.cursor.getPosition();
+    return [p.sectionIndex, p.paragraphIndex, p.parentParaIndex ?? -1, p.controlIndex ?? -1,
+      p.cellIndex ?? -1, p.cellParaIndex ?? -1, p.charOffset].join(':');
+  }
+
+  /** 대기 서식을 얹는다(누적) + 툴바·패널이 즉시 눌린 상태로 보이게 알린다 */
+  setPendingCharFormat(props: Partial<CharProperties>): void {
+    this.pendingChar = { ...(this.pendingChar ?? {}), ...props };
+    this.pendingAt = this.posKey();
+    this.eventBus.emit('cursor-format-changed', this.getPendingOrCurrentChar());
+  }
+
+  /** 현재 커서에서 유효한 대기 서식 (자리를 옮겼으면 버린다) */
+  getPendingCharFormat(): Partial<CharProperties> | null {
+    if (!this.pendingChar) return null;
+    if (this.pendingAt !== this.posKey()) {
+      this.pendingChar = null;
+      this.pendingAt = null;
+      return null;
+    }
+    return this.pendingChar;
+  }
+
+  /** 표시용 — 문서 서식 위에 대기 서식을 얹은 값 */
+  getPendingOrCurrentChar(): CharProperties {
+    const base = this.getCharPropertiesAtCursor();
+    const pend = this.getPendingCharFormat();
+    return pend ? { ...base, ...pend } : base;
+  }
+
+  /**
+   * 방금 삽입한 글자에 대기 서식을 입힌다. 삽입 위치·길이를 받아 그 범위에만.
+   * IME 조합 중에도 매 조합마다 다시 입힌다(조합 텍스트는 지웠다 다시 넣으므로).
+   */
+  applyPendingToInserted(pos: DocumentPosition, length: number): void {
+    const pend = this.pendingChar;
+    if (!pend || length <= 0) return;
+    try {
+      this.applyCharPropsToRange(
+        { ...pos, charOffset: pos.charOffset },
+        { ...pos, charOffset: pos.charOffset + length },
+        pend,
+      );
+    } catch (err) {
+      console.warn('[InputHandler] 대기 서식 적용 실패:', err);
+    }
+    // 커서는 삽입 끝으로 가므로 대기 위치도 함께 옮긴다 — 이어 치면 계속 적용된다
+    this.pendingAt = [pos.sectionIndex, pos.paragraphIndex, pos.parentParaIndex ?? -1,
+      pos.controlIndex ?? -1, pos.cellIndex ?? -1, pos.cellParaIndex ?? -1,
+      pos.charOffset + length].join(':');
   }
 
   /** 커서 위치의 글자 서식을 조회한다 */
@@ -2423,6 +2496,9 @@ export class InputHandler {
   /** 위치에 텍스트를 삽입한다 (WASM 직접 호출, IME 조합용) */
   private insertTextAtRaw(pos: DocumentPosition, text: string): void {
     _text.insertTextAtRaw.call(this, pos, text);
+    // 대기 서식(선택 없이 고른 굵게·크기 등)을 방금 넣은 글자에 입힌다.
+    // 여기 한 곳에 두는 이유: 본문·셀·머리말·각주 삽입이 전부 이 함수를 통과한다.
+    this.applyPendingToInserted(pos, text.length);
   }
 
   /** 위치에서 텍스트를 삭제한다 (WASM 직접 호출, IME 조합용) */
