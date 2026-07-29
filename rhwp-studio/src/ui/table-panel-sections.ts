@@ -53,6 +53,9 @@ export class TablePanelSections {
   private cellIdx = 0;
   private tp!: TableProperties;
   private cp!: CellProperties;
+  /** 배치 미리보기 — 배치 값이 바뀔 때 다시 그리려고 잡아 둔다 */
+  private posStage: HTMLElement | null = null;
+  private posCaption: HTMLElement | null = null;
 
   /** @returns 이 섹션을 그렸으면 true (모르는 섹션이면 false — 호출자가 폴백) */
   mount(
@@ -72,6 +75,7 @@ export class TablePanelSections {
     if (!build) return false;
     // ⚠ host.className 을 덮어쓰면 자리(.canva-props-host)의 스크롤 설정까지 날아간다.
     host.innerHTML = '';
+    this.posStage = this.posCaption = null;
     this.host = mkEl('div', 'tps');
     host.appendChild(this.host);
     build();
@@ -104,19 +108,25 @@ export class TablePanelSections {
   private buildPosition(): void {
     const inline = this.tp.treatAsChar ?? false;
     // 글자처럼 취급이면 아래 배치 컨트롤은 의미가 없다 — 통째로 흐려 끈다
-    this.host.appendChild(this.switchRow('글자처럼 취급', inline, (v) => this.patchTable({ treatAsChar: v })));
-
     const dep = mkEl('div', 'tps-dep');
     dep.classList.toggle('is-off', inline);
-
-    dep.appendChild(this.segRow('본문과의 배치', WRAP, this.tp.textWrap ?? 'Square',
-      (v) => this.patchTable({ textWrap: v })));
+    this.host.appendChild(this.switchRow('글자처럼 취급', inline, (v) => {
+      this.patchTable({ treatAsChar: v });
+      dep.classList.toggle('is-off', v);
+      this.refreshPos();
+    }));
 
     // 본문 위치는 '어울림'일 때만 의미가 있다
     const flowRow = this.segRow('본문 위치', FLOW, this.tp.textFlow ?? 'BothSides',
-      (v) => this.patchTable({ textFlow: v }));
+      (v) => { this.patchTable({ textFlow: v }); this.refreshPos(); });
+    dep.appendChild(this.segRow('본문과의 배치', WRAP, this.tp.textWrap ?? 'Square', (v) => {
+      this.patchTable({ textWrap: v });
+      flowRow.classList.toggle('is-off', v !== 'Square');
+      this.refreshPos();
+    }));
     flowRow.classList.toggle('is-off', (this.tp.textWrap ?? 'Square') !== 'Square');
     dep.appendChild(flowRow);
+    dep.appendChild(this.posPreview());
 
     dep.appendChild(this.composeRow('가로', 'arrows-horizontal',
       H_REL, this.tp.horzRelTo ?? 'Column', (v) => this.patchTable({ horzRelTo: v }),
@@ -148,7 +158,7 @@ export class TablePanelSections {
 
   /** 표 바깥 여백 */
   private buildOuterMargin(): void {
-    this.host.appendChild(this.quad({
+    this.host.appendChild(this.quad('outer', {
       Top: toMm(this.tp.outerTop), Bottom: toMm(this.tp.outerBottom),
       Left: toMm(this.tp.outerLeft), Right: toMm(this.tp.outerRight),
     }, (side, v) => this.patchTable({ [`outer${side}`]: fromMm(v) } as Partial<TableProperties>)));
@@ -216,7 +226,7 @@ export class TablePanelSections {
 
   private buildCellPadding(): void {
     const apply = this.cp.applyInnerMargin ?? false;
-    const box = this.quad({
+    const box = this.quad('inner', {
       Top: toMm(this.cp.paddingTop), Bottom: toMm(this.cp.paddingBottom),
       Left: toMm(this.cp.paddingLeft), Right: toMm(this.cp.paddingRight),
     }, (side, v) => this.patchCell({
@@ -335,24 +345,134 @@ export class TablePanelSections {
     return row;
   }
 
-  /** 상·하·좌·우를 네모 둘레에 배치한 여백 상자 */
+  /**
+   * 여백 무대 — 점선 여백 영역 안에 표(또는 셀 내용)를 두고, 네 변에 ± 알약 스테퍼를
+   * 띄운다. 숫자 넷만 나열하면 어느 값이 어디에 붙는지 매번 읽어야 한다.
+   * `연동`을 켜면 네 값을 함께 움직인다.
+   */
   private quad(
+    kind: 'outer' | 'inner',
     values: Record<'Top' | 'Bottom' | 'Left' | 'Right', string>,
     onChange: (side: 'Top' | 'Bottom' | 'Left' | 'Right', v: string) => void,
   ): HTMLElement {
-    const box = mkEl('div', 'tps-quad');
+    const card = mkEl('div', 'tps-stage');
+    const head = mkEl('div', 'tps-stage-head');
+    const link = mkButton('tps-link', { title: '네 값을 함께 움직입니다' });
+    link.innerHTML = '<i class="ph-duotone ph-link"></i>연동';
+    let linked = false;
+    link.addEventListener('click', () => {
+      linked = !linked;
+      link.classList.toggle('is-on', linked);
+    });
+    head.append(mkEl('span', 'tps-stage-tag', kind === 'outer' ? '바깥 여백' : '안 여백'), link);
+
+    const stage = mkEl('div', 'tps-stage-body');
+    const region = mkEl('div', 'tps-stage-region');
+    region.appendChild(mkEl('div', `tps-stage-obj is-${kind}`, kind === 'outer' ? '표' : '셀 내용'));
+    stage.appendChild(region);
+
+    const fields: Partial<Record<string, HTMLInputElement>> = {};
     for (const [side, label] of QUAD_SIDES) {
-      const cell = mkEl('label', `tps-quad-${side.toLowerCase()}`);
-      const input = mkEl('input', 'tps-input tps-input-sm');
-      input.type = 'number';
-      input.step = '0.1';
+      const pill = mkEl('div', `tps-pill tps-pill-${side.toLowerCase()}`);
+      pill.title = `${label} 여백`;
+      const input = mkEl('input', 'tps-pill-val');
+      input.type = 'text';
+      input.inputMode = 'decimal';
       input.value = values[side];
-      input.addEventListener('change', () => onChange(side, input.value));
-      cell.append(mkEl('span', 'tps-quad-label', label), input);
-      box.appendChild(cell);
+      fields[side] = input;
+      const commit = (v: number) => {
+        const next = Math.max(0, Math.round(v * 100) / 100).toFixed(2);
+        if (linked) {
+          for (const [s] of QUAD_SIDES) { fields[s]!.value = next; onChange(s, next); }
+        } else {
+          input.value = next;
+          onChange(side, next);
+        }
+      };
+      const step = (d: number) => mkButton('tps-pill-btn', { html: `<i class="ph-bold ph-${d > 0 ? 'plus' : 'minus'}"></i>` });
+      const dec = step(-1); const inc = step(1);
+      dec.addEventListener('click', () => commit((parseFloat(input.value) || 0) - 0.1));
+      inc.addEventListener('click', () => commit((parseFloat(input.value) || 0) + 0.1));
+      input.addEventListener('change', () => commit(parseFloat(input.value) || 0));
+      pill.append(dec, input, inc);
+      stage.appendChild(pill);
     }
-    box.appendChild(mkEl('span', 'tps-quad-mid'));
-    return box;
+    card.append(head, stage);
+    return card;
+  }
+
+  /**
+   * 배치 미리보기 — 글과 표가 어떻게 놓이는지 그림 하나로. 이름(어울림·자리 차지)만으론
+   * 결과가 안 그려져 매번 눌러 보고 되돌리게 된다.
+   */
+  private posPreview(): HTMLElement {
+    const wrap = mkEl('div', 'tps-pos');
+    const head = mkEl('div', 'tps-pos-head');
+    head.innerHTML = '<i class="ph-duotone ph-eye"></i>미리보기';
+    const stage = mkEl('div', 'tps-pos-stage');
+    const caption = mkEl('p', 'tps-pos-cap');
+    wrap.append(head, stage, caption);
+    this.paintPos(stage, caption);
+    this.posStage = stage;
+    this.posCaption = caption;
+    return wrap;
+  }
+
+  /** posPreview 의 그림을 현재 배치 값으로 다시 그린다 */
+  private paintPos(stage: HTMLElement, caption: HTMLElement): void {
+    stage.innerHTML = '';
+    const tac = this.tp.treatAsChar ?? false;
+    const wrapKind = this.tp.textWrap ?? 'Square';
+    const flow = this.tp.textFlow ?? 'BothSides';
+    const rows = [18, 31, 44, 57, 70, 83, 96];
+    const line = (x: number, y: number, w: number, faint = false) => {
+      const el = mkEl('i', `tps-pos-line${faint ? ' is-faint' : ''}`);
+      el.style.cssText += `left:${x}px;top:${y}px;width:${w}px`;
+      stage.appendChild(el);
+    };
+    const tbl = (x: number, y: number, w: number, h: number, back = false) => {
+      const el = mkEl('div', `tps-pos-tbl${back ? ' is-back' : ''}`, '표');
+      el.style.cssText += `left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+      stage.appendChild(el);
+    };
+    let text: string;
+    if (tac) {
+      rows.forEach((y, i) => { if (i !== 3) line(18, y, i % 2 ? 122 : 136); });
+      line(18, rows[3], 40);
+      tbl(62, rows[3] - 5, 34, 15);
+      text = '글자처럼 취급 — 표가 글자처럼 줄 안에 흐릅니다';
+    } else if (wrapKind === 'TopAndBottom') {
+      line(18, rows[0], 136); line(18, rows[1], 120);
+      tbl(18, 42, 136, 40);
+      line(18, rows[5], 136); line(18, rows[6], 104);
+      text = '자리 차지 — 표가 줄 전체를 차지하고 글은 위·아래로만 흐릅니다';
+    } else if (wrapKind === 'BehindText' || wrapKind === 'InFrontOfText') {
+      const back = wrapKind === 'BehindText';
+      if (back) tbl(50, 40, 72, 42, true);
+      rows.forEach((y, i) => line(18, y, i % 2 ? 122 : 136, !back));
+      if (!back) tbl(50, 40, 72, 42);
+      text = back ? '글 뒤로 — 표가 글 아래 깔립니다' : '글 앞으로 — 표가 글 위를 덮습니다';
+    } else {
+      line(18, rows[0], 136); line(18, rows[1], 120);
+      const band = [rows[2], rows[3], rows[4]];
+      if (flow === 'LeftOnly') { band.forEach((y) => line(18, y, 78)); tbl(104, 40, 50, 42); }
+      else if (flow === 'RightOnly') { tbl(18, 40, 50, 42); band.forEach((y) => line(78, y, 76)); }
+      else if (flow === 'BothSides') { band.forEach((y) => { line(18, y, 44); line(112, y, 42); }); tbl(68, 40, 38, 42); }
+      else { band.forEach((y) => { line(18, y, 22, true); line(72, y, 82); }); tbl(18, 40, 46, 42); }
+      line(18, rows[5], 136); line(18, rows[6], 104);
+      text = {
+        BothSides: '어울림 · 양쪽 — 글이 표 좌우 양쪽으로 흐릅니다',
+        LeftOnly: '어울림 · 왼쪽 — 글이 표 왼쪽에만 흐릅니다',
+        RightOnly: '어울림 · 오른쪽 — 글이 표 오른쪽에만 흐릅니다',
+        LargestOnly: '어울림 · 큰 쪽 — 넓은 쪽에만 글이 흐릅니다 (좁은 쪽은 비움)',
+      }[flow] ?? '어울림 — 글이 표 옆으로 흐릅니다';
+    }
+    caption.textContent = text;
+  }
+
+  /** 배치 값이 바뀌면 미리보기를 다시 그린다 */
+  private refreshPos(): void {
+    if (this.posStage && this.posCaption) this.paintPos(this.posStage, this.posCaption);
   }
 
   /** 쪽 경계 카드 그림 — 쪽 두 장에 표가 걸친 모습 */

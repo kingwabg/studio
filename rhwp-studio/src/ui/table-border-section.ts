@@ -144,34 +144,67 @@ export class TableBorderSection {
     return grid;
   }
 
-  private buildStyleBar(): HTMLElement {
-    const bar = mkEl('div', 'tbs-style');
-
-    const typeSel = mkEl('select', 'tbs-select');
-    for (const [name, type] of LINE_DEFS) {
-      const o = mkEl('option', '', name);
-      o.value = String(type);
-      typeSel.appendChild(o);
+  /** 선 종류 한 줄 샘플 SVG — 이름만 보는 드롭다운으로는 파선·점선을 못 고른다 */
+  private lineSample(type: number, w = 60): string {
+    const dash = LINE_DEFS.find(([, t]) => t === type)?.[2] ?? '';
+    if (type === 0) return '<span class="tbs-none">선 없음</span>';
+    if (dash === 'double') {
+      return `<svg viewBox="0 0 ${w} 8" preserveAspectRatio="none"><line x1="0" y1="2" x2="${w}" y2="2" stroke="currentColor" stroke-width="1"/>`
+        + `<line x1="0" y1="6" x2="${w}" y2="6" stroke="currentColor" stroke-width="1"/></svg>`;
     }
-    typeSel.value = String(this.lineType);
-    typeSel.addEventListener('change', () => {
-      this.lineType = parseInt(typeSel.value, 10);
-      this.onStyleChanged();
-    });
+    return `<svg viewBox="0 0 ${w} 6" preserveAspectRatio="none"><line x1="0" y1="3" x2="${w}" y2="3"`
+      + ` stroke="currentColor" stroke-width="1.5"${dash ? ` stroke-dasharray="${dash}"` : ''}/></svg>`;
+  }
 
-    const wSel = mkEl('select', 'tbs-select');
-    LINE_WEIGHTS.forEach((w, i) => {
-      const o = mkEl('option', '', `${w}mm`);
-      o.value = String(i);
-      wSel.appendChild(o);
-    });
-    wSel.value = String(this.weightIdx);
-    wSel.addEventListener('change', () => {
-      this.weightIdx = parseInt(wSel.value, 10);
-      this.onStyleChanged();
-    });
+  /** 펜촉 카드 — 선 종류·굵기 팝오버 + 색 스와치 (디자인 2c) */
+  private buildStyleBar(): HTMLElement {
+    const card = mkEl('div', 'tbs-pen');
+    card.appendChild(mkEl('i', 'ph-duotone ph-pen-nib tbs-pen-icon'));
 
-    bar.append(typeSel, wSel);
+    const typeName = () => LINE_DEFS.find(([, t]) => t === this.lineType)?.[0] ?? '실선';
+    const typeBtn = mkButton('tbs-pick tbs-pick-type');
+    const paintType = () => {
+      typeBtn.innerHTML = `<span class="tbs-pick-art">${this.lineSample(this.lineType, 44)}</span>`
+        + `<span class="tbs-pick-name">${typeName()}</span><i class="ph ph-caret-down"></i>`;
+    };
+    paintType();
+    const typePop = mkEl('div', 'tbs-pop tbs-pop-type');
+    for (const [name, type] of LINE_DEFS) {
+      const it = mkButton('tbs-pop-item');
+      it.classList.toggle('is-on', type === this.lineType);
+      it.innerHTML = `<span class="tbs-pop-art">${this.lineSample(type)}</span><span>${name}</span>`;
+      it.addEventListener('click', () => {
+        this.lineType = type;
+        paintType();
+        typePop.querySelectorAll('.tbs-pop-item').forEach((e) => e.classList.remove('is-on'));
+        it.classList.add('is-on');
+        this.onStyleChanged();
+      });
+      typePop.appendChild(it);
+    }
+    card.appendChild(this.popover(typeBtn, typePop));
+
+    const wBtn = mkButton('tbs-pick tbs-pick-w');
+    const paintW = () => { wBtn.innerHTML = `<span>${LINE_WEIGHTS[this.weightIdx]}mm</span><i class="ph ph-caret-down"></i>`; };
+    paintW();
+    const wPop = mkEl('div', 'tbs-pop tbs-pop-w');
+    LINE_WEIGHTS.forEach((mm, i) => {
+      const it = mkButton('tbs-pop-item');
+      it.classList.toggle('is-on', i === this.weightIdx);
+      // 막대 두께가 곧 그 굵기 — 숫자만으론 0.12 와 0.15 를 구별할 수 없다
+      it.innerHTML = `<u class="tbs-pop-bar" style="height:${Math.max(1, parseFloat(mm) * 6)}px"></u><span>${mm}mm</span>`;
+      it.addEventListener('click', () => {
+        this.weightIdx = i;
+        paintW();
+        wPop.querySelectorAll('.tbs-pop-item').forEach((e) => e.classList.remove('is-on'));
+        it.classList.add('is-on');
+        this.onStyleChanged();
+      });
+      wPop.appendChild(it);
+    });
+    card.appendChild(this.popover(wBtn, wPop));
+
+    card.appendChild(mkEl('span', 'tbs-pen-sep'));
 
     const inks = mkEl('div', 'tbs-swatches');
     for (const c of INK) {
@@ -186,8 +219,30 @@ export class TableBorderSection {
       });
       inks.appendChild(s);
     }
-    const wrap = mkEl('div', 'tbs-style-wrap');
-    wrap.append(bar, inks);
+    card.appendChild(inks);
+    return card;
+  }
+
+  /** 버튼 + 팝오버 묶음. 바깥을 누르면 닫힌다(리스너는 한 번 쓰고 스스로 사라진다). */
+  private popover(btn: HTMLElement, pop: HTMLElement): HTMLElement {
+    const wrap = mkEl('div', 'tbs-pop-wrap');
+    wrap.append(btn, pop);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = wrap.classList.toggle('is-open');
+      // 다른 팝오버는 닫는다
+      for (const w of Array.from(wrap.parentElement?.querySelectorAll('.tbs-pop-wrap') ?? [])) {
+        if (w !== wrap) w.classList.remove('is-open');
+      }
+      if (open) {
+        setTimeout(() => document.addEventListener('pointerdown', function close(ev) {
+          if (wrap.contains(ev.target as Node)) return;
+          wrap.classList.remove('is-open');
+          document.removeEventListener('pointerdown', close);
+        }), 0);
+      }
+    });
+    pop.addEventListener('click', () => wrap.classList.remove('is-open'));
     return wrap;
   }
 

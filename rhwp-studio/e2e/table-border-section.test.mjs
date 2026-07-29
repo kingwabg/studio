@@ -28,9 +28,12 @@ runTest('테두리·배경 섹션 — 안쪽/바깥 프리셋이 정확한 변�
     sec.mount(host, w, { getInputHandler: () => ih }, ctx, 0, 'table');
 
     const cardOf = (label) => [...host.querySelectorAll('.tbs-preset')].find((b) => b.title === label);
-    const sels = host.querySelectorAll('.tbs-select');
-    sels[0].value = '2';                                  // 파선
-    sels[0].dispatchEvent(new Event('change'));
+    // 선 종류는 샘플 팝오버로 고른다
+    const pickType = (name) => {
+      host.querySelector('.tbs-pick-type').click();
+      [...host.querySelectorAll('.tbs-pop-type .tbs-pop-item')].find((i) => i.textContent.trim().endsWith(name)).click();
+    };
+    pickType('파선');
     cardOf('안쪽').click();
 
     const cp = (i) => w.getCellProperties(0, ctx.ppi, ctx.ci, i);
@@ -45,14 +48,30 @@ runTest('테두리·배경 섹션 — 안쪽/바깥 프리셋이 정확한 변�
     };
 
     // 이어서 '바깥' — 이번엔 가장자리만 바뀌어야 한다
-    sels[0].value = '3';                                  // 점선
-    sels[0].dispatchEvent(new Event('change'));
+    pickType('점선');
     cardOf('바깥').click();
     const corner2 = cp(0);
     const center2 = cp(4);
     out.outerCornerTop = t(corner2.borderTop);
     out.outerCornerLeft = t(corner2.borderLeft);
     out.outerCenter = [t(center2.borderTop), t(center2.borderRight), t(center2.borderBottom), t(center2.borderLeft)];
+
+    // 선 종류·굵기는 이름 드롭다운이 아니라 **샘플 팝오버**여야 한다(디자인 2c) —
+    // 파선·점선은 이름만으론 못 고른다.
+    out.typeItems = host.querySelectorAll('.tbs-pop-type .tbs-pop-item').length;
+    out.wItems = host.querySelectorAll('.tbs-pop-w .tbs-pop-item').length;
+    out.samples = host.querySelectorAll('.tbs-pop-art svg').length;
+    host.querySelector('.tbs-pick-type').click();
+    out.opened = host.querySelector('.tbs-pop-wrap').classList.contains('is-open');
+    [...host.querySelectorAll('.tbs-pop-type .tbs-pop-item')]
+      .find((i) => i.textContent.includes('파선') && !i.textContent.includes('긴')).click();
+    out.closedAfterPick = !host.querySelector('.tbs-pop-wrap').classList.contains('is-open');
+    host.querySelector('.tbs-pick-w').click();
+    [...host.querySelectorAll('.tbs-pop-w .tbs-pop-item')].find((i) => i.textContent === '0.3mm').click();
+    out.picked = [host.querySelector('.tbs-pick-name').textContent, host.querySelector('.tbs-pick-w span').textContent];
+    cardOf('모두').click();
+    const mid = cp(4);
+    out.pickApplied = { type: mid.borderTop.type, width: mid.borderTop.width };
 
     host.remove();
     return out;
@@ -70,6 +89,15 @@ runTest('테두리·배경 섹션 — 안쪽/바깥 프리셋이 정확한 변�
   assert.strictEqual(r.outerCornerTop, 3, '바깥 — 모서리 셀 위는 표 바깥 변');
   assert.strictEqual(r.outerCornerLeft, 3, '바깥 — 모서리 셀 왼쪽은 표 바깥 변');
   assert.deepStrictEqual(r.outerCenter, [2, 2, 2, 2], '바깥 — 가운데 셀은 그대로(직전 안쪽 값 유지)');
+
+  // 픽커(팝오버) — 고른 값이 실제로 적용되는가
+  assert.strictEqual(r.typeItems, 8, '선 종류 8종');
+  assert.strictEqual(r.wItems, 7, '굵기 7종');
+  assert.ok(r.samples >= 7, '선 종류마다 샘플 SVG');
+  assert.ok(r.opened, '픽커를 누르면 팝오버가 열림');
+  assert.ok(r.closedAfterPick, '고르면 닫힘');
+  assert.deepStrictEqual(r.picked, ['파선', '0.3mm'], '고른 값이 버튼에 반영됨');
+  assert.deepStrictEqual(r.pickApplied, { type: 2, width: 5 }, '고른 값이 문서에 적용됨');
 
   assert.deepStrictEqual(errors, [], `페이지 오류 발생: ${JSON.stringify(errors)}`);
 });

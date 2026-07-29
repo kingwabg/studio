@@ -47,7 +47,7 @@ runTest('표/셀 패널 섹션 — 10종 렌더 + 저장 왕복', async ({ page 
 
     // 표:여백 — 바깥 위 여백 3mm
     ps.mount(host, w, services, ctx, 0, 'table', '여백');
-    const top = host.querySelector('.tps-quad-top input');
+    const top = host.querySelector('.tps-pill-top .tps-pill-val');
     top.value = '3'; top.dispatchEvent(new Event('change'));
     saved.outerTopMm = Math.round(tp().outerTop * 25.4 / 7200 * 10) / 10;
 
@@ -75,6 +75,22 @@ runTest('표/셀 패널 섹션 — 10종 렌더 + 저장 왕복', async ({ page 
     fname.value = '금액'; fname.dispatchEvent(new Event('change'));
     saved.fieldName = cp().fieldName;
 
+    // 여백 '연동' — 켜고 위쪽을 올리면 네 값이 함께 움직인다
+    ps.mount(host, w, services, ctx, 0, 'table', '여백');
+    host.querySelector('.tps-link').click();
+    host.querySelector('.tps-pill-top .tps-pill-btn').click();  // 위쪽 −0.1
+    const mm = (hu) => Math.round((hu ?? 0) * 25.4 / 7200 * 100) / 100;
+    saved.linked = [mm(tp().outerTop), mm(tp().outerLeft), mm(tp().outerRight), mm(tp().outerBottom)];
+
+    // 배치 미리보기 — '자리 차지' 를 고르면 그림과 설명이 함께 바뀐다
+    ps.mount(host, w, services, ctx, 0, 'table', '위치');
+    const capBefore = host.querySelector('.tps-pos-cap').textContent;
+    // 지금 선택된 것과 다른 배치를 골라야 '바뀌는지'를 볼 수 있다
+    const cur = host.querySelector('.tps-seg-btn.is-on')?.textContent;
+    [...host.querySelectorAll('.tps-seg-btn')].find((b) => b.textContent === (cur === '글 앞으로' ? '어울림' : '글 앞으로')).click();
+    saved.pos = { before: capBefore, after: host.querySelector('.tps-pos-cap').textContent,
+                  pieces: host.querySelectorAll('.tps-pos-stage > *').length };
+
     // 모르는 섹션은 false 로 폴백을 알려야 한다
     const unknown = ps.mount(host, w, services, ctx, 0, 'table', '테두리·배경');
 
@@ -95,6 +111,10 @@ runTest('표/셀 패널 섹션 — 10종 렌더 + 저장 왕복', async ({ page 
   assert.strictEqual(r.saved.verticalAlign, 2, '세로 정렬 아래쪽 저장');
   assert.strictEqual(r.saved.isHeader.got, r.saved.isHeader.want, '제목 셀 저장');
   assert.strictEqual(r.saved.fieldName, '금액', '필드 이름 저장');
+  assert.strictEqual(new Set(r.saved.linked).size, 1, `연동 — 네 값이 같아야 함: ${r.saved.linked}`);
+  assert.ok(r.saved.pos.after.length > 0, '배치 미리보기 설명이 있음');
+  assert.notStrictEqual(r.saved.pos.after, r.saved.pos.before, '배치를 바꾸면 미리보기도 바뀜');
+  assert.ok(r.saved.pos.pieces > 3, '미리보기에 글줄·표가 그려짐');
   assert.strictEqual(r.unknown, false, '테두리·배경은 이 모듈이 맡지 않는다(폴백 신호)');
 
   assert.deepStrictEqual(errors, [], `페이지 오류 발생: ${JSON.stringify(errors)}`);

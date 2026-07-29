@@ -723,17 +723,50 @@
 .tbs-preset-label { font-size: 9px; color: var(--color-text-muted); }
 .tbs-preset.is-on .tbs-preset-label { color: var(--color-primary); }
 
-.tbs-style-wrap {
-  display: flex; flex-direction: column; gap: 8px;
+/* 펜촉 카드 — 선 종류/굵기 팝오버 + 색 (디자인 2c) */
+.tbs-pen {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 4px;
   background: var(--color-surface);
 }
-.tbs-style { display: flex; gap: 6px; }
-.tbs-select {
-  flex: 1; min-width: 0; height: 28px; padding: 0 6px; font-size: 11.5px;
+.tbs-pen-icon { font-size: 16px; color: var(--color-primary); }
+.tbs-pen-sep { width: 1px; height: 18px; background: var(--color-border); }
+
+.tbs-pop-wrap { position: relative; }
+.tbs-pick {
+  height: 28px; display: inline-flex; align-items: center; gap: 8px; padding: 0 9px;
   border: 1px solid var(--color-border); border-radius: 3px;
   background: var(--color-surface-raised); color: var(--color-text);
+  font: inherit; font-size: 12px; cursor: pointer;
 }
+.tbs-pick:hover { border-color: var(--color-primary); }
+.tbs-pick-type { width: 148px; }
+.tbs-pick-w { width: 86px; justify-content: space-between; }
+.tbs-pick-art { width: 44px; flex: none; display: flex; align-items: center; }
+.tbs-pick-art svg { width: 44px; height: 6px; display: block; }
+.tbs-pick-name { flex: 1; text-align: left; white-space: nowrap; }
+.tbs-pick > .ph-caret-down { font-size: 10px; color: var(--color-text-muted); }
+
+.tbs-pop {
+  display: none; position: absolute; top: 32px; left: 0; z-index: 9;
+  min-width: 128px; padding: 4px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border); border-radius: 3px;
+  box-shadow: 0 8px 24px rgba(32, 30, 29, .16);
+}
+.tbs-pop-wrap.is-open .tbs-pop { display: block; }
+.tbs-pop-type { width: 186px; }
+.tbs-pop-item {
+  width: 100%; height: 30px; display: flex; align-items: center; gap: 10px;
+  padding: 0 8px; border: 0; border-radius: 3px; background: transparent;
+  color: var(--color-text); font: inherit; font-size: 12px; cursor: pointer; text-align: left;
+}
+.tbs-pop-item:hover { background: var(--color-accent-bg); }
+.tbs-pop-item.is-on { background: var(--color-accent-bg); color: var(--color-primary); }
+.tbs-pop-art { width: 60px; flex: none; display: flex; align-items: center; }
+.tbs-pop-art svg { width: 60px; display: block; }
+.tbs-pop-bar { width: 26px; flex: none; border-radius: 1px; background: currentColor; }
+.tbs-none { font-size: 10.5px; color: var(--color-text-muted); }
 
 .tbs-swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .tbs-swatch {
@@ -743,9 +776,9 @@
 .tbs-swatch.is-on { box-shadow: inset 0 0 0 1px rgba(32, 30, 29, .12), 0 0 0 2px var(--color-surface-raised), 0 0 0 4px var(--color-primary); }
 .tbs-color-more { width: 22px; height: 22px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; background: none; }
 
-.tbs-preview-wrap { display: flex; align-items: center; gap: 10px; }
+.tbs-preview-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
 .tbs-preview {
-  width: 92px; height: 66px; flex: none; box-sizing: border-box;
+  width: 100%; max-width: 196px; height: 116px; flex: none; box-sizing: border-box;
   background: var(--doc-paper, #fff);
   display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
 }
@@ -845,24 +878,75 @@
 .tps-compose { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .tps-compose .tps-label { min-width: 40px; }
 
-/* 여백 상자 — 네모 둘레에 상·좌·우·하 */
-.tps-quad {
-  display: grid; gap: 5px; justify-items: center; align-items: center;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-areas: '.  top   .' 'left mid right' '.  bottom .';
-  padding: 8px; border: 1px solid var(--color-border); border-radius: 4px;
-  background: var(--color-surface);
+/* 여백 무대 — 점선 여백 영역 + 표/셀 내용 + 사면 알약 스테퍼 (디자인 2c) */
+.tps-stage { padding: 11px 12px 12px; border-radius: 10px; background: var(--color-surface); }
+.tps-stage-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.tps-stage-tag { font-size: 10.5px; letter-spacing: .06em; color: var(--color-text-muted); }
+.tps-link {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px;
+  border: 1px solid var(--color-border); border-radius: 100px;
+  background: var(--color-surface-raised); color: var(--color-text);
+  font: inherit; font-size: 11px; cursor: pointer;
 }
-.tps-quad-top { grid-area: top; }
-.tps-quad-left { grid-area: left; }
-.tps-quad-right { grid-area: right; }
-.tps-quad-bottom { grid-area: bottom; }
-.tps-quad > label { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.tps-quad-label { font-size: 10px; color: var(--color-text-muted); }
-.tps-quad-mid {
-  grid-area: mid; width: 34px; height: 26px;
-  border: 1.5px solid var(--color-text-muted); border-radius: 2px;
+.tps-link:hover { border-color: var(--color-primary); }
+.tps-link.is-on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+.tps-stage-body { position: relative; width: 100%; height: 148px; }
+.tps-stage-region {
+  position: absolute; left: 52px; right: 52px; top: 32px; bottom: 32px;
+  border-radius: 10px; border: 1px dashed rgba(214, 0, 108, .45); background: rgba(214, 0, 108, .07);
 }
+.tps-stage-obj {
+  position: absolute; inset: 11px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 600;
+}
+.tps-stage-obj.is-outer { background: var(--color-primary); color: #fff; }
+.tps-stage-obj.is-inner {
+  background: var(--color-surface-raised); color: var(--color-text-muted); font-weight: 400;
+  box-shadow: inset 0 0 0 1.5px var(--color-primary);
+}
+
+.tps-pill {
+  position: absolute; display: flex; align-items: center; gap: 1px;
+  height: 26px; padding: 0 3px; border-radius: 100px;
+  background: var(--color-surface-raised); box-shadow: 0 1px 3px rgba(32, 30, 29, .12);
+}
+.tps-pill-top { left: 50%; top: 0; transform: translateX(-50%); }
+.tps-pill-bottom { left: 50%; bottom: 0; transform: translateX(-50%); }
+.tps-pill-left { left: 0; top: 50%; transform: translateY(-50%); }
+.tps-pill-right { right: 0; top: 50%; transform: translateY(-50%); }
+.tps-pill-btn {
+  width: 22px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 100px; background: transparent;
+  color: var(--color-text-muted); cursor: pointer; padding: 0;
+}
+.tps-pill-btn:hover { background: var(--color-accent-bg); color: var(--color-primary); }
+.tps-pill-btn i { font-size: 10px; }
+.tps-pill-val {
+  width: 38px; height: 20px; padding: 0; border: 0; background: transparent;
+  text-align: center; font: inherit; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--color-text);
+}
+.tps-pill-val:focus { outline: none; background: var(--color-accent-bg); border-radius: 3px; }
+
+/* 배치 미리보기 — 글줄과 표를 그려 결과를 보여준다 */
+.tps-pos { display: flex; flex-direction: column; gap: 6px; }
+.tps-pos-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--color-text); }
+.tps-pos-head > i { font-size: 14px; color: var(--color-primary); }
+.tps-pos-stage {
+  position: relative; width: 172px; height: 114px;
+  border: 1px solid var(--color-border); border-radius: 4px; background: var(--doc-paper, #fff);
+}
+.tps-pos-line { position: absolute; height: 5px; border-radius: 2px; background: var(--color-border); }
+.tps-pos-line.is-faint { opacity: .45; }
+.tps-pos-tbl {
+  position: absolute; border-radius: 2px; background: var(--color-primary); color: #fff;
+  font-size: 10px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(32, 30, 29, .24);
+}
+.tps-pos-tbl.is-back { background: #bfe3ee; color: var(--color-text); box-shadow: none; }
+.tps-pos-cap { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--color-text); font-weight: 600; }
 
 /* 쪽 넘김 카드 */
 .tps-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
