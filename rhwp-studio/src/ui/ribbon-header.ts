@@ -46,13 +46,17 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('text-b', '굵게', 'format:bold'),
       P('text-italic', '기울임', 'format:italic'),
       P('text-underline', '밑줄', 'format:underline'),
+      P('text-strikethrough', '취소선', 'format:strikethrough'),
       // 디자인 2a 홈 리본은 글자 색·형광펜을 여기 둔다. 전용 색 명령이 없어(패널의
       // 스와치는 format-char 이벤트를 직접 쏜다) 색 설정이 있는 글자 모양으로 보낸다.
       P('palette', '글자 색', 'format:char-shape'),
       P('highlighter', '형광펜', 'format:char-shape'),
       gap(),
+      // 정렬 4종은 한컴·워드와 같은 순서(왼쪽·가운데·오른쪽·양쪽)로 나란히 둔다 —
+      // '오른쪽 정렬'만 「⋯」에 숨어 있어 정렬을 고르는 손이 두 곳으로 갈렸다(2026-07-30).
       P('text-align-left', '왼쪽 정렬', 'format:align-left'),
       P('text-align-center', '가운데 정렬', 'format:align-center'),
+      P('text-align-right', '오른쪽 정렬', 'format:align-right'),
       P('text-align-justify', '양쪽 정렬', 'format:align-justify'),
       P('arrows-vertical', '줄 간격', 'format:line-spacing'),
       gap(),
@@ -61,11 +65,10 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('text-indent', '한 수준 증가', 'format:level-increase'),
       P('text-outdent', '한 수준 감소', 'format:level-decrease'),
       gap(),
-      { kind: 'expander', label: '자세히', cmd: 'format:char-shape' },
-      O('text-align-right', '오른쪽 정렬', 'Alt+Shift+H', 'format:align-right'),
-      O('paragraph', '문단 모양', '', 'format:para-shape'),
-      O('text-aa', '글자 모양', '', 'format:char-shape'),
-      O('text-strikethrough', '취소선', '', 'format:strikethrough'),
+      // 「⋯」에 있던 두 대화상자를 꺼내 놓는다. 옛 '자세히' 확장 버튼은 글자 모양과
+      // 같은 명령이라 중복 — 버튼으로 대체하고 홈의 오버플로는 비운다(⋯ 자동 소멸).
+      P('text-aa', '글자 모양', 'format:char-shape'),
+      P('paragraph', '문단 모양', 'format:para-shape'),
     ],
   },
   {

@@ -45,9 +45,26 @@ runTest('리본 헤더 — 2행 88px·탭 전환·명령 배선', async ({ page 
 
   const home = await page.evaluate(() => {
     [...document.querySelectorAll('.rb-tab')].find(b => b.textContent === '홈')?.click();
-    return [...document.querySelectorAll('.rb-btn[data-cmd], .rb-over-item[data-cmd]')].map(b => b.dataset.cmd);
+    return {
+      cmds: [...document.querySelectorAll('.rb-btn[data-cmd], .rb-over-item[data-cmd]')].map(b => b.dataset.cmd),
+      // 「⋯」은 오버플로 항목이 있을 때만 그려진다 — 홈은 전부 리본에 꺼냈으므로 없어야 한다
+      hasMore: !!document.querySelector('.rb-more'),
+      hasExpander: !!document.querySelector('.rb-expander'),
+      aligns: [...document.querySelectorAll('.rb-btn[data-cmd^="format:align-"]')].map(b => b.dataset.cmd),
+    };
   });
-  for (const c of MOVED) assert.ok(!home.includes(c), `홈에는 ${c} 가 남아 있으면 안 됨`);
+  console.log('  홈탭:', JSON.stringify(home));
+  for (const c of MOVED) assert.ok(!home.cmds.includes(c), `홈에는 ${c} 가 남아 있으면 안 됨`);
+
+  // [2026-07-30] 「⋯」에 숨어 있던 4종을 리본으로 꺼냈다
+  for (const c of ['format:align-right', 'format:strikethrough', 'format:char-shape', 'format:para-shape']) {
+    assert.ok(home.cmds.includes(c), `홈 리본에 ${c}`);
+  }
+  assert.deepStrictEqual(home.aligns,
+    ['format:align-left', 'format:align-center', 'format:align-right', 'format:align-justify'],
+    '정렬 4종이 왼쪽·가운데·오른쪽·양쪽 순서로 나란히');
+  assert.ok(!home.hasMore, '홈의 「⋯」은 비었으므로 사라져야 함');
+  assert.ok(!home.hasExpander, "옛 '자세히' 확장 버튼은 글자 모양 버튼으로 대체됨");
   await screenshot(page, 'ribbon-header');
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);
 });
