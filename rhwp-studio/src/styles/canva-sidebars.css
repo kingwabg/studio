@@ -30,8 +30,9 @@
   border-right: 1px solid var(--ui-border);
 }
 .canva-rail--right {
-  /* [디자인 2c] 284px */
+  /* [디자인 2c 갱신 2026-07-29] 가변 폭 — 왼쪽 가장자리 드래그. 284px 는 기본값. */
   width: 284px;
+  position: relative;
   border-left: 1px solid var(--ui-border);
 }
 /* 레일 본문 컨테이너 — 인라인 display 대신 클래스로 둬야 접힘 시 display:none이 이긴다 */
@@ -667,3 +668,30 @@
   background: var(--color-accent-bg); color: var(--color-primary);
   font-size: 11px; font-weight: 600;
 }
+
+/* 가변 폭 손잡이 — 우측 패널 왼쪽 가장자리 (디자인 2c 갱신) */
+.canva-rail-grip {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 8px;
+  cursor: col-resize; z-index: 5;
+}
+.canva-rail-grip::after {
+  content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px;
+  background: transparent; border-radius: 2px;
+}
+.canva-rail-grip:hover::after { background: var(--color-primary); }
+.canva-rail.is-collapsed .canva-rail-grip { display: none; }
+
+/* 표/셀 탭의 섹션 스트립 — 대화상자 탭을 패널 안 아이콘 줄로 */
+.canva-sec-strip {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding-bottom: 10px; margin-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+.canva-sec-btn {
+  flex: 0 0 auto; min-width: 46px; height: 44px; padding: 0 7px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border: 0; border-radius: 4px; background: transparent;
+  color: var(--color-text); font: inherit; font-size: 10.5px; cursor: pointer;
+}
+.canva-sec-btn > i { font-size: 17px; }
+.canva-sec-btn:hover { background: var(--color-accent-bg); color: var(--color-primary); }

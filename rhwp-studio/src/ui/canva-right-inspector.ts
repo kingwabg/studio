@@ -35,6 +35,7 @@ function svg(inner: string): string {
 
 export class CanvaRightInspector {
   private ctx: Ctx = 'none';
+  private panelTab: 'props' | 'table' | 'cell' = 'props';
   private painted = false;
   /** [캔버스 한컴 포크] 그림 컨텍스트 내 다중 선택 여부 — 단일↔다중 전환 시 정렬 섹션 재렌더 */
   private lastMulti = false;
@@ -43,6 +44,7 @@ export class CanvaRightInspector {
   private fmtPane!: HTMLElement;
   private emptyEl!: HTMLElement;
   private extrasHost!: HTMLElement;
+  private tabPane!: HTMLElement;
   private biu: Record<'bold' | 'italic' | 'underline' | 'strike', HTMLButtonElement> = {} as any;
   private fontNameBtn!: HTMLButtonElement;
   private lineSpacingBtn!: HTMLButtonElement;
@@ -192,6 +194,11 @@ export class CanvaRightInspector {
     this.extrasHost = mkEl('div', 'canva-pane');
     this.fmtPane.appendChild(this.extrasHost);
 
+    // [디자인 2c 갱신] 표·셀 탭 전용 영역 — fmtPane 을 숨겨도 살아 있어야 하므로 형제로 둔다
+    this.tabPane = mkEl('div', 'canva-pane');
+    this.tabPane.hidden = true;
+    pane.appendChild(this.tabPane);
+
     pane.appendChild(this.fmtPane);
     this.root.appendChild(pane);
   }
@@ -306,6 +313,34 @@ export class CanvaRightInspector {
     return '';
   }
 
+  /** 패널 탭 — 디자인 2c 갱신: 속성 · 표 · 셀 */
+  setPanelTab(tab: 'props' | 'table' | 'cell'): void {
+    this.panelTab = tab;
+    this.applyContext();
+  }
+
+  /** 표/셀 탭의 섹션 스트립 — 대화상자 탭을 패널 안 아이콘 줄로 (디자인 2c 갱신) */
+  private buildSectionStrip(kind: 'table' | 'cell'): HTMLElement {
+    const SECTIONS: Record<string, Array<[string, string]>> = {
+      table: [['위치', 'crosshair-simple'], ['크기', 'arrows-out-cardinal'], ['여백', 'square-half'],
+              ['쪽 넘김', 'files'], ['테두리·배경', 'square'], ['캡션', 'subtitles']],
+      cell: [['크기', 'arrows-out-cardinal'], ['여백', 'square-half'], ['정렬', 'align-center-vertical'],
+             ['속성', 'sliders-horizontal'], ['테두리·배경', 'square'], ['필드', 'textbox']],
+    };
+    const strip = mkEl('div', 'canva-sec-strip');
+    for (const [label, icon] of SECTIONS[kind]) {
+      const b = mkButton('canva-sec-btn', { title: label });
+      b.innerHTML = `<i class="ph-duotone ph-${icon}"></i><span>${label}</span>`;
+      b.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        // 세부 편집은 표/셀 속성 대화상자가 정본 — 해당 탭으로 연다
+        this.services.dispatcher.dispatch('table:cell-props');
+      });
+      strip.appendChild(b);
+    }
+    return strip;
+  }
+
   private applyContext(): void {
     const c = this.ctx;
     const meta: Record<Ctx, { icon: string; label: string }> = {
@@ -322,6 +357,20 @@ export class CanvaRightInspector {
       `<span class="canva-ctx-tile">${svg(meta[c].icon)}</span>` +
       `<span class="canva-ctx-text"><span class="canva-ctx-label">${meta[c].label}</span>` +
       (sub ? `<span class="canva-ctx-sub">${sub}</span>` : '') + '</span>';
+
+    // [디자인 2c 갱신] 표·셀 탭은 섹션 스트립을 보여준다. 속성 탭만 기존 서식 화면.
+    if (this.panelTab !== 'props') {
+      this.emptyEl.hidden = true;
+      this.fmtPane.hidden = true;
+      this.tabPane.hidden = false;
+      this.tabPane.innerHTML = '';
+      this.tabPane.appendChild(this.buildSectionStrip(this.panelTab));
+      this.tabPane.appendChild(mkEl('div', 'canva-hint',
+        this.panelTab === 'table' ? '표 전체에 적용되는 설정입니다.' : '선택한 셀에 적용되는 설정입니다.'));
+      return;
+    }
+    this.tabPane.hidden = true;
+    this.fmtPane.hidden = false;
 
     const showFmt = c === 'body' || c === 'cell';
     this.emptyEl.hidden = c !== 'none';

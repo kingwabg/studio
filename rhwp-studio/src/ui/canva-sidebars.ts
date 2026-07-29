@@ -47,14 +47,16 @@ export function mountCanvaSidebars(services: CanvaServices): void {
   recordPane.hidden = true;
   right.content.append(recordPane);
 
-  new CanvaRightInspector(inspectorPane, services);
+  const inspector = new CanvaRightInspector(inspectorPane, services);
   const ai = new CanvaAiPanel(aiPane, services);
   new CanvaRecordPanel(recordPane, services);
 
-  const tabs = right.setTabs(['속성', 'AI', '녹음'], (idx) => {
-    inspectorPane.hidden = idx !== 0;
-    aiPane.hidden = idx !== 1;
-    recordPane.hidden = idx !== 2;
+  // [디자인 2c 갱신] 탭 = 속성 · 표 · 셀 (AI·녹음은 명세에서 빠짐 → 속성 탭 하단으로 접근)
+  const tabs = right.setTabs(['속성', '표', '셀'], (idx) => {
+    inspectorPane.hidden = false;
+    aiPane.hidden = true;
+    recordPane.hidden = true;
+    inspector.setPanelTab(idx === 0 ? 'props' : idx === 1 ? 'table' : 'cell');
   });
   // [디자인 2c] 모델 이름 칩은 **AI 패널 안**으로 — 속성 탭에서는 쓰이지 않는 정보라
   // 탭 스트립에 상시 노출할 이유가 없다.
@@ -128,6 +130,35 @@ function buildRail(side: 'left' | 'right'): RailParts {
   handle.addEventListener('click', () => { rail.classList.toggle('is-collapsed'); setChevron(); });
   rail.appendChild(handle);
   setChevron();
+
+  // [디자인 2c 갱신 2026-07-29] 우측 패널은 **가변 폭** — 왼쪽 가장자리를 끌어 조절한다.
+  if (side === 'right') {
+    const grip = mkEl('div', 'canva-rail-grip');
+    grip.title = '드래그해서 패널 폭 조절';
+    grip.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const startX = (e as MouseEvent).clientX;
+      const startW = rail.getBoundingClientRect().width;
+      const move = (ev: MouseEvent) => {
+        // 왼쪽 가장자리를 끌므로 왼쪽으로 갈수록 넓어진다
+        const w = Math.max(240, Math.min(560, startW + (startX - ev.clientX)));
+        rail.style.width = `${w}px`;
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        try { localStorage.setItem('rhwp:right-rail-width', String(Math.round(rail.getBoundingClientRect().width))); } catch { /* 저장 실패 무시 */ }
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+    rail.appendChild(grip);
+    // 지난 폭 복원
+    try {
+      const saved = Number(localStorage.getItem('rhwp:right-rail-width'));
+      if (saved >= 240 && saved <= 560) rail.style.width = `${saved}px`;
+    } catch { /* 무시 */ }
+  }
 
   return {
     rail, head, content, body,

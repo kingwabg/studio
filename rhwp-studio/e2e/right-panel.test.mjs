@@ -32,7 +32,7 @@ runTest('우측 속성 패널 2c — 284px·컨텍스트 헤더·표 조작 섹�
   assert.ok(parts.palette, '팔레트 버튼');
   assert.strictEqual(parts.highlights, 4, '형광펜 4색');
   assert.ok(parts.paraShape, '문단 모양 자세히');
-  assert.strictEqual(base.width, 284, `패널 284px 기대 (실측 ${base.width})`);
+  assert.strictEqual(base.width, 284, `기본 폭 284px 기대 (실측 ${base.width})`);
   assert.ok(base.hasTile, '컨텍스트 아이콘 타일');
   assert.strictEqual(base.bannerBorder, '0px', '파란 강조 박스(테두리) 제거');
 
@@ -67,5 +67,31 @@ runTest('우측 속성 패널 2c — 284px·컨텍스트 헤더·표 조작 섹�
     };
   });
   console.log('  셀 컨텍스트:', JSON.stringify(cell));
+
+  // [디자인 2c 갱신] 패널 탭 = 속성·표·셀, 가변 폭
+  const tabsAndResize = await page.evaluate(async () => {
+    const tabs = [...document.querySelectorAll('.canva-rail--right .canva-tab')].map(t => t.textContent.trim());
+    // 표 탭으로 전환 → 섹션 스트립
+    const tblTab = [...document.querySelectorAll('.canva-rail--right .canva-tab')].find(t => t.textContent.trim() === '표');
+    tblTab?.click();
+    await new Promise(r => setTimeout(r, 300));
+    const secs = [...document.querySelectorAll('.canva-sec-btn')].map(b => b.title);
+    // 가변 폭: 손잡이를 40px 왼쪽으로 끌기
+    const rail = document.querySelector('.canva-rail--right');
+    const grip = document.querySelector('.canva-rail-grip');
+    const before = Math.round(rail.getBoundingClientRect().width);
+    const r0 = grip.getBoundingClientRect();
+    grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: r0.left + 4 }));
+    document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r0.left - 40 }));
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 200));
+    return { tabs, secs, before, after: Math.round(rail.getBoundingClientRect().width) };
+  });
+  console.log('  탭·가변폭:', JSON.stringify(tabsAndResize));
+  assert.deepStrictEqual(tabsAndResize.tabs, ['속성', '표', '셀'], '패널 탭 3종');
+  assert.deepStrictEqual(tabsAndResize.secs,
+    ['위치', '크기', '여백', '쪽 넘김', '테두리·배경', '캡션'], '표 탭 섹션 스트립');
+  assert.ok(tabsAndResize.after > tabsAndResize.before + 30,
+    `왼쪽으로 끌면 넓어져야 함 (${tabsAndResize.before} → ${tabsAndResize.after})`);
   await screenshot(page, 'right-panel');
 });
