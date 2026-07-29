@@ -1,0 +1,332 @@
+/**
+ * 「텍스트」 탭 — 문단 모양 대화상자(Alt+T)를 패널 섹션으로 재편 (디자인 2c 갱신 2026-07-30).
+ *
+ * 표/셀 탭과 같은 계약: 섹션 하나만 그리고, 값이 바뀌면 즉시 저장(확인 버튼 없음).
+ * 저장은 전부 커맨드 경로(applyParaPropsToRange / format-char)라 Ctrl+Z 로 되돌아간다.
+ *
+ * ⚠ 자간·장평은 **글자 모양** 속성이라 선택 글자에만 걸린다(디자인의 주석과 동일) —
+ * 선택이 없으면 대기 서식(pending-format.ts)으로 흘러 다음 입력에 붙는다.
+ */
+import { mkEl, mkButton } from './canva-dom';
+import type { CanvaServices } from './canva-services';
+import type { ParaProperties, CharProperties } from '@/core/types';
+
+const HWPUNIT_PER_PT = 100;
+const toPt = (v: number | undefined): string => (((v ?? 0) as number) / HWPUNIT_PER_PT).toFixed(1);
+const fromPt = (v: string): number => Math.round((parseFloat(v) || 0) * HWPUNIT_PER_PT);
+
+type Opt<T> = [T, string];
+
+const ALIGNS: Opt<string>[] = [
+  ['justify', '양쪽'], ['left', '왼쪽'], ['right', '오른쪽'],
+  ['center', '가운데'], ['distribute', '배분'], ['split', '나눔'],
+];
+const HEAD_TYPES: Opt<string>[] = [
+  ['None', '없음'], ['Outline', '개요'], ['Number', '번호'], ['Bullet', '글머리표'],
+];
+const KOR_BREAK: Opt<number>[] = [[0, '어절'], [1, '글자']];
+const ENG_BREAK: Opt<number>[] = [[0, '단어'], [1, '하이픈'], [2, '글자']];
+const VALIGN: Opt<number>[] = [[0, '글꼴 기준'], [1, '위'], [2, '가운데'], [3, '아래']];
+const LINE_SPACING_TYPES: Opt<string>[] = [
+  ['Percent', '글자에 따라(%)'], ['Fixed', '고정값'], ['SpaceOnly', '여백만'], ['Minimum', '최소'],
+];
+
+/** 문단 종류 섹션의 체크 9종 — [필드, 라벨, 기본값] */
+const FLAGS: Array<[keyof ParaProperties, string, boolean]> = [
+  ['widowOrphan', '외톨이줄 보호(K)', false],
+  ['keepWithNext', '다음 문단과 함께(N)', false],
+  ['keepLines', '문단 보호(P)', false],
+  ['pageBreakBefore', '문단 앞에서 항상 쪽 나눔(E)', false],
+  ['fontLineHeight', '글꼴에 어울리는 줄 높이(H)', true],
+  ['singleLine', '한 줄로 입력(W)', false],
+  ['autoSpaceKrEn', '한글과 영어 간격 자동 조절(G)', true],
+  ['autoSpaceKrNum', '한글과 숫자 간격 자동 조절(R)', true],
+];
+
+export const TEXT_SECTIONS: Array<[string, string]> = [
+  ['정렬', 'text-align-left'], ['여백·첫 줄', 'text-indent'], ['간격', 'arrows-vertical'],
+  ['문단 종류', 'list-bullets'], ['줄 나눔', 'text-t'], ['탭', 'arrow-elbow-down-right'],
+];
+
+export class TextPanelSections {
+  private host!: HTMLElement;
+  private services!: CanvaServices;
+  private pp!: ParaProperties;
+  private cp!: CharProperties;
+  private preview: HTMLElement | null = null;
+
+  /** @returns 그렸으면 true */
+  mount(host: HTMLElement, services: CanvaServices, section: string): boolean {
+    this.services = services;
+    const ih = services.getInputHandler() as any;
+    if (!ih) return false;
+    try {
+      this.pp = ih.getParaProperties();
+      this.cp = ih.getPendingOrCurrentChar?.() ?? {};
+    } catch {
+      return false;
+    }
+    const build = this.sections()[section];
+    if (!build) return false;
+    host.innerHTML = '';
+    this.preview = null;
+    this.host = mkEl('div', 'tps');
+    host.appendChild(this.host);
+    build();
+    return true;
+  }
+
+  private sections(): Record<string, () => void> {
+    return {
+      정렬: () => this.buildAlign(),
+      '여백·첫 줄': () => this.buildIndent(),
+      간격: () => this.buildSpacing(),
+      '문단 종류': () => this.buildKind(),
+      '줄 나눔': () => this.buildBreak(),
+      탭: () => this.buildTab(),
+    };
+  }
+
+  // ── 섹션 ────────────────────────────────────────
+
+  private buildAlign(): void {
+    this.host.appendChild(this.segRow('정렬 방식', ALIGNS, this.pp.alignment ?? 'justify', (v) => {
+      this.para({ alignment: v });
+      this.paintPreview();
+    }));
+    this.host.appendChild(this.buildPreview());
+  }
+
+  private buildIndent(): void {
+    this.host.appendChild(this.numRow('왼쪽 여백', toPt(this.pp.marginLeft), 'pt',
+      (v) => this.para({ marginLeft: fromPt(v) })));
+    this.host.appendChild(this.numRow('오른쪽 여백', toPt(this.pp.marginRight), 'pt',
+      (v) => this.para({ marginRight: fromPt(v) })));
+    // 첫 줄: indent 부호가 곧 종류 — 양수=들여쓰기, 음수=내어쓰기, 0=보통
+    const cur = this.pp.indent ?? 0;
+    const kind = cur > 0 ? 'indent' : cur < 0 ? 'hang' : 'normal';
+    const valRow = this.numRow('첫 줄 값', Math.abs(cur / HWPUNIT_PER_PT).toFixed(1), 'pt', (v) => {
+      const sign = (this.pp.indent ?? 0) < 0 ? -1 : 1;
+      this.para({ indent: sign * fromPt(v) });
+    });
+    valRow.classList.toggle('is-off', kind === 'normal');
+    this.host.appendChild(this.segRow('첫 줄',
+      [['normal', '보통'], ['indent', '들여쓰기'], ['hang', '내어쓰기']] as Opt<string>[], kind, (v) => {
+        const mag = Math.abs(this.pp.indent ?? 0) || fromPt('10');
+        const next = v === 'normal' ? 0 : v === 'indent' ? mag : -mag;
+        this.para({ indent: next });
+        valRow.classList.toggle('is-off', v === 'normal');
+        this.paintPreview();
+      }));
+    this.host.appendChild(valRow);
+    this.host.appendChild(this.buildPreview());
+  }
+
+  private buildSpacing(): void {
+    this.host.appendChild(mkEl('div', 'tps-sub-title', '줄'));
+    this.host.appendChild(this.selectRow('줄 간격 기준', LINE_SPACING_TYPES,
+      this.pp.lineSpacingType ?? 'Percent', (v) => this.para({ lineSpacingType: v })));
+    this.host.appendChild(this.numRow('줄 간격', String(this.pp.lineSpacing ?? 160), '%', (v) => {
+      this.para({ lineSpacing: parseFloat(v) || 160 });
+      this.paintPreview();
+    }));
+
+    this.host.appendChild(mkEl('div', 'tps-sub-title', '문단'));
+    this.host.appendChild(this.numRow('위 간격', toPt(this.pp.spacingBefore), 'pt',
+      (v) => this.para({ spacingBefore: fromPt(v) })));
+    this.host.appendChild(this.numRow('아래 간격', toPt(this.pp.spacingAfter), 'pt',
+      (v) => this.para({ spacingAfter: fromPt(v) })));
+
+    this.host.appendChild(mkEl('div', 'tps-sub-title', '글자'));
+    this.host.appendChild(this.stepper('자간', this.cp.spacings?.[0] ?? 0, '%', -50, 50, (next) => {
+      this.char({ spacings: Array(7).fill(next) } as Partial<CharProperties>);
+    }));
+    this.host.appendChild(this.stepper('장평', this.cp.ratios?.[0] ?? 100, '%', 50, 200, (next) => {
+      this.char({ ratios: Array(7).fill(next) } as Partial<CharProperties>);
+    }));
+    this.host.appendChild(mkEl('div', 'tps-note',
+      '※ 자간·장평은 글자 모양 속성이라 선택한 글자에 적용됩니다. 선택이 없으면 다음에 칠 글자에 걸립니다.'));
+    this.host.appendChild(this.buildPreview());
+  }
+
+  private buildKind(): void {
+    const cur = this.pp.headType ?? 'None';
+    const levelRow = this.selectRow('수준',
+      [0, 1, 2, 3, 4, 5, 6].map((i) => [i, `${i + 1} 수준`] as Opt<number>),
+      this.pp.paraLevel ?? 0, (v) => this.para({ paraLevel: v }));
+    levelRow.classList.toggle('is-off', cur === 'None');
+    this.host.appendChild(this.segRow('종류', HEAD_TYPES, cur, (v) => {
+      // 번호·글머리표는 정의 id 가 필요하다 — 없으면 엔진 기본을 만들어 쓴다
+      const patch: Partial<ParaProperties> = { headType: v };
+      if (v === 'Number' || v === 'Outline') {
+        try { patch.numberingId = this.services.wasm.ensureDefaultNumbering(); } catch { /* 기본 유지 */ }
+      }
+      this.para(patch);
+      levelRow.classList.toggle('is-off', v === 'None');
+    }));
+    this.host.appendChild(levelRow);
+
+    this.host.appendChild(mkEl('div', 'tps-sub-title', '기타'));
+    for (const [key, label, dflt] of FLAGS) {
+      const on = (this.pp[key] as boolean | undefined) ?? dflt;
+      this.host.appendChild(this.switchRow(label, on, (v) => this.para({ [key]: v } as Partial<ParaProperties>)));
+    }
+    this.host.appendChild(this.selectRow('세로 정렬', VALIGN, this.pp.verticalAlign ?? 0,
+      (v) => this.para({ verticalAlign: v })));
+  }
+
+  private buildBreak(): void {
+    this.host.appendChild(this.segRow('한글(K)', KOR_BREAK, this.pp.koreanBreakUnit ?? 0,
+      (v) => this.para({ koreanBreakUnit: v })));
+    this.host.appendChild(this.segRow('영어(E)', ENG_BREAK, this.pp.englishBreakUnit ?? 0,
+      (v) => this.para({ englishBreakUnit: v })));
+    this.host.appendChild(mkEl('div', 'tps-note', '※ 줄 끝에서 무엇을 단위로 줄을 바꿀지 정합니다.'));
+  }
+
+  private buildTab(): void {
+    // 탭 목록 편집은 대화상자(문단 모양 → 탭 설정)가 정본 — 패널은 진입만 제공한다.
+    // 탭은 위치·채움·정렬 3속성의 표라 좁은 패널에 넣을 이득이 없다(v1 판단).
+    this.host.appendChild(mkEl('div', 'tps-note',
+      '탭 목록(위치·채움·정렬)은 문단 모양 대화상자에서 편집합니다.'));
+    const b = mkButton('canva-full-btn');
+    b.innerHTML = '<i class="ph-duotone ph-arrow-elbow-down-right"></i><span>탭 설정 열기</span>';
+    b.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      this.services.dispatcher.dispatch('format:para-shape');
+    });
+    this.host.appendChild(b);
+  }
+
+  // ── 저장 ────────────────────────────────────────
+
+  private para(patch: Partial<ParaProperties>): void {
+    const ih = this.services.getInputHandler() as any;
+    if (!ih) return;
+    try {
+      const pos = ih.getCursorPosition();
+      ih.applyParaPropsToRange(pos, pos, patch);
+      Object.assign(this.pp, patch);
+    } catch (err) {
+      console.warn('[text-panel] 문단 속성 적용 실패:', err);
+    }
+  }
+
+  /** 글자 속성 — 선택이 있으면 그 범위, 없으면 대기 서식(다음 입력) */
+  private char(patch: Partial<CharProperties>): void {
+    this.services.eventBus.emit('format-char', patch);
+    Object.assign(this.cp, patch);
+  }
+
+  // ── 컨트롤 ──────────────────────────────────────
+
+  private segRow<T>(label: string, opts: Opt<T>[], cur: T, onChange: (v: T) => void): HTMLElement {
+    const row = mkEl('div', 'tps-field');
+    if (label) row.appendChild(mkEl('span', 'tps-label', label));
+    const seg = mkEl('div', 'tps-seg tps-seg--wrap');
+    for (const [value, text] of opts) {
+      const b = mkButton('tps-seg-btn', { text });
+      b.classList.toggle('is-on', value === cur);
+      b.addEventListener('click', () => {
+        seg.querySelectorAll('.tps-seg-btn').forEach((e) => e.classList.remove('is-on'));
+        b.classList.add('is-on');
+        onChange(value);
+      });
+      seg.appendChild(b);
+    }
+    row.appendChild(seg);
+    return row;
+  }
+
+  private selectRow<T extends string | number>(
+    label: string, opts: Opt<T>[], cur: T, onChange: (v: T) => void,
+  ): HTMLElement {
+    const row = mkEl('div', 'tps-row');
+    row.appendChild(mkEl('span', 'tps-label', label));
+    const sel = mkEl('select', 'tps-select');
+    for (const [value, text] of opts) {
+      const o = mkEl('option', '', text);
+      o.value = String(value);
+      sel.appendChild(o);
+    }
+    sel.value = String(cur);
+    sel.addEventListener('change', () =>
+      onChange((typeof cur === 'number' ? Number(sel.value) : sel.value) as T));
+    row.appendChild(sel);
+    return row;
+  }
+
+  private numRow(label: string, value: string, unit: string, onChange: (v: string) => void): HTMLElement {
+    const row = mkEl('div', 'tps-row');
+    row.appendChild(mkEl('span', 'tps-label', label));
+    const input = mkEl('input', 'tps-input');
+    input.type = 'number';
+    input.step = '0.1';
+    input.value = value;
+    input.addEventListener('change', () => onChange(input.value));
+    row.append(input, mkEl('span', 'tps-unit', unit));
+    return row;
+  }
+
+  private switchRow(label: string, on: boolean, onChange: (v: boolean) => void): HTMLElement {
+    const row = mkEl('label', 'tps-switch-row');
+    const input = mkEl('input');
+    input.type = 'checkbox';
+    input.checked = on;
+    input.addEventListener('change', () => onChange(input.checked));
+    row.append(input, mkEl('span', 'tps-switch-track'), mkEl('span', 'tps-switch-label', label));
+    return row;
+  }
+
+  /** −/값/+ 알약 스테퍼 (자간·장평) */
+  private stepper(
+    label: string, value: number, unit: string, min: number, max: number,
+    onChange: (next: number) => void,
+  ): HTMLElement {
+    const row = mkEl('div', 'tps-row');
+    row.appendChild(mkEl('span', 'tps-label', label));
+    const box = mkEl('div', 'tps-pill-stepper');
+    let cur = value;
+    const val = mkEl('span', 'tps-pill-num', `${cur}${unit}`);
+    const step = (d: number) => () => {
+      cur = Math.max(min, Math.min(max, cur + d));
+      val.textContent = `${cur}${unit}`;
+      onChange(cur);
+      this.paintPreview();
+    };
+    const dec = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-minus"></i>', title: `${label} 줄이기` });
+    const inc = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-plus"></i>', title: `${label} 늘리기` });
+    dec.addEventListener('click', step(-1));
+    inc.addEventListener('click', step(1));
+    box.append(dec, val, inc);
+    row.appendChild(box);
+    return row;
+  }
+
+  /** 문단 미리보기 — 설정을 바꾸면 예문 두 줄이 그대로 변한다 */
+  private buildPreview(): HTMLElement {
+    const wrap = mkEl('div', 'tps-para-prev');
+    wrap.appendChild(mkEl('div', 'tps-pos-head')).innerHTML = '<i class="ph-duotone ph-eye"></i>미리보기';
+    this.preview = mkEl('div', 'tps-para-prev-body');
+    this.preview.append(mkEl('p', '', '문단 모양은 글이 지면에 어떻게 앉는지를 정합니다.'),
+      mkEl('p', '', '정렬·여백·간격을 바꾸면 이 예문이 그대로 따라 바뀝니다.'));
+    wrap.appendChild(this.preview);
+    this.paintPreview();
+    return wrap;
+  }
+
+  private paintPreview(): void {
+    if (!this.preview) return;
+    const align = this.pp.alignment ?? 'justify';
+    const cssAlign = align === 'distribute' || align === 'split' ? 'justify' : align;
+    const indent = this.pp.indent ?? 0;
+    for (const p of Array.from(this.preview.children) as HTMLElement[]) {
+      p.style.textAlign = cssAlign;
+      p.style.lineHeight = String((this.pp.lineSpacing ?? 160) / 100);
+      p.style.textIndent = indent > 0 ? `${indent / HWPUNIT_PER_PT}pt` : '0';
+      p.style.paddingLeft = indent < 0 ? `${-indent / HWPUNIT_PER_PT}pt` : '0';
+      p.style.letterSpacing = `${(this.cp.spacings?.[0] ?? 0) / 100}em`;
+      p.style.transform = `scaleX(${(this.cp.ratios?.[0] ?? 100) / 100})`;
+      p.style.transformOrigin = 'left center';
+    }
+  }
+}

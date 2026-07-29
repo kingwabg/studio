@@ -46,7 +46,8 @@ const legacyBaselines = new Map([
   ['src/ui/toolbar.ts', 726],
   ['src/ui/para-shape-tab-builders.ts', 685],
   ['src/engine/input-handler-text.ts', 682],  // +1: 대기 서식 호출 1줄(2026-07-30)
-  ['src/ui/canva-right-inspector.ts', 662],
+  // +26: 텍스트 탭 배선(2026-07-30) — 섹션 본문은 text-panel-sections.ts, 여긴 탭 상태·분기뿐
+  ['src/ui/canva-right-inspector.ts', 688],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
 

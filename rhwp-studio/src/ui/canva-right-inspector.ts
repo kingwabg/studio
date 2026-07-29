@@ -8,13 +8,16 @@ import type { CanvaServices } from './canva-services';
 import type { CharProperties, ParaProperties } from '@/core/types';
 import { TableBorderSection } from './table-border-section';
 import { TablePanelSections } from './table-panel-sections';
+import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
+export type PanelTab = 'props' | 'text' | 'table' | 'cell';
 
-/** 표/셀 탭의 섹션 목차 (디자인 2c) */
-const SECTIONS: Record<'table' | 'cell', Array<[string, string]>> = {
+/** 각 탭의 섹션 목차 (디자인 2c 갱신 2026-07-30 — 텍스트 탭 신설) */
+const SECTIONS: Record<'text' | 'table' | 'cell', Array<[string, string]>> = {
+  text: TEXT_SECTIONS,
   table: [['위치', 'crosshair-simple'], ['크기', 'arrows-out-cardinal'], ['여백', 'square-half'],
           ['쪽 넘김', 'files'], ['테두리·배경', 'square'], ['캡션', 'subtitles']],
   cell: [['크기', 'arrows-out-cardinal'], ['여백', 'square-half'], ['정렬', 'align-center-vertical'],
@@ -63,7 +66,7 @@ function svg(inner: string): string {
 
 export class CanvaRightInspector {
   private ctx: Ctx = 'none';
-  private panelTab: 'props' | 'table' | 'cell' = 'props';
+  private panelTab: 'props' | 'text' | 'table' | 'cell' = 'props';
   private painted = false;
   /** [캔버스 한컴 포크] 그림 컨텍스트 내 다중 선택 여부 — 단일↔다중 전환 시 정렬 섹션 재렌더 */
   private lastMulti = false;
@@ -77,8 +80,10 @@ export class CanvaRightInspector {
   private borderSection = new TableBorderSection();
   /** 나머지 섹션의 2c UI */
   private panelSections = new TablePanelSections();
+  /** 텍스트(문단 모양) 탭 */
+  private textSections = new TextPanelSections();
   /** 표·셀 탭에서 지금 보고 있는 섹션 */
-  private curSection: Record<'table' | 'cell', string> = { table: '위치', cell: '크기' };
+  private curSection: Record<'text' | 'table' | 'cell', string> = { text: '정렬', table: '위치', cell: '크기' };
   private biu: Record<'bold' | 'italic' | 'underline' | 'strike', HTMLButtonElement> = {} as any;
   private fontNameBtn!: HTMLButtonElement;
   private lineSpacingBtn!: HTMLButtonElement;
@@ -345,17 +350,27 @@ export class CanvaRightInspector {
     this.syncTabs();
   }
 
-  /** 사이드바 탭 스트립 갱신 — 표 안에서만 [표|셀]이 보인다 */
-  onTabsState: ((visible: boolean, active: 'table' | 'cell' | null) => void) | null = null;
+  /**
+   * 사이드바 탭 스트립 갱신 — **보이는 탭 집합이 선택을 따라간다**(사용자 결정 2026-07-30):
+   * 본문/그림 = [속성, 텍스트] · 표 안 = [속성, 텍스트, 표, 셀] · 선택 없음 = [속성].
+   */
+  onTabsState: ((tabs: PanelTab[], active: PanelTab) => void) | null = null;
 
   /** 사이드바가 콜백을 늦게 다는 부팅 순서 보정 — 현재 상태를 즉시 알린다 */
   pokeTabs(): void {
     this.syncTabs();
   }
 
+  private visibleTabs(): PanelTab[] {
+    if (this.ctx === 'none') return ['props'];
+    if (this.ctx === 'cell' || this.ctx === 'table') return ['props', 'text', 'table', 'cell'];
+    return ['props', 'text'];
+  }
+
   private syncTabs(): void {
-    const inTable = this.ctx === 'cell' || this.ctx === 'table';
-    this.onTabsState?.(inTable, inTable && this.panelTab !== 'props' ? this.panelTab : null);
+    const tabs = this.visibleTabs();
+    if (!tabs.includes(this.panelTab)) this.panelTab = 'props';
+    this.onTabsState?.(tabs, this.panelTab);
   }
 
   /**
@@ -441,19 +456,19 @@ export class CanvaRightInspector {
   }
 
   /** 섹션을 지정해 연다 — 명령·우클릭 진입점이 특정 섹션으로 바로 보내려고 쓴다 */
-  setSection(kind: 'table' | 'cell', section: string): void {
+  setSection(kind: 'text' | 'table' | 'cell', section: string): void {
     if (SECTIONS[kind].some(([label]) => label === section)) this.curSection[kind] = section;
   }
 
   /** 패널 탭 — 컨텍스트 탭: 표 안에서만 표·셀 두 개 */
-  setPanelTab(tab: 'props' | 'table' | 'cell'): void {
+  setPanelTab(tab: PanelTab): void {
     this.panelTab = tab;
     this.applyContext();
     this.syncTabs();
   }
 
   /** 표/셀 탭의 섹션 스트립 — 대화상자 탭을 패널 안 아이콘 줄로 (디자인 2c 갱신) */
-  private buildSectionStrip(kind: 'table' | 'cell'): HTMLElement {
+  private buildSectionStrip(kind: 'text' | 'table' | 'cell'): HTMLElement {
     const strip = mkEl('div', 'canva-sec-strip');
     for (const [label, icon] of SECTIONS[kind]) {
       const b = mkButton('canva-sec-btn', { title: label });
@@ -508,12 +523,23 @@ export class CanvaRightInspector {
     const c = this.ctx;
     this.paintBanner();
 
-    // [디자인 2c 갱신] 표·셀 탭은 섹션 스트립을 보여준다. 속성 탭만 기존 서식 화면.
+    // [디자인 2c 갱신] 속성 외 탭은 섹션 스트립 + 폼. 속성 탭만 기존 서식 화면.
     if (this.panelTab !== 'props') {
       this.emptyEl.hidden = true;
       this.fmtPane.hidden = true;
       this.tabPane.hidden = false;
       this.tabPane.innerHTML = '';
+
+      // 텍스트 탭 = 문단 모양(표와 무관) — 커서만 있으면 된다
+      if (this.panelTab === 'text') {
+        this.tabPane.appendChild(this.buildSectionStrip('text'));
+        const textHost = mkEl('div', 'canva-props-host');
+        this.tabPane.appendChild(textHost);
+        if (!this.textSections.mount(textHost, this.services, this.curSection.text)) {
+          textHost.appendChild(mkEl('div', 'canva-hint', '문단에 커서를 두면 문단 설정이 열립니다.'));
+        }
+        return;
+      }
 
       // 셀 편집이면 커서에서, 표 개체 선택이면 선택에서 표를 찾는다
       const ih = this.services.getInputHandler() as any;
@@ -528,14 +554,14 @@ export class CanvaRightInspector {
 
       // 섹션 목차(빠른 이동) + 실제 폼 + 그 아래 조작 칩(컨텍스트 탭으로 속성 탭이
       // 사라지면서, 옛 속성 탭의 표 조작이 성격대로 표/셀 탭에 나뉘어 들어왔다)
-      const strip = this.buildSectionStrip(this.panelTab);
+      const strip = this.buildSectionStrip(this.panelTab as 'table' | 'cell');
       this.tabPane.appendChild(strip);
       const formHost = mkEl('div', 'canva-props-host');
       this.tabPane.appendChild(formHost);
       const pos = ih.cursor?.getPosition?.();
-      this.renderSection(this.panelTab, formHost,
+      this.renderSection(this.panelTab as 'table' | 'cell', formHost,
         { sec: ref.sec, ppi: ref.ppi, ci: ref.ci }, pos?.cellIndex ?? 0);
-      this.tabPane.appendChild(this.buildTableOps(this.panelTab));
+      this.tabPane.appendChild(this.buildTableOps(this.panelTab as 'table' | 'cell'));
       return;
     }
     this.tabPane.hidden = true;

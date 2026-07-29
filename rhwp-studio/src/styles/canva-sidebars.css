@@ -1018,8 +1018,31 @@
 .tps-cap-art.is-sub0 .tps-cap-bar { bottom: auto; height: 8px; }
 .tps-cap-art.is-sub2 .tps-cap-bar { top: auto; height: 8px; }
 
-/* [컨텍스트 탭] 본문 편집 중엔 탭 스트립이 통째로 사라진다 — 표 안에서만 [표|셀] */
-.canva-rail-head.canva-tabs-hidden { display: none; }
+/* [컨텍스트 탭 2026-07-30] 탭은 선택에 따라 개별로 숨는다(스트립은 항상 있다) */
+.canva-rail-head .canva-tab[hidden] { display: none; }
+
+/* 텍스트 탭 — 자간·장평 알약 스테퍼 + 문단 미리보기 */
+.tps-pill-stepper {
+  display: inline-flex; align-items: center; height: 28px;
+  border: 1px solid var(--color-border); border-radius: 100px; overflow: hidden;
+  background: var(--color-surface-raised);
+}
+.tps-pill-num {
+  min-width: 46px; text-align: center; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--color-text);
+}
+.tps-seg--wrap { flex-wrap: wrap; }
+.tps-seg--wrap .tps-seg-btn { flex: 1 1 30%; }
+
+.tps-para-prev { display: flex; flex-direction: column; gap: 6px; }
+.tps-para-prev-body {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 11px 13px; border: 1px solid var(--color-border); border-radius: 5px;
+  background: var(--doc-paper, #fff);
+}
+.tps-para-prev-body p {
+  margin: 0; font-size: 11px; color: var(--color-text);
+}
 
 /* 텍스트 스타일 프리셋 — 카드가 곧 미리보기(캔바식 '제목 추가') */
 .canva-styles { display: flex; flex-direction: column; gap: 6px; }

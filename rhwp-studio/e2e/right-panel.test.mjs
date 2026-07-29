@@ -109,8 +109,8 @@ runTest('우측 속성 패널 2c — 284px·컨텍스트 헤더·표 조작 섹�
     return { tabs, secs, before, after: Math.round(rail.getBoundingClientRect().width) };
   });
   console.log('  탭·가변폭:', JSON.stringify(tabsAndResize));
-  // [컨텍스트 탭 2026-07-30] 탭은 표·셀 둘뿐 — 본문 편집 중엔 스트립 자체가 숨는다
-  assert.deepStrictEqual(tabsAndResize.tabs, ['표', '셀'], '패널 탭은 표·셀 2종');
+  // [컨텍스트 탭 2026-07-30 갱신] 탭 4종이 있고 보이는 집합이 선택을 따라간다
+  assert.deepStrictEqual(tabsAndResize.tabs, ['속성', '텍스트', '표', '셀'], '패널 탭 4종');
   assert.deepStrictEqual(tabsAndResize.secs,
     ['위치', '크기', '여백', '쪽 넘김', '테두리·배경', '캡션'], '표 탭 섹션 스트립');
   assert.ok(tabsAndResize.after > tabsAndResize.before + 30,
