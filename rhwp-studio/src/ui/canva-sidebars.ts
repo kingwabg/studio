@@ -59,22 +59,28 @@ export function mountCanvaSidebars(services: CanvaServices): void {
   new CanvaRecordPanel(recordPane, services);
 
   // [디자인 2c 갱신] 탭 = 속성 · 표 · 셀 (AI·녹음은 명세에서 빠짐 → 속성 탭 하단으로 접근)
+  // [컨텍스트 탭] 탭은 표·셀 둘뿐 — 본문에선 탭 스트립이 사라지고 글자 서식 패널만.
+  // 셀 클릭=셀 탭, 표 개체 선택=표 탭이 자동으로 잡힌다(inspector 가 알려 온다).
   const showTab = (idx: number) => {
     inspectorPane.hidden = false;
     aiPane.hidden = true;
     recordPane.hidden = true;
-    inspector.setPanelTab(idx === 0 ? 'props' : idx === 1 ? 'table' : 'cell');
+    inspector.setPanelTab(idx === 0 ? 'table' : 'cell');
   };
-  const tabs = right.setTabs(['속성', '표', '셀'], showTab);
+  const tabs = right.setTabs(['표', '셀'], showTab);
+  inspector.onTabsState = (visible, active) => {
+    right.head.classList.toggle('canva-tabs-hidden', !visible);
+    tabs.forEach((b, i) => b.classList.toggle('is-active',
+      active !== null && i === (active === 'table' ? 0 : 1)));
+  };
+  inspector.pokeTabs();
 
   // 표/셀 속성 진입점(명령·우클릭·리본)이 여는 곳 — 대화상자를 대신한다.
   // 접혀 있으면 펼치고, 탭 강조까지 손으로 누른 것과 같게 맞춘다.
   openTablePanel = (which, section) => {
     right.rail.classList.remove('is-collapsed');
-    const idx = which === 'table' ? 1 : 2;
-    tabs.forEach((b, i) => b.classList.toggle('is-active', i === idx));
     if (section) inspector.setSection(which, section);
-    showTab(idx);
+    showTab(which === 'table' ? 0 : 1);
   };
   // [디자인 2c] 모델 이름 칩은 **AI 패널 안**으로 — 속성 탭에서는 쓰이지 않는 정보라
   // 탭 스트립에 상시 노출할 이유가 없다.

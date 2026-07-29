@@ -1017,3 +1017,6 @@
 .tps-cap-art.is-right .tps-cap-bar { top: 2px; bottom: 2px; right: -6px; width: 3px; }
 .tps-cap-art.is-sub0 .tps-cap-bar { bottom: auto; height: 8px; }
 .tps-cap-art.is-sub2 .tps-cap-bar { top: auto; height: 8px; }
+
+/* [컨텍스트 탭] 본문 편집 중엔 탭 스트립이 통째로 사라진다 — 표 안에서만 [표|셀] */
+.canva-rail-head.canva-tabs-hidden { display: none; }
