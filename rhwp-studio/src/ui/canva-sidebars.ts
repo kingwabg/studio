@@ -85,11 +85,18 @@ export function mountCanvaSidebars(services: CanvaServices): void {
     if (section) inspector.setSection(which, section);
     showTab(ALL_TABS.indexOf(which));
   };
-  // [디자인 2c] 모델 이름 칩은 **AI 패널 안**으로 — 속성 탭에서는 쓰이지 않는 정보라
-  // 탭 스트립에 상시 노출할 이유가 없다.
-  const badge = ai.getModelBadge();
-  badge.classList.add('canva-ai-model--inpane');
-  aiPane.prepend(badge);
+  // [디자인 갱신 2026-07-30] 모델 칩은 AI 패널 **머리말 안**으로 들어갔다(패널이 직접 배치).
+  // 뒤로가기는 속성 탭으로 — 패널이 이벤트로 알려 온다.
+  const showTool = (pane: HTMLElement | null) => {
+    inspectorPane.hidden = !!pane;
+    aiPane.hidden = pane !== aiPane;
+    recordPane.hidden = pane !== recordPane;
+    if (!pane) inspector.setPanelTab('props');
+  };
+  services.eventBus.on('ai-panel-open', () => { right.rail.classList.remove('is-collapsed'); showTool(aiPane); });
+  services.eventBus.on('record-panel-open', () => { right.rail.classList.remove('is-collapsed'); showTool(recordPane); });
+  services.eventBus.on('ai-panel-close', () => showTool(null));
+  void ai;
 }
 
 // [캔버스 한컴 포크] 메뉴바 우측 캔버스/문서 모드 토글 — 입력 해석 레이어 전환(캔바 손맛 vs 한글 커서).
@@ -97,9 +104,16 @@ function mountModeToggle(services: CanvaServices): void {
   const menuBar = document.getElementById('menu-bar');
   if (!menuBar) return;
 
+  // [디자인 갱신 2026-07-30] 버튼 두 개 → 회색 트랙 안 흰 알약 세그먼트(아이콘 + 라벨).
+  // 선택된 쪽이 흰 알약 + 그림자로 떠오른다 — 지금 어느 모드인지 한눈에 보인다.
   const wrap = mkEl('div', 'canva-mode-toggle');
-  const bCanvas = mkButton('', { text: '캔버스' });
-  const bDoc = mkButton('', { text: '문서' });
+  const seg = (label: string, icon: string, title: string) => {
+    const b = mkButton('canva-mode-seg', { title });
+    b.innerHTML = `<i class="ph-duotone ph-${icon}"></i><span>${label}</span>`;
+    return b;
+  };
+  const bCanvas = seg('캔버스', 'selection-all', '캔버스 모드 — 개체를 자유롭게 놓습니다');
+  const bDoc = seg('문서', 'article', '문서 모드 — 한글 커서로 글을 흘립니다');
   wrap.append(bCanvas, bDoc);
   // [리본 재설계 2026-07-29] 구 #menu-bar 는 이제 숨은 채 '파일' 드롭다운만 겹쳐 그린다.
   // 모드 토글은 리본 1행의 전용 자리(.rb-mode-slot)로 옮겨 겹침을 없앤다.
@@ -110,6 +124,9 @@ function mountModeToggle(services: CanvaServices): void {
     services.getInputHandler()?.setCanvasMode(on);
     bCanvas.classList.toggle('is-active', on);
     bDoc.classList.toggle('is-active', !on);
+    // 선택된 쪽만 fill 아이콘 — 디자인의 ph-fill/ph-duotone 대비
+    bCanvas.querySelector('i')!.className = `${on ? 'ph-fill' : 'ph-duotone'} ph-selection-all`;
+    bDoc.querySelector('i')!.className = `${on ? 'ph-duotone' : 'ph-fill'} ph-article`;
     if (persist) { try { localStorage.setItem(CANVAS_MODE_KEY, on ? '1' : '0'); } catch { /* ignore */ } }
   };
   bCanvas.addEventListener('click', () => apply(true, true));

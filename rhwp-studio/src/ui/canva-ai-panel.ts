@@ -44,23 +44,33 @@ export class CanvaAiPanel {
   private render(): void {
     const pane = mkEl('div', 'canva-ai-pane');
 
-    // ── 상단 기능 버튼 줄 (라벨로 기능이 한눈에 보이게 — 문서 생성/일반은 모드 토글, 검토는 실행) ──
+    // ── 머리말: 뒤로가기 + 스파클 + 도구 제목 + 모델 칩 (디자인 갱신 2026-07-30) ──
+    const head = mkEl('div', 'canva-ai-head');
+    const back = mkButton('canva-ai-back', { title: '속성으로 돌아가기', html: '<i class="ph ph-arrow-left"></i>' });
+    back.addEventListener('click', () => this.services.eventBus.emit('ai-panel-close'));
+    this.modelBadge = mkEl('span', 'canva-ai-model', 'MiniMax M3');
+    head.append(
+      back,
+      mkEl('i', 'ph-duotone ph-sparkle canva-ai-spark'),
+      mkEl('span', 'canva-ai-title', 'AI 도우미'),
+      this.modelBadge,
+    );
+    pane.appendChild(head);
+
+    // ── 모드 카드 3종 (아이콘 위·라벨 아래) — 앞의 둘은 모드 토글, 검토는 실행 ──
     const modes = mkEl('div', 'canva-ai-modes');
-    this.genBtn = mkButton('canva-ai-modebtn', {
-      text: '문서 생성',
-      title: '캔버스식 문서 생성: 지면에 제목·본문·표를 배치합니다',
-    });
-    this.plainBtn = mkButton('canva-ai-modebtn', {
-      text: '일반 글쓰기',
-      title: '일반 글쓰기: 텍스트 답변을 커서 위치에 삽입합니다',
-    });
+    const card = (label: string, icon: string, title: string) => {
+      const b = mkButton('canva-ai-modebtn', { title });
+      b.innerHTML = `<i class="ph-duotone ph-${icon}"></i><span>${label}</span>`;
+      return b;
+    };
+    this.genBtn = card('문서 생성', 'article', '캔버스식 문서 생성: 지면에 제목·본문·표를 배치합니다');
+    this.plainBtn = card('일반 글쓰기', 'pencil-simple', '일반 글쓰기: 텍스트 답변을 커서 위치에 삽입합니다');
     this.genBtn.addEventListener('click', () => { this.genMode = true; this.syncMode(); });
     this.plainBtn.addEventListener('click', () => { this.genMode = false; this.syncMode(); });
     // 문서 검토 — 프롬프트가 아니라 버튼 동작(수집→동의→검토→findings)이라 모드가 아닌 실행 버튼.
-    const reviewBtn = mkButton('canva-ai-modebtn canva-ai-modebtn-action', {
-      title: '문서 전체 검토 (표현·오탈자)',
-      html: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>문서 검토</span>',
-    });
+    const reviewBtn = card('문서 검토', 'check-circle', '문서 전체 검토 (표현·오탈자)');
+    reviewBtn.classList.add('canva-ai-modebtn-action');
     reviewBtn.addEventListener('click', () => void this.reviewFlow());
     modes.append(this.genBtn, this.plainBtn, reviewBtn);
     pane.appendChild(modes);
@@ -88,9 +98,6 @@ export class CanvaAiPanel {
     this.syncMode();
 
     this.root.appendChild(pane);
-
-    // 모델 배지 (레일 헤더 우측에 표시하도록 노출)
-    this.modelBadge = mkEl('span', 'canva-ai-model', 'MiniMax M3');
   }
 
   getModelBadge(): HTMLElement { return this.modelBadge; }

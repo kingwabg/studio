@@ -483,46 +483,48 @@
 .canva-ai-send:disabled { opacity: 0.5; cursor: default; }
 .canva-ai-send svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
 /* ── 상단 기능 버튼 줄 (문서 생성/일반=모드 토글, 문서 검토=실행) ── */
+/* AI 패널 머리말 — 뒤로가기 + 스파클 + 제목 + 모델 칩 (디자인 갱신 2026-07-30) */
+.canva-ai-head {
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+  padding: 12px 13px 10px;
+}
+.canva-ai-back {
+  width: 24px; height: 24px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent;
+  color: var(--color-text-muted); cursor: pointer; padding: 0;
+}
+.canva-ai-back:hover { background: var(--color-accent-bg); color: var(--color-primary); }
+.canva-ai-spark { font-size: 18px; color: var(--color-primary); }
+.canva-ai-title { flex: 1; font-size: 13px; font-weight: 600; color: var(--color-text); }
+
+/* 모드 카드 3종 — 아이콘 위, 라벨 아래 */
 .canva-ai-modes {
-  flex-shrink: 0;
-  display: flex;
-  gap: 6px;
-  padding: 10px 10px 8px;
-  border-bottom: 1px solid var(--ui-border);
+  flex-shrink: 0; display: flex; gap: 4px;
+  padding: 0 13px 10px;
+  border-bottom: 1px solid var(--color-border);
 }
 .canva-ai-modebtn {
-  flex: 1 1 0;
-  height: 32px;
-  border-radius: 7px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-  color: var(--ui-text-muted);
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
+  flex: 1; height: 52px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 1px solid var(--color-border); border-radius: 6px;
+  background: var(--color-surface-raised); color: var(--color-text-muted);
+  font: inherit; font-size: 11px; cursor: pointer; padding: 0;
 }
-.canva-ai-modebtn:hover { background: var(--ui-hover); color: var(--ui-text); }
+.canva-ai-modebtn > i { font-size: 17px; }
+.canva-ai-modebtn:hover { background: var(--color-accent-bg); border-color: var(--color-primary); color: var(--color-primary); }
 .canva-ai-modebtn.is-active {
-  background: var(--ui-accent-bg);
-  border-color: var(--ui-note-border);
-  color: var(--ui-link);
+  background: var(--color-accent-bg); border-color: var(--color-primary);
+  color: var(--color-primary); font-weight: 600;
 }
-/* 검토는 모드가 아니라 실행 — 아이콘+라벨, 항상 강조색(활성 토글이 아님) */
-.canva-ai-modebtn-action {
-  flex: 0 0 auto;
-  padding: 0 10px;
-  color: var(--ui-link);
-  border-color: var(--ui-note-border);
-}
-.canva-ai-modebtn-action:hover { background: var(--ui-accent-bg-light); color: var(--ui-link); }
-.canva-ai-modebtn-action svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+/* 검토는 모드가 아니라 실행 — 항상 강조색(활성 토글이 아님) */
+.canva-ai-modebtn-action { color: var(--color-primary); border-color: var(--color-primary); }
+
 .canva-ai-model {
-  font-size: 10px;
+  flex: none; display: inline-flex; align-items: center;
+  height: 22px; padding: 0 8px; border-radius: 100px;
+  background: var(--color-surface); color: var(--color-text-muted);
+  font-size: 10.5px;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 20px;
@@ -634,31 +636,28 @@
 }
 
 /* ── 메뉴바 우측 캔버스/문서 모드 토글 ── */
+/* 캔버스/문서 모드 — 회색 트랙 안 흰 알약 세그먼트 (디자인 갱신 2026-07-30) */
 .canva-mode-toggle {
   margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  overflow: hidden;
-  height: 20px;
+  display: flex; align-items: center; gap: 2px;
+  padding: 3px; border-radius: 100px;
+  background: var(--color-surface, #f3f2f2);
 }
-.canva-mode-toggle button {
-  border: none;
-  background: var(--ui-surface);
-  color: var(--ui-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 0 10px;
-  height: 100%;
-  cursor: pointer;
+.canva-mode-seg {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 12px;
+  border: 0; border-radius: 100px; background: transparent;
+  color: var(--color-text-muted); font: inherit; font-size: 12.5px;
+  cursor: pointer; white-space: nowrap;
+  transition: background .12s ease, color .12s ease, box-shadow .12s ease;
 }
-.canva-mode-toggle button + button { border-left: 1px solid var(--ui-border); }
-.canva-mode-toggle button:hover { background: var(--ui-hover); color: var(--ui-text); }
-.canva-mode-toggle button.is-active {
-  background: var(--ui-link);
-  color: var(--ui-text-on-accent);
+.canva-mode-seg > i { font-size: 15px; }
+.canva-mode-seg:hover { color: var(--color-primary); }
+.canva-mode-seg.is-active {
+  background: var(--color-surface-raised, #fff);
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(32, 30, 29, .14);
 }
 
 /* 접힘 상태에서 편집영역이 꽉 차도록 (모바일/좁은 화면) */
@@ -667,7 +666,7 @@
   .canva-rail--right { width: 220px; }
 }
 
-/* 모델 칩이 AI 패널 안에 들어갔을 때(디자인 2c) — 탭 위 배지가 아니라 패널 머리말 */
+/* (구) 패널 상단 배치 — 머리말 안으로 들어가며 사용 중단 */
 .canva-ai-model--inpane {
   display: inline-flex; align-self: flex-start;
   margin: 0 0 8px; padding: 3px 9px;

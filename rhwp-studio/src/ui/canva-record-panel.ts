@@ -56,6 +56,12 @@ export class CanvaRecordPanel {
 
   private render(): void {
     const pane = mkEl('div', 'canva-record-pane');
+    // 뒤로가기 — AI 패널과 같은 규약(속성 탭으로 복귀)
+    const head = mkEl('div', 'canva-ai-head');
+    const back = mkButton('canva-ai-back', { title: '속성으로 돌아가기', html: '<i class="ph ph-arrow-left"></i>' });
+    back.addEventListener('click', () => this.services.eventBus.emit('ai-panel-close'));
+    head.append(back, mkEl('i', 'ph-duotone ph-microphone canva-ai-spark'), mkEl('span', 'canva-ai-title', '녹음·받아쓰기'));
+    pane.appendChild(head);
 
     this.errBox = mkEl('div', 'canva-record-err');
     this.errBox.hidden = true;

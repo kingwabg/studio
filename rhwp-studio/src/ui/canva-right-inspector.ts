@@ -248,6 +248,22 @@ export class CanvaRightInspector {
     fullPara.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:para-shape'); });
     this.fmtPane.appendChild(fullPara);
 
+    // [디자인 2c] AI·녹음은 탭에서 빠졌다 → 속성 탭 하단이 그 진입점이다.
+    // (탭만 없애고 진입점을 안 만들어 AI 패널이 열리지 않던 상태를 여기서 메운다.)
+    const toolSec = this.section('도구');
+    const toolRow = mkEl('div', 'canva-chip-row');
+    for (const [label, icon, ev] of [
+      ['AI 도우미', 'sparkle', 'ai-panel-open'],
+      ['녹음·받아쓰기', 'microphone', 'record-panel-open'],
+    ] as const) {
+      const b = mkButton('canva-chip', { title: label });
+      b.innerHTML = `<i class="ph-duotone ph-${icon}"></i><span>${label}</span>`;
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.eventBus.emit(ev); });
+      toolRow.appendChild(b);
+    }
+    toolSec.appendChild(toolRow);
+    this.fmtPane.appendChild(toolSec);
+
     // 컨텍스트 추가(표/그림) 영역
     this.extrasHost = mkEl('div', 'canva-pane');
     this.fmtPane.appendChild(this.extrasHost);
