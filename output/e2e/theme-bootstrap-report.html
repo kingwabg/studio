@@ -7,7 +7,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', -apple-system, sans-serif; background: #f5f5f5; color: #333; }
-  .header { background: #28a745; color: white; padding: 24px 32px; }
+  .header { background: #dc3545; color: white; padding: 24px 32px; }
   .header h1 { font-size: 24px; margin-bottom: 8px; }
   .header .meta { font-size: 14px; opacity: 0.9; }
   .summary { display: flex; gap: 16px; padding: 20px 32px; background: white; border-bottom: 1px solid #e0e0e0; }
@@ -43,19 +43,19 @@
 <body>
 <div class="header">
   <h1>초기 테마 bootstrap</h1>
-  <div class="meta">생성: 2026. 7. 29. 오전 12:18:42 | 소요: 1.7초 | rhwp E2E CDP 테스트</div>
+  <div class="meta">생성: 2026. 7. 29. 오후 8:39:56 | 소요: 1.7초 | rhwp E2E CDP 테스트</div>
 </div>
 <div class="summary">
   <div class="stat total"><div class="number">6</div><div class="label">Total</div></div>
-  <div class="stat pass"><div class="number">6</div><div class="label">Passed</div></div>
-  <div class="stat fail"><div class="number">0</div><div class="label">Failed</div></div>
+  <div class="stat pass"><div class="number">5</div><div class="label">Passed</div></div>
+  <div class="stat fail"><div class="number">1</div><div class="label">Failed</div></div>
   <div class="stat skip"><div class="number">0</div><div class="label">Skipped</div></div>
 </div>
 <div class="content">
 
-      <div class="tc-card pass">
+      <div class="tc-card fail">
         <div class="tc-header">
-          <h3><span class="badge pass">PASS</span> 초기 테마 bootstrap</h3>
+          <h3><span class="badge fail">FAIL</span> 초기 테마 bootstrap</h3>
         </div>
         <div class="tc-body">
           <div class="assertions"><div class="assertion pass">✅ TC1: DOMContentLoaded 시점에 저장된 dark mode가 root dataset에 반영된다</div>
@@ -63,7 +63,7 @@
 <div class="assertion pass">✅ TC1: DOMContentLoaded 시점에 root color-scheme이 dark only다</div>
 <div class="assertion pass">✅ TC1: DOMContentLoaded 시점에 meta color-scheme이 only dark다</div>
 <div class="assertion pass">✅ TC1: DOMContentLoaded 시점에 theme-color가 dark token이다</div>
-<div class="assertion pass">✅ TC1: 초기 paint 대상 menu-bar가 dark token으로 계산된다</div></div>
+<div class="assertion fail">❌ TC1: 초기 paint 대상 menu-bar가 dark token으로 계산된다</div></div>
           
         </div>
       </div>

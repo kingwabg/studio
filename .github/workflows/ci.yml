@@ -36,3 +36,6 @@ jobs:
         run: npx --prefix rhwp-studio tsc --noEmit -p rhwp-studio
       - name: rhwp-studio test
         run: npm test --prefix rhwp-studio
+      # 파일 크기 래칫 — 거대 파일(input-handler 4,797줄 등)이 더 자라는 것을 막는다
+      - name: rhwp-studio file-size ratchet
+        run: npm run check:file-size --prefix rhwp-studio

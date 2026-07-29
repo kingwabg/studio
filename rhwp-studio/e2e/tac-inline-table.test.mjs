@@ -25,12 +25,11 @@ runTest('인라인 TAC 표 배치 (한컴 원본)', async ({ page }) => {
     if (!w) return null;
 
     const paraCount = w.getParagraphCount(0);
-    const pi1Text = w.getParaText(0, 1);
+    // [드리프트 수리 2026-07-30] getParaText 는 사라진 API — getTextRange 로 전문을 읽는다
+    const pi1Text = w.getTextRange(0, 1, 0, w.getParagraphLength(0, 1));
 
-    // pi=1의 컨트롤 정보
-    const pi1Info = JSON.parse(w.doc.getParagraphInfo(0, 1));
-
-    return { paraCount, pi1Text, pi1Info };
+    // (구 getParagraphInfo 호출은 API 소멸 + 판정에 미사용이라 삭제 — 2026-07-30)
+    return { paraCount, pi1Text };
   });
 
   if (!info) {
@@ -52,7 +51,7 @@ runTest('인라인 TAC 표 배치 (한컴 원본)', async ({ page }) => {
 
     // 페이지 0의 SVG를 생성하여 표/텍스트 좌표 추출
     try {
-      const svg = w.doc.renderPageToSvg(0, 1.0);
+      const svg = w.doc.renderPageSvg(0);
       if (!svg) return null;
 
       // 표 테두리 수평선의 y좌표 추출
