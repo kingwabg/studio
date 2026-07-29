@@ -39,6 +39,24 @@ const OBJ_ALIGN: { cmd: string; title: string; icon: string }[] = [
 ];
 const COLORS = ['#000000', '#dc3545', '#f59e0b', '#16a34a', '#256ef4', '#7c3aed', '#6b7280', '#ffffff'];
 
+/** 텍스트 스타일 프리셋 — pt 는 HWP 단위(pt×100), level 은 개요 번호 수준(없으면 번호 해제 안 함) */
+interface TextStyle {
+  id: string;
+  label: string;
+  hint: string;
+  pt: number;
+  bold: boolean;
+  /** undefined = 번호 상태를 건드리지 않음, -1 = 번호 해제, 0~6 = 그 수준의 개요 번호 */
+  level?: number;
+}
+const TEXT_STYLES: TextStyle[] = [
+  { id: 'h1', label: '제목 추가', hint: '제목 1 — 20pt 굵게', pt: 20, bold: true },
+  { id: 'h2', label: '부제목 추가', hint: '제목 2 — 15pt 굵게', pt: 15, bold: true },
+  { id: 'body', label: '약간의 본문 텍스트 추가', hint: '본문 — 10pt', pt: 10, bold: false },
+  { id: 'num1', label: '1. 번호 제목', hint: '개요 번호 1수준 — 13pt 굵게', pt: 13, bold: true, level: 0 },
+  { id: 'num2', label: '가. 번호 문단', hint: '개요 번호 2수준 — 10pt', pt: 10, bold: false, level: 1 },
+];
+
 function svg(inner: string): string {
   return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
@@ -87,6 +105,20 @@ export class CanvaRightInspector {
 
     // 글자 서식
     this.fmtPane = mkEl('div', 'canva-pane');
+
+    // [텍스트 스타일 프리셋 2026-07-30] 캔바식 '제목 추가' 카드 — 누르면 현재 문단
+    // 전체에 크기·굵기(·번호)를 한 번에 입힌다. 카드 자체가 그 스타일로 그려져
+    // 결과를 미리 보여준다.
+    const styleSec = this.section('텍스트 스타일');
+    const styles = mkEl('div', 'canva-styles');
+    for (const t of TEXT_STYLES) {
+      const b = mkButton(`canva-style-card canva-style--${t.id}`, { title: t.hint });
+      b.textContent = t.label;
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.applyTextStyle(t); });
+      styles.appendChild(b);
+    }
+    styleSec.appendChild(styles);
+    this.fmtPane.appendChild(styleSec);
 
     // B / I / U
     const biuSec = this.section('글자');
@@ -320,6 +352,33 @@ export class CanvaRightInspector {
   private syncTabs(): void {
     const inTable = this.ctx === 'cell' || this.ctx === 'table';
     this.onTabsState?.(inTable, inTable && this.panelTab !== 'props' ? this.panelTab : null);
+  }
+
+  /**
+   * 현재 문단 전체에 스타일 프리셋을 입힌다 — 부분 선택을 요구하지 않는 게 핵심.
+   * (캔바·워드의 스타일 적용과 같은 기대: 커서만 두고 누르면 문단이 바뀐다.)
+   * 글자(크기·굵게)는 문단 범위 char 서식으로, 번호는 para 서식으로 — 모두 커맨드
+   * 경로라 Ctrl+Z 한 번에 되돌아간다.
+   */
+  private applyTextStyle(t: { pt: number; bold: boolean; level?: number }): void {
+    const ih = this.services.getInputHandler() as any;
+    if (!ih) return;
+    try {
+      const pos = ih.cursor.getPosition();
+      // v1 은 본문 문단만 — 셀 안은 컨텍스트 탭에서 이 화면이 아예 안 보인다
+      if (pos.parentParaIndex !== undefined) return;
+      const len = this.services.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex);
+      const start = { ...pos, charOffset: 0 };
+      const end = { ...pos, charOffset: len };
+      ih.applyCharPropsToRange(start, end, { fontSize: t.pt * 100, bold: t.bold });
+      if (t.level !== undefined) {
+        const nid = this.services.wasm.ensureDefaultNumbering();
+        ih.applyParaPropsToRange(start, end,
+          { headType: 'Number', numberingId: nid, paraLevel: t.level } as any);
+      }
+    } catch (err) {
+      console.warn('[inspector] 텍스트 스타일 적용 실패:', err);
+    }
   }
 
   /** 아이콘 칩 여러 개를 한 줄(줄바꿈 허용)로 — 디자인 2c 의 표 조작 섹션 */
