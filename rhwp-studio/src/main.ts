@@ -38,6 +38,7 @@ import { formatCommands } from '@/command/commands/format';
 import { insertCommands } from '@/command/commands/insert';
 import { tableCommands } from '@/command/commands/table';
 import { pageCommands } from '@/command/commands/page';
+import { reviewTrackCommands } from '@/command/commands/review-track';
 import { toolCommands } from '@/command/commands/tool';
 import { aiCommands } from '@/command/commands/ai';
 import { objectCommands } from '@/command/commands/object'; // [캔버스 한컴 포크] 개체 정렬
@@ -170,6 +171,7 @@ registry.registerAll(formatCommands);
 registry.registerAll(insertCommands);
 registry.registerAll(tableCommands);
 registry.registerAll(pageCommands);
+registry.registerAll(reviewTrackCommands); // 변경 내용 추적 (track-changes.md)
 registry.registerAll(toolCommands);
 registry.registerAll(aiCommands); // [캔버스 한컴 포크] AI에게 수정하기
 registry.registerAll(objectCommands); // [캔버스 한컴 포크] 개체 정렬(다중 선택)

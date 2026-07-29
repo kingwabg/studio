@@ -584,6 +584,37 @@ export class WasmBridge {
     return (this.doc as any).insertColumnBreak(sec, para, charOffset);
   }
 
+  // ── 변경 내용 추적 (track-changes.md) ──
+  setTrackChanges(enabled: boolean, author: string, date: string): void {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    (this.doc as any).setTrackChanges(enabled, author, date);
+  }
+
+  isTrackChangesEnabled(): boolean {
+    if (!this.doc) return false;
+    try { return !!(this.doc as any).isTrackChangesEnabled(); } catch { return false; }
+  }
+
+  getTrackChanges(): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).getTrackChanges();
+  }
+
+  acceptTrackChange(id: number): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).acceptTrackChange(id);
+  }
+
+  rejectTrackChange(id: number): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).rejectTrackChange(id);
+  }
+
+  resolveAllTrackChanges(accept: boolean): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).resolveAllTrackChanges(accept);
+  }
+
   /** 구역 나누기 — 커서부터 끝까지 새 구역 (Alt+Shift+Enter) */
   insertSectionBreak(sec: number, para: number, charOffset: number): string {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');

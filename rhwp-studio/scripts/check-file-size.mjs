@@ -19,18 +19,19 @@ const FAIL = 600;
 
 // 현재 크기 스냅샷(2026-07-30 실측 생성) — 늘어나면 실패, 줄이면 수동 갱신
 const legacyBaselines = new Map([
-  // +10: 대기 서식 배선(2026-07-30). 본문은 pending-format.ts 로 갔고 위임·상태만 남았다 —
-  // 게이트가 잡아 준 대로 새 모듈로 뺀 뒤의 잔여 배선분. 기능 코드로 다시 불리면 안 된다.
-  ['src/engine/input-handler.ts', 4807],
+  // +10 대기 서식, +16 변경 추적(오버레이 필드·갱신 훅·승격 지점) — 둘 다 본문은
+  // pending-format.ts / track-review.ts 에 있고 여긴 배선뿐. 기능 코드 반입 금지.
+  ['src/engine/input-handler.ts', 4823],
   ['src/compare/diff-engine.ts', 3106],
   ['src/ui/picture-props-dialog.ts', 2826],
-  ['src/core/wasm-bridge.ts', 2291],
+  // +31: 변경 추적 API 래퍼 6종(2026-07-30) — 이 파일은 wasm 경계라 래퍼의 정위치다
+  ['src/core/wasm-bridge.ts', 2322],
   ['src/engine/input-handler-mouse.ts', 2202],
   ['src/engine/input-handler-keyboard.ts', 2097],
   ['src/engine/cursor.ts', 1854],
   ['src/engine/input-handler-table.ts', 1627],
   ['src/core/types.ts', 1397],
-  ['src/main.ts', 1301],
+  ['src/main.ts', 1303],  // +2: 변경 추적 명령 등록(2026-07-30)
   ['src/engine/input-handler-picture.ts', 1215],
   ['src/engine/command.ts', 1169],
   ['src/ui/cell-border-bg-dialog.ts', 1120],

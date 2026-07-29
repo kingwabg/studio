@@ -38,6 +38,7 @@ import * as _table from './input-handler-table';
 import * as _keyboard from './input-handler-keyboard';
 import * as _text from './input-handler-text';
 import * as _pend from './pending-format';
+import * as _track from './track-review';
 import * as _picture from './input-handler-picture';
 import type { AlignMode } from './object-align'; // [캔버스 한컴 포크] 개체 정렬 모드
 import { computeHangingIndentPx } from './hanging-indent';
@@ -258,6 +259,8 @@ export class InputHandler {
   private fieldMarker: FieldMarkerRenderer;
   /** 메모 말풍선 오버레이(읽기 전용) */
   private memoOverlay: MemoOverlay;
+  /** 변경 추적 오버레이 — 구현 track-review.ts */
+  private trackOverlay: _track.TrackOverlay;
   private selectionRenderer: SelectionRenderer;
   private history: CommandHistory;
   private textarea: HTMLTextAreaElement;
@@ -488,6 +491,7 @@ export class InputHandler {
     this.caret = new CaretRenderer(container, virtualScroll);
     this.fieldMarker = new FieldMarkerRenderer(container, virtualScroll);
     this.memoOverlay = new MemoOverlay(container, virtualScroll);
+    this.trackOverlay = new _track.TrackOverlay(container, virtualScroll);
     this.selectionRenderer = new SelectionRenderer(container, virtualScroll);
     this.history = new CommandHistory();
 
@@ -600,6 +604,7 @@ export class InputHandler {
     // 문서 변경 후 그림/표 선택 마커 재렌더링
     eventBus.on('document-changed', () => {
       this.refreshMemoOverlay();
+      this.refreshTrackOverlay();
       this.protectedCellHitCache = null;
       this.protectedCellHoverEl?.remove();
       this.protectedCellHoverEl = null;
@@ -647,6 +652,13 @@ export class InputHandler {
    * 에서 같은 경로를 태워야 오버레이가 용지를 따라간다.
    */
   /** 메모 말풍선을 다시 그린다 — 문서·레이아웃·줌 변경 시 */
+  /** 변경 추적 마크를 다시 그린다 — 문서·레이아웃·줌 변경 시(메모와 같은 트리거) */
+  refreshTrackOverlay(): void {
+    try {
+      this.trackOverlay.render(this.wasm, this.viewportManager.getZoom());
+    } catch { /* 표시용 — 실패 무시 */ }
+  }
+
   refreshMemoOverlay(): void {
     try {
       const memos = this.wasm.getMemos();
@@ -663,6 +675,7 @@ export class InputHandler {
 
   private refreshOverlayPositions(): void {
     this.refreshMemoOverlay();
+    this.refreshTrackOverlay();
     if (this.active) {
       if (this.cursor.getRect()) {
         this.caret.updatePosition(this.viewportManager.getZoom());
@@ -2351,6 +2364,9 @@ export class InputHandler {
    */
   executeOperation(desc: OperationDescriptor): void {
     if (!this.isOperationAllowedInEditMode(desc)) return;
+    // [변경 추적] ON 이면 텍스트 명령을 스냅샷으로 승격한다 — 구현·이유는 track-review.ts
+    const promoted = _track.promoteWhileTracking?.call(this, desc);
+    if (promoted) desc = promoted;
     switch (desc.kind) {
       case 'command': {
         const beforePos = this.cursor.getPosition();

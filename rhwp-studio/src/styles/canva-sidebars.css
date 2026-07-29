@@ -1035,3 +1035,12 @@
 .canva-style--body { font-size: 11.5px; }
 .canva-style--num1 { font-size: 13px; font-weight: 700; }
 .canva-style--num2 { font-size: 11.5px; }
+
+/* 변경 추적 오버레이 — 삽입=초록 밑줄+옅은 배경, 삭제=자홍 취소선 (track-review.ts) */
+.track-mark { pointer-events: none; }
+.track-mark--insert { background: rgba(26, 127, 55, .12); border-bottom: 2px solid #1a7f37; }
+.track-mark--delete { background: rgba(214, 0, 108, .08); }
+.track-mark--delete::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  border-top: 2px solid #d6006c;
+}
