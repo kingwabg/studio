@@ -6,7 +6,7 @@ import { StyleDialog } from '@/ui/style-dialog';
 import { StyleEditDialog } from '@/ui/style-edit-dialog';
 import { PicturePropsDialog } from '@/ui/picture-props-dialog';
 import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
-import { TableCellPropsDialog } from '@/ui/table-cell-props-dialog';
+import { openTablePanel } from '@/ui/canva-sidebars';
 
 export const formatCommands: CommandDef[] = [
   {
@@ -477,14 +477,8 @@ export const formatCommands: CommandDef[] = [
         return;
       }
 
-      // 표 선택 시
-      if (ih.isInTableObjectSelection()) {
-        const pos = ih.getCursorPosition();
-        if (pos.parentParaIndex === undefined || pos.controlIndex === undefined || pos.cellIndex === undefined) return;
-        const tableCtx = { sec: pos.sectionIndex, ppi: pos.parentParaIndex, ci: pos.controlIndex };
-        const dialog = new TableCellPropsDialog(services.wasm, services.eventBus, tableCtx, pos.cellIndex, 'table', services);
-        dialog.show();
-      }
+      // 표 선택 시 — 대화상자 은퇴, 오른쪽 패널 표 탭으로 (2026-07-29)
+      if (ih.isInTableObjectSelection()) openTablePanel('table', '위치');
     },
   },
 ];

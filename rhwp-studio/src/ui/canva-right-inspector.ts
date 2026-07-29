@@ -9,6 +9,7 @@ import type { CharProperties, ParaProperties } from '@/core/types';
 import { TableBorderSection } from './table-border-section';
 import { TablePanelSections } from './table-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
+import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
 
@@ -328,6 +329,20 @@ export class CanvaRightInspector {
     return '';
   }
 
+  /** 같은 패널의 표/셀 탭으로 보내는 버튼 — 예전 '표/셀 속성…' 대화상자 자리 */
+  private panelLink(label: string, kind: 'table' | 'cell', section: string): HTMLElement {
+    const b = mkButton('canva-full-btn', { title: label });
+    b.innerHTML = `<i class="ph-duotone ph-${kind === 'table' ? 'table' : 'grid-nine'}"></i><span>${label}</span>`
+      + '<i class="ph ph-caret-right canva-full-caret"></i>';
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); openTablePanel(kind, section); });
+    return b;
+  }
+
+  /** 섹션을 지정해 연다 — 명령·우클릭 진입점이 특정 섹션으로 바로 보내려고 쓴다 */
+  setSection(kind: 'table' | 'cell', section: string): void {
+    if (SECTIONS[kind].some(([label]) => label === section)) this.curSection[kind] = section;
+  }
+
   /** 패널 탭 — 디자인 2c 갱신: 속성 · 표 · 셀 */
   setPanelTab(tab: 'props' | 'table' | 'cell'): void {
     this.panelTab = tab;
@@ -467,10 +482,14 @@ export class CanvaRightInspector {
       host.appendChild(cellSec);
 
       const lookSec = this.section('모양');
-      lookSec.appendChild(this.chipRow([
-        ['테두리', 'table:border-each', 'frame-corners'],
-        ['배경색', 'table:cell-props', 'paint-bucket'],
-      ]));
+      // 테두리·배경은 이 패널의 셀 탭 안에 있다 — 대화상자로 나가지 않는다(2026-07-29).
+      // '테두리(각 셀마다)'만 셀 범위 선택을 다루므로 전용 대화상자를 유지한다.
+      const look = this.chipRow([['범위 테두리', 'table:border-each', 'frame-corners']]);
+      const bgChip = mkButton('canva-chip', { title: '테두리·배경' });
+      bgChip.innerHTML = '<i class="ph-duotone ph-paint-bucket"></i><span>테두리·배경</span>';
+      bgChip.addEventListener('mousedown', (e) => { e.preventDefault(); openTablePanel('cell', '테두리·배경'); });
+      look.appendChild(bgChip);
+      lookSec.appendChild(look);
       host.appendChild(lookSec);
 
       const calcSec = this.section('블록 계산');
@@ -491,13 +510,13 @@ export class CanvaRightInspector {
 
       // 속성은 두 갈래 — 셀 안쪽 / 개체 전체를 항상 함께 노출(디자인 2c)
       const propSec = this.section('속성');
-      propSec.appendChild(fullBtn('표/셀 속성…', 'table:cell-props', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18"/>'));
+      propSec.appendChild(this.panelLink('셀 속성 전체', 'cell', '크기'));
       propSec.appendChild(fullBtn('개체 속성…', 'format:object-properties', '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M9 9h6v6H9z"/>'));
       host.appendChild(propSec);
     } else if (this.ctx === 'table') {
       const sec = this.section('표 개체');
       sec.appendChild(fullBtn('개체 속성…', 'format:object-properties', '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M9 9h6v6H9z"/>'));
-      sec.appendChild(fullBtn('표/셀 속성…', 'table:cell-props', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18"/>'));
+      sec.appendChild(this.panelLink('표 속성 전체', 'table', '위치'));
       sec.appendChild(mkEl('div', 'canva-hint', '셀을 클릭하면 글자 서식과 행·열 편집이 열립니다.'));
       host.appendChild(sec);
     } else if (this.ctx === 'picture') {

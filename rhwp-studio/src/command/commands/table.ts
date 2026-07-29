@@ -1,8 +1,8 @@
 import type { CommandDef, CommandServices, EditorContext } from '../types';
-import { TableCellPropsDialog } from '@/ui/table-cell-props-dialog';
 import { TableCreateDialog } from '@/ui/table-create-dialog';
 import type { TableCreateOptions } from '@/ui/table-create-dialog';
 import { CellSplitDialog } from '@/ui/cell-split-dialog';
+import { openTablePanel } from '@/ui/canva-sidebars';
 import { CellBorderBgDialog } from '@/ui/cell-border-bg-dialog';
 import { FormulaDialog } from '@/ui/formula-dialog';
 import {
@@ -295,23 +295,13 @@ export const tableCommands: CommandDef[] = [
     id: 'table:cell-props',
     label: '표/셀 속성',
     canExecute: (ctx) => ctx.inTable || ctx.inCellSelectionMode || ctx.inTableObjectSelection,
+    // [2026-07-29] 대화상자 은퇴 — 오른쪽 패널의 표/셀 탭이 같은 설정을 전부 담는다.
+    // 표 개체를 고른 상태면 표 탭(위치부터), 셀 안이면 셀 탭(크기부터)을 연다.
     execute(services) {
       const ih = services.getInputHandler();
       if (!ih) return;
-      if (ih.isInTableObjectSelection()) {
-        const ref = ih.getSelectedTableRef();
-        if (!ref) return;
-        const tableCtx = { sec: ref.sec, ppi: ref.ppi, ci: ref.ci };
-        const dialog = new TableCellPropsDialog(services.wasm, services.eventBus, tableCtx, 0, 'table', services);
-        dialog.show();
-        return;
-      }
-
-      const pos = ih.getCursorPosition();
-      if (pos.parentParaIndex === undefined || pos.controlIndex === undefined || pos.cellIndex === undefined) return;
-      const tableCtx = { sec: pos.sectionIndex, ppi: pos.parentParaIndex, ci: pos.controlIndex };
-      const dialog = new TableCellPropsDialog(services.wasm, services.eventBus, tableCtx, pos.cellIndex, 'cell', services);
-      dialog.show();
+      if (ih.isInTableObjectSelection()) { openTablePanel('table', '위치'); return; }
+      openTablePanel('cell', '크기');
     },
   },
   {

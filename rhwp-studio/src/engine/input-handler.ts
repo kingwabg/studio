@@ -1833,7 +1833,7 @@ export class InputHandler {
       { type: 'separator' },
       { type: 'command', commandId: 'table:caption-toggle', label: '캡션 넣기(A)' },
       { type: 'separator' },
-      { type: 'command', commandId: 'table:cell-props', label: '표 속성...' },
+      { type: 'command', commandId: 'table:cell-props', label: '표 속성' },
       { type: 'separator' },
       { type: 'command', commandId: 'table:delete' },
     ];
@@ -1909,7 +1909,7 @@ export class InputHandler {
       { type: 'command', commandId: 'edit:format-copy' },
       { type: 'command', commandId: 'edit:format-paste' },
       { type: 'separator' },
-      { type: 'command', commandId: 'table:cell-props', label: '셀 속성...' },
+      { type: 'command', commandId: 'table:cell-props', label: '셀 속성' },
       { type: 'separator' },
       { type: 'command', commandId: 'table:insert-row-col' },
       { type: 'separator' },

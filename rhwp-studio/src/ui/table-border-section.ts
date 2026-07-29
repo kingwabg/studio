@@ -1,13 +1,13 @@
 /**
  * 표/셀 「테두리·배경」 섹션 — 오른쪽 패널 전용 (디자인 2c).
  *
- * 왜 새 파일인가: 모달의 테두리 탭(table-cell-props-dialog buildBorderTab)은
- * ①방향이 좌·우·상·하 4개뿐이라 **안쪽·가로선·세로선을 못 만든다** ②적용이 「확인」에
- * 몰려 있어 패널의 즉시 반영과 맞지 않는다. 그래서 2c 레이아웃(프리셋 10종 + 미리보기)을
- * 새로 그리고, 적용은 셀 단위 setCellProperties 로 직접 한다 —
+ * 왜 새 파일인가: 옛 표/셀 속성 대화상자의 테두리 탭은 ①방향이 좌·우·상·하 4개뿐이라
+ * **안쪽·가로선·세로선을 못 만들었고** ②적용이 「확인」에 몰려 있어 패널의 즉시 반영과
+ * 맞지 않았다. 그래서 2c 레이아웃(프리셋 10종 + 미리보기)을 새로 그리고,
+ * 적용은 셀 단위 setCellProperties 로 직접 한다 —
  * wasm-bridge.applyDefaultTableBorders 가 쓰는 것과 같은 경로(검증된 길)다.
  *
- * ⚠ setTableProperties 는 borderFill 재빌드로 전 셀 배경을 날린다(모달 주석 참조).
+ * ⚠ setTableProperties 는 borderFill 재빌드로 전 셀 배경을 날린다(table-panel-sections 참조).
  * 여기서는 셀 간격을 고칠 때만 부르고, 그 앞뒤로 셀 배경을 스냅샷·복원한다.
  */
 import { mkEl, mkButton } from './canva-dom';

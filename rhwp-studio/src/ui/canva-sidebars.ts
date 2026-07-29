@@ -15,6 +15,13 @@ let mounted = false;
 // '1'=캔버스 모드(기본), '0'=문서 모드. main.ts(새 문서 여백 0 분기)와 공유 — 문자열 중복 금지.
 export const CANVAS_MODE_KEY = 'rhwpCanvasMode';
 
+/**
+ * 표/셀 속성 패널을 연다 — 사이드바가 마운트된 뒤에만 동작한다.
+ * 명령 계층이 UI 인스턴스를 직접 알 필요가 없도록 모듈 함수로 노출한다
+ * (구 TableCellPropsDialog 진입점들이 이걸 부른다).
+ */
+export let openTablePanel: (which: 'table' | 'cell', section?: string) => void = () => {};
+
 export function mountCanvaSidebars(services: CanvaServices): void {
   if (mounted) return;
   const root = document.getElementById('studio-root');
@@ -52,18 +59,28 @@ export function mountCanvaSidebars(services: CanvaServices): void {
   new CanvaRecordPanel(recordPane, services);
 
   // [디자인 2c 갱신] 탭 = 속성 · 표 · 셀 (AI·녹음은 명세에서 빠짐 → 속성 탭 하단으로 접근)
-  const tabs = right.setTabs(['속성', '표', '셀'], (idx) => {
+  const showTab = (idx: number) => {
     inspectorPane.hidden = false;
     aiPane.hidden = true;
     recordPane.hidden = true;
     inspector.setPanelTab(idx === 0 ? 'props' : idx === 1 ? 'table' : 'cell');
-  });
+  };
+  const tabs = right.setTabs(['속성', '표', '셀'], showTab);
+
+  // 표/셀 속성 진입점(명령·우클릭·리본)이 여는 곳 — 대화상자를 대신한다.
+  // 접혀 있으면 펼치고, 탭 강조까지 손으로 누른 것과 같게 맞춘다.
+  openTablePanel = (which, section) => {
+    right.rail.classList.remove('is-collapsed');
+    const idx = which === 'table' ? 1 : 2;
+    tabs.forEach((b, i) => b.classList.toggle('is-active', i === idx));
+    if (section) inspector.setSection(which, section);
+    showTab(idx);
+  };
   // [디자인 2c] 모델 이름 칩은 **AI 패널 안**으로 — 속성 탭에서는 쓰이지 않는 정보라
   // 탭 스트립에 상시 노출할 이유가 없다.
   const badge = ai.getModelBadge();
   badge.classList.add('canva-ai-model--inpane');
   aiPane.prepend(badge);
-  void tabs;
 }
 
 // [캔버스 한컴 포크] 메뉴바 우측 캔버스/문서 모드 토글 — 입력 해석 레이어 전환(캔바 손맛 vs 한글 커서).
