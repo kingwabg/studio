@@ -14,6 +14,22 @@ runTest('우측 속성 패널 2c — 284px·컨텍스트 헤더·표 조작 섹�
     };
   });
   console.log('  기본:', JSON.stringify(base));
+
+  // [2026-07-30] 배너 위치 설명은 커서를 따라간다 — 같은 컨텍스트 안 이동에서도
+  const follow = await page.evaluate(async () => {
+    const ih = window.__inputHandler;
+    ih.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 1, charOffset: 0 });
+    window.__eventBus?.emit('cursor-rect-updated');
+    await new Promise(r => setTimeout(r, 300));
+    const at2 = document.querySelector('.canva-ctx-sub')?.textContent ?? null;
+    ih.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 0, charOffset: 0 });
+    window.__eventBus?.emit('cursor-rect-updated');
+    await new Promise(r => setTimeout(r, 300));
+    return { at2, at1: document.querySelector('.canva-ctx-sub')?.textContent ?? null };
+  });
+  console.log('  배너 추적:', JSON.stringify(follow));
+  assert.ok(follow.at2?.includes('2번째'), `2번째 문단 표시 (실측 ${follow.at2})`);
+  assert.ok(follow.at1?.includes('1번째'), `1번째 문단 복귀 (실측 ${follow.at1})`);
   // [디자인 2c] 본문 패널 구성 요소 전수
   const parts = await page.evaluate(() => ({
     fontName: document.querySelector('.canva-font-name span')?.textContent ?? null,

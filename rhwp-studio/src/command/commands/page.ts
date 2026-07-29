@@ -449,6 +449,38 @@ export const pageCommands: CommandDef[] = [
     },
   },
   {
+    id: 'page:section-break',
+    label: '구역 나누기',
+    shortcutLabel: 'Alt+Shift+Enter',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      const ih = services.getInputHandler();
+      if (!ih) return;
+      const pos = ih.getPosition();
+      try {
+        ih.executeOperation({
+          kind: 'snapshot',
+          operationType: 'sectionBreak',
+          operation: (wasm) => {
+            const result = JSON.parse(wasm.insertSectionBreak(pos.sectionIndex, pos.paragraphIndex, pos.charOffset));
+            if (result.ok) {
+              // 커서를 새 구역 머리로
+              return {
+                sectionIndex: result.sectionIdx ?? pos.sectionIndex + 1,
+                paragraphIndex: 0,
+                charOffset: 0,
+              };
+            }
+            return pos;
+          },
+          meta: { actionId: 'page:section-break', domain: 'page', refresh: 'full', dirtyScope: 'document' },
+        });
+      } catch (err) {
+        console.warn('[page:section-break] 구역 나누기 실패:', err);
+      }
+    },
+  },
+  {
     id: 'page:column-break',
     label: '단 나누기',
     shortcutLabel: 'Ctrl+Shift+Enter',

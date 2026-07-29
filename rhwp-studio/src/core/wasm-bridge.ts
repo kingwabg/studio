@@ -584,6 +584,12 @@ export class WasmBridge {
     return (this.doc as any).insertColumnBreak(sec, para, charOffset);
   }
 
+  /** 구역 나누기 — 커서부터 끝까지 새 구역 (Alt+Shift+Enter) */
+  insertSectionBreak(sec: number, para: number, charOffset: number): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).insertSectionBreak(sec, para, charOffset);
+  }
+
   getColumnDef(sec: number): { columnCount: number; columnType: number; sameWidth: boolean; spacing: number } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse((this.doc as any).getColumnDef(sec));

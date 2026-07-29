@@ -146,6 +146,7 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('grid-nine', '격자 설정', 'view:grid-settings'),
       gap(),
       P('rectangle-dashed', '구역 설정', 'page:section-settings'),
+      P('arrows-out-line-horizontal', '구역 나누기', 'page:section-break'),
       P('stack-simple', '바탕쪽', 'page:masterpage'),
       P('printer', '인쇄', 'file:print'),
       O('eye-slash', '현재 쪽만 감추기', '', 'page:hide-current'),

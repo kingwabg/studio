@@ -330,7 +330,11 @@ export class CanvaRightInspector {
     else ctx = 'body';
     // [캔버스 한컴 포크] 그림 컨텍스트 안에서도 다중 선택 전환이면 다시 그린다(정렬 섹션 노출)
     const multi = ctx === 'picture' && !!ih.isMultiPictureSelection?.();
-    if (ctx === this.ctx && this.painted && multi === this.lastMulti) return;
+    if (ctx === this.ctx && this.painted && multi === this.lastMulti) {
+      // 같은 컨텍스트 안의 커서 이동 — 위치 설명(쪽·문단·셀 주소)만 따라간다
+      this.paintBanner();
+      return;
+    }
     this.painted = true;
     this.ctx = ctx;
     this.lastMulti = multi;
@@ -478,7 +482,13 @@ export class CanvaRightInspector {
     }
   }
 
-  private applyContext(): void {
+  /**
+   * 컨텍스트 배너(상태명 + "1쪽 · N번째 문단")를 다시 그린다.
+   * ⚠ applyContext 와 분리한 이유: 컨텍스트가 안 바뀌는 커서 이동(본문 안 문단 이동,
+   * 셀 사이 이동)에서도 위치 설명은 바뀐다 — 패널 전체 재렌더 없이 이것만 갱신한다
+   * (사용자 신고 2026-07-30: 2번째 문단인데 배너는 1번째 문단 고정).
+   */
+  private paintBanner(): void {
     const c = this.ctx;
     const meta: Record<Ctx, { icon: string; label: string }> = {
       none: { icon: '<circle cx="12" cy="12" r="9"/>', label: '선택 없음' },
@@ -487,13 +497,16 @@ export class CanvaRightInspector {
       table: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16"/>', label: '표 개체 선택됨' },
       picture: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>', label: '그림 선택됨' },
     };
-    // [디자인 2c] 24px 아이콘 타일 + 상태명 + 위치 설명. 파란 강조 박스는 걷어내고
-    // 실제 선택 상태는 헤더 탭과 같은 시안 하나로만 표시한다.
     const sub = this.describeSelection(c);
     this.banner.innerHTML =
       `<span class="canva-ctx-tile">${svg(meta[c].icon)}</span>` +
       `<span class="canva-ctx-text"><span class="canva-ctx-label">${meta[c].label}</span>` +
       (sub ? `<span class="canva-ctx-sub">${sub}</span>` : '') + '</span>';
+  }
+
+  private applyContext(): void {
+    const c = this.ctx;
+    this.paintBanner();
 
     // [디자인 2c 갱신] 표·셀 탭은 섹션 스트립을 보여준다. 속성 탭만 기존 서식 화면.
     if (this.panelTab !== 'props') {
