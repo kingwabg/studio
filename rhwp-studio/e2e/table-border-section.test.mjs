@@ -58,6 +58,20 @@ runTest('테두리·배경 섹션 — 안쪽/바깥 프리셋이 정확한 변�
 
     // 선 종류·굵기는 이름 드롭다운이 아니라 **샘플 팝오버**여야 한다(디자인 2c) —
     // 파선·점선은 이름만으론 못 고른다.
+    // [사용자 요청 2026-07-29] 미리보기와 선 모양은 한 상자 안에 — 왼쪽 결과, 오른쪽 손잡이
+    const card = host.querySelector('.tbs-card');
+    out.card = {
+      hasPreview: !!card?.querySelector('.tbs-preview'),
+      hasPickers: card?.querySelectorAll('.tbs-pick').length ?? 0,
+      hasInks: card?.querySelectorAll('.tbs-swatch').length ?? 0,
+      hasCaption: !!card?.querySelector('.tbs-caption'),
+      // 펜촉 아이콘이 선 종류와 같은 줄에 있어야 한다(혼자 윗줄에 남지 않게)
+      iconRow: (() => {
+        const i = card?.querySelector('.tbs-pen-icon')?.getBoundingClientRect();
+        const t = card?.querySelector('.tbs-pick-type')?.getBoundingClientRect();
+        return !!(i && t && i.left < t.left && Math.abs((i.top + i.height / 2) - (t.top + t.height / 2)) < 4);
+      })(),
+    };
     out.typeItems = host.querySelectorAll('.tbs-pop-type .tbs-pop-item').length;
     out.wItems = host.querySelectorAll('.tbs-pop-w .tbs-pop-item').length;
     out.samples = host.querySelectorAll('.tbs-pop-art svg').length;
@@ -89,6 +103,11 @@ runTest('테두리·배경 섹션 — 안쪽/바깥 프리셋이 정확한 변�
   assert.strictEqual(r.outerCornerTop, 3, '바깥 — 모서리 셀 위는 표 바깥 변');
   assert.strictEqual(r.outerCornerLeft, 3, '바깥 — 모서리 셀 왼쪽은 표 바깥 변');
   assert.deepStrictEqual(r.outerCenter, [2, 2, 2, 2], '바깥 — 가운데 셀은 그대로(직전 안쪽 값 유지)');
+
+  // 한 상자 구성
+  assert.ok(r.card.hasPreview && r.card.hasPickers === 2 && r.card.hasInks === 8 && r.card.hasCaption,
+    `미리보기·선 종류·굵기·색·설명이 한 상자에: ${JSON.stringify(r.card)}`);
+  assert.ok(r.card.iconRow, '펜촉 아이콘은 선 종류와 같은 줄');
 
   // 픽커(팝오버) — 고른 값이 실제로 적용되는가
   assert.strictEqual(r.typeItems, 8, '선 종류 8종');

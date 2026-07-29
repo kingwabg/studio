@@ -109,8 +109,7 @@ export class TableBorderSection {
     const box = mkEl('div', 'tbs');
     this.host.appendChild(box);
     box.appendChild(this.buildPresets());
-    box.appendChild(this.buildStyleBar());
-    box.appendChild(this.buildPreview());
+    box.appendChild(this.buildStyleCard());
     box.appendChild(this.buildImmediate());
     box.appendChild(this.buildSpacing());
     box.appendChild(this.buildFill());
@@ -156,10 +155,26 @@ export class TableBorderSection {
       + ` stroke="currentColor" stroke-width="1.5"${dash ? ` stroke-dasharray="${dash}"` : ''}/></svg>`;
   }
 
-  /** 펜촉 카드 — 선 종류·굵기 팝오버 + 색 스와치 (디자인 2c) */
-  private buildStyleBar(): HTMLElement {
-    const card = mkEl('div', 'tbs-pen');
-    card.appendChild(mkEl('i', 'ph-duotone ph-pen-nib tbs-pen-icon'));
+  /**
+   * 미리보기 + 선 모양을 **한 상자**로 (사용자 요청 2026-07-29).
+   * 왼쪽에 결과(미리보기), 오른쪽에 그 결과를 만드는 손잡이(선 종류·굵기·색).
+   * 떨어져 있으면 무엇을 바꾸면 무엇이 변하는지 눈으로 잇기 어렵다.
+   */
+  private buildStyleCard(): HTMLElement {
+    const card = mkEl('div', 'tbs-card');
+    card.appendChild(this.buildPreview());
+    card.appendChild(this.buildControls());
+    this.caption = mkEl('div', 'tbs-caption');
+    card.appendChild(this.caption);
+    this.paintPreview();
+    return card;
+  }
+
+  /** 선 종류·굵기 팝오버 + 색 스와치 */
+  private buildControls(): HTMLElement {
+    const card = mkEl('div', 'tbs-ctl');
+    const pen = mkEl('div', 'tbs-pen');
+    pen.appendChild(mkEl('i', 'ph-duotone ph-pen-nib tbs-pen-icon'));
 
     const typeName = () => LINE_DEFS.find(([, t]) => t === this.lineType)?.[0] ?? '실선';
     const typeBtn = mkButton('tbs-pick tbs-pick-type');
@@ -182,7 +197,7 @@ export class TableBorderSection {
       });
       typePop.appendChild(it);
     }
-    card.appendChild(this.popover(typeBtn, typePop));
+    pen.appendChild(this.popover(typeBtn, typePop, 'type'));
 
     const wBtn = mkButton('tbs-pick tbs-pick-w');
     const paintW = () => { wBtn.innerHTML = `<span>${LINE_WEIGHTS[this.weightIdx]}mm</span><i class="ph ph-caret-down"></i>`; };
@@ -202,9 +217,7 @@ export class TableBorderSection {
       });
       wPop.appendChild(it);
     });
-    card.appendChild(this.popover(wBtn, wPop));
-
-    card.appendChild(mkEl('span', 'tbs-pen-sep'));
+    pen.appendChild(this.popover(wBtn, wPop, 'w'));
 
     const inks = mkEl('div', 'tbs-swatches');
     for (const c of INK) {
@@ -219,13 +232,17 @@ export class TableBorderSection {
       });
       inks.appendChild(s);
     }
-    card.appendChild(inks);
+    card.append(pen, inks);
     return card;
   }
 
-  /** 버튼 + 팝오버 묶음. 바깥을 누르면 닫힌다(리스너는 한 번 쓰고 스스로 사라진다). */
-  private popover(btn: HTMLElement, pop: HTMLElement): HTMLElement {
-    const wrap = mkEl('div', 'tbs-pop-wrap');
+  /**
+   * 버튼 + 팝오버 묶음. 바깥을 누르면 닫힌다(리스너는 한 번 쓰고 스스로 사라진다).
+   * ⚠ 폭 조절은 **이 wrap** 에 걸어야 한다 — flex 항목은 버튼이 아니라 wrap 이다
+   *   (버튼에 flex 를 줬더니 아무 효과가 없어 아이콘만 윗줄에 남았다).
+   */
+  private popover(btn: HTMLElement, pop: HTMLElement, mod: string): HTMLElement {
+    const wrap = mkEl('div', `tbs-pop-wrap tbs-pop-wrap--${mod}`);
     wrap.append(btn, pop);
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -247,13 +264,9 @@ export class TableBorderSection {
   }
 
   private buildPreview(): HTMLElement {
-    const wrap = mkEl('div', 'tbs-preview-wrap');
     this.preview = mkEl('div', 'tbs-preview');
     this.preview.append(mkEl('i'), mkEl('i'), mkEl('i'), mkEl('i'));
-    this.caption = mkEl('div', 'tbs-caption');
-    wrap.append(this.preview, this.caption);
-    this.paintPreview();
-    return wrap;
+    return this.preview;
   }
 
   /** 선택한 변만 현재 선 모양으로 — 디자인 2c 의 prev 규칙 그대로 */
