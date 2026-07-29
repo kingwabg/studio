@@ -6,8 +6,8 @@
  */
 import type { CanvaServices } from './canva-services';
 import type { CharProperties, ParaProperties } from '@/core/types';
-import { TablePropsInline } from './table-props-inline';
 import { TableBorderSection } from './table-border-section';
+import { TablePanelSections } from './table-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -19,12 +19,6 @@ const SECTIONS: Record<'table' | 'cell', Array<[string, string]>> = {
   cell: [['크기', 'arrows-out-cardinal'], ['여백', 'square-half'], ['정렬', 'align-center-vertical'],
          ['속성', 'sliders-horizontal'], ['테두리·배경', 'square'], ['필드', 'textbox']],
 };
-/** 섹션 → 내장 폼(모달)의 탭 id. 테두리·배경만 2c 전용 UI 라 여기 없다. */
-const SECTION_TAB: Record<string, string> = {
-  위치: 'basic', 크기: 'basic', 여백: 'margin', '쪽 넘김': 'table', 캡션: 'margin',
-  정렬: 'cell', 속성: 'cell', 필드: 'cell',
-};
-
 const ALIGN_ICONS: Record<string, string> = {
   left: '<path d="M3 5h18M3 10h12M3 15h18M3 20h12"/>',
   center: '<path d="M3 5h18M6 10h12M3 15h18M6 20h12"/>',
@@ -60,10 +54,10 @@ export class CanvaRightInspector {
   private emptyEl!: HTMLElement;
   private extrasHost!: HTMLElement;
   private tabPane!: HTMLElement;
-  /** 표/셀 속성 폼(대화상자와 같은 폼을 패널에 내장) */
-  private inlineProps = new TablePropsInline();
   /** 테두리·배경 섹션만 2c 전용 UI */
   private borderSection = new TableBorderSection();
+  /** 나머지 섹션의 2c UI */
+  private panelSections = new TablePanelSections();
   /** 표·셀 탭에서 지금 보고 있는 섹션 */
   private curSection: Record<'table' | 'cell', string> = { table: '위치', cell: '크기' };
   private biu: Record<'bold' | 'italic' | 'underline' | 'strike', HTMLButtonElement> = {} as any;
@@ -357,19 +351,17 @@ export class CanvaRightInspector {
     return strip;
   }
 
-  /** 선택한 섹션의 내용을 그린다 — 테두리·배경만 2c 전용, 나머지는 기존 폼 */
+  /** 선택한 섹션의 내용을 그린다 (디자인 2c) */
   private renderSection(kind: 'table' | 'cell', host: HTMLElement,
     ref: { sec: number; ppi: number; ci: number }, cellIdx: number): void {
     const label = this.curSection[kind];
     if (label === '테두리·배경') {
-      this.inlineProps.dispose();
       this.borderSection.mount(host, this.services.wasm, this.services, ref, cellIdx, kind);
       return;
     }
-    this.inlineProps.mount(host, this.services.wasm, this.services.eventBus, ref, cellIdx, kind);
-    // 폼은 모달 탭 구조 그대로라, 고른 섹션에 해당하는 탭을 펼친다
-    // (셀 탭에서는 모달도 셀 탭 하나로 모여 있다)
-    this.inlineProps.showTab(kind === 'cell' ? 'cell' : SECTION_TAB[label] ?? 'basic');
+    if (!this.panelSections.mount(host, this.services.wasm, this.services, ref, cellIdx, kind, label)) {
+      host.appendChild(mkEl('div', 'canva-hint', '이 설정을 불러오지 못했습니다.'));
+    }
   }
 
   private applyContext(): void {
