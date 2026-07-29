@@ -162,6 +162,18 @@ export class TableCellPropsDialog extends ModalDialog {
     this.tableCtx = tableCtx;
     this.cellIdx = cellIdx;
     this.mode = mode;
+    // [디자인 3a] 타이틀바에 선택 대상 표기 — "표 블록 · 3×3 · B2"
+    try {
+      const d = (wasm as any).getTableDimensions?.(tableCtx.sec, tableCtx.ppi, tableCtx.ci);
+      const size = d?.rowCount && d?.colCount ? ` · ${d.rowCount}×${d.colCount}` : '';
+      let cell = '';
+      if (mode === 'cell' && cellIdx !== undefined && d?.colCount) {
+        const r = Math.floor(cellIdx / d.colCount);
+        const c = cellIdx % d.colCount;
+        cell = ` · ${String.fromCharCode(65 + c)}${r + 1}`;
+      }
+      this.titleSubject = `표 블록${size}${cell}`;
+    } catch { /* 조회 실패 시 표기 없음 */ }
     this.services = services;
   }
 
@@ -180,6 +192,11 @@ export class TableCellPropsDialog extends ModalDialog {
     body.className = 'tcp-dialog-body';
 
     // 탭 정의: mode에 따라 테두리/배경 탭 포함 여부 결정
+    // [디자인 3a] 탭마다 아이콘 — 6탭을 눈으로 구분하게 한다(브라우저 탭 → 칩은 셸 CSS).
+    const TAB_ICON: Record<string, string> = {
+      basic: 'frame-corners', margin: 'subtitles', border: 'square',
+      background: 'paint-bucket', table: 'table', cell: 'grid-nine',
+    };
     const tabDefs: TabDef[] = [
       { id: 'basic', label: '기본', builder: () => this.buildBasicTab() },
       { id: 'margin', label: '여백/캡션', builder: () => this.buildMarginTab() },
@@ -205,8 +222,14 @@ export class TableCellPropsDialog extends ModalDialog {
       // 탭 버튼
       const btn = document.createElement('button');
       btn.className = 'dialog-tab';
-      btn.textContent = def.label;
       btn.type = 'button';
+      const ic = TAB_ICON[def.id];
+      if (ic) {
+        const i = document.createElement('i');
+        i.className = `ph-duotone ph-${ic}`;
+        btn.appendChild(i);
+      }
+      btn.appendChild(document.createTextNode(def.label));
       btn.addEventListener('click', () => this.switchTab(i));
       this.tabs.push(btn);
       tabBar.appendChild(btn);
