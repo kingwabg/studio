@@ -153,18 +153,25 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
   {
     id: 'tools',
     label: '도구',
-    // 디자인의 tools 탭. AI·녹음은 `side:` 로 우측 패널을 여는 항목이라 명령으로 배선했다.
-    // 사전·번역·스크립트·문서 공유·함께 편집은 엔진/서비스가 없어 v1 에서 뺐다(자리만 비움).
+    // 디자인의 tools 탭 그대로. AI·녹음은 `side:` 로 우측 패널을 여는 항목이라 명령으로 배선.
+    // ⚠ 아직 구현이 없는 도구(사전·번역·스크립트·문서 공유·함께 편집)도 **자리를 남긴다** —
+    //   누르면 '준비 중' 안내가 뜬다(tool.ts). 뺄지 말지는 제품 결정이다.
     items: [
       PP('sparkle', 'AI 도우미', 'tool:ai-panel'),
       PP('microphone', '음성 녹음', 'tool:record-panel'),
       gap(),
       P('text-aa', '맞춤법 검사', 'edit:spellcheck'),
+      P('books', '사전', 'tool:dictionary'),
+      P('translate', '번역', 'tool:translate'),
+      gap(),
       P('list-numbers', '차례 만들기', 'insert:toc'),
       P('text-align-left', '상용구', 'insert:snippet'),
       gap(),
       P('command', '명령 팔레트', 'tool:command-palette'),
+      P('puzzle-piece', '스크립트', 'tool:script'),
       P('gear-six', '환경 설정', 'tool:options'),
+      O('cloud-arrow-up', '문서 공유', '', 'tool:share'),
+      O('users-three', '함께 편집', '', 'tool:coedit'),
     ],
   },
   {

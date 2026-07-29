@@ -83,5 +83,30 @@ runTest('리본 헤더 — 2행 88px·탭 전환·명령 배선', async ({ page 
   assert.ok(!review.includes('edit:spellcheck'), '맞춤법은 도구로 이동');
   assert.ok(!review.includes('tool:options'), '환경 설정은 도구로 이동');
 
+  // [2026-07-30] 아직 구현이 없는 도구도 **자리를 남긴다** — 임의로 빼지 않는다.
+  // 누르면 '준비 중' 안내가 뜬다(무동작 아님).
+  const roadmap = await page.evaluate(async () => {
+    [...document.querySelectorAll('.rb-tab')].find(b => b.textContent === '도구')?.click();
+    const cmds = [...document.querySelectorAll('.rb-btn[data-cmd]')].map(b => b.dataset.cmd);
+    const more = document.querySelector('.rb-more');
+    more?.click();
+    await new Promise(r => setTimeout(r, 200));
+    const over = [...document.querySelectorAll('.rb-over-item[data-cmd]')].map(b => b.dataset.cmd);
+    // '문서 공유' 눌러 준비 중 안내 확인
+    document.querySelector('.rb-over-item[data-cmd="tool:share"]')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    const toast = document.body.textContent.includes('준비 중입니다');
+    return { cmds, over, toast };
+  });
+  console.log('  로드맵 자리:', JSON.stringify({ over: roadmap.over, toast: roadmap.toast }));
+  for (const c of ['tool:dictionary', 'tool:translate', 'tool:script']) {
+    assert.ok(roadmap.cmds.includes(c), `도구 탭에 ${c} 자리`);
+  }
+  for (const c of ['tool:share', 'tool:coedit']) {
+    assert.ok(roadmap.over.includes(c), `도구 「⋯」에 ${c} 자리`);
+  }
+  assert.ok(roadmap.toast, "미구현 도구는 '준비 중' 안내를 띄운다(무동작 금지)");
+
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);
 });
