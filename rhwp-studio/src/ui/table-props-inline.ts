@@ -25,6 +25,11 @@ class InlineForm extends TableCellPropsDialog {
   applyNow(): void {
     this.onConfirm();
   }
+
+  /** 섹션 목차가 고른 탭을 펼친다 */
+  showTab(id: string): void {
+    this.switchTabById(id);
+  }
 }
 
 export class TablePropsInline {
@@ -66,6 +71,11 @@ export class TablePropsInline {
       console.warn('[table-props-inline] 폼 구성 실패:', err);
       host.textContent = '표 속성을 불러오지 못했습니다.';
     }
+  }
+
+  /** 섹션 목차가 고른 탭을 펼친다 (마운트 뒤 호출) */
+  showTab(id: string): void {
+    this.form?.showTab(id);
   }
 
   private applySafely(): void {

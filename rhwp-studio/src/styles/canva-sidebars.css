@@ -716,3 +716,87 @@
 .canva-props-host select { max-width: 100%; }
 .canva-props-host .tcp-section,
 .canva-props-host .dialog-section { margin-bottom: 12px !important; }
+
+/* 섹션 스트립 선택 상태 — 디자인 2c 는 현재 섹션을 시안 칩으로 강조한다 */
+.canva-sec-btn.is-on { background: var(--color-accent-bg); color: var(--color-primary); font-weight: 600; }
+
+/* ── 테두리·배경 섹션 (디자인 2c) — table-border-section.ts ── */
+.tbs { display: flex; flex-direction: column; gap: 12px; }
+
+.tbs-presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.tbs-preset {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 5px 0 3px; border: 1px solid var(--color-border); border-radius: 3px;
+  background: var(--color-surface-raised); color: var(--color-text);
+  font: inherit; cursor: pointer;
+}
+.tbs-preset:hover:not(:disabled) { border-color: var(--color-primary); }
+.tbs-preset.is-on { background: var(--color-accent-bg); border-color: var(--color-primary); color: var(--color-primary); }
+.tbs-preset.is-off { opacity: .42; cursor: default; }
+.tbs-preset-box {
+  width: 20px; height: 20px; box-sizing: border-box;
+  border: 1.5px solid var(--color-border);
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+}
+.tbs-preset-label { font-size: 9px; color: var(--color-text-muted); }
+.tbs-preset.is-on .tbs-preset-label { color: var(--color-primary); }
+
+.tbs-style-wrap {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-surface);
+}
+.tbs-style { display: flex; gap: 6px; }
+.tbs-select {
+  flex: 1; min-width: 0; height: 28px; padding: 0 6px; font-size: 11.5px;
+  border: 1px solid var(--color-border); border-radius: 3px;
+  background: var(--color-surface-raised); color: var(--color-text);
+}
+
+.tbs-swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tbs-swatch {
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 100px; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(32, 30, 29, .12);
+}
+.tbs-swatch.is-on { box-shadow: inset 0 0 0 1px rgba(32, 30, 29, .12), 0 0 0 2px var(--color-surface-raised), 0 0 0 4px var(--color-primary); }
+.tbs-color-more { width: 22px; height: 22px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; background: none; }
+
+.tbs-preview-wrap { display: flex; align-items: center; gap: 10px; }
+.tbs-preview {
+  width: 92px; height: 66px; flex: none; box-sizing: border-box;
+  background: var(--doc-paper, #fff);
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+}
+.tbs-caption { font-size: 11px; color: var(--color-text-muted); }
+
+.tbs-switch-row { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+.tbs-switch-row > input { position: absolute; opacity: 0; pointer-events: none; }
+.tbs-switch-track {
+  width: 32px; height: 18px; flex: none; border-radius: 100px;
+  background: var(--color-border); position: relative; transition: background .12s ease;
+}
+.tbs-switch-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+  border-radius: 100px; background: #fff; transition: transform .12s ease;
+}
+.tbs-switch-row > input:checked + .tbs-switch-track { background: var(--color-primary); }
+.tbs-switch-row > input:checked + .tbs-switch-track::after { transform: translateX(14px); }
+
+.tbs-sub { display: flex; flex-direction: column; gap: 6px; }
+.tbs-sub-title { font-size: 11.5px; font-weight: 600; color: var(--color-text-muted); }
+.tbs-row { display: flex; align-items: center; gap: 6px; }
+.tbs-label { font-size: 12px; color: var(--color-text-muted); min-width: 52px; }
+.tbs-input {
+  width: 70px; height: 26px; padding: 0 6px; font-size: 11.5px;
+  border: 1px solid var(--color-border); border-radius: 3px;
+  background: var(--color-surface-raised); color: var(--color-text);
+}
+.tbs-unit { font-size: 11px; color: var(--color-text-muted); }
+.tbs-note { font-size: 10.5px; color: var(--color-text-muted); line-height: 1.4; }
+
+.tbs-seg { display: flex; gap: 2px; padding: 2px; border-radius: 4px; background: var(--color-surface); }
+.tbs-seg-btn {
+  flex: 1; height: 26px; border: 0; border-radius: 3px; background: transparent;
+  color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer;
+}
+.tbs-seg-btn.is-on { background: var(--color-surface-raised); color: var(--color-primary); font-weight: 600; }

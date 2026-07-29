@@ -49,6 +49,8 @@ export class TableCellPropsDialog extends ModalDialog {
 
   // ─── 탭 UI ───
   private tabs: HTMLButtonElement[] = [];
+  /** 탭 id 순서 — 패널 내장판이 id 로 탭을 고르려고 기록한다 */
+  private tabIds: string[] = [];
   private panels: HTMLDivElement[] = [];
 
   // ─── 셀 탭 필드 ───
@@ -238,6 +240,7 @@ export class TableCellPropsDialog extends ModalDialog {
         btn.appendChild(i);
       }
       btn.appendChild(document.createTextNode(def.label));
+      this.tabIds.push(def.id);
       btn.addEventListener('click', () => this.switchTab(i));
       this.tabs.push(btn);
       tabBar.appendChild(btn);
@@ -257,6 +260,12 @@ export class TableCellPropsDialog extends ModalDialog {
     this.switchTab(this.mode === 'table' ? 0 : tabDefs.length - 1);
 
     return body;
+  }
+
+  /** 탭 id 로 전환 (패널 내장판의 섹션 목차용) */
+  protected switchTabById(id: string): void {
+    const i = this.tabIds.indexOf(id);
+    if (i >= 0) this.switchTab(i);
   }
 
   private switchTab(idx: number): void {

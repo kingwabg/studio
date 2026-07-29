@@ -1,0 +1,67 @@
+{
+  "config": {
+    "fixtures": [
+      "basic/KTX.hwp",
+      "biz_plan.hwp",
+      "tac-case-001.hwp"
+    ],
+    "scale": 1,
+    "maxPages": "1",
+    "channelTolerance": 1,
+    "maxDiffRatio": 0.0005,
+    "writeImages": false
+  },
+  "results": [
+    {
+      "pageIndex": 0,
+      "legacyWidth": 1122,
+      "legacyHeight": 793,
+      "layerWidth": 1122,
+      "layerHeight": 793,
+      "width": 1122,
+      "height": 793,
+      "sameSize": true,
+      "diffPixels": 116,
+      "totalPixels": 889746,
+      "diffRatio": 0.0001303742865941516,
+      "maxChannelDelta": 84,
+      "averageChannelDelta": 0.0015490375905033572,
+      "pass": true,
+      "fixture": "basic/KTX.hwp"
+    },
+    {
+      "pageIndex": 0,
+      "legacyWidth": 793,
+      "legacyHeight": 1122,
+      "layerWidth": 793,
+      "layerHeight": 1122,
+      "width": 793,
+      "height": 1122,
+      "sameSize": true,
+      "diffPixels": 0,
+      "totalPixels": 889746,
+      "diffRatio": 0,
+      "maxChannelDelta": 0,
+      "averageChannelDelta": 0,
+      "pass": true,
+      "fixture": "biz_plan.hwp"
+    },
+    {
+      "pageIndex": 0,
+      "legacyWidth": 793,
+      "legacyHeight": 1122,
+      "layerWidth": 793,
+      "layerHeight": 1122,
+      "width": 793,
+      "height": 1122,
+      "sameSize": true,
+      "diffPixels": 0,
+      "totalPixels": 889746,
+      "diffRatio": 0,
+      "maxChannelDelta": 0,
+      "averageChannelDelta": 0,
+      "pass": true,
+      "fixture": "tac-case-001.hwp"
+    }
+  ]
+}
