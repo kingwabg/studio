@@ -93,12 +93,89 @@ runTest('변경 추적 — 기록·표시·검토·되돌리기', async ({ page 
   assert.ok(afterUndo.text.startsWith('원본'), 'undo → 삭제 표시 글자 복원');
   assert.strictEqual(afterUndo.changes, 2, 'undo → 변경 목록 복원');
 
+  // ⑥ [v2] 선택 삭제 — 지워지지 않고 마크 (실사고: delete_range 훅 밖이라 진짜 지워졌었다)
+  const range = await page.evaluate(async () => {
+    const ih = window.__inputHandler, w = window.__wasm;
+    ih.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 0, charOffset: 0 });
+    ih.updateCaret?.();
+    await new Promise((r) => setTimeout(r, 200));
+    return { before: w.getTextRange(0, 0, 0, w.getParagraphLength(0, 0)) };
+  });
+  await page.keyboard.down('Shift');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.up('Shift');
+  await page.keyboard.press('Backspace');
+  await new Promise((r) => setTimeout(r, 700));
+  const afterRange = await page.evaluate(() => {
+    const w = window.__wasm;
+    return {
+      text: w.getTextRange(0, 0, 0, w.getParagraphLength(0, 0)),
+      changes: JSON.parse(w.getTrackChanges()).filter((c) => c.kind === 'delete').length,
+    };
+  });
+  console.log('  선택삭제:', JSON.stringify(afterRange));
+  assert.strictEqual(afterRange.text, range.before, '선택 삭제도 글자를 지우지 않는다');
+  assert.ok(afterRange.changes >= 1, '선택 삭제가 Delete 변경으로 기록');
+
+  // ⑦ [v2] 셀 안 추적 + 셀 오버레이 + 여백 변경 막대 + 한컴 빨강
+  const cellRes = await page.evaluate(async () => {
+    const w = window.__wasm, ih = window.__inputHandler;
+    const t = JSON.parse(w.doc.createTableEx(JSON.stringify({
+      sectionIdx: 0, paraIdx: 0, charOffset: w.getParagraphLength(0, 0),
+      rowCount: 2, colCount: 2, treatAsChar: true, colWidths: [6000, 6000],
+    })));
+    window.__eventBus?.emit('document-changed');
+    await new Promise((r) => setTimeout(r, 500));
+    w.insertTextInCell(0, t.paraIdx, t.controlIdx, 0, 0, 0, '셀추가');
+    window.__eventBus?.emit('document-changed');
+    await new Promise((r) => setTimeout(r, 600));
+    ih.refreshTrackOverlay();
+    await new Promise((r) => setTimeout(r, 300));
+    const cellChange = JSON.parse(w.getTrackChanges()).find((c) => c.cell);
+    const mark = document.querySelector('.track-mark--insert');
+    return {
+      cellChange: cellChange ? { kind: cellChange.kind, text: cellChange.text } : null,
+      bars: document.querySelectorAll('.track-change-bar').length,
+      insertColor: mark ? getComputedStyle(mark).borderBottomColor : null,
+    };
+  });
+  console.log('  셀·표시:', JSON.stringify(cellRes));
+  assert.deepStrictEqual(cellRes.cellChange, { kind: 'insert', text: '셀추가' }, '셀 삽입이 추적됨');
+  assert.ok(cellRes.bars >= 1, '왼쪽 여백 변경 막대(한컴식)');
+  assert.strictEqual(cellRes.insertColor, 'rgb(224, 49, 49)', '삽입 표시는 한컴 빨강');
+
+  // ⑧ [v2] 본 최종 미리보기 — 적용본 표시·편집 잠금·복귀
+  const finalView = await page.evaluate(async () => {
+    const ih = window.__inputHandler, w = window.__wasm;
+    const beforeChanges = JSON.parse(w.getTrackChanges()).length;
+    ih.dispatcher.dispatch('review:view-final');
+    await new Promise((r) => setTimeout(r, 600));
+    const inFinal = {
+      changes: JSON.parse(w.getTrackChanges()).length,
+      locked: !ih.active,
+    };
+    ih.dispatcher.dispatch('review:view-final');
+    await new Promise((r) => setTimeout(r, 600));
+    return {
+      beforeChanges,
+      inFinal,
+      restored: JSON.parse(w.getTrackChanges()).length,
+      unlocked: ih.active,
+    };
+  });
+  console.log('  본최종:', JSON.stringify(finalView));
+  assert.strictEqual(finalView.inFinal.changes, 0, '본 최종 = 변경이 전부 적용된 모습');
+  assert.ok(finalView.inFinal.locked, '본 최종 중 편집 잠금');
+  assert.strictEqual(finalView.restored, finalView.beforeChanges, '복귀 시 변경 목록 복원');
+  assert.ok(finalView.unlocked, '복귀 시 편집 잠금 해제');
+
   // ⑤ 리본 검토 탭 배선
   const ribbon = await page.evaluate(() => {
     [...document.querySelectorAll('.rb-tab')].find((b) => b.textContent === '검토')?.click();
     return [...document.querySelectorAll('.rb-btn[data-cmd^="review:"]')].map((b) => b.dataset.cmd);
   });
-  for (const c of ['review:track-toggle', 'review:accept-change', 'review:reject-change', 'review:prev-change', 'review:next-change']) {
+  for (const c of ['review:track-toggle', 'review:accept-change', 'review:reject-change', 'review:prev-change', 'review:next-change', 'review:view-final']) {
     assert.ok(ribbon.includes(c), `검토 리본에 ${c}`);
   }
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);

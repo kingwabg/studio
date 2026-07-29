@@ -7,7 +7,8 @@
  *     DeleteTextCommand 의 undo 는 "지운 텍스트 재삽입"이라 문서가 이중이 된다.
  *     스냅샷은 마크·레코드까지 통째로 되돌린다. (추적은 검토 시간의 일이라
  *     키입력당 스냅샷 비용은 감수 — v1 한계로 스펙에 명시)
- *  2. TrackOverlay — 삽입=초록 밑줄+옅은 배경, 삭제=자홍 취소선. 조판을 건드리지 않고
+ *  2. TrackOverlay — 한컴식 표시(2026-07-30 개편): 삽입=빨간 밑줄+옅은 붉은 배경,
+ *     삭제=빨간 취소선, 왼쪽 여백에 빨간 변경 막대. 조판을 건드리지 않고
  *     getSelectionRects 로 범위 사각형을 받아 위에 그린다(memo-overlay 와 같은 방식).
  *  3. 검토 명령 헬퍼 — 토글·적용/취소·모두·다음/이전 (command/commands/review-track.ts 가 사용)
  */
@@ -24,13 +25,17 @@ export interface TrackChangeItem {
   start: number;
   end: number;
   text: string;
+  /** 표 셀 안 변경이면 셀 좌표 (v2) */
+  cell?: { ppi: number; ci: number; cei: number; cpi: number };
 }
 
 /** 추적 ON 동안 텍스트 명령을 스냅샷으로 승격 (this = InputHandler) */
 export function promoteWhileTracking(this: any, desc: any): any | null {
   if (desc?.kind !== 'command') return null;
   const t = desc.command?.type;
-  if (t !== 'insertText' && t !== 'deleteText') return null;
+  // deleteSelection(범위 삭제)도 승격 — 엔진이 마크만 남기는데 이 명령의 undo 는
+  // '지운 텍스트 재삽입'이라 문서가 이중이 된다(단건 삭제와 같은 이유).
+  if (t !== 'insertText' && t !== 'deleteText' && t !== 'deleteSelection') return null;
   try {
     if (!this.wasm.isTrackChangesEnabled()) return null;
   } catch {
@@ -88,10 +93,16 @@ export class TrackOverlay {
     const scrollContent = this.container.querySelector('#scroll-content') as HTMLElement | null;
     const contentWidth = scrollContent?.clientWidth ?? 0;
 
+    // 같은 쪽·같은 세로 구간의 여백 변경 막대는 하나로 합친다(한컴처럼 왼쪽 여백에 |)
+    const bars = new Map<number, Array<[number, number]>>();
+
     for (const it of items) {
       let rects: Array<{ pageIndex: number; x: number; y: number; width: number; height: number }> = [];
       try {
-        rects = wasm.getSelectionRects(it.section, it.para, it.start, it.para, it.end);
+        rects = it.cell
+          ? wasm.getSelectionRectsInCell(it.section, it.cell.ppi, it.cell.ci, it.cell.cei,
+              it.cell.cpi, it.start, it.cell.cpi, it.end)
+          : wasm.getSelectionRects(it.section, it.para, it.start, it.para, it.end);
       } catch {
         continue;
       }
@@ -107,6 +118,32 @@ export class TrackOverlay {
           `position:absolute;left:${pageLeft + r.x * zoom}px;top:${pageTop + r.y * zoom}px;` +
           `width:${r.width * zoom}px;height:${r.height * zoom}px;`;
         this.layer.appendChild(el);
+        // 여백 변경 막대 구간 수집 (쪽 왼쪽 여백 안쪽, 한컴의 빨간 세로선)
+        const list = bars.get(r.pageIndex) ?? [];
+        list.push([pageTop + r.y * zoom, r.height * zoom]);
+        bars.set(r.pageIndex, list);
+      }
+    }
+
+    for (const [pageIndex, spans] of bars) {
+      const pageLeft = this.virtualScroll.getPageLeftResolved(pageIndex, contentWidth);
+      // 겹치는 구간 병합
+      spans.sort((a, b) => a[0] - b[0]);
+      const merged: Array<[number, number]> = [];
+      for (const [top, h] of spans) {
+        const last = merged[merged.length - 1];
+        if (last && top <= last[0] + last[1] + 2) {
+          last[1] = Math.max(last[1], top + h - last[0]);
+        } else {
+          merged.push([top, h]);
+        }
+      }
+      for (const [top, h] of merged) {
+        const bar = document.createElement('div');
+        bar.className = 'track-change-bar';
+        bar.style.cssText =
+          `position:absolute;left:${pageLeft + 8}px;top:${top}px;height:${h}px;`;
+        this.layer.appendChild(bar);
       }
     }
   }

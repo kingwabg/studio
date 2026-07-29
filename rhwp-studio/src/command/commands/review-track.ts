@@ -4,6 +4,7 @@
  */
 import type { CommandDef } from '../types';
 import { findAdjacentChange, findChangeAtCursor, type TrackChangeItem } from '@/engine/track-review';
+import { showToast } from '@/ui/toast';
 
 function changes(wasm: { getTrackChanges(): string }): TrackChangeItem[] {
   try {
@@ -36,7 +37,47 @@ function jumpTo(services: any, it: TrackChangeItem | null): void {
   services.eventBus.emit('cursor-rect-updated');
 }
 
+/** 본 최종 미리보기 상태 — 스냅샷 id 를 들고 있다(모듈 전역: 뷰는 하나뿐) */
+let finalPreview: { snapshotId: number } | null = null;
+
 export const reviewTrackCommands: CommandDef[] = [
+  {
+    id: 'review:view-final',
+    label: '본 최종',
+    canExecute: (ctx) => ctx.hasDocument,
+    // 한컴의 [변경 내용 보기 → 본 최종]: 모든 변경을 적용한 모습을 **읽기 전용**으로
+    // 미리 본다. 구현 = 스냅샷 저장 → 모두 적용 → (다시 누르면) 스냅샷 복원.
+    // 미리보기 중 편집을 막는 이유: 적용된 문서를 고치면 복원 시 그 편집이 사라진다.
+    execute(services) {
+      const ih = services.getInputHandler() as any;
+      if (!ih) return;
+      const wasm = services.wasm as any;
+      if (finalPreview) {
+        wasm.restoreSnapshot(finalPreview.snapshotId);
+        finalPreview = null;
+        ih.active = true;
+        services.eventBus.emit('track-view-final', false);
+        services.eventBus.emit('document-changed');
+        showToast({ message: '예정 및 변경 내용 보기로 돌아왔습니다.', durationMs: 2500 });
+        return;
+      }
+      const changes = JSON.parse(wasm.getTrackChanges());
+      if (changes.length === 0) {
+        showToast({ message: '표시할 변경 내용이 없습니다.', durationMs: 2500 });
+        return;
+      }
+      const snapshotId = wasm.saveSnapshot();
+      wasm.resolveAllTrackChanges(true);
+      finalPreview = { snapshotId };
+      ih.active = false; // 읽기 전용 — 편집하면 복원 시 소실되므로 잠근다
+      services.eventBus.emit('track-view-final', true);
+      services.eventBus.emit('document-changed');
+      showToast({
+        message: '본 최종 미리보기 — 모든 변경을 적용한 모습입니다.\n편집은 잠겨 있습니다. 다시 누르면 검토 화면으로 돌아갑니다.',
+        durationMs: 5000,
+      });
+    },
+  },
   {
     id: 'review:track-toggle',
     label: '변경 내용 추적',

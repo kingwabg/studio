@@ -187,6 +187,7 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('x', '취소 후 다음', 'review:reject-change'),
       P('caret-left', '이전 변경', 'review:prev-change'),
       P('caret-right', '다음 변경', 'review:next-change'),
+      P('eye', '본 최종', 'review:view-final'),
       O('checks', '모두 적용', '', 'review:accept-all'),
       O('trash', '모두 취소', '', 'review:reject-all'),
       gap(),
