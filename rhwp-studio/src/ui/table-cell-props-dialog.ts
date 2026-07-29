@@ -180,7 +180,15 @@ export class TableCellPropsDialog extends ModalDialog {
   show(): void {
     super.show();
     this.dialog.classList.add('tcp-dialog');
-    // 속성 조회
+    this.loadAndPopulate();
+  }
+
+  /**
+   * 문서에서 속성을 읽어 폼을 채운다.
+   * ⚠ show() 안에만 있으면 **패널 내장판**(모달을 띄우지 않는 경로)에서 tableProps 가
+   * undefined 로 남아 저장이 통째로 죽는다(실측 2026-07-29). 그래서 별도 메서드로 뺀다.
+   */
+  protected loadAndPopulate(): void {
     const { sec, ppi, ci } = this.tableCtx;
     this.cellProps = this.wasm.getCellProperties(sec, ppi, ci, this.cellIdx);
     this.tableProps = this.wasm.getTableProperties(sec, ppi, ci);

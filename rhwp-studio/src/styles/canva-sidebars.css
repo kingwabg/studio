@@ -695,3 +695,24 @@
 }
 .canva-sec-btn > i { font-size: 17px; }
 .canva-sec-btn:hover { background: var(--color-accent-bg); color: var(--color-primary); }
+
+/* 패널 내장 표/셀 속성 폼 — 모달용 폭·여백을 패널 폭에 맞춘다 */
+.canva-props-host { overflow: auto; }
+.canva-props-host .tcp-inline { width: 100%; padding: 0; }
+.canva-props-host .tcp-dialog-body,
+.canva-props-host .dialog-body { padding: 0; }
+/* 모달 안에서만 의미 있는 탭 바는 패널에선 숨긴다(패널 탭이 대신한다) */
+.canva-props-host .dialog-tabs { display: none; }
+.canva-props-host .dialog-label { width: 78px; min-width: 78px; font-size: 11.5px; }
+.canva-props-host input[type='text'],
+.canva-props-host input[type='number'],
+.canva-props-host select { height: 26px; font-size: 11.5px; }
+.canva-props-host .tcp-panel-container { max-height: none; }
+/* 좁은 패널에서 짝 입력(너비/높이 등)이 넘치지 않게 줄바꿈 허용 */
+.canva-props-host .tcp-row,
+.canva-props-host .dialog-row { flex-wrap: wrap; row-gap: 6px; }
+.canva-props-host input[type='text'],
+.canva-props-host input[type='number'] { max-width: 84px; min-width: 56px; }
+.canva-props-host select { max-width: 100%; }
+.canva-props-host .tcp-section,
+.canva-props-host .dialog-section { margin-bottom: 12px !important; }

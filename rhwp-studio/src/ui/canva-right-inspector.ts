@@ -6,6 +6,7 @@
  */
 import type { CanvaServices } from './canva-services';
 import type { CharProperties, ParaProperties } from '@/core/types';
+import { TablePropsInline } from './table-props-inline';
 import { mkEl, mkButton } from './canva-dom';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -45,6 +46,8 @@ export class CanvaRightInspector {
   private emptyEl!: HTMLElement;
   private extrasHost!: HTMLElement;
   private tabPane!: HTMLElement;
+  /** 표/셀 속성 폼(대화상자와 같은 폼을 패널에 내장) */
+  private inlineProps = new TablePropsInline();
   private biu: Record<'bold' | 'italic' | 'underline' | 'strike', HTMLButtonElement> = {} as any;
   private fontNameBtn!: HTMLButtonElement;
   private lineSpacingBtn!: HTMLButtonElement;
@@ -333,8 +336,12 @@ export class CanvaRightInspector {
       b.innerHTML = `<i class="ph-duotone ph-${icon}"></i><span>${label}</span>`;
       b.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        // 세부 편집은 표/셀 속성 대화상자가 정본 — 해당 탭으로 연다
-        this.services.dispatcher.dispatch('table:cell-props');
+        // 폼이 패널 안에 있으므로 해당 섹션으로 스크롤한다(모달을 열지 않는다)
+        const host = this.tabPane.querySelector('.canva-props-host');
+        const heads = [...(host?.querySelectorAll('.tcp-section-title, legend, .dialog-section-title') ?? [])];
+        const hit = heads.find((h) => (h.textContent ?? '').includes(label.replace('·', '')) 
+          || (h.textContent ?? '').includes(label.split('·')[0]));
+        (hit ?? host)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
       });
       strip.appendChild(b);
     }
@@ -364,9 +371,28 @@ export class CanvaRightInspector {
       this.fmtPane.hidden = true;
       this.tabPane.hidden = false;
       this.tabPane.innerHTML = '';
-      this.tabPane.appendChild(this.buildSectionStrip(this.panelTab));
-      this.tabPane.appendChild(mkEl('div', 'canva-hint',
-        this.panelTab === 'table' ? '표 전체에 적용되는 설정입니다.' : '선택한 셀에 적용되는 설정입니다.'));
+
+      // 표 안에 있을 때만 표/셀 속성을 다룰 수 있다
+      const ih = this.services.getInputHandler() as any;
+      const ref = ih?.cursor?.getCellTableContext?.();
+      if (!ref) {
+        this.tabPane.appendChild(mkEl('div', 'canva-hint',
+          '표 안에 커서를 두면 표·셀 설정이 여기 열립니다.'));
+        return;
+      }
+
+      // 섹션 목차(빠른 이동) + 실제 폼 — 디자인 2c 갱신
+      const strip = this.buildSectionStrip(this.panelTab);
+      this.tabPane.appendChild(strip);
+      const formHost = mkEl('div', 'canva-props-host');
+      this.tabPane.appendChild(formHost);
+      const pos = ih.cursor?.getPosition?.();
+      this.inlineProps.mount(
+        formHost, this.services.wasm, this.services.eventBus,
+        { sec: ref.sec, ppi: ref.ppi, ci: ref.ci },
+        pos?.cellIndex ?? 0,
+        this.panelTab,
+      );
       return;
     }
     this.tabPane.hidden = true;
