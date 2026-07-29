@@ -29,7 +29,9 @@ const legacyBaselines = new Map([
   // +9: 더블클릭 단어 선택 배선(2026-07-30 한컴 대조 실측 결함 수리) — dblclick 핸들러의 정위치
   ['src/engine/input-handler-mouse.ts', 2211],
   // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치
-  ['src/engine/input-handler-keyboard.ts', 2100],
+  // +47: 셀 블록 잘라내기·셀 채움 붙여넣기 분기(2026-07-30) — 로직 본체는 cell-paste.ts,
+  //      여기는 onCut/onPaste 이벤트 분기(정위치). 판정 근거는 e2e/cell-clipboard.test.mjs
+  ['src/engine/input-handler-keyboard.ts', 2147],
   // +31: selectWordAtCursor(2026-07-30) — findWordAt·anchor 가 이 파일 전용이라 정위치
   ['src/engine/cursor.ts', 1885],
   ['src/engine/input-handler-table.ts', 1627],

@@ -14,6 +14,7 @@ import {
 import type { DocumentPosition, CellBbox, CellPathLike } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import { buildCellGrid, gridToTsv, gridToHtml } from './cell-copy';
+import { clearCellRange, fillCellsFrom, parseHtmlTableGrid } from './cell-paste';
 
 const RHWP_CLIPBOARD_MARKER_RE = /<!--\s*rhwp-studio-clipboard:([A-Za-z0-9._:-]+)\s*-->/;
 
@@ -1692,6 +1693,28 @@ export function onCut(this: any, e: ClipboardEvent): void {
     return;
   }
 
+  // [한컴 대조 실측 2026-07-30] 셀 블록 Ctrl+X — 한컴은 표 구조를 남기고 셀 내용만 잘라낸다.
+  // hasSelection()은 텍스트 앵커만 봐서 셀 선택 모드를 못 보고 아래 이른 반환에 걸렸다
+  // → 잘라내기가 조용히 무동작이었다(실측: 클립보드 빈 문자열·셀 내용 그대로).
+  if (this.cursor.isInCellSelectionMode()) {
+    const range = this.cursor.getSelectedCellRange();
+    const ctx = this.cursor.getCellTableContext();
+    if (range && ctx) {
+      this.onCopy(e); // onCopy 의 셀 블록 분기가 TSV+표 HTML을 싣는다
+      const excluded = this.cursor.getExcludedCells();
+      this.executeOperation({
+        kind: 'snapshot',
+        operationType: 'cutCellRange',
+        operation: (wasm: WasmBridge) => {
+          clearCellRange(wasm, ctx, range, excluded.size > 0 ? excluded : undefined);
+          return this.cursor.getPosition();
+        },
+      });
+      this.eventBus.emit('document-changed');
+    }
+    return;
+  }
+
   if (!this.cursor.hasSelection()) return;
   // 먼저 복사
   this.onCopy(e);
@@ -1798,6 +1821,30 @@ export function onPaste(this: any, e: ClipboardEvent): void {
           return;
         }
       }
+    }
+  }
+
+  // [한컴 대조 실측 2026-07-30] 표 셀 안에 "표"를 붙여넣을 때는 셀 채움(덮어쓰기)이 정답.
+  // pasteHtmlInCell 로 넘기면 표가 한 셀 안에 탭 문자열로 뭉개졌다
+  // (실측: 2×2 표 붙여넣기 → 셀 하나에 "X1\tY1\tX2\tY2"). 한컴은 「셀 붙이기」 대화상자로
+  // 7가지(밀어내기 4·덮어쓰기·내용만 덮어쓰기·셀 안에 표로 넣기)를 묻고 기본값이 덮어쓰기다 —
+  // 여기서는 그 기본값만 구현한다(나머지 6종은 대화상자와 함께 별도 작업).
+  if (html && pos.parentParaIndex !== undefined && pos.controlIndex !== undefined
+      && pos.cellIndex !== undefined && !isNestedCellPosition(pos)) {
+    const grid = parseHtmlTableGrid(html);
+    if (grid) {
+      const ctx = { sec: pos.sectionIndex, ppi: pos.parentParaIndex, ci: pos.controlIndex };
+      const anchorCellIdx = pos.cellIndex;
+      this.executeOperation({
+        kind: 'snapshot',
+        operationType: 'pasteCellGrid',
+        operation: (wasm: WasmBridge) => {
+          fillCellsFrom(wasm, ctx, anchorCellIdx, grid);
+          return this.cursor.getPosition();
+        },
+      });
+      this.eventBus.emit('document-changed');
+      return;
     }
   }
 
