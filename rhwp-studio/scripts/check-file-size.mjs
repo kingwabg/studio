@@ -26,9 +26,12 @@ const legacyBaselines = new Map([
   ['src/ui/picture-props-dialog.ts', 2826],
   // +31: 변경 추적 API 래퍼 6종(2026-07-30) — 이 파일은 wasm 경계라 래퍼의 정위치다
   ['src/core/wasm-bridge.ts', 2322],
-  ['src/engine/input-handler-mouse.ts', 2202],
-  ['src/engine/input-handler-keyboard.ts', 2097],
-  ['src/engine/cursor.ts', 1854],
+  // +9: 더블클릭 단어 선택 배선(2026-07-30 한컴 대조 실측 결함 수리) — dblclick 핸들러의 정위치
+  ['src/engine/input-handler-mouse.ts', 2211],
+  // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치
+  ['src/engine/input-handler-keyboard.ts', 2100],
+  // +31: selectWordAtCursor(2026-07-30) — findWordAt·anchor 가 이 파일 전용이라 정위치
+  ['src/engine/cursor.ts', 1885],
   ['src/engine/input-handler-table.ts', 1627],
   ['src/core/types.ts', 1397],
   ['src/main.ts', 1303],  // +2: 변경 추적 명령 등록(2026-07-30)

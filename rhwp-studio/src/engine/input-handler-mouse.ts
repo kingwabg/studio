@@ -1493,6 +1493,15 @@ export function onDblClick(this: any, e: MouseEvent): void {
       }
     } catch { /* hitTest 실패 시 무시 */ }
   }
+
+  // 본문/셀 텍스트 더블클릭 = 단어 선택 (한컴·워드 관례) — mousedown이 커서를 이미
+  // 그 지점으로 옮겨 두었으므로 현재 위치 기준으로 단어를 잡는다. 이게 없으면
+  // 더블클릭+Ctrl+B 가 대기 서식으로 빠진다(2026-07-30 한컴 대조 실측).
+  if (this.cursor.selectWordAtCursor()) {
+    e.preventDefault();
+    this.updateCaret?.();
+    this.textarea.focus();
+  }
 }
 
 export function onContextMenu(this: any, e: MouseEvent): void {

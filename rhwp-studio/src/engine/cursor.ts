@@ -1230,6 +1230,37 @@ export class CursorState {
     }
   }
 
+  /** 더블클릭 단어 선택 — 현재 위치의 단어 범위 (본문/같은 셀 안).
+   * 한컴·워드 관례: 더블클릭 직후 Ctrl+B 등 서식이 그 단어에 걸려야 한다
+   * (2026-07-30 한컴 대조 실측에서 부재 발견 — 선택이 없어 대기 서식으로 빠졌다). */
+  selectWordAtCursor(): boolean {
+    const pos = this.position;
+    try {
+      let text: string;
+      if (pos.parentParaIndex !== undefined && pos.controlIndex !== undefined
+          && pos.cellIndex !== undefined && pos.cellParaIndex !== undefined) {
+        const len = this.wasm.getCellParagraphLength(
+          pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, pos.cellParaIndex);
+        text = this.wasm.getTextInCell(
+          pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, pos.cellParaIndex, 0, len);
+      } else if (pos.parentParaIndex !== undefined) {
+        return false; // 셀 좌표 불완전 — 단어 선택 생략
+      } else {
+        const len = this.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex);
+        text = this.wasm.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0, len);
+      }
+      const { start, end } = findWordAt(text, pos.charOffset);
+      if (start === end) return false;
+      this.anchor = { ...pos, charOffset: start };
+      this.position = { ...pos, charOffset: end };
+      this.updateRect();
+      return true;
+    } catch (e) {
+      console.warn('[CursorState] selectWordAtCursor 실패:', e);
+      return false;
+    }
+  }
+
   /** 셀 선택을 화살표 방향으로 이동한다 (anchor/focus 함께 이동, 단일 셀 선택). */
   moveCellSelection(deltaRow: number, deltaCol: number): void {
     if (!this._cellSelectionMode || !this.cellFocus || !this.cellTableCtx) return;

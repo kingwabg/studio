@@ -1460,6 +1460,9 @@ export function handleCtrlKey(this: any, e: KeyboardEvent): void {
 
 // [캔버스 한컴 포크] 문서 전체 선택 (셀 밖 기본 동작 — 문서 시작→끝)
 function selectWholeDoc(self: any): void {
+  // setAnchor 는 기존 anchor 를 보존하므로 먼저 비운다 — 선택이 남은 상태의 Ctrl+A 가
+  // 옛 anchor 에서 시작하는 부분 선택이 됐다(2026-07-30 한컴 대조 실측, 복사 앞부분 유실).
+  self.cursor.clearSelection();
   self.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 0, charOffset: 0 });
   self.cursor.setAnchor();
   self.cursor.moveToDocumentEnd();
