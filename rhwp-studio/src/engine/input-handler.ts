@@ -271,7 +271,7 @@ export class InputHandler {
   private lastCellKey: string | null = null;
   private dispatcher: CommandDispatcher | null = null;
   private contextMenu: ContextMenu | null = null;
-  private commandPalette: CommandPalette | null = null;
+  commandPalette: CommandPalette | null = null;
   private cellSelectionRenderer: CellSelectionRenderer | null = null;
   private tableObjectRenderer: TableObjectRenderer | null = null;
   private tableHoverHandles: TableHoverHandles | null = null;

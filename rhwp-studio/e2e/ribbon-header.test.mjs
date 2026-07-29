@@ -19,7 +19,7 @@ runTest('리본 헤더 — 2행 88px·탭 전환·명령 배선', async ({ page 
   });
   console.log('  실측:', JSON.stringify(r));
   assert.strictEqual(r.h, 88, `헤더 88px 기대 (실측 ${r.h})`);
-  assert.deepStrictEqual(r.tabs, ['홈','편집','삽입','레이아웃','검토'], '탭 5종');
+  assert.deepStrictEqual(r.tabs, ['홈','편집','삽입','레이아웃','도구','검토'], '탭 6종');
   assert.strictEqual(r.active, '홈', '기본 활성 탭 = 홈');
   assert.ok(r.btns >= 12, `홈 리본 버튼 다수 기대 (실측 ${r.btns}) — 편집 묶음 6개가 편집 탭으로 빠졌다`);
   assert.deepStrictEqual(r.oldBars, [false, false], '구 툴바/서식바는 화면에 보이지 않아야 함');
@@ -66,5 +66,22 @@ runTest('리본 헤더 — 2행 88px·탭 전환·명령 배선', async ({ page 
   assert.ok(!home.hasMore, '홈의 「⋯」은 비었으므로 사라져야 함');
   assert.ok(!home.hasExpander, "옛 '자세히' 확장 버튼은 글자 모양 버튼으로 대체됨");
   await screenshot(page, 'ribbon-header');
+  // [2026-07-30] 도구 탭 — AI·녹음은 우측 패널을 여는 명령으로 배선
+  const tools = await page.evaluate(() => {
+    [...document.querySelectorAll('.rb-tab')].find(b => b.textContent === '도구')?.click();
+    return [...document.querySelectorAll('.rb-btn[data-cmd]')].map(b => b.dataset.cmd);
+  });
+  console.log('  도구탭:', JSON.stringify(tools));
+  for (const c of ['tool:ai-panel', 'tool:record-panel', 'tool:command-palette', 'tool:options']) {
+    assert.ok(tools.includes(c), `도구 탭에 ${c}`);
+  }
+  // 중복 금지: 도구로 옮긴 것은 옛 자리에 남지 않는다
+  const review = await page.evaluate(() => {
+    [...document.querySelectorAll('.rb-tab')].find(b => b.textContent === '검토')?.click();
+    return [...document.querySelectorAll('.rb-btn[data-cmd], .rb-over-item[data-cmd]')].map(b => b.dataset.cmd);
+  });
+  assert.ok(!review.includes('edit:spellcheck'), '맞춤법은 도구로 이동');
+  assert.ok(!review.includes('tool:options'), '환경 설정은 도구로 이동');
+
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);
 });
