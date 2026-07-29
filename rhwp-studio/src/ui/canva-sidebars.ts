@@ -56,8 +56,12 @@ export function mountCanvaSidebars(services: CanvaServices): void {
     aiPane.hidden = idx !== 1;
     recordPane.hidden = idx !== 2;
   });
-  // AI 탭에 모델 배지 부착
-  tabs[1].appendChild(ai.getModelBadge());
+  // [디자인 2c] 모델 이름 칩은 **AI 패널 안**으로 — 속성 탭에서는 쓰이지 않는 정보라
+  // 탭 스트립에 상시 노출할 이유가 없다.
+  const badge = ai.getModelBadge();
+  badge.classList.add('canva-ai-model--inpane');
+  aiPane.prepend(badge);
+  void tabs;
 }
 
 // [캔버스 한컴 포크] 메뉴바 우측 캔버스/문서 모드 토글 — 입력 해석 레이어 전환(캔바 손맛 vs 한글 커서).

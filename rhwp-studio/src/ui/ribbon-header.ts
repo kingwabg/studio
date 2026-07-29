@@ -53,7 +53,10 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('text-b', '굵게', 'format:bold'),
       P('text-italic', '기울임', 'format:italic'),
       P('text-underline', '밑줄', 'format:underline'),
-      P('text-strikethrough', '취소선', 'format:strikethrough'),
+      // 디자인 2a 홈 리본은 글자 색·형광펜을 여기 둔다. 전용 색 명령이 없어(패널의
+      // 스와치는 format-char 이벤트를 직접 쏜다) 색 설정이 있는 글자 모양으로 보낸다.
+      P('palette', '글자 색', 'format:char-shape'),
+      P('highlighter', '형광펜', 'format:char-shape'),
       gap(),
       P('text-align-left', '왼쪽 정렬', 'format:align-left'),
       P('text-align-center', '가운데 정렬', 'format:align-center'),
@@ -75,6 +78,7 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       O('text-align-right', '오른쪽 정렬', 'Alt+Shift+H', 'format:align-right'),
       O('paragraph', '문단 모양', '', 'format:para-shape'),
       O('text-aa', '글자 모양', '', 'format:char-shape'),
+      O('text-strikethrough', '취소선', '', 'format:strikethrough'),
       O('spell-check', '맞춤법 검사', 'F8', 'edit:spellcheck'),
     ],
   },

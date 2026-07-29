@@ -43,7 +43,7 @@ export class CanvaRightInspector {
   private fmtPane!: HTMLElement;
   private emptyEl!: HTMLElement;
   private extrasHost!: HTMLElement;
-  private biu: Record<'bold' | 'italic' | 'underline', HTMLButtonElement> = {} as any;
+  private biu: Record<'bold' | 'italic' | 'underline' | 'strike', HTMLButtonElement> = {} as any;
   private aligns: Record<string, HTMLButtonElement> = {};
   private sizeInput!: HTMLInputElement;
   private swatches: HTMLButtonElement[] = [];
@@ -71,15 +71,18 @@ export class CanvaRightInspector {
     // B / I / U
     const biuSec = this.section('글자');
     const biuRow = mkEl('div', 'canva-btn-row');
-    const mkTog = (key: 'bold' | 'italic' | 'underline', label: string, cmd: string, style: string) => {
-      const b = mkButton('canva-icon-btn', { html: `<i style="${style}">${label}</i>` });
+    // [디자인 2c] 가·가·가 → 아이콘 4등분 세그먼트(굵게·기울임·밑줄·취소선)
+    biuRow.classList.add('canva-segment');
+    const mkTog = (key: 'bold' | 'italic' | 'underline' | 'strike', icon: string, cmd: string, title: string) => {
+      const b = mkButton('canva-seg-btn', { title, html: `<i class="ph ph-${icon}"></i>` });
       b.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch(cmd); });
       this.biu[key] = b;
       return b;
     };
-    biuRow.appendChild(mkTog('bold', '가', 'format:bold', 'font-weight:800'));
-    biuRow.appendChild(mkTog('italic', '가', 'format:italic', 'font-style:italic'));
-    biuRow.appendChild(mkTog('underline', '가', 'format:underline', 'text-decoration:underline'));
+    biuRow.appendChild(mkTog('bold', 'text-b', 'format:bold', '굵게'));
+    biuRow.appendChild(mkTog('italic', 'text-italic', 'format:italic', '기울임'));
+    biuRow.appendChild(mkTog('underline', 'text-underline', 'format:underline', '밑줄'));
+    biuRow.appendChild(mkTog('strike', 'text-strikethrough', 'format:strikethrough', '취소선'));
     biuSec.appendChild(biuRow);
 
     // 크기 스테퍼
@@ -169,6 +172,7 @@ export class CanvaRightInspector {
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
     this.biu.underline?.classList.toggle('is-active', !!p.underline);
+    this.biu.strike?.classList.toggle('is-active', !!p.strikethrough);
     if (p.fontSize !== undefined) this.sizeInput.value = String(p.fontSize / 100);
     if (p.textColor) {
       const hex = p.textColor.toLowerCase();
@@ -199,6 +203,52 @@ export class CanvaRightInspector {
     this.applyContext();
   }
 
+  /** 아이콘 칩 여러 개를 한 줄(줄바꿈 허용)로 — 디자인 2c 의 표 조작 섹션 */
+  private chipRow(items: Array<[label: string, cmd: string, icon: string]>): HTMLElement {
+    const row = mkEl('div', 'canva-chip-row');
+    for (const [label, cmd, icon] of items) {
+      const b = mkButton('canva-chip', { title: label });
+      b.innerHTML = `<i class="ph-duotone ph-${icon}"></i><span>${label}</span>`;
+      b.dataset.cmd = cmd;
+      row.appendChild(b);
+    }
+    return row;
+  }
+
+  /** 선택 대상의 위치 설명 — 디자인 2c 의 "표 블록 · 3×3 · B2" 자리 */
+  private describeSelection(c: Ctx): string {
+    const ih = this.services.getInputHandler() as any;
+    if (!ih) return '';
+    try {
+      if (c === 'body') {
+        const pos = ih.cursor?.getPosition?.();
+        if (!pos) return '';
+        const page = this.services.wasm.getPageOfPosition?.(pos.sectionIndex, pos.paragraphIndex);
+        const p = page?.ok && page.page != null ? `${page.page + 1}쪽 · ` : '';
+        return `${p}${pos.paragraphIndex + 1}번째 문단`;
+      }
+      if (c === 'cell' || c === 'table') {
+        const ref = ih.cursor?.getCellTableContext?.();
+        if (!ref) return '';
+        const dim = this.services.wasm.getTableDimensions?.(ref.sec, ref.ppi, ref.ci);
+        const size = dim?.rowCount && dim?.colCount ? `${dim.rowCount}×${dim.colCount}` : '';
+        const pos = ih.cursor?.getPosition?.();
+        // A1 표기 — 셀 인덱스에서 행/열 역산
+        let cell = '';
+        if (c === 'cell' && pos?.cellIndex !== undefined && dim?.colCount) {
+          const r = Math.floor(pos.cellIndex / dim.colCount);
+          const col = pos.cellIndex % dim.colCount;
+          cell = ` · ${String.fromCharCode(65 + col)}${r + 1}`;
+        }
+        return `표 블록${size ? ` · ${size}` : ''}${cell}`;
+      }
+      if (c === 'picture') {
+        return ih.isMultiPictureSelection?.() ? '개체 2개 이상 선택' : '';
+      }
+    } catch { /* 조회 실패 시 설명 없음 */ }
+    return '';
+  }
+
   private applyContext(): void {
     const c = this.ctx;
     const meta: Record<Ctx, { icon: string; label: string }> = {
@@ -208,7 +258,13 @@ export class CanvaRightInspector {
       table: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16"/>', label: '표 개체 선택됨' },
       picture: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>', label: '그림 선택됨' },
     };
-    this.banner.innerHTML = svg(meta[c].icon) + `<span>${meta[c].label}</span>`;
+    // [디자인 2c] 24px 아이콘 타일 + 상태명 + 위치 설명. 파란 강조 박스는 걷어내고
+    // 실제 선택 상태는 헤더 탭과 같은 시안 하나로만 표시한다.
+    const sub = this.describeSelection(c);
+    this.banner.innerHTML =
+      `<span class="canva-ctx-tile">${svg(meta[c].icon)}</span>` +
+      `<span class="canva-ctx-text"><span class="canva-ctx-label">${meta[c].label}</span>` +
+      (sub ? `<span class="canva-ctx-sub">${sub}</span>` : '') + '</span>';
 
     const showFmt = c === 'body' || c === 'cell';
     this.emptyEl.hidden = c !== 'none';
@@ -249,11 +305,55 @@ export class CanvaRightInspector {
       cross.appendChild(mk('오른쪽에 칸 추가', 'table:insert-col-right', '<path d="M4 12h12M10 6l6 6-6 6"/>', 'right'));
       cross.appendChild(mk('아래에 줄 추가', 'table:insert-row-below', '<path d="M12 4v12M6 10l6 6 6-6"/>', 'down'));
       sec.appendChild(cross);
-      sec.appendChild(fullBtn('표/셀 속성…', 'table:cell-props', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18"/>'));
+      // 줄·칸 지우기 (디자인 2c — 십자 아래 한 줄)
+      sec.appendChild(this.chipRow([
+        ['줄 지우기', 'table:delete-row', 'rows'],
+        ['칸 지우기', 'table:delete-col', 'columns'],
+      ]));
       host.appendChild(sec);
+
+      // [디자인 2c] 표 조작 전체를 여기로 — 헤더 컨텍스트 탭을 없앤 대가로 패널이 받는다.
+      const cellSec = this.section('셀');
+      cellSec.appendChild(this.chipRow([
+        ['셀 합치기', 'table:cell-merge', 'arrows-in'],
+        ['셀 나누기', 'table:cell-split', 'square-split-horizontal'],
+        ['높이 같게', 'table:cell-height-equal', 'arrows-out-line-vertical'],
+        ['너비 같게', 'table:cell-width-equal', 'arrows-out-line-horizontal'],
+      ]));
+      host.appendChild(cellSec);
+
+      const lookSec = this.section('모양');
+      lookSec.appendChild(this.chipRow([
+        ['테두리', 'table:border-each', 'frame-corners'],
+        ['배경색', 'table:cell-props', 'paint-bucket'],
+      ]));
+      host.appendChild(lookSec);
+
+      const calcSec = this.section('블록 계산');
+      calcSec.appendChild(this.chipRow([
+        ['합계', 'table:block-formula', 'sigma'],
+        ['계산식', 'table:formula', 'math-operations'],
+        ['1,000 단위', 'table:thousand-sep', 'currency-krw'],
+        ['자릿점 +', 'table:decimal-add', 'plus-minus'],
+      ]));
+      host.appendChild(calcSec);
+
+      const moreSec = this.section('행/열 바꿈');
+      moreSec.appendChild(this.chipRow([
+        ['바꿈 복사', 'table:transpose-copy', 'swap'],
+        ['바꿈 붙여넣기', 'table:transpose-paste', 'clipboard-text'],
+      ]));
+      host.appendChild(moreSec);
+
+      // 속성은 두 갈래 — 셀 안쪽 / 개체 전체를 항상 함께 노출(디자인 2c)
+      const propSec = this.section('속성');
+      propSec.appendChild(fullBtn('표/셀 속성…', 'table:cell-props', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18"/>'));
+      propSec.appendChild(fullBtn('개체 속성…', 'format:object-properties', '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M9 9h6v6H9z"/>'));
+      host.appendChild(propSec);
     } else if (this.ctx === 'table') {
       const sec = this.section('표 개체');
       sec.appendChild(fullBtn('개체 속성…', 'format:object-properties', '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M9 9h6v6H9z"/>'));
+      sec.appendChild(fullBtn('표/셀 속성…', 'table:cell-props', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18"/>'));
       sec.appendChild(mkEl('div', 'canva-hint', '셀을 클릭하면 글자 서식과 행·열 편집이 열립니다.'));
       host.appendChild(sec);
     } else if (this.ctx === 'picture') {
