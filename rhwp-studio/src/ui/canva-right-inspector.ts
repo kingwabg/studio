@@ -91,10 +91,11 @@ export class CanvaRightInspector {
     // B / I / U
     const biuSec = this.section('글자');
     const biuRow = mkEl('div', 'canva-btn-row');
-    // [디자인 2c] 가·가·가 → 아이콘 4등분 세그먼트(굵게·기울임·밑줄·취소선)
-    biuRow.classList.add('canva-segment');
+    // [디자인 2c] 가·가·가 → 4등분 버튼(굵게·기울임·밑줄·취소선). 붙은 세그먼트가 아니라
+    // 각자 테두리를 가진 넓은 버튼이다 — 좁은 패널에서 눌러야 할 곳이 분명해진다.
+    biuRow.classList.add('canva-tog-row');
     const mkTog = (key: 'bold' | 'italic' | 'underline' | 'strike', icon: string, cmd: string, title: string) => {
-      const b = mkButton('canva-seg-btn', { title, html: `<i class="ph ph-${icon}"></i>` });
+      const b = mkButton('canva-tog-btn', { title, html: `<i class="ph ph-${icon}"></i>` });
       b.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch(cmd); });
       this.biu[key] = b;
       return b;
@@ -145,20 +146,29 @@ export class CanvaRightInspector {
     }
     alignSec.appendChild(alignRow);
     // [디자인 2c] 줄 간격 — 정렬과 같은 섹션에
+    // 값 자체를 −/+ 로 바로 조절한다(디자인 2c) — 드롭다운은 한 번 더 눌러야 했다.
+    // 숫자를 누르면 기존 줄 간격 대화상자가 열려 정확한 값을 고를 수 있다.
     const lsRow = mkEl('div', 'canva-line-row');
     const lsLabel = mkEl('span', 'canva-line-label', '줄 간격');
-    this.lineSpacingBtn = mkButton('canva-line-value', { title: '줄 간격' });
-    this.lineSpacingBtn.innerHTML = '<span>160%</span><i class="ph ph-caret-down"></i>';
-    this.lineSpacingBtn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      this.services.dispatcher.dispatch('format:line-spacing');
-    });
-    lsRow.append(lsLabel, this.lineSpacingBtn);
+    const lsStep = mkEl('div', 'canva-stepper canva-stepper--wide');
+    const lsDec = mkButton('', { html: '<i class="ph ph-minus"></i>', title: '줄 간격 줄이기' });
+    this.lineSpacingBtn = mkButton('canva-step-value', { title: '줄 간격 자세히' });
+    this.lineSpacingBtn.innerHTML = '<span>160%</span>';
+    const lsInc = mkButton('', { html: '<i class="ph ph-plus"></i>', title: '줄 간격 늘리기' });
+    const dispatch = (cmd: string) => (e: Event) => { e.preventDefault(); this.services.dispatcher.dispatch(cmd); };
+    lsDec.addEventListener('mousedown', dispatch('format:line-spacing-decrease'));
+    lsInc.addEventListener('mousedown', dispatch('format:line-spacing-increase'));
+    this.lineSpacingBtn.addEventListener('mousedown', dispatch('format:line-spacing'));
+    lsStep.append(lsDec, this.lineSpacingBtn, lsInc);
+    lsRow.append(lsLabel, lsStep);
     alignSec.appendChild(lsRow);
     this.fmtPane.appendChild(alignSec);
 
     // 글자색
-    const colorSec = this.section('글자색');
+    const colorSec = this.section('글자색', {
+      text: '팔레트',
+      onClick: () => this.services.dispatcher.dispatch('format:char-shape'),
+    });
     const sw = mkEl('div', 'canva-swatches');
     for (const c of COLORS) {
       const b = mkButton('canva-swatch', { title: c });
@@ -172,12 +182,7 @@ export class CanvaRightInspector {
       sw.appendChild(b);
     }
     colorSec.appendChild(sw);
-    // [디자인 2c] 나머지 색은 '팔레트'로, 형광펜 4색을 같은 섹션에
-    const paletteBtn = mkButton('canva-chip', { title: '더 많은 색' });
-    paletteBtn.innerHTML = '<i class="ph-duotone ph-palette"></i><span>팔레트</span>';
-    paletteBtn.addEventListener('mousedown', (e) => {
-      e.preventDefault(); this.services.dispatcher.dispatch('format:char-shape');
-    });
+    // [디자인 2c] 나머지 색은 섹션 머리의 '팔레트' 링크로 — 형광펜 4색만 같은 섹션에
     const hlRow = mkEl('div', 'canva-swatches canva-highlights');
     for (const c of ['#fff59d', '#a5d6a7', '#90caf9', '#f48fb1']) {
       const b = mkButton('canva-swatch canva-swatch--hl', { title: `형광펜 ${c}` });
@@ -189,7 +194,7 @@ export class CanvaRightInspector {
       hlRow.appendChild(b);
     }
     const hlLabel = mkEl('div', 'canva-sub-label', '형광펜');
-    colorSec.append(paletteBtn, hlLabel, hlRow);
+    colorSec.append(hlLabel, hlRow);
     this.fmtPane.appendChild(colorSec);
 
     // 전체 글자 모양 다이얼로그
@@ -219,9 +224,17 @@ export class CanvaRightInspector {
     this.root.appendChild(pane);
   }
 
-  private section(label: string): HTMLElement {
+  /** 섹션 머리 — 디자인 2c 는 부차 동작을 제목 오른쪽 작은 링크로 둔다(전체폭 버튼 아님) */
+  private section(label: string, link?: { text: string; onClick: () => void }): HTMLElement {
     const sec = mkEl('div', 'canva-ins-section');
-    sec.appendChild(mkEl('div', 'canva-section-label', label));
+    const head = mkEl('div', 'canva-section-head');
+    head.appendChild(mkEl('span', 'canva-section-label', label));
+    if (link) {
+      const a = mkButton('canva-section-link', { text: link.text });
+      a.addEventListener('mousedown', (e) => { e.preventDefault(); link.onClick(); });
+      head.appendChild(a);
+    }
+    sec.appendChild(head);
     return sec;
   }
 

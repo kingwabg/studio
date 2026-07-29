@@ -21,15 +21,20 @@ runTest('우측 속성 패널 2c — 284px·컨텍스트 헤더·표 조작 섹�
       const r = document.querySelector('.canva-font-row');
       return !!(r?.querySelector('.canva-font-name') && r?.querySelector('.canva-stepper'));
     })(),
-    lineSpacing: document.querySelector('.canva-line-value span')?.textContent ?? null,
-    palette: [...document.querySelectorAll('.canva-chip')].some(c => c.textContent.includes('팔레트')),
+    // [2c 마무리 2026-07-29] 줄 간격은 −/+ 스테퍼, 팔레트는 섹션 머리 링크
+    lineSpacing: document.querySelector('.canva-stepper--wide .canva-step-value span')?.textContent ?? null,
+    lineStepper: document.querySelectorAll('.canva-stepper--wide button').length,
+    palette: [...document.querySelectorAll('.canva-section-link')].some(a => a.textContent.includes('팔레트')),
+    togBtns: document.querySelectorAll('.canva-tog-btn').length,
     highlights: document.querySelectorAll('.canva-swatch--hl').length,
     paraShape: [...document.querySelectorAll('.canva-full-btn')].some(b => b.textContent.includes('문단 모양')),
   }));
   console.log('  본문 패널:', JSON.stringify(parts));
   assert.ok(parts.sameRow, '글꼴 이름과 크기 스테퍼가 한 줄');
   assert.ok(parts.lineSpacing, '줄 간격 표시');
-  assert.ok(parts.palette, '팔레트 버튼');
+  assert.strictEqual(parts.lineStepper, 3, '줄 간격은 −/값/+ 스테퍼');
+  assert.ok(parts.palette, '팔레트는 섹션 머리 링크');
+  assert.strictEqual(parts.togBtns, 4, '굵게·기울임·밑줄·취소선 4등분 버튼');
   assert.strictEqual(parts.highlights, 4, '형광펜 4색');
   assert.ok(parts.paraShape, '문단 모양 자세히');
   assert.strictEqual(base.width, 284, `기본 폭 284px 기대 (실측 ${base.width})`);

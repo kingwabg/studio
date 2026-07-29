@@ -1,6 +1,9 @@
 /**
- * 회귀: 표 모달의 기능이 오른쪽 패널 안에서 동작하는가(모달 없이).
- * 판정: 표 탭에 실제 폼이 뜨고, 값을 바꾸면 문서에 반영된다.
+ * 회귀: **실제 UI 경로**(탭 클릭 → 섹션 클릭)로 표/셀 속성이 저장되는가.
+ *
+ * table-panel-sections.test.mjs 는 클래스를 직접 mount 해 로직만 본다. 이 테스트는
+ * 사용자가 실제로 밟는 길 — 레일 탭 클릭 → 섹션 칩 클릭 → 컨트롤 조작 — 을 지킨다.
+ * (배선이 끊겨도 로직 테스트는 초록일 수 있다.)
  */
 import assert from 'node:assert';
 import { runTest, createNewDocument, screenshot } from './helpers.mjs';
@@ -31,21 +34,27 @@ runTest('패널 내장 표/셀 속성 — 폼 렌더·자동 저장', async ({ p
   });
   assert.ok(ref, '표 생성 실패');
 
-  // 셀 탭으로 전환 → 폼이 뜨는가
+  // 셀 탭 → 여백 섹션 (둘 다 실제 클릭)
   const mounted = await page.evaluate(async () => {
     const tab = [...document.querySelectorAll('.canva-rail--right .canva-tab')].find((t) => t.textContent.trim() === '셀');
     tab.click();
     await new Promise((r) => setTimeout(r, 700));
+    const chip = [...document.querySelectorAll('.canva-sec-btn')].find((b) => b.title === '여백');
+    chip?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 600));
     const host = document.querySelector('.canva-props-host');
     return {
-      hasForm: !!host && host.children.length > 0,
+      sections: document.querySelectorAll('.canva-sec-btn').length,
+      active: document.querySelector('.canva-sec-btn.is-on')?.title ?? null,
+      wrap: host?.firstElementChild?.className ?? null,
       inputs: host ? host.querySelectorAll('input, select').length : 0,
-      hiddenTabs: host ? getComputedStyle(host.querySelector('.dialog-tabs') ?? document.body).display : null,
     };
   });
-  console.log('  폼:', JSON.stringify(mounted));
-  assert.ok(mounted.hasForm, '패널에 표/셀 속성 폼이 떠야 함');
-  assert.ok(mounted.inputs >= 8, `폼 입력이 다수 있어야 함 (실측 ${mounted.inputs})`);
+  console.log('  섹션:', JSON.stringify(mounted));
+  assert.strictEqual(mounted.sections, 6, '셀 탭 섹션 6종');
+  assert.strictEqual(mounted.active, '여백', '고른 섹션이 활성화');
+  assert.strictEqual(mounted.wrap, 'tps', '섹션 내용이 그려져야 함');
+  assert.ok(mounted.inputs >= 4, `사면 여백 입력 (실측 ${mounted.inputs})`);
 
   // 기능 판정: 폼에서 값을 바꾸면 문서에 반영되는가(확인 버튼 없이 자동 저장)
   const applied = await page.evaluate(async (ref) => {
@@ -57,8 +66,8 @@ runTest('패널 내장 표/셀 속성 — 폼 렌더·자동 저장', async ({ p
     const label = (el) => (el.parentElement?.textContent ?? '').trim();
     const checks = [...host.querySelectorAll('input[type=checkbox]')];
     const marginChk = checks.find((c) => label(c).includes('안 여백 지정'));
-    if (!marginChk) return { changed: false, why: '안 여백 지정 체크박스를 못 찾음', labels: checks.map(label).slice(0, 14) };
-    if (!marginChk.checked) marginChk.click();
+    if (!marginChk) return { changed: false, why: '안 여백 지정 스위치를 못 찾음', labels: checks.map(label).slice(0, 14) };
+    marginChk.checked = !marginChk.checked;
     marginChk.dispatchEvent(new Event('change', { bubbles: true }));
     await new Promise((r) => setTimeout(r, 1000));
     const after = w.getCellProperties(ref.sec, ref.ppi, ref.ci, 0);

@@ -158,6 +158,14 @@
 .canva-obj-card svg { width: 26px; height: 26px; stroke: currentColor; }
 .canva-obj-card.is-disabled { opacity: 0.4; pointer-events: none; }
 
+/* 섹션 머리 — 제목 왼쪽, 부차 링크 오른쪽 */
+.canva-section-head { display: flex; align-items: baseline; justify-content: space-between; }
+.canva-section-link {
+  border: 0; background: transparent; padding: 0;
+  font: inherit; font-size: 11.5px; color: var(--color-primary); cursor: pointer;
+}
+.canva-section-link:hover { text-decoration: underline; }
+
 .canva-section-label {
   font-size: 10.5px;
   font-weight: 700;
@@ -201,18 +209,16 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* 글자 서식 4등분 세그먼트 — 디자인 2c (가·가·가 → 아이콘) */
-.canva-segment { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
-.canva-seg-btn {
-  height: 30px; display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--color-border); border-right-width: 0;
-  background: var(--color-surface); color: var(--color-text);
-  cursor: pointer; font-size: 15px;
+/* 글자 서식 4등분 버튼 — 디자인 2c. 붙은 세그먼트가 아니라 각자 테두리를 가진 넓은 버튼 */
+.canva-tog-row { display: flex; gap: 6px; }
+.canva-tog-btn {
+  flex: 1; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--color-border); border-radius: 3px;
+  background: var(--color-surface-raised); color: var(--color-text);
+  cursor: pointer; font-size: 17px; padding: 0;
 }
-.canva-segment > .canva-seg-btn:first-child { border-radius: 5px 0 0 5px; }
-.canva-segment > .canva-seg-btn:last-child { border-radius: 0 5px 5px 0; border-right-width: 1px; }
-.canva-seg-btn:hover { background: var(--color-accent-bg); }
-.canva-seg-btn.is-active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.canva-tog-btn:hover { background: var(--color-accent-bg); border-color: var(--color-primary); color: var(--color-primary); }
+.canva-tog-btn.is-active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 
 /* 색 스와치는 원형으로, 선택은 링으로 — 디자인 2c */
 .canva-swatch { border-radius: 50%; }
@@ -231,16 +237,16 @@
 .canva-font-name:hover { border-color: var(--color-primary); }
 .canva-font-row > .canva-stepper { flex: none; width: 108px; }
 
-/* 줄 간격 행 */
-.canva-line-row { display: flex; align-items: center; gap: 8px; }
-.canva-line-label { flex: 1; font-size: 12px; color: var(--color-text-muted); }
-.canva-line-value {
-  height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px;
-  border: 1px solid var(--color-border); border-radius: 5px;
-  background: var(--color-surface); color: var(--color-text);
-  font: inherit; font-size: 12px; cursor: pointer;
+/* 줄 간격 행 — 값을 −/+ 로 바로 조절(디자인 2c). 숫자를 누르면 자세히 대화상자 */
+.canva-line-row { display: flex; align-items: center; gap: 9px; }
+.canva-line-label { flex: 1; font-size: 12.5px; color: var(--color-text-muted); }
+.canva-stepper--wide { flex: none; width: 104px; }
+.canva-step-value {
+  flex: 1; height: 30px; border: 0; background: transparent;
+  color: var(--color-text); font: inherit; font-size: 13px; font-weight: 600;
+  text-align: center; cursor: pointer; padding: 0;
 }
-.canva-line-value:hover { border-color: var(--color-primary); }
+.canva-step-value:hover { color: var(--color-primary); }
 
 /* 형광펜 — 글자색과 같은 섹션 */
 .canva-sub-label { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
@@ -259,7 +265,7 @@
 .canva-chip > i { font-size: 14px; }
 
 .canva-ins-section { display: flex; flex-direction: column; gap: 8px; }
-.canva-ins-section > .canva-section-label { margin-bottom: 0; }
+.canva-ins-section > .canva-section-head { margin-bottom: 0; }
 
 .canva-btn-row { display: flex; gap: 6px; }
 .canva-icon-btn {
