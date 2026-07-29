@@ -19,7 +19,9 @@ const FAIL = 600;
 
 // 현재 크기 스냅샷(2026-07-30 실측 생성) — 늘어나면 실패, 줄이면 수동 갱신
 const legacyBaselines = new Map([
-  ['src/engine/input-handler.ts', 4797],
+  // +10: 대기 서식 배선(2026-07-30). 본문은 pending-format.ts 로 갔고 위임·상태만 남았다 —
+  // 게이트가 잡아 준 대로 새 모듈로 뺀 뒤의 잔여 배선분. 기능 코드로 다시 불리면 안 된다.
+  ['src/engine/input-handler.ts', 4807],
   ['src/compare/diff-engine.ts', 3106],
   ['src/ui/picture-props-dialog.ts', 2826],
   ['src/core/wasm-bridge.ts', 2291],
@@ -42,7 +44,7 @@ const legacyBaselines = new Map([
   ['src/ui/equation-editor-dialog.ts', 734],
   ['src/ui/toolbar.ts', 726],
   ['src/ui/para-shape-tab-builders.ts', 685],
-  ['src/engine/input-handler-text.ts', 681],
+  ['src/engine/input-handler-text.ts', 682],  // +1: 대기 서식 호출 1줄(2026-07-30)
   ['src/ui/canva-right-inspector.ts', 662],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
