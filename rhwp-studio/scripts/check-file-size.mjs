@@ -53,9 +53,8 @@ const legacyBaselines = new Map([
   // +3: 커서 좌표계를 논리 길이로 통일(2026-07-30, TAC 신고③) — 주석 2줄 포함,
   //     판정 = e2e/table-cursor-parity
   ['src/engine/cursor.ts', 1944],
-  // +8: TAC 표 이동 후 커서 문단 보정 배선(2026-07-30) — 순수 로직은 engine/table-move-cursor.ts,
-  //     여기는 moveTableOffset 응답을 받는 호출부(정위치)
-  ['src/engine/input-handler-table.ts', 1635],
+  // -9: TAC 문단 교환 커서 보정 제거(2026-07-30 사용자 결정 — 한컴에 없는 기능)
+  ['src/engine/input-handler-table.ts', 1628],
   // +2: tabStops 단위 주석(2026-07-30, 2×HWPUNIT 재발 방지)
   ['src/core/types.ts', 1399],
   // +2: 변경 추적 명령 등록 · +14: 자 마커 드래그 배선(2026-07-30, 로직은 view/ruler-drag.ts)
