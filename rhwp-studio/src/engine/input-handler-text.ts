@@ -195,6 +195,9 @@ function tryConfirmDeleteInlineControl(this: any, pos: DocumentPosition, targetL
   if (ci < 0) return false;
   try { this.wasm.getTableProperties(sec, para, ci); } catch { return false; }
   void showConfirm('지우기', '[표] 를 지울까요?').then((yes: boolean) => {
+    // 확인/취소 어느 쪽이든 편집기로 포커스를 돌려준다 — 안 그러면 대화상자를 닫은 뒤
+    // 키 입력이 통째로 먹통이 된다(e2e 실측 2026-07-30).
+    try { this.focusTextarea?.(); } catch { /* 포커스 실패는 무시 */ }
     if (!yes) return;
     try {
       const r = this.wasm.deleteTableControl(sec, para, ci);

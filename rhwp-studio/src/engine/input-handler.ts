@@ -2359,9 +2359,42 @@ export class InputHandler {
     if (!sel) return;
     if (!this.canDeleteSelectionInFormMode()) return;
 
+    // [범위 삭제 2026-07-30] 선택이 인라인 표·그림을 덮으면 한컴처럼 컨트롤까지 함께
+    // 지운다(부록2 O8 — 확인 대화상자 없음). 텍스트만 되돌리는 DeleteSelectionCommand
+    // 로는 undo 에서 컨트롤이 살아나지 않으므로 스냅샷 연산으로 처리한다.
+    if (this.selectionSpansInlineControl(sel.start, sel.end)) {
+      this.cursor.clearSelection();
+      this.executeOperation({ kind: 'snapshot', operationType: 'deleteSelection', operation: (wasm: WasmBridge) => {
+        wasm.deleteRangeLogical(
+          sel.start.sectionIndex,
+          sel.start.paragraphIndex, sel.start.charOffset,
+          sel.end.paragraphIndex, sel.end.charOffset,
+        );
+        return { ...sel.start };
+      }});
+      return;
+    }
+
     const cmd = new DeleteSelectionCommand(sel.start, sel.end);
     this.cursor.clearSelection();
     this.executeOperation({ kind: 'command', command: cmd });
+  }
+
+  /** 본문 선택이 인라인(글자취급) 컨트롤을 덮는가 — 셀 안 선택은 규격 부재로 false */
+  private selectionSpansInlineControl(start: DocumentPosition, end: DocumentPosition): boolean {
+    if (start.parentParaIndex !== undefined || end.parentParaIndex !== undefined) return false;
+    try {
+      for (let p = start.paragraphIndex; p <= end.paragraphIndex; p++) {
+        const from = p === start.paragraphIndex ? start.charOffset : 0;
+        const to = p === end.paragraphIndex
+          ? end.charOffset
+          : this.wasm.getLogicalLength(start.sectionIndex, p);
+        for (let off = from; off < to; off++) {
+          if (this.wasm.getInlineControlIndexAtLogical(start.sectionIndex, p, off) >= 0) return true;
+        }
+      }
+    } catch { /* 조회 실패는 종전 경로로 */ }
+    return false;
   }
 
   /** Undo 처리 */

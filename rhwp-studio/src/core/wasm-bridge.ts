@@ -685,6 +685,12 @@ export class WasmBridge {
     return this.doc.insertTextLogical(sec, para, logicalOffset, text);
   }
 
+  /** 논리 좌표 범위 삭제 — 걸친 인라인 표·그림도 함께 지운다(한컴 O8) */
+  deleteRangeLogical(sec: number, startPara: number, startOffset: number, endPara: number, endOffset: number): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).deleteRangeLogical(sec, startPara, startOffset, endPara, endOffset);
+  }
+
   /** 논리 오프셋 위치의 인라인(글자취급) 컨트롤 인덱스, 없으면 -1 */
   getInlineControlIndexAtLogical(sec: number, para: number, logicalOffset: number): number {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');

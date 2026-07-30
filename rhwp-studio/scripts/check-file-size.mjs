@@ -25,14 +25,17 @@ const legacyBaselines = new Map([
   //      둘 다 이벤트 핸들러/updateCaret 본체라 이 파일이 정위치. 판정 = e2e/paper-cursor-sweep
   // +2: applyStyle(styleId, overwrite) 스레딩(2026-07-30)
   // +15: 모양 복사 반복 적용(소진 제거)·해제 공개 메서드·apply-first 주석(2026-07-30 스윕)
-  ['src/engine/input-handler.ts', 4860],
+  // +33: 표 걸친 선택 삭제 분기 + selectionSpansInlineControl(2026-07-30, 한컴 O8) —
+  //      deleteSelection 본체가 이 파일이라 정위치. 판정 = e2e/table-cursor-parity ⑤
+  ['src/engine/input-handler.ts', 4893],
   ['src/compare/diff-engine.ts', 3106],
   ['src/ui/picture-props-dialog.ts', 2826],
   // +31: 변경 추적 API 래퍼 6종(2026-07-30) — 이 파일은 wasm 경계라 래퍼의 정위치다
   // +2: applyStyle 에 overwrite 인자(2026-07-30) — wasm 경계 래퍼라 이 파일이 정위치
   // +30: 논리 좌표계 래퍼 5종(2026-07-30, TAC 신고③) — getLogicalLength·logical↔text
   //      변환·insertTextLogical·getInlineControlIndexAtLogical, wasm 경계라 정위치
-  ['src/core/wasm-bridge.ts', 2354],
+  // +6: deleteRangeLogical 래퍼(2026-07-30, 표 걸친 선택 삭제 O8)
+  ['src/core/wasm-bridge.ts', 2360],
   // +9: 더블클릭 단어 선택 배선(2026-07-30 한컴 대조 실측 결함 수리) — dblclick 핸들러의 정위치
   ['src/engine/input-handler-mouse.ts', 2211],
   // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치
@@ -80,7 +83,8 @@ const legacyBaselines = new Map([
   // +1: 대기 서식 호출 1줄(2026-07-30)
   // +25: 인라인 표 삭제 확인 라우팅(2026-07-30, 한컴 O5 오라클 "[표] 를 지울까요?") —
   //      Backspace/Delete 본체가 이 파일이라 정위치. 판정 = e2e/table-cursor-parity ④
-  ['src/engine/input-handler-text.ts', 708],
+  // +3: 확인 대화상자 닫은 뒤 편집기 포커스 복귀(2026-07-30 e2e 실측 결함 — 키 입력 먹통)
+  ['src/engine/input-handler-text.ts', 711],
   // +26: 텍스트 탭 배선(2026-07-30) — 섹션 본문은 text-panel-sections.ts, 여긴 탭 상태·분기뿐
   ['src/ui/canva-right-inspector.ts', 704],  // +16: AI·녹음 진입 칩(2026-07-30)
   ['src/ui/page-border-dialog.ts', 654],

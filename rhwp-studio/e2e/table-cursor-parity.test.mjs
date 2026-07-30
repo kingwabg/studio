@@ -112,9 +112,54 @@ runTest('표 앵커·TAC 커서 패리티', async ({ page }) => {
   console.log('  ④지우기확인:', JSON.stringify(dialog));
   assert.ok(dialog.shown, 'Backspace 가 "[표] 를 지울까요?" 확인을 띄우지 않음');
   await page.keyboard.press('Escape');
-  await new Promise((r) => setTimeout(r, 200));
-  const afterCancel = await page.evaluate(() => window.__wasm.getLogicalLength(0, 0));
-  assert.strictEqual(afterCancel, 4, '취소 후 표가 남아 있어야 함');
+  await new Promise((r) => setTimeout(r, 400));
+  const afterCancel = await page.evaluate(() => ({
+    logical: window.__wasm.getLogicalLength(0, 0),
+    active: document.activeElement?.tagName,
+  }));
+  console.log('  ④취소:', JSON.stringify(afterCancel));
+  assert.strictEqual(afterCancel.logical, 4, '취소 후 표가 남아 있어야 함');
+  assert.strictEqual(afterCancel.active, 'TEXTAREA',
+    '대화상자를 닫은 뒤 포커스가 편집기로 돌아오지 않음 — 키 입력 먹통');
+
+  // ── ⑤ 표를 덮는 선택 삭제 → 표까지 함께 사라진다 (한컴 O8, 확인 없음) ──
+  const selState = await page.evaluate(() => {
+    const ih = window.__inputHandler;
+    ih.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 0, charOffset: 0 });
+    ih.cursor.setAnchor();
+    ih.cursor.moveTo({ sectionIndex: 0, paragraphIndex: 0, charOffset: 4 });
+    const sel = ih.cursor.getSelectionOrdered?.();
+    return {
+      has: ih.cursor.hasSelection(),
+      sel: sel ? [sel.start.charOffset, sel.end.charOffset] : null,
+      spans: ih.selectionSpansInlineControl
+        ? 'private'
+        : (typeof ih.deleteSelection),
+      dialogOpen: !!document.querySelector('.modal-overlay, .dialog-overlay'),
+    };
+  });
+  console.log('  ⑤sel:', JSON.stringify(selState));
+  await page.keyboard.press('Delete');
+  await new Promise((r) => setTimeout(r, 700));
+  const afterDel = await page.evaluate(() => {
+    const w = window.__wasm;
+    return { logical: w.getLogicalLength(0, 0), text: w.getParagraphLength(0, 0),
+      ctrlAt: w.getInlineControlIndexAtLogical(0, 0, 0) };
+  });
+  console.log('  ⑤선택삭제:', JSON.stringify(afterDel));
+  assert.strictEqual(afterDel.logical, 0, `표 포함 선택 삭제 후 문단이 비어야 함: ${afterDel.logical}`);
+  assert.strictEqual(afterDel.ctrlAt, -1, '표가 남았다 — O8 위반');
+
+  // 되돌리기로 표가 복원된다(스냅샷 경로)
+  await page.evaluate(() => window.__inputHandler.performUndo?.() ?? window.__commandDispatcher?.dispatch?.('edit:undo'));
+  await new Promise((r) => setTimeout(r, 700));
+  const afterUndo = await page.evaluate(() => ({
+    logical: window.__wasm.getLogicalLength(0, 0),
+    ctrlAt2: window.__wasm.getInlineControlIndexAtLogical(0, 0, 2),
+  }));
+  console.log('  ⑤되돌리기:', JSON.stringify(afterUndo));
+  assert.strictEqual(afterUndo.logical, 4, '되돌리기 후 논리 길이 4');
+  assert.ok(afterUndo.ctrlAt2 >= 0, '되돌리기로 표가 복원되지 않음');
 
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);
 });
