@@ -122,6 +122,19 @@ const FORMAT_COPY_PARA_KEYS: Array<keyof ParaProperties> = [
   'koreanBreakUnit',
   'borderConnect',
   'borderIgnoreMargin',
+  // [서식 패리티] 문단 테두리/배경 + 탭 정의 — 판독(build_para_properties_json)과
+  // 적용(helpers.rs border/tab 게이트) 모두 raw 단위 왕복이라 normalize 변환 불필요.
+  // fillType 은 배경 유무(none/solid) 판별에 필수라 함께 나른다.
+  'borderLeft',
+  'borderRight',
+  'borderTop',
+  'borderBottom',
+  'fillType',
+  'fillColor',
+  'patternColor',
+  'patternType',
+  'borderSpacing',
+  'tabStops',
 ];
 
 const FORMAT_COPY_CELL_KEYS: Array<keyof CellProperties> = [
@@ -3567,6 +3580,9 @@ export class InputHandler {
   /** 모양 복사 상태가 있는가? */
   hasCopiedFormat(): boolean { return this.formatCopyState !== null; }
 
+  /** 모양 복사 상태를 해제한다 (Esc — 한컴 반복 적용 모드 종료) */
+  clearCopiedFormat(): void { this.formatCopyState = null; }
+
   /** 현재 커서 위치를 반환한다 */
   getCursorPosition(): DocumentPosition { return this.cursor.getPosition(); }
 
@@ -4262,6 +4278,8 @@ export class InputHandler {
 
   /** 모양 복사/붙여넣기 (커맨드 시스템용) */
   performFormatCopy(): void {
+    // armed 상태에선 apply-first — sticky 이후 선택 상태로 Opt+C 를 눌러도 재복사가
+    // 아니라 적용이다(재복사는 Esc 해제 후). 반복 적용 시맨틱과 정합인 의도된 동작.
     if (this.applyCopiedFormatToCurrentTarget()) return;
     this.copyFormatAtCursor();
   }
@@ -4276,9 +4294,7 @@ export class InputHandler {
 
     if (this.cursor.isInCellSelectionMode()) {
       if (this.formatCopyState.cellProps && Object.keys(this.formatCopyState.cellProps).length > 0) {
-        const applied = this.applyCopiedCellPropsToSelection(this.formatCopyState.cellProps);
-        if (applied) this.formatCopyState = null;
-        return applied;
+        return this.applyCopiedCellPropsToSelection(this.formatCopyState.cellProps);
       }
       return false;
     }
@@ -4293,8 +4309,7 @@ export class InputHandler {
     if (Object.keys(paraProps).length > 0) {
       this.applyParaPropsToRange(sel.start, sel.end, paraProps);
     }
-    // 한컴 호환: 복사한 모양은 한 번 붙여넣으면 자동 해제한다.
-    this.formatCopyState = null;
+    // 한컴(데스크톱) 호환: 모양 복사는 Esc 로 해제할 때까지 반복 적용된다.
     this.focusTextarea();
     return true;
   }

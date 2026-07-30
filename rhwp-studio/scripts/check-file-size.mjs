@@ -24,35 +24,48 @@ const legacyBaselines = new Map([
   // +20: 커서 정합 수리(2026-07-30) — document-changed 캐럿 재조회 + rect 실패 시 캐럿 숨김.
   //      둘 다 이벤트 핸들러/updateCaret 본체라 이 파일이 정위치. 판정 = e2e/paper-cursor-sweep
   // +2: applyStyle(styleId, overwrite) 스레딩(2026-07-30)
-  ['src/engine/input-handler.ts', 4845],
+  // +15: 모양 복사 반복 적용(소진 제거)·해제 공개 메서드·apply-first 주석(2026-07-30 스윕)
+  ['src/engine/input-handler.ts', 4860],
   ['src/compare/diff-engine.ts', 3106],
   ['src/ui/picture-props-dialog.ts', 2826],
   // +31: 변경 추적 API 래퍼 6종(2026-07-30) — 이 파일은 wasm 경계라 래퍼의 정위치다
   // +2: applyStyle 에 overwrite 인자(2026-07-30) — wasm 경계 래퍼라 이 파일이 정위치
-  ['src/core/wasm-bridge.ts', 2324],
+  // +30: 논리 좌표계 래퍼 5종(2026-07-30, TAC 신고③) — getLogicalLength·logical↔text
+  //      변환·insertTextLogical·getInlineControlIndexAtLogical, wasm 경계라 정위치
+  ['src/core/wasm-bridge.ts', 2354],
   // +9: 더블클릭 단어 선택 배선(2026-07-30 한컴 대조 실측 결함 수리) — dblclick 핸들러의 정위치
   ['src/engine/input-handler-mouse.ts', 2211],
   // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치
   // +47: 셀 블록 잘라내기·셀 채움 붙여넣기 분기(2026-07-30) — 로직 본체는 cell-paste.ts,
   //      여기는 onCut/onPaste 이벤트 분기(정위치). 판정 근거는 e2e/cell-clipboard.test.mjs
   // +13: 그림 붙여넣기 커서 수리(2026-07-30) — 없는 문단 이동·셀 컨텍스트 상실 2건
-  ['src/engine/input-handler-keyboard.ts', 2160],
+  // +2: 그림 붙여넣기 캐럿 클램프를 논리 길이로(2026-07-30, TAC 신고③) — 주석 포함
+  // +7: Esc 모양복사 해제 + Alt+V chord code 폴백(2026-07-30 한컴 패리티 스윕)
+  ['src/engine/input-handler-keyboard.ts', 2169],
   // +31: selectWordAtCursor(2026-07-30) — findWordAt·anchor 가 이 파일 전용이라 정위치
   // +25: moveTo 오프셋 클램프(2026-07-30) — 모든 커서 이동이 지나는 단일 관문이라 정위치.
   //      유령 캐럿(문단 길이 초과 오프셋) 차단. 판정 = e2e/paper-cursor-sweep D축
   // +31: moveOutOfSelectedPicture 컨테이너 복귀(2026-07-30) — 셀·머리말 안 개체에서 나갈 때
   //      표 밖으로 튀던 결함. selectedPictureRef 가 이 파일 전용이라 정위치. 판정 = 스윕 E축
-  ['src/engine/cursor.ts', 1941],
+  // +3: 커서 좌표계를 논리 길이로 통일(2026-07-30, TAC 신고③) — 주석 2줄 포함,
+  //     판정 = e2e/table-cursor-parity
+  ['src/engine/cursor.ts', 1944],
   // +8: TAC 표 이동 후 커서 문단 보정 배선(2026-07-30) — 순수 로직은 engine/table-move-cursor.ts,
   //     여기는 moveTableOffset 응답을 받는 호출부(정위치)
   ['src/engine/input-handler-table.ts', 1635],
-  ['src/core/types.ts', 1397],
+  // +2: tabStops 단위 주석(2026-07-30, 2×HWPUNIT 재발 방지)
+  ['src/core/types.ts', 1399],
   // +2: 변경 추적 명령 등록 · +14: 자 마커 드래그 배선(2026-07-30, 로직은 view/ruler-drag.ts)
-  ['src/main.ts', 1317],
+  // +4: 리본 글자색·형광펜 슬롯 입양 2종(2026-07-30 스윕)
+  ['src/main.ts', 1321],
   ['src/engine/input-handler-picture.ts', 1215],
-  ['src/engine/command.ts', 1169],
+  // +28: 논리↔텍스트 좌표 변환(2026-07-30, TAC 신고③) — 모든 편집 명령이 지나는
+  //      doInsertText/doDeleteText/doGetTextRange 3헬퍼 + 선택삭제·서식·병합·분할의
+  //      변환 지점이 전부 이 파일이라 정위치. 판정 = e2e/table-cursor-parity
+  ['src/engine/command.ts', 1197],
   ['src/ui/cell-border-bg-dialog.ts', 1120],
-  ['src/ui/char-shape-dialog.ts', 1116],
+  // +18: 양각/음각 진입점 5종(2026-07-30 스윕) — ATTR_ICONS·상호배타·현재값 반영
+  ['src/ui/char-shape-dialog.ts', 1134],
   ['src/view/canvaskit-renderer.ts', 1091],
   ['src/command/commands/table.ts', 1028],
   ['src/ui/para-shape-dialog.ts', 929],
@@ -60,9 +73,14 @@ const legacyBaselines = new Map([
   ['src/ui/endnote-shape-dialog.ts', 801],
   ['src/command/commands/insert.ts', 786],
   ['src/ui/equation-editor-dialog.ts', 734],
-  ['src/ui/toolbar.ts', 726],
-  ['src/ui/para-shape-tab-builders.ts', 685],
-  ['src/engine/input-handler-text.ts', 682],  // +1: 대기 서식 호출 1줄(2026-07-30)
+  // +36: 글머리표 팝업 앵커 일반화 + open-bullet-popup 수신(2026-07-30 스윕)
+  ['src/ui/toolbar.ts', 762],
+  // +1: 탭 위치 2×HWPUNIT 저장 수리(2026-07-30 스윕)
+  ['src/ui/para-shape-tab-builders.ts', 686],
+  // +1: 대기 서식 호출 1줄(2026-07-30)
+  // +25: 인라인 표 삭제 확인 라우팅(2026-07-30, 한컴 O5 오라클 "[표] 를 지울까요?") —
+  //      Backspace/Delete 본체가 이 파일이라 정위치. 판정 = e2e/table-cursor-parity ④
+  ['src/engine/input-handler-text.ts', 708],
   // +26: 텍스트 탭 배선(2026-07-30) — 섹션 본문은 text-panel-sections.ts, 여긴 탭 상태·분기뿐
   ['src/ui/canva-right-inspector.ts', 704],  // +16: AI·녹음 진입 칩(2026-07-30)
   ['src/ui/page-border-dialog.ts', 654],

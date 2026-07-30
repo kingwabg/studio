@@ -661,6 +661,36 @@ export class WasmBridge {
     return this.doc.getParagraphLength(sec, para);
   }
 
+  // ── 논리 좌표계 (텍스트 문자 + 인라인 컨트롤 각 1칸) ──
+  // 커서 charOffset 은 논리 좌표(엔진 navigate/hitTest/getLineInfo 와 동일),
+  // insertText/deleteText/getTextRange 는 텍스트 좌표 — 경계에서 반드시 변환한다.
+  // (TAC 표가 문단 길이·선택에서 빠지던 신고 ③의 근본 원인 = 이 4종 미배선)
+  getLogicalLength(sec: number, para: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return this.doc.getLogicalLength(sec, para);
+  }
+
+  logicalToTextOffset(sec: number, para: number, logicalOffset: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return this.doc.logicalToTextOffset(sec, para, logicalOffset);
+  }
+
+  textToLogicalOffset(sec: number, para: number, textOffset: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return this.doc.textToLogicalOffset(sec, para, textOffset);
+  }
+
+  insertTextLogical(sec: number, para: number, logicalOffset: number, text: string): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return this.doc.insertTextLogical(sec, para, logicalOffset, text);
+  }
+
+  /** 논리 오프셋 위치의 인라인(글자취급) 컨트롤 인덱스, 없으면 -1 */
+  getInlineControlIndexAtLogical(sec: number, para: number, logicalOffset: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).getInlineControlIndexAtLogical(sec, para, logicalOffset);
+  }
+
   getParagraphCount(sec: number): number {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return this.doc.getParagraphCount(sec);

@@ -29,7 +29,7 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   [{ key: 'ㅊ', alt: true }, 'edit:format-copy'],
 
   // 파일
-  [{ key: 'n', alt: true }, 'file:new-doc'],
+  [{ key: 'n', code: 'KeyN', alt: true }, 'file:new-doc'],
   [{ key: 'ㅜ', alt: true }, 'file:new-doc'],
   [{ key: 'o', ctrl: true }, 'file:open'],
   [{ key: 'ㅐ', ctrl: true }, 'file:open'],
@@ -43,9 +43,9 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   [{ key: 'b', ctrl: true }, 'format:bold'],
   [{ key: 'i', ctrl: true }, 'format:italic'],
   [{ key: 'u', ctrl: true }, 'format:underline'],
-  [{ key: 'l', alt: true }, 'format:char-shape'],
+  [{ key: 'l', code: 'KeyL', alt: true }, 'format:char-shape'],
   [{ key: 'ㄹ', alt: true }, 'format:char-shape'],
-  [{ key: 't', alt: true }, 'format:para-shape'],
+  [{ key: 't', code: 'KeyT', alt: true }, 'format:para-shape'],
   [{ key: 'ㅅ', alt: true }, 'format:para-shape'],
 
   // 서식 – 스타일
@@ -53,6 +53,12 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
 
   // 쪽
   [{ key: 'f7' }, 'file:page-setup'],
+
+  // 한 수준 증가/감소 (한컴: Ctrl+Num −/+) — numpad 는 e.key 가 '+'/'-' 라 아래 줌 항목이
+  // 선점하므로 줌보다 먼저 두고, key 는 센티널('num-')로 막아 code(Numpad*)로만 매칭한다
+  // (본자리 Ctrl+'-'는 code 가 Minus 라 걸리지 않아 줌 유지).
+  [{ key: 'num-', code: 'NumpadSubtract', ctrl: true }, 'format:level-increase'],
+  [{ key: 'num+', code: 'NumpadAdd', ctrl: true }, 'format:level-decrease'],
 
   // 줌
   [{ key: '=', ctrl: true }, 'view:zoom-in'],
@@ -65,16 +71,20 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
 
   // 상용구 (한컴: Ctrl+F3 목록, Alt+I 준말 확장)
   [{ key: 'f3', ctrl: true }, 'insert:snippet'],
-  [{ key: 'i', alt: true }, 'insert:snippet-expand'],
+  [{ key: 'i', code: 'KeyI', alt: true }, 'insert:snippet-expand'],
   [{ key: 'ㅑ', alt: true }, 'insert:snippet-expand'],
 
   // 검색
   [{ key: 'f', ctrl: true }, 'edit:find'],
   [{ key: 'f2', ctrl: true }, 'edit:find-replace'],
+  // mac 한컴: Cmd+L = 글자 모양 — find-again 보다 먼저 두어 첫 매칭 우선으로 mac 만 가로챈다.
+  // (웹 한컴도 Cmd+L 캡처에 성공함 — 스펙 §5. Cmd+T 는 브라우저 예약이라 제외.)
+  // ⚠ find-again 의 라벨('Ctrl+L', edit.ts / ribbon-header.ts)은 미수정 — 표시 정책 미결.
+  [{ key: 'l', code: 'KeyL', ctrl: true, platform: 'mac' }, 'format:char-shape'],
   [{ key: 'l', ctrl: true }, 'edit:find-again'],
-  [{ key: 'v', alt: true, shift: true }, 'edit:compare-documents'],
+  [{ key: 'v', code: 'KeyV', alt: true, shift: true }, 'edit:compare-documents'],
   [{ key: 'h', ctrl: true, shift: true }, 'edit:document-history'],
-  [{ key: 'g', alt: true }, 'edit:goto'],
+  [{ key: 'g', code: 'KeyG', alt: true }, 'edit:goto'],
   [{ key: 'ㅎ', alt: true }, 'edit:goto'],
 
   // 입력
@@ -87,15 +97,15 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   [{ key: 'enter', ctrl: true, alt: true }, 'page:col-settings'],
 
   // 줄간격
-  [{ key: 'a', alt: true, shift: true }, 'format:line-spacing-decrease'],
+  [{ key: 'a', code: 'KeyA', alt: true, shift: true }, 'format:line-spacing-decrease'],
   [{ key: 'ㅁ', alt: true, shift: true }, 'format:line-spacing-decrease'],
-  [{ key: 'z', alt: true, shift: true }, 'format:line-spacing-increase'],
+  [{ key: 'z', code: 'KeyZ', alt: true, shift: true }, 'format:line-spacing-increase'],
   [{ key: 'ㅋ', alt: true, shift: true }, 'format:line-spacing-increase'],
 
   // 글꼴 크기
-  [{ key: 'e', alt: true, shift: true }, 'format:font-size-increase'],
+  [{ key: 'e', code: 'KeyE', alt: true, shift: true }, 'format:font-size-increase'],
   [{ key: 'ㄷ', alt: true, shift: true }, 'format:font-size-increase'],
-  [{ key: 'r', alt: true, shift: true }, 'format:font-size-decrease'],
+  [{ key: 'r', code: 'KeyR', alt: true, shift: true }, 'format:font-size-decrease'],
   [{ key: 'ㄱ', alt: true, shift: true }, 'format:font-size-decrease'],
   // 글꼴 크기 — Ctrl+]/[ (한컴 호환, 브라우저 충돌 없음)
   [{ key: ']', ctrl: true }, 'format:font-size-increase'],
@@ -119,11 +129,11 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   // Ctrl+Shift+R: 브라우저 강제새로고침 충돌 → Alt+Shift+H로 재매핑 (Alt+Shift+R은 글꼴크기축소)
   // Ctrl+Shift+C: 브라우저 요소검사 충돌 → Alt+Shift+C로 재매핑
   // Ctrl+Shift+T: 브라우저 탭복원 충돌 → Alt+Shift+T로 재매핑
-  [{ key: 'h', alt: true, shift: true }, 'format:align-right'],   // 오른쪽 정렬 (재매핑, H=rigHt)
+  [{ key: 'h', code: 'KeyH', alt: true, shift: true }, 'format:align-right'],   // 오른쪽 정렬 (재매핑, H=rigHt)
   [{ key: 'ㅗ', alt: true, shift: true }, 'format:align-right'],
-  [{ key: 'c', alt: true, shift: true }, 'format:align-center'],  // 가운데 정렬 (재매핑)
+  [{ key: 'c', code: 'KeyC', alt: true, shift: true }, 'format:align-center'],  // 가운데 정렬 (재매핑)
   [{ key: 'ㅊ', alt: true, shift: true }, 'format:align-center'],
-  [{ key: 'd', alt: true, shift: true }, 'format:align-distribute'], // 배분 정렬 (재매핑)
+  [{ key: 'd', code: 'KeyD', alt: true, shift: true }, 'format:align-distribute'], // 배분 정렬 (재매핑)
   [{ key: 'ㅇ', alt: true, shift: true }, 'format:align-distribute'],
 
   // 표

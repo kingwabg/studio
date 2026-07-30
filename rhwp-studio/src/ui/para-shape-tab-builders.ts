@@ -283,7 +283,8 @@ export function buildTabSettingsTab(state: TabState): TabSettingsResult {
   function addTabStop(): void {
     const positionPt = parseFloat(tabPositionInput.value) || 0;
     if (positionPt <= 0) return;
-    const position = Math.round(positionPt * 100);
+    // IR 계약: TabItem.position 은 2× HWPUNIT(pt×200) — HWPX 파서 ×2 정규화·렌더러 ÷2 와 동일 규약
+    const position = Math.round(positionPt * 200);
     const tabType = parseInt(tabTypeRadios.find(r => r.checked)?.value ?? '0');
     const fill = parseInt(tabFillSelect.value);
     if (state.currentTabStops.some(t => t.position === position)) return;
@@ -325,7 +326,7 @@ export function buildTabSettingsTab(state: TabState): TabSettingsResult {
     state.currentTabStops.forEach((t, i) => {
       const tr = document.createElement('tr');
       if (i === state.selectedTabIndex) tr.className = 'selected';
-      appendTableCell(tr, `${(t.position / 100).toFixed(1)} pt`);
+      appendTableCell(tr, `${(t.position / 200).toFixed(1)} pt`);
       appendTableCell(tr, TAB_TYPE_NAMES[t.type] ?? '?');
       tr.addEventListener('click', () => {
         state.selectedTabIndex = i;
@@ -339,7 +340,7 @@ export function buildTabSettingsTab(state: TabState): TabSettingsResult {
     deletedTabListBody.replaceChildren();
     state.deletedTabStops.forEach((t, i) => {
       const tr = document.createElement('tr');
-      appendTableCell(tr, `${(t.position / 100).toFixed(1)} pt`);
+      appendTableCell(tr, `${(t.position / 200).toFixed(1)} pt`);
       appendTableCell(tr, TAB_TYPE_NAMES[t.type] ?? '?');
       tr.addEventListener('dblclick', () => restoreTabStop(i));
       tr.title = '더블클릭하여 복원';

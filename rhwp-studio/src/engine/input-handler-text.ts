@@ -184,6 +184,29 @@ function tryDeleteBodyFootnoteAtCursor(
   }
 }
 
+/** [TAC 좌표계 2026-07-30] 지울 논리 위치가 인라인(글자취급) 표면 한컴 UX 로 라우팅.
+ * 한컴 오라클(O5 실측): 즉시 삭제도 개체선택도 아닌 "[표] 를 지울까요?" 확인 대화상자.
+ * 표가 아닌 컨트롤(그림·수식·각주)은 종전 동작 유지 — getTableProperties 프로브로 판별.
+ * 셀 안은 셀용 논리 API 부재로 미지원(종전 동작). */
+function tryConfirmDeleteInlineControl(this: any, pos: DocumentPosition, targetLogical: number): boolean {
+  const { sectionIndex: sec, paragraphIndex: para } = pos;
+  let ci = -1;
+  try { ci = this.wasm.getInlineControlIndexAtLogical(sec, para, targetLogical); } catch { return false; }
+  if (ci < 0) return false;
+  try { this.wasm.getTableProperties(sec, para, ci); } catch { return false; }
+  void showConfirm('지우기', '[표] 를 지울까요?').then((yes: boolean) => {
+    if (!yes) return;
+    try {
+      const r = this.wasm.deleteTableControl(sec, para, ci);
+      if (r?.ok) {
+        this.cursor.moveTo({ sectionIndex: sec, paragraphIndex: para, charOffset: targetLogical });
+        this.afterEdit();
+      }
+    } catch { /* 삭제 실패 시 무동작 */ }
+  });
+  return true;
+}
+
 export function handleBackspace(this: any, pos: DocumentPosition, inCell: boolean): void {
   if (this.isFormMode?.() && !this.canEditCurrentFormField?.()) return;
   // 머리말/꼬리말 편집 모드
@@ -237,6 +260,7 @@ export function handleBackspace(this: any, pos: DocumentPosition, inCell: boolea
     const { sectionIndex: sec, paragraphIndex: para } = pos;
     if (tryDeleteBodyFootnoteAtCursor.call(this, pos, 'backward')) return;
     if (charOffset > 0) {
+      if (tryConfirmDeleteInlineControl.call(this, pos, charOffset - 1)) return;
       const deletePos = { ...pos, charOffset: charOffset - 1 };
       this.executeOperation({ kind: 'command', command: new DeleteTextCommand(deletePos, 1, 'backward') });
     } else if (para > 0) {
@@ -312,8 +336,10 @@ export function handleDelete(this: any, pos: DocumentPosition, inCell: boolean):
   } else {
     const { sectionIndex: sec, paragraphIndex: para } = pos;
     if (tryDeleteBodyFootnoteAtCursor.call(this, pos, 'forward')) return;
-    const paraLen = this.wasm.getParagraphLength(sec, para);
+    // 논리 길이 — 표 바로 앞(텍스트 끝) Delete 가 문단 병합으로 새지 않게
+    const paraLen = this.wasm.getLogicalLength(sec, para);
     if (charOffset < paraLen) {
+      if (tryConfirmDeleteInlineControl.call(this, pos, charOffset)) return;
       this.executeOperation({ kind: 'command', command: new DeleteTextCommand(pos, 1, 'forward') });
     } else {
       // 문단 끝에서 Delete → 다음 문단과 병합

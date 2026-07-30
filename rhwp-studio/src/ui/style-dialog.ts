@@ -58,6 +58,8 @@ export class StyleDialog extends ModalDialog {
   /** 편집 후 다이얼로그 새로고침 콜백 */
   onEditRequest?: (styleId: number) => void;
   onAddRequest?: () => void;
+  /** [스타일 패리티] wasm 직호출을 스냅샷 undo 로 감싸는 실행기 — format.ts 가 주입 */
+  runOp?: (opType: string, op: () => void) => void;
 
   constructor(
     private wasm: WasmBridge,
@@ -264,7 +266,16 @@ export class StyleDialog extends ModalDialog {
     if (!style) return;
     if (!confirm(`'${style.name}' 스타일을 삭제하시겠습니까?\n이 스타일을 사용 중인 문단은 바탕글로 변경됩니다.`)) return;
     try {
-      this.wasm.deleteStyle(this.selectedId);
+      const doDelete = () => { this.wasm.deleteStyle(this.selectedId); };
+      // [스타일 패리티] 삭제도 undo 이력·렌더 갱신 대상 — 스냅샷 실행기 경유(미주입 시 직접 emit).
+      // 삭제는 사용 문단을 바탕글로 되돌리므로 렌더 갱신 없이는 화면이 낡은 스타일로 남았다.
+      if (this.runOp) {
+        this.runOp('styleDelete', doDelete);
+      } else {
+        doDelete();
+        this.eventBus.emit('document-changed');
+      }
+      this.eventBus.emit('style-list-changed');
       this.selectedId = 0;
       this.loadStyles();
       this.updateInfo();

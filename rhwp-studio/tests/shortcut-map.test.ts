@@ -57,3 +57,24 @@ test('표 줄/칸 추가·지우기 단축키는 대화상자 명령으로 매�
   assert.equal(command({ key: 'Delete', altKey: true }), 'table:delete-row-col');
   assert.equal(command({ key: 'delete', altKey: true }), 'table:delete-row-col');
 });
+
+// [한컴 패리티 2026-07-30] 수준 증감·mac 글자모양·Option 특수문자 폴백
+test('Ctrl+Num −/+ 는 수준 증감, 본자리 -/= 는 줌 유지', () => {
+  assert.equal(command({ key: '-', code: 'NumpadSubtract', ctrlKey: true }), 'format:level-increase');
+  assert.equal(command({ key: '+', code: 'NumpadAdd', ctrlKey: true }), 'format:level-decrease');
+  assert.equal(command({ key: '-', code: 'Minus', ctrlKey: true }), 'view:zoom-out');
+  assert.equal(command({ key: '=', code: 'Equal', ctrlKey: true }), 'view:zoom-in');
+});
+
+test('mac Cmd+L 은 글자 모양, 그 외 플랫폼 Ctrl+L 은 다시 찾기', () => {
+  assert.equal(command({ key: 'l', code: 'KeyL', metaKey: true }, 'mac'), 'format:char-shape');
+  assert.equal(command({ key: 'l', code: 'KeyL', ctrlKey: true }, 'other'), 'edit:find-again');
+});
+
+test('mac Option 특수문자에도 code 폴백으로 단축키를 잡는다', () => {
+  assert.equal(command({ key: '˜', code: 'KeyN', altKey: true }, 'mac'), 'file:new-doc');
+  assert.equal(command({ key: '¬', code: 'KeyL', altKey: true }, 'mac'), 'format:char-shape');
+  assert.equal(command({ key: '†', code: 'KeyT', altKey: true }, 'mac'), 'format:para-shape');
+  assert.equal(command({ key: '©', code: 'KeyG', altKey: true }, 'mac'), 'edit:goto');
+  assert.equal(command({ key: 'å', code: 'KeyA', altKey: true, shiftKey: true }, 'mac'), 'format:line-spacing-decrease');
+});

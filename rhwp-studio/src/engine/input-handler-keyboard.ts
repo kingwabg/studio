@@ -464,6 +464,12 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
     return;
   }
 
+  // 모양 복사 유지 모드 해제 — 한컴: Esc 로 종료.
+  // return 하지 않는다: 셀 선택 해제 등 다른 Esc 의미는 계속 진행(같은 키로 동시 해제).
+  if (e.key === 'Escape' && this.hasCopiedFormat()) {
+    this.clearCopiedFormat();
+  }
+
   // [캔버스 한컴 포크] 캔버스 모드: 편집 컨텍스트 없이 본문을 파괴할 수 있는 편집 키 무시.
   // (개체 선택/셀 선택/머리말·각주 등 자체 편집 상태는 각자 분기가 먼저 처리하므로 제외)
   if (this.canvasMode && !this.canvasEditingRef
@@ -1056,7 +1062,8 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
   );
   if (e.altKey && !isAltWordKey && this.dispatcher) {
     // Alt+V → Chord 대기 (보기 메뉴 단축키, 한컴 Alt+V,T 계승)
-    if ((e.key === 'v' || e.key === 'V' || e.key === 'ㅍ') && !e.shiftKey && !e.ctrlKey) {
+    // mac Option+V 는 e.key 가 '√' — 물리 키 code 로도 판정한다.
+    if ((e.key === 'v' || e.key === 'V' || e.key === 'ㅍ' || e.code === 'KeyV') && !e.shiftKey && !e.ctrlKey) {
       e.preventDefault();
       this._pendingChordV = true;
       return;
@@ -1936,7 +1943,9 @@ async function pasteImageFile(this: any, file: File, hasSelection: boolean): Pro
         const insertedPara = result.paraIdx ?? p.paragraphIndex;
         const paraCount = wasm.getParagraphCount(p.sectionIndex);
         const safePara = Math.min(insertedPara, Math.max(0, paraCount - 1));
-        const len = wasm.getParagraphLength(p.sectionIndex, safePara);
+        // 엔진 반환 logicalOffset 은 논리 좌표 — 논리 길이로 클램프해야 방금 넣은
+        // 인라인 그림 뒤 오프셋이 잘리지 않는다
+        const len = wasm.getLogicalLength(p.sectionIndex, safePara);
         const off = result.logicalOffset !== undefined
           ? Math.min(result.logicalOffset, len)
           : Math.min(p.charOffset + 1, len);

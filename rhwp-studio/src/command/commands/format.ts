@@ -390,10 +390,12 @@ export const formatCommands: CommandDef[] = [
     id: 'format:bullet-shape',
     label: '글머리표 모양',
     canExecute: (ctx) => ctx.hasDocument,
-    execute(services) {
-      // 글머리표 버튼의 팝업을 프로그래밍적으로 열기
-      const btn = document.getElementById('tb-bullet');
-      if (btn) btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    execute(services, params) {
+      // 숨은 구 툴바 버튼(#tb-bullet)에 합성 mousedown 을 쏘면 rect 가 (0,0)이라
+      // 팝업이 좌상단 (0,2)에 붙었다 — 팝업 소유자(Toolbar)에 앵커를 넘겨 연다.
+      services.eventBus.emit('open-bullet-popup', {
+        anchorEl: params?.anchorEl instanceof HTMLElement ? params.anchorEl : undefined,
+      });
     },
   },
   {
@@ -424,6 +426,14 @@ export const formatCommands: CommandDef[] = [
       const ih = services.getInputHandler();
       if (!ih) return;
       const dialog = new StyleDialog(services.wasm, services.eventBus);
+      // [스타일 패리티] 스타일 CRUD 를 스냅샷 undo + 전량 재렌더 경로(executeOperation)로
+      // 태운다 — 수식 속성 다이얼로그(#2077)와 동일 패턴.
+      const runStyleOp = (opType: string, op: () => void) => ih.executeOperation({
+        kind: 'snapshot',
+        operationType: opType,
+        operation: () => { op(); return ih.getCursorPosition(); },
+      });
+      dialog.runOp = runStyleOp;
 
       // 편집 요청
       dialog.onEditRequest = (styleId: number) => {
@@ -434,6 +444,7 @@ export const formatCommands: CommandDef[] = [
           id: style.id, name: style.name, englishName: style.englishName,
           type: style.type, nextStyleId: style.nextStyleId,
         });
+        editDlg.runOp = runStyleOp;
         editDlg.onSave = () => dialog.refresh();
         editDlg.show();
       };
@@ -450,6 +461,7 @@ export const formatCommands: CommandDef[] = [
           baseInfo = {};
         }
         const addDlg = new StyleEditDialog(services.wasm, services.eventBus, 'add', undefined, baseInfo);
+        addDlg.runOp = runStyleOp;
         addDlg.onSave = () => dialog.refresh();
         addDlg.show();
       };

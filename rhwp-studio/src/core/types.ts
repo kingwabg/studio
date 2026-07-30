@@ -399,11 +399,13 @@ export interface ParaProperties {
   verticalAlign?: number;    // 0=글꼴기준, 1=위, 2=가운데, 3=아래
   englishBreakUnit?: number; // 0=단어, 1=하이픈, 2=글자
   koreanBreakUnit?: number;  // 0=어절, 1=글자
+  snapToGrid?: boolean;      // 편집 용지 줄 격자 사용 (attr1 bit8)
+  condense?: number;         // 공백 최소값 % (0~75, attr1 bit9-15)
   // 탭 설정 탭 속성
   tabAutoLeft?: boolean;
   tabAutoRight?: boolean;
-  tabStops?: { position: number; type: number; fill: number }[];
-  defaultTabSpacing?: number;    // HWPUNIT (읽기 전용, 구역 기본 탭 간격)
+  tabStops?: { position: number; type: number; fill: number }[]; // position: 2× HWPUNIT(pt×200) — 엔진 IR raw, marginLeft(px)와 다름
+  defaultTabSpacing?: number;    // 2× HWPUNIT(pt×200) (읽기 전용, 구역 기본 탭 간격)
   // 테두리/배경 탭 속성
   borderFillId?: number;
   borderLeft?: { type: number; width: number; color: string };

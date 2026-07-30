@@ -48,6 +48,8 @@ const ATTR_ICONS: { id: string; title: string }[] = [
   { id: 'strikethrough', title: '취소선' },
   { id: 'outline',       title: '외곽선' },
   { id: 'shadow',        title: '그림자' },
+  { id: 'emboss',        title: '양각' },
+  { id: 'engrave',       title: '음각' },
   { id: 'superscript',   title: '위 첨자' },
   { id: 'subscript',     title: '아래 첨자' },
 ];
@@ -74,6 +76,15 @@ function createAttrIconContent(id: string): HTMLSpanElement {
       break;
     case 'shadow':
       span.style.textShadow = '2px 2px 0 #999';
+      break;
+    case 'emboss':
+      // style-bar.css .sb-emboss와 같은 시각 규약(좌상단 밝음 = 돋음)
+      span.style.color = '#999';
+      span.style.textShadow = '-1px -1px 0 #fff, 1px 1px 0 #666';
+      break;
+    case 'engrave':
+      span.style.color = '#999';
+      span.style.textShadow = '1px 1px 0 #fff, -1px -1px 0 #666';
       break;
     case 'superscript': {
       span.textContent = '';
@@ -387,6 +398,11 @@ export class CharShapeDialog {
           this.attrBtns['subscript']?.classList.remove('active');
         } else if (a.id === 'subscript' && !btn.classList.contains('active')) {
           this.attrBtns['superscript']?.classList.remove('active');
+        } else if (a.id === 'emboss' && !btn.classList.contains('active')) {
+          // 엔진과 동일 규약: 양각↔음각 상호배타 (input-handler.ts:2029-2038)
+          this.attrBtns['engrave']?.classList.remove('active');
+        } else if (a.id === 'engrave' && !btn.classList.contains('active')) {
+          this.attrBtns['emboss']?.classList.remove('active');
         }
         btn.classList.toggle('active');
         this.updatePreview();
@@ -851,6 +867,8 @@ export class CharShapeDialog {
     this.setAttrBtn('strikethrough', p.strikethrough);
     this.setAttrBtn('superscript', p.superscript);
     this.setAttrBtn('subscript', p.subscript);
+    this.setAttrBtn('emboss', p.emboss);
+    this.setAttrBtn('engrave', p.engrave);
 
     this.textColorInput.value = p.textColor || '#000000';
     this.shadeColorInput.value = p.shadeColor || '#ffffff';
@@ -932,7 +950,7 @@ export class CharShapeDialog {
     }
 
     // 속성 토글
-    for (const f of ['bold', 'italic', 'superscript', 'subscript'] as const) {
+    for (const f of ['bold', 'italic', 'superscript', 'subscript', 'emboss', 'engrave'] as const) {
       const active = this.attrBtns[f]?.classList.contains('active') || false;
       if (active !== (p[f] || false)) (mods as Record<string, unknown>)[f] = active;
     }

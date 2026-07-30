@@ -26,6 +26,7 @@ import type { CharProperties, ParaProperties } from '@/core/types';
 import { ModalDialog } from './dialog';
 import { CharShapeDialog } from './char-shape-dialog';
 import { ParaShapeDialog } from './para-shape-dialog';
+import { NumberingDialog } from './numbering-dialog';
 
 interface StyleInfo {
   id: number;
@@ -57,6 +58,8 @@ export class StyleEditDialog extends ModalDialog {
 
   onSave?: () => void;
   onClose?: () => void;
+  /** [스타일 패리티] wasm 직호출을 스냅샷 undo 로 감싸는 실행기 — format.ts 가 주입 */
+  runOp?: (opType: string, op: () => void) => void;
 
   constructor(
     private wasm: WasmBridge,
@@ -179,8 +182,16 @@ export class StyleEditDialog extends ModalDialog {
     btnChar.textContent = '글자 모양(L)...';
     btnChar.addEventListener('click', () => this.openCharDialog());
 
+    // [스타일 패리티] 한컴 스타일 대화상자의 세 번째 버튼 — 번호/글머리표를 스타일에 지정
+    const btnNum = document.createElement('button');
+    btnNum.type = 'button';
+    btnNum.className = 'se-shape-btn';
+    btnNum.textContent = '문단 번호/글머리표(B)...';
+    btnNum.addEventListener('click', () => this.openNumberingDialog());
+
     shapeBtns.appendChild(btnPara);
     shapeBtns.appendChild(btnChar);
+    shapeBtns.appendChild(btnNum);
     body.appendChild(shapeBtns);
 
     // ── 안내 문구 ──
@@ -268,6 +279,35 @@ export class StyleEditDialog extends ModalDialog {
     }
   }
 
+  /** [스타일 패리티] 번호/글머리표 지정 — 기존 NumberingDialog 재사용, 결과를 paraMods 에 병합 */
+  private openNumberingDialog(): void {
+    const dialog = new NumberingDialog(this.wasm, this.eventBus);
+    if (this.styleInfo.id >= 0) {
+      try {
+        const pp = this.wasm.getStyleDetail(this.styleInfo.id).paraProps;
+        dialog.currentHeadType = pp?.headType ?? 'None';
+        dialog.currentNumberingId = pp?.numberingId ?? 0;
+      } catch {
+        // 무시 — 초기값 없이 연다
+      }
+    }
+    dialog.onApply = (nid) => {
+      // restartMode/startNumber 는 문단 단위 개념 — 스타일엔 headType/numberingId 만 반영
+      this.mergeParaMods(nid === 0
+        ? { headType: 'None', numberingId: 0 }
+        : { headType: 'Number', numberingId: nid });
+    };
+    dialog.onApplyBullet = (bulletChar) => {
+      const bulletId = this.wasm.ensureDefaultBullet(bulletChar);
+      if (bulletId >= 0) this.mergeParaMods({ headType: 'Bullet', numberingId: bulletId });
+    };
+    dialog.show();
+  }
+
+  private mergeParaMods(mods: Record<string, unknown>): void {
+    this.paraModsJson = JSON.stringify({ ...JSON.parse(this.paraModsJson), ...mods });
+  }
+
   protected onConfirm(): void {
     const name = this.nameInput.value.trim();
     const englishName = this.enNameInput.value.trim();
@@ -280,25 +320,36 @@ export class StyleEditDialog extends ModalDialog {
     }
 
     try {
-      if (this.addMode) {
-        const baseParaShapeId = this.baseInfo.paraProps?.paraShapeId;
-        const baseCharShapeId = this.baseInfo.charProps?.charShapeId;
-        const newId = this.wasm.createStyle(JSON.stringify({
-          name, englishName, type: styleType, nextStyleId,
-          ...(typeof baseParaShapeId === 'number' ? { baseParaShapeId } : {}),
-          ...(typeof baseCharShapeId === 'number' ? { baseCharShapeId } : {}),
-        }));
-        if (this.charModsJson !== '{}' || this.paraModsJson !== '{}') {
-          this.wasm.updateStyleShapes(newId, this.charModsJson, this.paraModsJson);
+      const doSave = () => {
+        if (this.addMode) {
+          const baseParaShapeId = this.baseInfo.paraProps?.paraShapeId;
+          const baseCharShapeId = this.baseInfo.charProps?.charShapeId;
+          const newId = this.wasm.createStyle(JSON.stringify({
+            name, englishName, type: styleType, nextStyleId,
+            ...(typeof baseParaShapeId === 'number' ? { baseParaShapeId } : {}),
+            ...(typeof baseCharShapeId === 'number' ? { baseCharShapeId } : {}),
+          }));
+          if (this.charModsJson !== '{}' || this.paraModsJson !== '{}') {
+            this.wasm.updateStyleShapes(newId, this.charModsJson, this.paraModsJson);
+          }
+        } else {
+          this.wasm.updateStyle(this.styleInfo.id, JSON.stringify({
+            name, englishName, nextStyleId,
+          }));
+          if (this.charModsJson !== '{}' || this.paraModsJson !== '{}') {
+            this.wasm.updateStyleShapes(this.styleInfo.id, this.charModsJson, this.paraModsJson);
+          }
         }
+      };
+      // [스타일 패리티] wasm 직호출이 undo 이력·렌더 갱신을 우회하던 갭 — 스냅샷 실행기
+      // (내부에서 document-changed 발행) 경유. 미주입 환경만 직접 emit 폴백.
+      if (this.runOp) {
+        this.runOp(this.addMode ? 'styleCreate' : 'styleUpdate', doSave);
       } else {
-        this.wasm.updateStyle(this.styleInfo.id, JSON.stringify({
-          name, englishName, nextStyleId,
-        }));
-        if (this.charModsJson !== '{}' || this.paraModsJson !== '{}') {
-          this.wasm.updateStyleShapes(this.styleInfo.id, this.charModsJson, this.paraModsJson);
-        }
+        doSave();
+        this.eventBus.emit('document-changed');
       }
+      this.eventBus.emit('style-list-changed');
       this.onSave?.();
     } catch (err) {
       console.warn('[StyleEditDialog] 저장 실패:', err);

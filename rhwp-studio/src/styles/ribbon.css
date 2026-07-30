@@ -83,6 +83,11 @@
 }
 .rb-slot > .rb-adopted:focus { outline: none; border-color: var(--rb-accent); }
 .rb-slot > select.rb-adopted { padding-right: 2px; }
+/* 색 피커 입양분(버튼 묶음)은 입력형 스타일(테두리·고정 높이)을 받지 않는다 */
+.rb-slot > .sb-color-wrap.rb-adopted,
+.rb-slot > #highlight-dropdown.rb-adopted {
+  border: none; background: transparent; padding: 0; height: auto; width: auto;
+}
 
 /* 캔버스/문서 모드 토글 자리 */
 .rb-mode-slot { display: flex; align-items: center; margin-left: 6px; }

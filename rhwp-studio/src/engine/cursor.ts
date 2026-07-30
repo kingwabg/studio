@@ -280,7 +280,9 @@ export class CursorState {
       } else if (pos.parentParaIndex !== undefined) {
         return off; // 셀 좌표 불완전(글상자 등) — 조회 규격이 달라 건드리지 않는다
       } else {
-        len = this.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex);
+        // 본문 커서 오프셋은 논리 좌표(인라인 컨트롤=1칸) — 텍스트 길이
+        // (getParagraphLength)로 깎으면 TAC 표 뒤 캐럿이 표 앞으로 후퇴한다
+        len = this.wasm.getLogicalLength(pos.sectionIndex, pos.paragraphIndex);
       }
       return Number.isFinite(len) && len >= 0 ? Math.min(off, len) : off;
     } catch {
@@ -676,7 +678,8 @@ export class CursorState {
       const paraCount = this.wasm.getParagraphCount(lastSec);
       if (paraCount > 0) {
         const lastPara = paraCount - 1;
-        const paraLen = this.wasm.getParagraphLength(lastSec, lastPara);
+        // 논리 길이 — 문서 끝 캐럿이 TAC 표 뒤까지 가야 한다(신고 ③)
+        const paraLen = this.wasm.getLogicalLength(lastSec, lastPara);
         this.position = { sectionIndex: lastSec, paragraphIndex: lastPara, charOffset: paraLen };
       } else {
         this.position = { sectionIndex: lastSec, paragraphIndex: 0, charOffset: 0 };
@@ -743,7 +746,7 @@ export class CursorState {
           } else {
             // 문서 마지막 문단 끝
             const lastPara = paraCount - 1;
-            const paraLen = this.wasm.getParagraphLength(sec, lastPara);
+            const paraLen = this.wasm.getLogicalLength(sec, lastPara);
             this.position = { ...pos, paragraphIndex: lastPara, charOffset: paraLen };
           }
         }
@@ -1229,14 +1232,14 @@ export class CursorState {
         this.anchor = { ...pos, charOffset: start };
         this.position = { ...pos, charOffset: end };
       } else if (this._expandPhase === 3) {
-        // 문단 전체 선택
-        const paraLen = this.wasm.getParagraphLength(sec, para);
+        // 문단 전체 선택 — 논리 길이(TAC 표 포함, 신고 ③)
+        const paraLen = this.wasm.getLogicalLength(sec, para);
         this.anchor = { ...pos, charOffset: 0 };
         this.position = { ...pos, charOffset: paraLen };
       } else if (this._expandPhase === 4) {
         // 구역 전체 선택
         const paraCount = this.wasm.getParagraphCount(sec);
-        const lastParaLen = this.wasm.getParagraphLength(sec, paraCount - 1);
+        const lastParaLen = this.wasm.getLogicalLength(sec, paraCount - 1);
         this.anchor = { sectionIndex: sec, paragraphIndex: 0, charOffset: 0 };
         this.position = { sectionIndex: sec, paragraphIndex: paraCount - 1, charOffset: lastParaLen };
       } else {
@@ -1244,7 +1247,7 @@ export class CursorState {
         const secCount = this.wasm.getSectionCount();
         const lastSec = secCount - 1;
         const lastParaCount = this.wasm.getParagraphCount(lastSec);
-        const lastParaLen = this.wasm.getParagraphLength(lastSec, lastParaCount - 1);
+        const lastParaLen = this.wasm.getLogicalLength(lastSec, lastParaCount - 1);
         this.anchor = { sectionIndex: 0, paragraphIndex: 0, charOffset: 0 };
         this.position = { sectionIndex: lastSec, paragraphIndex: lastParaCount - 1, charOffset: lastParaLen };
         this._expandPhase = 5; // cap
@@ -1498,7 +1501,7 @@ export class CursorState {
       if (ppi + 1 < paraCount) {
         this.position = { sectionIndex: sec, paragraphIndex: ppi + 1, charOffset: 0 };
       } else if (ppi > 0) {
-        const prevLen = this.wasm.getParagraphLength(sec, ppi - 1);
+        const prevLen = this.wasm.getLogicalLength(sec, ppi - 1);
         this.position = { sectionIndex: sec, paragraphIndex: ppi - 1, charOffset: prevLen };
       }
     }
@@ -1629,7 +1632,7 @@ export class CursorState {
         // 문단이 하나뿐이어도(또는 마지막 문단이어도) 앵커 문단 끝으로 확실히 이동한다
         const safePara = Math.min(ppi, Math.max(0, paraCount - 1));
         let len = 0;
-        try { len = this.wasm.getParagraphLength(sec, safePara); } catch { /* 0 */ }
+        try { len = this.wasm.getLogicalLength(sec, safePara); } catch { /* 0 */ }
         this.position = { sectionIndex: sec, paragraphIndex: safePara, charOffset: len };
       }
     }

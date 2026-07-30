@@ -47,10 +47,10 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('text-italic', '기울임', 'format:italic'),
       P('text-underline', '밑줄', 'format:underline'),
       P('text-strikethrough', '취소선', 'format:strikethrough'),
-      // 디자인 2a 홈 리본은 글자 색·형광펜을 여기 둔다. 전용 색 명령이 없어(패널의
-      // 스와치는 format-char 이벤트를 직접 쏜다) 색 설정이 있는 글자 모양으로 보낸다.
-      P('palette', '글자 색', 'format:char-shape'),
-      P('highlighter', '형광펜', 'format:char-shape'),
+      // 글자 색·형광펜은 구 서식바(Toolbar)가 소유한 동작하는 피커를 입양한다
+      // (글꼴 콤보와 같은 adopt 패턴 — 이벤트·상태 동기가 그대로 산다. 배선은 main.ts).
+      slot('text-color', 40),
+      slot('highlight', 44),
       gap(),
       // 정렬 4종은 한컴·워드와 같은 순서(왼쪽·가운데·오른쪽·양쪽)로 나란히 둔다 —
       // '오른쪽 정렬'만 「⋯」에 숨어 있어 정렬을 고르는 손이 두 곳으로 갈렸다(2026-07-30).

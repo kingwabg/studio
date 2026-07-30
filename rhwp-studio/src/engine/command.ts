@@ -128,7 +128,21 @@ function doInsertText(wasm: WasmBridge, pos: DocumentPosition, text: string): vo
       wasm.insertTextInCell(pos.sectionIndex, pos.parentParaIndex!, pos.controlIndex!, pos.cellIndex!, pos.cellParaIndex!, pos.charOffset, text);
     }
   } else {
-    wasm.insertText(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, text);
+    // [TAC 좌표계 2026-07-30] 본문 커서 charOffset 은 논리 좌표(인라인 컨트롤=1칸).
+    // 텍스트-좌표 insertText 에 그대로 넘기면 표 뒤(논리 N) 타이핑이 표 앞에 꽂힌다.
+    // 논리 삽입 API 로 삽입 위치·반환 오프셋을 모두 논리로 정합시킨다.
+    // 셀 분기는 셀용 논리 API 부재로 종전 유지(셀 안 TAC 표는 동일 결함 잔존).
+    wasm.insertTextLogical(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, text);
+  }
+}
+
+/** 본문 논리 오프셋 → 텍스트 오프셋 (셀은 변환 없이 원값) */
+function bodyTextOffset(wasm: WasmBridge, pos: DocumentPosition): number {
+  if (isNestedCell(pos) || isCell(pos)) return pos.charOffset;
+  try {
+    return wasm.logicalToTextOffset(pos.sectionIndex, pos.paragraphIndex, pos.charOffset);
+  } catch {
+    return pos.charOffset;
   }
 }
 
@@ -138,7 +152,7 @@ function doDeleteText(wasm: WasmBridge, pos: DocumentPosition, count: number): v
   } else if (isCell(pos)) {
     wasm.deleteTextInCell(pos.sectionIndex, pos.parentParaIndex!, pos.controlIndex!, pos.cellIndex!, pos.cellParaIndex!, pos.charOffset, count);
   } else {
-    wasm.deleteText(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, count);
+    wasm.deleteText(pos.sectionIndex, pos.paragraphIndex, bodyTextOffset(wasm, pos), count);
   }
 }
 
@@ -148,7 +162,7 @@ function doGetTextRange(wasm: WasmBridge, pos: DocumentPosition, count: number):
   } else if (isCell(pos)) {
     return wasm.getTextInCell(pos.sectionIndex, pos.parentParaIndex!, pos.controlIndex!, pos.cellIndex!, pos.cellParaIndex!, pos.charOffset, count);
   } else {
-    return wasm.getTextRange(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, count);
+    return wasm.getTextRange(pos.sectionIndex, pos.paragraphIndex, bodyTextOffset(wasm, pos), count);
   }
 }
 
@@ -332,7 +346,9 @@ export class SplitParagraphCommand implements EditCommand {
   constructor(private position: DocumentPosition) {}
 
   execute(wasm: WasmBridge): DocumentPosition {
-    const { sectionIndex: sec, paragraphIndex: para, charOffset } = this.position;
+    const { sectionIndex: sec, paragraphIndex: para } = this.position;
+    // splitParagraph 는 텍스트 좌표 — 커서(논리)를 변환해 TAC 표 뒤 Enter 정합
+    const charOffset = bodyTextOffset(wasm, this.position);
     const result = JSON.parse(wasm.splitParagraph(sec, para, charOffset));
     if (result.ok) {
       return { sectionIndex: sec, paragraphIndex: result.paraIdx, charOffset: 0 };
@@ -355,17 +371,19 @@ export class MergeParagraphCommand implements EditCommand {
   readonly type = 'mergeParagraph';
   readonly timestamp = Date.now();
 
-  /** undo 시 분할 위치 (이전 문단의 원래 길이) */
+  /** undo 시 분할 위치 (이전 문단의 원래 텍스트 길이 — splitParagraph 좌표계) */
   private mergePointOffset = 0;
 
   constructor(private position: DocumentPosition) {}
 
   execute(wasm: WasmBridge): DocumentPosition {
     const { sectionIndex: sec, paragraphIndex: para } = this.position;
-    // 병합 전 이전 문단 길이 기억
+    // 병합 전 이전 문단 길이 기억 — undo 분할점은 텍스트 좌표, 병합 후 캐럿은
+    // 논리 좌표(이전 문단이 TAC 표로 끝나면 둘이 다르다)
     this.mergePointOffset = wasm.getParagraphLength(sec, para - 1);
+    const caretOffset = wasm.getLogicalLength(sec, para - 1);
     wasm.mergeParagraph(sec, para);
-    return { sectionIndex: sec, paragraphIndex: para - 1, charOffset: this.mergePointOffset };
+    return { sectionIndex: sec, paragraphIndex: para - 1, charOffset: caretOffset };
   }
 
   undo(wasm: WasmBridge): DocumentPosition {
@@ -420,17 +438,23 @@ export class DeleteSelectionCommand implements EditCommand {
     } else {
       const sec = start.sectionIndex;
       this.multiPara = start.paragraphIndex !== end.paragraphIndex;
+      // [TAC 좌표계 2026-07-30] 선택 끝점은 논리 좌표 — 텍스트-좌표 소비자
+      // (getTextRange/deleteRange)에 넘기기 전에 변환한다. 변환 없이는 표 뒤에서
+      // 시작하는 선택이 getTextRange 하드 에러로 죽었다. 표 자체의 삭제는 엔진
+      // deleteRange 한계로 아직 안 됨(별도 엔진 과제).
+      const startText = bodyTextOffset(wasm, start);
+      const endText = bodyTextOffset(wasm, end);
       for (let p = start.paragraphIndex; p <= end.paragraphIndex; p++) {
         const pLen = wasm.getParagraphLength(sec, p);
-        const from = p === start.paragraphIndex ? start.charOffset : 0;
-        const to = p === end.paragraphIndex ? end.charOffset : pLen;
+        const from = p === start.paragraphIndex ? startText : 0;
+        const to = p === end.paragraphIndex ? endText : pLen;
         if (to > from) {
           this.savedTexts.push(wasm.getTextRange(sec, p, from, to - from));
         } else {
           this.savedTexts.push('');
         }
       }
-      wasm.deleteRange(sec, start.paragraphIndex, start.charOffset, end.paragraphIndex, end.charOffset);
+      wasm.deleteRange(sec, start.paragraphIndex, startText, end.paragraphIndex, endText);
     }
 
     return { ...start };
@@ -543,10 +567,14 @@ export class ApplyCharFormatCommand implements EditCommand {
       const startPara = start.paragraphIndex;
       const endPara = end.paragraphIndex;
 
+      // [TAC 좌표계 2026-07-30] applyCharFormat 은 텍스트 좌표(상한 무검증) —
+      // 논리 끝점을 변환 없이 넘기면 표 포함 선택의 서식 범위가 조용히 어긋난다.
+      const startText = bodyTextOffset(wasm, start);
+      const endText = bodyTextOffset(wasm, end);
       this.entries = [];
       for (let p = startPara; p <= endPara; p++) {
-        const from = p === startPara ? start.charOffset : 0;
-        const to = p === endPara ? end.charOffset : wasm.getParagraphLength(sec, p);
+        const from = p === startPara ? startText : 0;
+        const to = p === endPara ? endText : wasm.getParagraphLength(sec, p);
         if (to <= from) continue;
 
         const prevProps = wasm.getCharPropertiesAt(sec, p, from);

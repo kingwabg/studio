@@ -90,6 +90,12 @@ export class Toolbar {
       this.updateStyleState(info as { id: number; name: string });
     });
 
+    // [스타일 패리티] 스타일 추가/편집/삭제 후 콤보를 다시 채운다 — 문서 로드 1회 채움뿐이라
+    // deleteStyle 뒤 id 재배열(엔진 fix_style_ids)에도 옛 id 가 남아 잘못된 스타일이 적용됐다.
+    eventBus.on('style-list-changed', () => {
+      this.initStyleDropdown();
+    });
+
     eventBus.on('local-fonts-changed', () => {
       this.refreshFontDropdown();
     });
@@ -385,7 +391,19 @@ export class Toolbar {
     this.btnHighlight.addEventListener('mousedown', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      const willOpen = !this.highlightDropdown.classList.contains('open');
       this.highlightDropdown.classList.toggle('open');
+      if (willOpen) {
+        // 리본 입양 후 조상 .rb-row-ribbon 의 overflow:hidden 이 absolute 팔레트를
+        // 자른다 — fixed + 실좌표로 탈출(legacy 서식바에서도 동일 동작).
+        const r = this.btnHighlight.getBoundingClientRect();
+        const pal = this.highlightDropdown.querySelector<HTMLElement>('#highlight-palette');
+        if (pal) {
+          pal.style.position = 'fixed';
+          pal.style.left = `${r.left}px`;
+          pal.style.top = `${r.bottom + 2}px`;
+        }
+      }
     });
 
     // 외부 클릭 시 닫기
@@ -429,12 +447,20 @@ export class Toolbar {
     ];
 
     let popup: HTMLDivElement | null = null;
-    const showPopup = () => {
+    const showPopup = (anchor: HTMLElement = btn) => {
       if (popup) { popup.remove(); popup = null; return; }
       popup = document.createElement('div');
       popup.className = 'bullet-popup';
       popup.style.cssText = 'position:absolute;z-index:1000;background:var(--color-surface);border:1px solid var(--color-border);border-radius:3px;box-shadow:var(--shadow-dropdown);padding:4px;display:grid;grid-template-columns:repeat(6,1fr);gap:2px;color:var(--color-text);';
-      const rect = btn.getBoundingClientRect();
+      let rect = anchor.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        // 앵커가 숨어 있으면(구 툴바가 리본 체제에서 display:none) 리본 하단으로 폴백 — (0,2) 방지
+        const rb = document.getElementById('ribbon-header');
+        if (rb) {
+          const rr = rb.getBoundingClientRect();
+          rect = new DOMRect(rr.left + 8, rr.bottom, 0, 0);
+        }
+      }
       popup.style.left = `${rect.left}px`;
       popup.style.top = `${rect.bottom + 2}px`;
       for (const ch of BULLETS) {
@@ -456,7 +482,7 @@ export class Toolbar {
       }
       document.body.appendChild(popup);
       const close = (e: MouseEvent) => {
-        if (popup && !popup.contains(e.target as Node) && e.target !== btn) {
+        if (popup && !popup.contains(e.target as Node) && !anchor.contains(e.target as Node)) {
           popup.remove(); popup = null;
           document.removeEventListener('mousedown', close);
         }
@@ -467,6 +493,12 @@ export class Toolbar {
     btn.addEventListener('mousedown', (e) => {
       e.preventDefault();
       showPopup();
+    });
+
+    // 명령 경로(format:bullet-shape) — 앵커(리본 버튼·메뉴 항목)를 넘겨받아 그 아래에 띄운다
+    this.eventBus.on('open-bullet-popup', (p) => {
+      const a = (p as { anchorEl?: HTMLElement } | undefined)?.anchorEl;
+      showPopup(a ?? btn);
     });
   }
 
@@ -544,6 +576,10 @@ export class Toolbar {
   /** 커서 위치의 스타일을 드롭다운에 반영한다 */
   private updateStyleState(info: { id: number; name: string }): void {
     if (!this.styleDropdownInitialized) return;
+    // [스타일 패리티] 목록이 낡았으면(id 없음·이름 불일치 — undo 로 스타일이 되살아난 경우 등)
+    // 자가 수복한다. style-list-changed 는 undo 경로에선 발행되지 않는다.
+    const opt = this.styleName.querySelector<HTMLOptionElement>(`option[value="${info.id}"]`);
+    if (!opt || opt.textContent !== info.name) this.initStyleDropdown();
     this.styleName.value = String(info.id);
   }
 
