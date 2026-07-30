@@ -359,12 +359,23 @@ export const formatCommands: CommandDef[] = [
           // "앞 번호 이어": 이전 번호 문단의 numbering_id를 찾아서 적용
           const prevNid = (props as any).numberingId ?? nid;
           ih.applyNumbering(prevNid > 0 ? prevNid : nid);
-        } else if (restartMode === 2) {
-          // "새 번호 시작": 새 Numbering 정의 적용 (다른 numbering_id)
-          ih.applyNumbering(nid);
         } else {
-          // "이전 번호 이어": 현재 numbering_id 유지
+          // [서식 패리티 2026-07-30] mode 1(이전 번호 목록에 이어)·2(새 번호 목록 시작)는
+          // 엔진의 NumberingRestart 로 표현해야 한다. 예전엔 두 분기가 같은 코드였고
+          // setNumberingRestart 를 아무도 호출하지 않아 3종이 실질 1종이었다.
           ih.applyNumbering(nid);
+          const pos = ih.getCursorPosition?.();
+          if (pos && pos.parentParaIndex === undefined) {
+            try {
+              (services.wasm as any).setNumberingRestart(
+                pos.sectionIndex, pos.paragraphIndex, restartMode,
+                restartMode === 2 ? startNum : 0,
+              );
+              services.eventBus.emit('document-changed');
+            } catch (err) {
+              console.warn('[format] setNumberingRestart 실패:', err);
+            }
+          }
         }
       };
       dialog.onApplyBullet = (bulletChar) => {

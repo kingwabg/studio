@@ -618,6 +618,20 @@ export class InputHandler {
         if (this.cursor.isInTableObjectSelection()) {
           this.renderTableObjectSelection();
         }
+        // [커서 정합 2026-07-30] 조판이 바뀌면 캐럿·선택 화면 좌표를 **다시 조회**한다.
+        // 예전엔 이 핸들러가 메모·변경추적·개체선택만 손대서, 편집 용지(여백·방향)를 바꾸거나
+        // 표를 옮긴 뒤 캐럿이 옛 자리에 남았다(오프셋은 맞고 화면 좌표만 낡음).
+        // 개체 선택 중에는 캐럿을 쓰지 않으므로 건드리지 않는다.
+        if (this.active
+            && !this.cursor.isInPictureObjectSelection()
+            && !this.cursor.isInTableObjectSelection()) {
+          try {
+            this.cursor.updateRect();
+            this.updateCaret(true); // skipScroll: 문서 변경이 화면을 끌고 다니지 않게
+          } catch (err) {
+            console.warn('[InputHandler] document-changed 캐럿 갱신 실패:', err);
+          }
+        }
       });
     });
     eventBus.on('create-new-document', () => {
@@ -2674,6 +2688,12 @@ export class InputHandler {
       if (!skipScroll) {
         this.scrollCaretIntoView(caretRect);
       }
+    } else {
+      // [커서 정합 2026-07-30] rect 조회 실패(개체 삭제·컨테이너 소멸·범위 초과)에서 예전엔
+      // 아무것도 하지 않아 **옛 좌표의 캐럿이 화면에 얼어붙어** 남았다. 유효 위치를 못 찾으면
+      // 캐럿을 감춘다 — 다음 유효 갱신에서 다시 나타난다.
+      this.caret.hideComposition();
+      this.caret.hide();
     }
     this.updateSelection();
     this.emitCursorFormatState();

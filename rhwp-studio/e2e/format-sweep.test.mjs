@@ -149,6 +149,54 @@ runTest('서식 전수 — 글자·문단 속성 적용-판독', async ({ page }
   assert.strictEqual(paraRes.before, 500, '문단 위 간격');
   assert.strictEqual(paraRes.after, 300, '문단 아래 간격');
 
+  // ── 문단 모양 「테두리/배경」 탭 + 탭 정의 + 줄나눔 기준 (한컴 문단 모양 미덮은 영역) ──
+  const paraExtRes = await page.evaluate(async () => {
+    const ih = window.__inputHandler;
+    const probe = async (mods) => {
+      ih.applyParaFormat(mods);
+      await new Promise((r) => setTimeout(r, 150));
+      return ih.getParaProperties();
+    };
+    const out = {};
+    let p = await probe({
+      borderLeft: { type: 1, width: 2, color: '#0000FF' },
+      borderTop: { type: 1, width: 2, color: '#0000FF' },
+      borderSpacing: [100, 200, 100, 200],
+      borderConnect: true,
+    });
+    out.borderLeft = p.borderLeft; out.borderSpacing = p.borderSpacing; out.borderConnect = p.borderConnect;
+    p = await probe({ fillType: 'solid', fillColor: '#FFFF99' });
+    out.fill = { type: p.fillType, color: p.fillColor };
+    // 줄 나눔 기준은 숫자 코드 규약 (types.ts: 한글 0=어절/1=글자, 영문 0=단어/1=하이픈/2=글자)
+    p = await probe({ koreanBreakUnit: 1, englishBreakUnit: 2 });
+    out.breakUnit = { ko: p.koreanBreakUnit, en: p.englishBreakUnit };
+    // 탭 정의 규약(types.ts): { position: HWPUNIT, type: 숫자(0=왼쪽,1=오른쪽,2=가운데,3=소수점), fill }
+    p = await probe({ tabStops: [{ position: 2000, type: 2, fill: 0 }] });
+    out.tabStops = (p.tabStops ?? []).map((t) => ({ position: t.position, type: t.type }));
+    p = await probe({ keepWithNext: true, keepLines: true, widowOrphan: true, pageBreakBefore: true });
+    out.flags = { next: p.keepWithNext, lines: p.keepLines, widow: p.widowOrphan, pb: p.pageBreakBefore };
+    p = await probe({ fontLineHeight: true, autoSpaceKrEn: true, autoSpaceKrNum: true });
+    out.auto = { fontLine: p.fontLineHeight, krEn: p.autoSpaceKrEn, krNum: p.autoSpaceKrNum };
+    // 세로 정렬 — autoSpacing 과 같은 비트로 오해석돼 항상 0으로 지워지던 결함 회귀
+    // (2026-07-30 수리: 판독이 attr2=autoSpacing / attr1 bit20-21=verticalAlign 로 분리)
+    p = await probe({ verticalAlign: 1, autoSpaceKrEn: true });
+    out.vAlign = { v: p.verticalAlign, krEn: p.autoSpaceKrEn };
+    return out;
+  });
+  console.log('  문단확장:', JSON.stringify(paraExtRes));
+  assert.ok(paraExtRes.borderLeft && paraExtRes.borderLeft.width > 0, '문단 테두리(왼쪽) 적용');
+  assert.deepStrictEqual(paraExtRes.borderSpacing, [100, 200, 100, 200], '테두리 간격 4방향');
+  assert.strictEqual(paraExtRes.borderConnect, true, '문단 테두리 연결');
+  assert.strictEqual((paraExtRes.fill.color ?? '').toLowerCase(), '#ffff99', '문단 배경 면 색');
+  assert.deepStrictEqual(paraExtRes.breakUnit, { ko: 1, en: 2 }, '줄 나눔 기준(한글=글자, 영문=글자)');
+  assert.deepStrictEqual(paraExtRes.tabStops, [{ position: 2000, type: 2 }], '사용자 탭 정의(가운데 탭)');
+  assert.deepStrictEqual(paraExtRes.flags,
+    { next: true, lines: true, widow: true, pb: true }, '문단 보호·다음문단과 함께·외톨이·쪽 나눔');
+  assert.deepStrictEqual(paraExtRes.auto,
+    { fontLine: true, krEn: true, krNum: true }, '글꼴 줄높이·한영/한숫자 자동 간격');
+  assert.deepStrictEqual(paraExtRes.vAlign, { v: 1, krEn: true },
+    '세로 정렬과 자동 간격이 서로를 지우지 않는다(비트 오해석 회귀)');
+
   // ── 수준 증감: 번호 문단에서 paraLevel 이동 (서식 > 한 수준 증가/감소) ──
   const levelRes = await page.evaluate(async () => {
     const ih = window.__inputHandler;

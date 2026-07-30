@@ -42,7 +42,11 @@ const NUM_FMT = {
   HANGUL_SYLLABLE: 6, // 가, 나, 다 (음절)
   HANGUL_JAMO: 10,    // ㄱ, ㄴ, ㄷ (자모)
   HANGUL_MIXED: 8,    // 가, 나, 다 (혼합)
-  HANJA: 7,           // 一, 二, 三
+  // [서식 패리티 2026-07-30] 한자는 13 이다. 7은 엔진 문단번호 표에 미매핑이라
+  // Digit 폴백으로 '一 二 三' 프리셋이 1,2,3 으로 조판됐다.
+  // 코드 표 정본 = rhwp src/renderer/layout/utils.rs numbering_format_to_number_format
+  // (⚠ 쪽 번호용 NumberFormat::from_hwp_format 과 코드 판이 다르다 — 혼용 금지)
+  HANJA: 13,          // 一, 二, 三
 };
 
 /** 프리셋 정의 */
@@ -87,6 +91,55 @@ const PRESETS: NumberingPreset[] = [
     label: '① ② ③ (원문자)',
     levelFormats: ['^1', '^2', '^3', '^4', '^5', '^6', '^7'],
     numberFormats: [NUM_FMT.CIRCLE_DIGIT, NUM_FMT.CIRCLE_DIGIT, NUM_FMT.CIRCLE_DIGIT, NUM_FMT.CIRCLE_DIGIT, NUM_FMT.CIRCLE_DIGIT, NUM_FMT.CIRCLE_DIGIT, NUM_FMT.CIRCLE_DIGIT],
+  },
+  // [한컴 패리티 2026-07-30] 한컴 「문단 번호 모양」 10종 중 위 목록에 없던 나머지.
+  // 한컴 실채록 순서(수준1/2/3/4)를 정본으로 삼는다 — 오라클은
+  // rhwp mydocs/eng/plans/hancom-format-parity.md 「프리셋 정본」 절.
+  // 정본 데이터 PARA_NUM_PRESETS_KO(core/numbering-defaults.ts)는 attrs 문자열 판이라
+  // 이 대화상자의 levelFormats/numberFormats 규격으로 옮겨 적었다.
+  {
+    label: '(1) (가) (a) 1) 가) a) ①',
+    levelFormats: ['(^1)', '(^2)', '(^3)', '^4)', '^5)', '^6)', '^7'],
+    numberFormats: [NUM_FMT.DIGIT, NUM_FMT.HANGUL_MIXED, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT, NUM_FMT.HANGUL_MIXED, NUM_FMT.ALPHA_LOWER, NUM_FMT.CIRCLE_DIGIT],
+  },
+  {
+    label: '1) 가) a) (1) (가) (a) ①',
+    levelFormats: ['^1)', '^2)', '^3)', '(^4)', '(^5)', '(^6)', '^7'],
+    numberFormats: [NUM_FMT.DIGIT, NUM_FMT.HANGUL_MIXED, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT, NUM_FMT.HANGUL_MIXED, NUM_FMT.ALPHA_LOWER, NUM_FMT.CIRCLE_DIGIT],
+  },
+  {
+    label: '① (ㄱ) (a) 1) ㄱ) a) -',
+    levelFormats: ['^1', '(^2)', '(^3)', '^4)', '^5)', '^6)', '-'],
+    numberFormats: [NUM_FMT.CIRCLE_DIGIT, NUM_FMT.HANGUL_JAMO, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT, NUM_FMT.HANGUL_JAMO, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT],
+  },
+  {
+    label: '가) a) (1) (가) (a) ① -',
+    levelFormats: ['^1)', '^2)', '(^3)', '(^4)', '(^5)', '^6', '-'],
+    numberFormats: [NUM_FMT.HANGUL_MIXED, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT, NUM_FMT.HANGUL_MIXED, NUM_FMT.ALPHA_LOWER, NUM_FMT.CIRCLE_DIGIT, NUM_FMT.DIGIT],
+  },
+  {
+    label: '(ㄱ) (1) (a) 1) a) ① -',
+    levelFormats: ['(^1)', '(^2)', '(^3)', '^4)', '^5)', '^6', '-'],
+    numberFormats: [NUM_FMT.HANGUL_JAMO, NUM_FMT.DIGIT, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT, NUM_FMT.ALPHA_LOWER, NUM_FMT.CIRCLE_DIGIT, NUM_FMT.DIGIT],
+  },
+  {
+    label: 'i. a. (i) (a) i) a) -',
+    levelFormats: ['^1.', '^2.', '(^3)', '(^4)', '^5)', '^6)', '-'],
+    numberFormats: [NUM_FMT.ROMAN_LOWER, NUM_FMT.ALPHA_LOWER, NUM_FMT.ROMAN_LOWER, NUM_FMT.ALPHA_LOWER, NUM_FMT.ROMAN_LOWER, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT],
+  },
+  {
+    label: 'A. 1. 가, (a) (1) (가) ①',
+    levelFormats: ['^1.', '^2.', '^3,', '(^4)', '(^5)', '(^6)', '^7'],
+    numberFormats: [NUM_FMT.ALPHA_UPPER, NUM_FMT.DIGIT, NUM_FMT.HANGUL_MIXED, NUM_FMT.ALPHA_LOWER, NUM_FMT.DIGIT, NUM_FMT.HANGUL_MIXED, NUM_FMT.CIRCLE_DIGIT],
+  },
+  {
+    // 다단계 누적형 — 한컴 10번째 프리셋. 수준마다 상위 번호를 누적 표기한다.
+    label: '1. 1.1. 1.1.1. 1.1.1.1. …',
+    levelFormats: [
+      '^1.', '^1.^2.', '^1.^2.^3.', '^1.^2.^3.^4.',
+      '^1.^2.^3.^4.^5.', '^1.^2.^3.^4.^5.^6.', '^1.^2.^3.^4.^5.^6.^7.',
+    ],
+    numberFormats: [NUM_FMT.DIGIT, NUM_FMT.DIGIT, NUM_FMT.DIGIT, NUM_FMT.DIGIT, NUM_FMT.DIGIT, NUM_FMT.DIGIT, NUM_FMT.DIGIT],
   },
 ];
 

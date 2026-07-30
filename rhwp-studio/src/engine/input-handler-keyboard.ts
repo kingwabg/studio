@@ -1927,10 +1927,23 @@ async function pasteImageFile(this: any, file: File, hasSelection: boolean): Pro
         cellPathJson, data, wHwp, hHwp, natW, natH, ext, '',
       );
       if (result.ok) {
+        // [커서 정합 2026-07-30] 예전엔 무조건 `result.paraIdx + 1` 로 보냈다. 두 결함:
+        //  ① 엔진은 문단을 새로 만들지 않으므로 **마지막 문단에서 붙여넣으면 없는 문단**을
+        //     가리켜 캐럿이 사라졌다.
+        //  ② 표 셀 안에서 붙여넣으면 셀 컨텍스트(cellPath 등)를 버려 캐럿이 표 밖으로 튀었다.
+        // 셀 안이면 위치를 그대로 유지하고, 본문이면 삽입 문단 안에서 논리 오프셋 뒤로 둔다.
+        if (inCell) return p;
+        const insertedPara = result.paraIdx ?? p.paragraphIndex;
+        const paraCount = wasm.getParagraphCount(p.sectionIndex);
+        const safePara = Math.min(insertedPara, Math.max(0, paraCount - 1));
+        const len = wasm.getParagraphLength(p.sectionIndex, safePara);
+        const off = result.logicalOffset !== undefined
+          ? Math.min(result.logicalOffset, len)
+          : Math.min(p.charOffset + 1, len);
         return {
           sectionIndex: p.sectionIndex,
-          paragraphIndex: result.paraIdx + 1,
-          charOffset: 0,
+          paragraphIndex: safePara,
+          charOffset: off,
         } as DocumentPosition;
       }
       return p;

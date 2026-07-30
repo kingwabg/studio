@@ -21,7 +21,9 @@ const FAIL = 600;
 const legacyBaselines = new Map([
   // +10 대기 서식, +16 변경 추적(오버레이 필드·갱신 훅·승격 지점) — 둘 다 본문은
   // pending-format.ts / track-review.ts 에 있고 여긴 배선뿐. 기능 코드 반입 금지.
-  ['src/engine/input-handler.ts', 4823],
+  // +20: 커서 정합 수리(2026-07-30) — document-changed 캐럿 재조회 + rect 실패 시 캐럿 숨김.
+  //      둘 다 이벤트 핸들러/updateCaret 본체라 이 파일이 정위치. 판정 = e2e/paper-cursor-sweep
+  ['src/engine/input-handler.ts', 4843],
   ['src/compare/diff-engine.ts', 3106],
   ['src/ui/picture-props-dialog.ts', 2826],
   // +31: 변경 추적 API 래퍼 6종(2026-07-30) — 이 파일은 wasm 경계라 래퍼의 정위치다
@@ -31,7 +33,8 @@ const legacyBaselines = new Map([
   // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치
   // +47: 셀 블록 잘라내기·셀 채움 붙여넣기 분기(2026-07-30) — 로직 본체는 cell-paste.ts,
   //      여기는 onCut/onPaste 이벤트 분기(정위치). 판정 근거는 e2e/cell-clipboard.test.mjs
-  ['src/engine/input-handler-keyboard.ts', 2147],
+  // +13: 그림 붙여넣기 커서 수리(2026-07-30) — 없는 문단 이동·셀 컨텍스트 상실 2건
+  ['src/engine/input-handler-keyboard.ts', 2160],
   // +31: selectWordAtCursor(2026-07-30) — findWordAt·anchor 가 이 파일 전용이라 정위치
   ['src/engine/cursor.ts', 1885],
   ['src/engine/input-handler-table.ts', 1627],
