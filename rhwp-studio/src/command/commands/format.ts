@@ -7,6 +7,7 @@ import { StyleEditDialog } from '@/ui/style-edit-dialog';
 import { PicturePropsDialog } from '@/ui/picture-props-dialog';
 import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
 import { openTablePanel } from '@/ui/canva-sidebars';
+import { showConfirm } from '@/ui/confirm-dialog';
 
 export const formatCommands: CommandDef[] = [
   {
@@ -453,9 +454,18 @@ export const formatCommands: CommandDef[] = [
         addDlg.show();
       };
 
-      // 설정(적용)
+      // 설정(적용) — [스타일 패리티 2026-07-30] 한컴은 적용 전에
+      // 「본문을 [X] 스타일 모양으로 덮어 쓸까요?」를 묻고, '예'면 직접 문단서식까지 덮는다.
+      // 예전엔 확인도 없고 '예' 경로 자체가 없어서, 직접 서식이 있는 문단은 스타일을 눌러도
+      // 문단 모양이 조용히 무시됐다.
       dialog.onApply = (styleId: number) => {
-        ih.applyStyle(styleId);
+        const name = services.wasm.getStyleList()
+          .find((st: { id: number }) => st.id === styleId)?.name ?? '선택한';
+        void showConfirm('스타일', `본문을 [${name}] 스타일 모양으로 덮어 쓸까요?`)
+          .then((yes) => {
+            ih.applyStyle(styleId, yes);
+            ih.focus();
+          });
       };
       dialog.onClose = () => ih.focus();
 

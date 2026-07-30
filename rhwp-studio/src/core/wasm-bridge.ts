@@ -1900,10 +1900,12 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).getCellStyleAt(sec, parentPara, controlIdx, cellIdx, cellParaIdx));
   }
 
-  applyStyle(sec: number, para: number, styleId: number): { ok: boolean } {
+  /** overwrite=true 면 문단의 직접 서식까지 스타일 모양으로 덮어쓴다
+   * (한컴 「본문을 [X] 스타일 모양으로 덮어 쓸까요?」의 '예'). */
+  applyStyle(sec: number, para: number, styleId: number, overwrite = false): { ok: boolean } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).applyStyle(sec, para, styleId));
+    return JSON.parse((this.doc as any).applyStyle(sec, para, styleId, overwrite));
   }
 
   applyCellStyle(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, styleId: number): { ok: boolean } {

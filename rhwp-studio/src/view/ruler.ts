@@ -25,6 +25,21 @@ function cssVar(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
+/** 자 마커의 화면 좌표(px, zoom 적용) + 본문 기준선. ruler-drag 가 히트테스트에 쓴다. */
+export interface RulerMarkers {
+  /** 첫 줄 마커(▽, 위) */
+  firstX: number;
+  /** 나머지 줄 마커(△, 아래) */
+  remainX: number;
+  /** 오른쪽 여백 마커(△) */
+  rightX: number;
+  /** 본문 영역 좌/우 기준(px, 화면) */
+  refLeft: number;
+  refRight: number;
+  /** 이 스냅샷을 그린 zoom */
+  zoom: number;
+}
+
 export class Ruler {
   private hCtx: CanvasRenderingContext2D | null;
   private vCtx: CanvasRenderingContext2D | null;
@@ -39,6 +54,16 @@ export class Ruler {
   private paraIndentPx = 0;
   /** 문단 정보가 유효한지 여부 */
   private hasParaInfo = false;
+
+  /** [자 드래그 2026-07-30] 마지막으로 그린 마커의 화면 좌표(px) + 기준선.
+   * 히트테스트·드래그가 조판과 **같은 계산**을 쓰도록 그리는 쪽에서 그대로 남긴다
+   * (좌표 공식을 두 번 쓰면 어긋난다). 소비자 = view/ruler-drag.ts */
+  private markers: RulerMarkers | null = null;
+
+  /** 마커 좌표 스냅샷 — 없으면 null(문단 정보 없음/미렌더) */
+  getMarkers(): RulerMarkers | null {
+    return this.markers;
+  }
 
   /** 셀 내부 여부 및 셀 좌표 (px, zoom=1, 페이지 좌표 기준) */
   private inCell = false;
@@ -334,6 +359,9 @@ export class Ruler {
       // 오른쪽 여백 마커 △
       const rightX = refRight - this.paraMarginRightPx * zoom;
       this.drawTriangleUp(ctx, rightX, canvasH, MARKER_SIZE);
+
+      // 드래그 히트테스트용 스냅샷 (그린 좌표를 그대로 넘긴다)
+      this.markers = { firstX, remainX, rightX, refLeft, refRight, zoom };
     }
 
     ctx.restore();

@@ -65,6 +65,7 @@ import { TableObjectRenderer } from '@/engine/table-object-renderer';
 import { TableHoverHandles } from '@/engine/table-hover-handles';
 import { TableResizeRenderer } from '@/engine/table-resize-renderer';
 import { Ruler } from '@/view/ruler';
+import { attachRulerDrag } from '@/view/ruler-drag';
 import type { CanvasKitLayerRenderer } from '@/view/canvaskit-renderer';
 import {
   resolveCanvasKitRenderMode,
@@ -320,6 +321,18 @@ async function initialize(): Promise<void> {
     );
     inputHandler.setEditMode(editMode);
 
+    // [자 드래그 2026-07-30] 마커를 끌어 여백·들여쓰기 조절 (한컴 패리티 확정 갭 — 리스너 0개였다).
+    // inputHandler 는 위에서 만들어지므로 getter 로 늦게 참조한다.
+    attachRulerDrag(
+      document.getElementById('h-ruler') as HTMLCanvasElement,
+      ruler,
+      () => (inputHandler as unknown as {
+        applyParaPropsAtCursor(p: Record<string, unknown>): void;
+        getParaProperties(): { marginLeft?: number; marginRight?: number; indent?: number } | null;
+        focus?: () => void;
+      } | null),
+    );
+
     // [캔버스 한컴 포크] 임베드 모드 — URL ?embed=1 이면 studio-root에 embed-mode 클래스를 붙여
     // 크롬(메뉴바·아이콘툴바·눈금자·상태바)을 숨기고 서식 리본(style-bar)만 남긴다(판매 페이지
     // iframe 임베드용). CSS = styles/embed.css. 스타일바의 삽입 버튼(sb-insert)도 이때만 노출.
@@ -484,6 +497,7 @@ async function initialize(): Promise<void> {
     // E2E 테스트용 전역 노출 (개발 모드 전용)
     if (import.meta.env.DEV) {
       (window as any).__inputHandler = inputHandler;
+      (window as any).__ruler = ruler; // 자 마커 드래그 e2e 판정용
       (window as any).__canvasView = canvasView;
       (window as any).__renderBackend = renderBackend;
       (window as any).__canvaskitRenderMode = canvaskitMode;

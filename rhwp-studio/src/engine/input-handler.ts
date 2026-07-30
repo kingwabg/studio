@@ -4404,8 +4404,10 @@ export class InputHandler {
     this.applyCharFormat({ spacings: Array(7).fill(nextSpacing) });
   }
 
-  /** 스타일 적용 (커맨드 시스템용) */
-  applyStyle(styleId: number): void {
+  /** 스타일 적용 (커맨드 시스템용).
+   * @param overwrite 한컴 「본문을 [X] 스타일 모양으로 덮어 쓸까요?」의 '예' — 직접 문단서식까지
+   *                  스타일 모양으로 덮는다. 확인 대화상자는 명령 계층(style.ts)이 띄운다. */
+  applyStyle(styleId: number, overwrite = false): void {
     try {
       const targets = this.getParaFormatTargetsAtCursor();
       if (targets.length === 0) return;
@@ -4413,7 +4415,7 @@ export class InputHandler {
       const operation = (wasm: WasmBridge): DocumentPosition => {
         for (const target of targets) {
           if (target.kind === 'body') {
-            wasm.applyStyle(target.sec, target.para, styleId);
+            wasm.applyStyle(target.sec, target.para, styleId, overwrite);
             continue;
           }
           wasm.applyCellStyle(

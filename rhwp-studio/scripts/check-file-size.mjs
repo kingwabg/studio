@@ -23,11 +23,13 @@ const legacyBaselines = new Map([
   // pending-format.ts / track-review.ts 에 있고 여긴 배선뿐. 기능 코드 반입 금지.
   // +20: 커서 정합 수리(2026-07-30) — document-changed 캐럿 재조회 + rect 실패 시 캐럿 숨김.
   //      둘 다 이벤트 핸들러/updateCaret 본체라 이 파일이 정위치. 판정 = e2e/paper-cursor-sweep
-  ['src/engine/input-handler.ts', 4843],
+  // +2: applyStyle(styleId, overwrite) 스레딩(2026-07-30)
+  ['src/engine/input-handler.ts', 4845],
   ['src/compare/diff-engine.ts', 3106],
   ['src/ui/picture-props-dialog.ts', 2826],
   // +31: 변경 추적 API 래퍼 6종(2026-07-30) — 이 파일은 wasm 경계라 래퍼의 정위치다
-  ['src/core/wasm-bridge.ts', 2322],
+  // +2: applyStyle 에 overwrite 인자(2026-07-30) — wasm 경계 래퍼라 이 파일이 정위치
+  ['src/core/wasm-bridge.ts', 2324],
   // +9: 더블클릭 단어 선택 배선(2026-07-30 한컴 대조 실측 결함 수리) — dblclick 핸들러의 정위치
   ['src/engine/input-handler-mouse.ts', 2211],
   // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치
@@ -45,7 +47,8 @@ const legacyBaselines = new Map([
   //     여기는 moveTableOffset 응답을 받는 호출부(정위치)
   ['src/engine/input-handler-table.ts', 1635],
   ['src/core/types.ts', 1397],
-  ['src/main.ts', 1303],  // +2: 변경 추적 명령 등록(2026-07-30)
+  // +2: 변경 추적 명령 등록 · +14: 자 마커 드래그 배선(2026-07-30, 로직은 view/ruler-drag.ts)
+  ['src/main.ts', 1317],
   ['src/engine/input-handler-picture.ts', 1215],
   ['src/engine/command.ts', 1169],
   ['src/ui/cell-border-bg-dialog.ts', 1120],
