@@ -68,11 +68,19 @@ export class PageSetupDialog extends ModalDialog {
   private marginInputs!: Record<string, HTMLInputElement>;
   private scopeSelect!: HTMLSelectElement;
 
-  constructor(wasm: WasmBridge, eventBus: EventBus, sectionIdx: number) {
+  /** 적용 범위 '새 구역으로' 는 커서 위치에서 구역을 나눠야 해서 InputHandler 가 필요하다.
+   * 없으면 그 옵션이 현재 구역 적용으로 안전 폴백한다(선택적 인자 — 기존 호출부 무수정). */
+  private ih: { cursor?: { getPosition(): { sectionIndex: number; paragraphIndex: number; charOffset: number } } } | null;
+
+  constructor(
+    wasm: WasmBridge, eventBus: EventBus, sectionIdx: number,
+    ih: { cursor?: { getPosition(): { sectionIndex: number; paragraphIndex: number; charOffset: number } } } | null = null,
+  ) {
     super('편집 용지', 440);
     this.wasm = wasm;
     this.eventBus = eventBus;
     this.sectionIdx = sectionIdx;
+    this.ih = ih;
   }
 
   show(): void {
@@ -190,7 +198,12 @@ export class PageSetupDialog extends ModalDialog {
     this.scopeSelect = document.createElement('select');
     this.scopeSelect.className = 'dialog-select';
     this.scopeSelect.style.width = '120px';
-    for (const [val, text] of [['all', '문서 전체'], ['new-section', '새 구역으로']] as const) {
+    // [용지 패리티 2026-07-30] 한컴 기본값은 '현재 구역' — 옵션 자체가 없어서 넣고 첫 항목
+    // (=기본 선택)으로 둔다. 예전엔 '문서 전체'가 기본으로 보이면서 실제로는 커서 구역
+    // 하나만 바뀌어 라벨과 동작이 정반대였다(select 값을 onConfirm 이 읽지 않았다).
+    for (const [val, text] of [
+      ['current', '현재 구역'], ['all', '문서 전체'], ['new-section', '새 구역으로'],
+    ] as const) {
       const opt = document.createElement('option');
       opt.value = val;
       opt.textContent = text;
@@ -226,8 +239,36 @@ export class PageSetupDialog extends ModalDialog {
       binding: parseInt(this.bindingRadios.find(r => r.checked)?.value ?? '0'),
     };
 
-    const result = this.wasm.setPageDef(this.sectionIdx, newDef);
-    if (result.ok) {
+    // [용지 패리티 2026-07-30] 적용 범위를 **실제로 읽는다**. 예전엔 select 를 만들고도
+    // onConfirm 이 값을 보지 않아 어떤 선택이든 커서 구역 1개에만 적용됐다
+    // (선례 = section-settings-dialog.ts 의 scope 분기).
+    const scope = this.scopeSelect.value;
+    let ok = false;
+    if (scope === 'all') {
+      const count = this.wasm.getSectionCount();
+      ok = true;
+      for (let s = 0; s < count; s++) {
+        ok = this.wasm.setPageDef(s, newDef).ok && ok;
+      }
+    } else if (scope === 'new-section') {
+      // 커서 위치에서 구역을 나눈 뒤, 새로 생긴 구역에만 적용한다.
+      const pos = this.ih?.cursor?.getPosition();
+      if (pos) {
+        try {
+          this.wasm.insertSectionBreak(pos.sectionIndex, pos.paragraphIndex, pos.charOffset);
+          const count = this.wasm.getSectionCount();
+          ok = this.wasm.setPageDef(Math.min(pos.sectionIndex + 1, count - 1), newDef).ok;
+        } catch (err) {
+          console.warn('[PageSetupDialog] 새 구역 만들기 실패:', err);
+          ok = this.wasm.setPageDef(this.sectionIdx, newDef).ok;
+        }
+      } else {
+        ok = this.wasm.setPageDef(this.sectionIdx, newDef).ok; // 커서 없으면 현재 구역
+      }
+    } else {
+      ok = this.wasm.setPageDef(this.sectionIdx, newDef).ok; // 'current'
+    }
+    if (ok) {
       this.eventBus.emit('document-changed');
     }
   }

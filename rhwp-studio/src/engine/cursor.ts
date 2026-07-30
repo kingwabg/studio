@@ -1594,13 +1594,44 @@ export class CursorState {
   /** 개체 객체 선택 상태에서 개체 밖으로 커서를 이동한다. */
   moveOutOfSelectedPicture(): void {
     if (!this.selectedPictureRef) return;
-    const { sec, ppi } = this.selectedPictureRef;
-    const paraCount = this.wasm.getParagraphCount(sec);
-    if (ppi + 1 < paraCount) {
-      this.position = { sectionIndex: sec, paragraphIndex: ppi + 1, charOffset: 0 };
-    } else if (ppi > 0) {
-      const prevLen = this.wasm.getParagraphLength(sec, ppi - 1);
-      this.position = { sectionIndex: sec, paragraphIndex: ppi - 1, charOffset: prevLen };
+    const ref = this.selectedPictureRef;
+    const { sec, ppi } = ref;
+    // [커서 정합 2026-07-30] 예전엔 sec/ppi 만 보고 무조건 `ppi+1, off 0` 으로 나갔다.
+    // 그래서 (a)표 셀 안 개체는 표 밖 본문으로 (b)머리말 안 개체는 본문으로 튀었고,
+    // (c)문단이 하나뿐인 문서에선 두 분기 모두 걸리지 않아 위치가 아예 갱신되지 않았다.
+    // ref 는 셀·머리말 좌표를 이미 들고 있으므로, **개체가 살던 컨테이너 안**으로 복귀한다.
+    const inCell = ref.cellIdx !== undefined && ref.cellParaIdx !== undefined;
+    if (inCell) {
+      const ctrl = ref.outerTableControlIdx ?? ref.ci;
+      let len = 0;
+      try {
+        len = this.wasm.getCellParagraphLength(sec, ppi, ctrl, ref.cellIdx!, ref.cellParaIdx!);
+      } catch { /* 길이 조회 실패 시 0 */ }
+      this.position = {
+        sectionIndex: sec,
+        paragraphIndex: ref.cellParaIdx!,
+        charOffset: len,
+        parentParaIndex: ppi,
+        controlIndex: ctrl,
+        cellIndex: ref.cellIdx,
+        cellParaIndex: ref.cellParaIdx,
+        ...(ref.cellPath ? { cellPath: ref.cellPath } : {}),
+      };
+    } else if (ref.headerFooter) {
+      // 머리말/꼬리말 안 개체 — 편집 모드 좌표계를 건드리지 않고 문단 시작에 둔다
+      // (본문으로 튀는 것보다 낫다. 머리말 전용 커서 API 연동은 별도 작업)
+      this.position = { sectionIndex: sec, paragraphIndex: ppi, charOffset: 0 };
+    } else {
+      const paraCount = this.wasm.getParagraphCount(sec);
+      if (ppi + 1 < paraCount) {
+        this.position = { sectionIndex: sec, paragraphIndex: ppi + 1, charOffset: 0 };
+      } else {
+        // 문단이 하나뿐이어도(또는 마지막 문단이어도) 앵커 문단 끝으로 확실히 이동한다
+        const safePara = Math.min(ppi, Math.max(0, paraCount - 1));
+        let len = 0;
+        try { len = this.wasm.getParagraphLength(sec, safePara); } catch { /* 0 */ }
+        this.position = { sectionIndex: sec, paragraphIndex: safePara, charOffset: len };
+      }
     }
     this.exitPictureObjectSelection();
     this.updateRect();

@@ -344,7 +344,11 @@ export const fileCommands: CommandDef[] = [
     shortcutLabel: 'F7',
     canExecute: (ctx) => ctx.hasDocument,
     execute(services) {
-      const dialog = new PageSetupDialog(services.wasm, services.eventBus, 0);
+      // [용지 패리티 2026-07-30] F7 이 항상 구역 0 을 고치던 결함 — 리본 [쪽]-편집 용지
+      // (page.ts:186-191)와 **같은 라벨·같은 키인데 다른 구역**을 고쳤다. 커서 구역으로 통일.
+      const ih = services.getInputHandler() as any;
+      const sectionIdx = ih?.cursor?.getPosition()?.sectionIndex ?? 0;
+      const dialog = new PageSetupDialog(services.wasm, services.eventBus, sectionIdx, ih);
       dialog.show();
     },
   },

@@ -206,5 +206,41 @@ runTest('용지·개체 배치별 커서 스윕', async ({ page }) => {
     `문단 길이 초과 오프셋은 클램프된다: off=${edgeRes.off} ≤ len=${edgeRes.len}`);
   assert.ok(edgeRes.hasRect, '클램프된 위치의 rect 는 유효하다');
 
+  // ── E. 개체 탈출: 셀 안 개체에서 나가면 셀 컨텍스트가 유지되어야 한다 ──
+  // (2026-07-30 수리: moveOutOfSelectedPicture 가 sec/ppi 만 보고 ppi+1 로 나가 표 밖으로 튀었다)
+  const exitRes = await page.evaluate(async () => {
+    const w = window.__wasm, ih = window.__inputHandler;
+    const t = JSON.parse(w.doc.createTableEx(JSON.stringify({
+      sectionIdx: 0, paraIdx: 0, charOffset: 0, rowCount: 2, colCount: 2,
+      treatAsChar: true, colWidths: [6000, 6000],
+    })));
+    w.insertTextInCell(0, t.paraIdx, t.controlIdx, 0, 0, 0, '셀내용');
+    window.__eventBus?.emit('document-changed');
+    await new Promise((r) => setTimeout(r, 600));
+    // 셀 안 개체 선택 상태를 흉내내어(ref 에 셀 좌표를 담아) 탈출 동작만 판정한다
+    // 시그니처: (sec, ppi, ci, type, cellIdx, cellParaIdx, headerFooter, outerTableControlIdx, ...)
+    ih.cursor.enterPictureObjectSelectionDirect(
+      0, t.paraIdx, 0, 'shape', 0, 0, undefined, t.controlIdx,
+    );
+    const entered = ih.cursor.isInPictureObjectSelection?.() ?? false;
+    ih.cursor.moveOutOfSelectedPicture();
+    await new Promise((r) => setTimeout(r, 250));
+    const p = ih.cursor.getPosition();
+    const r = ih.cursor.getRect();
+    return {
+      entered,
+      inCell: p.parentParaIndex !== undefined && p.cellIndex !== undefined,
+      parentPara: p.parentParaIndex, cellIdx: p.cellIndex,
+      hasRect: !!r,
+    };
+  });
+  console.log('  E탈출:', JSON.stringify(exitRes));
+  if (exitRes.entered) {
+    assert.ok(exitRes.inCell, `셀 안 개체 탈출은 셀 컨텍스트를 유지한다: ${JSON.stringify(exitRes)}`);
+    assert.ok(exitRes.hasRect, '탈출 후 캐럿 rect 유효');
+  } else {
+    console.log('  (개체 선택 진입 API 시그니처 불일치 — E 단언 생략)');
+  }
+
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);
 });

@@ -38,7 +38,9 @@ const legacyBaselines = new Map([
   // +31: selectWordAtCursor(2026-07-30) — findWordAt·anchor 가 이 파일 전용이라 정위치
   // +25: moveTo 오프셋 클램프(2026-07-30) — 모든 커서 이동이 지나는 단일 관문이라 정위치.
   //      유령 캐럿(문단 길이 초과 오프셋) 차단. 판정 = e2e/paper-cursor-sweep D축
-  ['src/engine/cursor.ts', 1910],
+  // +31: moveOutOfSelectedPicture 컨테이너 복귀(2026-07-30) — 셀·머리말 안 개체에서 나갈 때
+  //      표 밖으로 튀던 결함. selectedPictureRef 가 이 파일 전용이라 정위치. 판정 = 스윕 E축
+  ['src/engine/cursor.ts', 1941],
   // +8: TAC 표 이동 후 커서 문단 보정 배선(2026-07-30) — 순수 로직은 engine/table-move-cursor.ts,
   //     여기는 moveTableOffset 응답을 받는 호출부(정위치)
   ['src/engine/input-handler-table.ts', 1635],
