@@ -4,7 +4,6 @@
  * index.html·업스트림 코드는 무수정 — DOM 재구성은 전부 여기 부트스트랩에서 한다.
  */
 import type { CanvaServices } from './canva-services';
-import { CanvaLeftPalette } from './canva-left-palette';
 import { CanvaRightInspector, type PanelTab } from './canva-right-inspector';
 import { CanvaAiPanel } from './canva-ai-panel';
 import { CanvaRecordPanel } from './canva-record-panel';
@@ -36,13 +35,11 @@ export function mountCanvaSidebars(services: CanvaServices): void {
   ws.id = 'canva-workspace';
   root.insertBefore(ws, editorArea);
 
-  const left = buildRail('left');
+  // [2026-07-30 사용자 지시] 좌측 삽입 팔레트 제거 — 실사용 가치 없음으로 판정.
+  // 개체 삽입 진입점은 리본 [삽입] 탭과 명령 팔레트에 그대로 있다
+  // (insert:textbox · table:create · insert:shape · insert:image).
   const right = buildRail('right');
-  ws.append(left.rail, editorArea, right.rail);
-
-  // 좌: 삽입 팔레트
-  left.setTitle('삽입');
-  new CanvaLeftPalette(left.body, services);
+  ws.append(editorArea, right.rail);
 
   // 우: [속성] 인스펙터 + [AI] + [녹음] 탭 — buildRail이 만든 body를 인스펙터 창으로 재사용(잉여 노드 방지)
   const inspectorPane = right.body;
@@ -142,7 +139,6 @@ interface RailParts {
   head: HTMLElement;
   content: HTMLElement;
   body: HTMLElement;
-  setTitle: (t: string) => void;
   setTabs: (labels: string[], onSelect: (idx: number) => void) => HTMLElement[];
 }
 
@@ -214,9 +210,6 @@ function buildRail(side: 'left' | 'right'): RailParts {
 
   return {
     rail, head, content, body,
-    setTitle(t: string) {
-      head.appendChild(mkEl('span', 'canva-rail-title', t));
-    },
     setTabs(labels, onSelect) {
       const btns: HTMLElement[] = [];
       labels.forEach((label, idx) => {

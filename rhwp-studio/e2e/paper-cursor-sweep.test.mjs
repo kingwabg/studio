@@ -200,8 +200,11 @@ runTest('용지·개체 배치별 커서 스윕', async ({ page }) => {
     return { len, off: ih.cursor.getPosition().charOffset, hasRect: !!r };
   });
   console.log('  D경계:', JSON.stringify(edgeRes));
-  assert.ok(edgeRes.hasRect || edgeRes.off <= edgeRes.len,
-    `문단 길이 초과 오프셋은 클램프되거나 rect 를 유지해야 한다(현재 off=${edgeRes.off}, len=${edgeRes.len})`);
+  // [2026-07-30 수리] moveTo 가 오프셋을 문단 길이로 클램프한다 — 예전엔 초과 오프셋이 그대로
+  // 남아(len 168 → off 218) 유령 캐럿의 씨앗이 됐다.
+  assert.ok(edgeRes.off <= edgeRes.len,
+    `문단 길이 초과 오프셋은 클램프된다: off=${edgeRes.off} ≤ len=${edgeRes.len}`);
+  assert.ok(edgeRes.hasRect, '클램프된 위치의 rect 는 유효하다');
 
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);
 });

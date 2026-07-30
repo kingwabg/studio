@@ -256,11 +256,36 @@ export class CursorState {
     }
   }
 
-  /** 커서를 문서 위치로 이동한다 */
+  /** 커서를 문서 위치로 이동한다 — 오프셋을 문단 길이 안으로 클램프한다.
+   * [커서 정합 2026-07-30] 클램프가 studio·엔진 양쪽에 전무해서, 문서가 짧아진 뒤
+   * (개체 삭제·표 줄 삭제·되돌리기) 남은 오프셋이 문단 길이를 넘으면 캐럿이 유령 좌표에
+   * 남았다. 모든 커서 이동이 이 한 곳을 지나므로 여기서 한 번만 막는다. */
   moveTo(pos: DocumentPosition): void {
-    this.position = { ...pos };
+    this.position = { ...pos, charOffset: this.clampOffset(pos) };
     this.atLineEnd = false;
     this.updateRect();
+  }
+
+  /** charOffset 을 그 문단 길이 안으로 클램프. 조회 실패 시 원값 유지(안전한 무동작). */
+  private clampOffset(pos: DocumentPosition): number {
+    const off = pos.charOffset;
+    if (!(off > 0)) return off;
+    try {
+      let len: number;
+      if (pos.parentParaIndex !== undefined && pos.controlIndex !== undefined
+          && pos.cellIndex !== undefined && pos.cellParaIndex !== undefined) {
+        len = this.wasm.getCellParagraphLength(
+          pos.sectionIndex, pos.parentParaIndex, pos.controlIndex,
+          pos.cellIndex, pos.cellParaIndex);
+      } else if (pos.parentParaIndex !== undefined) {
+        return off; // 셀 좌표 불완전(글상자 등) — 조회 규격이 달라 건드리지 않는다
+      } else {
+        len = this.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex);
+      }
+      return Number.isFinite(len) && len >= 0 ? Math.min(off, len) : off;
+    } catch {
+      return off;
+    }
   }
 
   /** preferredX 초기화 (수평 이동/클릭/편집 시) */

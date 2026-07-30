@@ -11,6 +11,7 @@ import { showToast } from '@/ui/toast';
 import { snapLayerFor as _snapLayerFor, tableHoverFor as _tableHoverFor } from './canvas-snap'; // [캔버스 한컴 포크]
 import { showConfirm } from '@/ui/confirm-dialog';
 import { showCellClearChoice } from '@/ui/cell-clear-dialog';
+import { correctPositionAfterTableMove } from './table-move-cursor';
 
 // [캔버스 한컴 포크] 표 리사이즈 순수 로직은 table-resize-kbd.ts로 분리(Node 단위 테스트 가능).
 import {
@@ -1088,9 +1089,16 @@ export function moveSelectedTable(this: any, key: 'ArrowUp' | 'ArrowDown' | 'Arr
     this.executeOperation({ kind: 'record', command:
       new MoveTableCommand(ref.sec, ref.ppi, ref.ci, deltaH, deltaV, result.ppi, result.ci),
     });
-    // 문단 경계를 넘어 이동한 경우 selectedTableRef 갱신
+    // 문단 경계를 넘어 이동한 경우 selectedTableRef + **커서 위치**를 함께 갱신.
+    // TAC 표의 세로 이동은 엔진이 문단 배열을 swap 하므로, 커서를 보정하지 않으면
+    // 표를 옮긴 뒤 입력이 엉뚱한 문단으로 간다(table-move-cursor.ts 주석 참조).
     if (result.ppi !== ref.ppi || result.ci !== ref.ci) {
       this.cursor.updateSelectedTableRef(ref.sec, result.ppi, result.ci);
+      if (result.ppi !== ref.ppi) {
+        const cur = this.cursor.getPosition();
+        const next = correctPositionAfterTableMove(cur, ref.ppi, result.ppi);
+        if (next !== cur) this.cursor.moveTo(next);
+      }
     }
     this.eventBus.emit('document-changed');
     this.renderTableObjectSelection();

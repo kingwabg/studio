@@ -25,10 +25,6 @@
   position: relative;
   transition: width 0.14s ease;
 }
-.canva-rail--left {
-  width: 176px;
-  border-right: 1px solid var(--ui-border);
-}
 .canva-rail--right {
   /* [디자인 2c 갱신 2026-07-29] 가변 폭 — 왼쪽 가장자리 드래그. 284px 는 기본값. */
   width: 284px;
@@ -66,7 +62,6 @@
   font-size: 11px;
   user-select: none;
 }
-.canva-rail--left .canva-rail-handle { right: -19px; border-radius: 0 6px 6px 0; border-left: none; }
 .canva-rail--right .canva-rail-handle { left: -19px; border-radius: 6px 0 0 6px; border-right: none; }
 .canva-rail-handle:hover { background: var(--ui-hover); color: var(--ui-text); }
 
@@ -99,14 +94,6 @@
   border-bottom-color: var(--ui-link);
   background: var(--ui-accent-bg-light);
 }
-.canva-rail-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ui-text-secondary);
-  padding: 0 12px;
-  display: flex;
-  align-items: center;
-}
 
 /* 레일 본문 (스크롤) */
 .canva-rail-body {
@@ -127,37 +114,6 @@
 .canva-rail-body[hidden],
 .canva-ai-pane-wrap[hidden],
 .canva-record-pane-wrap[hidden] { display: none; }
-
-/* ── 좌: 삽입 팔레트 ── */
-.canva-palette-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.canva-obj-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 14px 6px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  cursor: pointer;
-  color: var(--ui-text-secondary);
-  font-size: 11.5px;
-  font-weight: 600;
-  transition: border-color 0.1s, background 0.1s, transform 0.06s;
-}
-.canva-obj-card:hover {
-  border-color: var(--ui-link);
-  background: var(--ui-accent-bg-light);
-  color: var(--ui-text);
-}
-.canva-obj-card:active { transform: scale(0.97); }
-.canva-obj-card svg { width: 26px; height: 26px; stroke: currentColor; }
-.canva-obj-card.is-disabled { opacity: 0.4; pointer-events: none; }
 
 /* 섹션 머리 — 제목 왼쪽, 부차 링크 오른쪽 */
 .canva-section-head { display: flex; align-items: baseline; justify-content: space-between; }
@@ -662,7 +618,6 @@
 
 /* 접힘 상태에서 편집영역이 꽉 차도록 (모바일/좁은 화면) */
 @media (max-width: 900px) {
-  .canva-rail--left { width: 140px; }
   .canva-rail--right { width: 220px; }
 }
 

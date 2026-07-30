@@ -36,8 +36,12 @@ const legacyBaselines = new Map([
   // +13: 그림 붙여넣기 커서 수리(2026-07-30) — 없는 문단 이동·셀 컨텍스트 상실 2건
   ['src/engine/input-handler-keyboard.ts', 2160],
   // +31: selectWordAtCursor(2026-07-30) — findWordAt·anchor 가 이 파일 전용이라 정위치
-  ['src/engine/cursor.ts', 1885],
-  ['src/engine/input-handler-table.ts', 1627],
+  // +25: moveTo 오프셋 클램프(2026-07-30) — 모든 커서 이동이 지나는 단일 관문이라 정위치.
+  //      유령 캐럿(문단 길이 초과 오프셋) 차단. 판정 = e2e/paper-cursor-sweep D축
+  ['src/engine/cursor.ts', 1910],
+  // +8: TAC 표 이동 후 커서 문단 보정 배선(2026-07-30) — 순수 로직은 engine/table-move-cursor.ts,
+  //     여기는 moveTableOffset 응답을 받는 호출부(정위치)
+  ['src/engine/input-handler-table.ts', 1635],
   ['src/core/types.ts', 1397],
   ['src/main.ts', 1303],  // +2: 변경 추적 명령 등록(2026-07-30)
   ['src/engine/input-handler-picture.ts', 1215],
