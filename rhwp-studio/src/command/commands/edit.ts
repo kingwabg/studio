@@ -32,6 +32,16 @@ export const editCommands: CommandDef[] = [
     },
   },
   {
+    // 서식 규정 검사 on/off — 기본 꺼짐(실제 문서에서 수백 건이 뜬다, 근거 lint/items.ts).
+    // 오버레이 인스턴스는 main.ts 가 들고 있으므로 이벤트로 신호만 보낸다.
+    id: 'edit:format-lint',
+    label: '서식 규정 검사',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      services.eventBus.emit('lint:toggle-format');
+    },
+  },
+  {
     id: 'edit:undo',
     label: '되돌리기',
     icon: 'icon-undo',

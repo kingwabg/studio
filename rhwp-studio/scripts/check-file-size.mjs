@@ -35,7 +35,8 @@ const legacyBaselines = new Map([
   // +30: 논리 좌표계 래퍼 5종(2026-07-30, TAC 신고③) — getLogicalLength·logical↔text
   //      변환·insertTextLogical·getInlineControlIndexAtLogical, wasm 경계라 정위치
   // +6: deleteRangeLogical 래퍼(2026-07-30, 표 걸친 선택 삭제 O8)
-  ['src/core/wasm-bridge.ts', 2360],
+  // +6: getTables 래퍼(2026-07-31, 서식 규정 검사) — wasm 경계 래퍼라 이 파일이 정위치
+  ['src/core/wasm-bridge.ts', 2366],
   // +9: 더블클릭 단어 선택 배선(2026-07-30 한컴 대조 실측 결함 수리) — dblclick 핸들러의 정위치
   ['src/engine/input-handler-mouse.ts', 2211],
   // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치

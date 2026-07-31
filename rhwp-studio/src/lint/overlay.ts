@@ -1,17 +1,18 @@
 /**
  * 인라인 검사 — 맞춤법·서식 위반을 **캔버스 위 밑줄로 바로** 보여주고, 눌러서 고친다.
- * 스펙: studio `docs/plans/format-linter.md` (1차 = 뼈대)
+ * 스펙: studio `docs/plans/format-linter.md`
  *
  * 왜 만들었나: 검사기 자체는 이미 있었다(`ui/spell-dialog.ts` — 규칙·검사·교정 전부).
  * 빠진 건 "대화상자를 열어야 보인다"는 것뿐이었다. 그래서 이 파일은 **표시와 조작**만
- * 맡고, 규칙·검사·교정은 전부 기존 것을 그대로 쓴다(중복 정의 금지).
+ * 맡고, 규칙·검사는 lint/items.ts(맞춤법+서식 합류)가 준다.
  *
  * ⚠ 조판을 건드리지 않는다 — 페이지 렌더 파이프라인 밖의 별도 레이어에 그린다.
  * (렌더에 손대면 조판 회귀가 나는 게 이 저장소의 반복 함정)
  * 좌표 변환은 TrackOverlay(engine/track-review.ts)와 같은 방식:
  * getSelectionRects → 쪽 좌표 → virtualScroll 로 화면 좌표.
  */
-import { scanDocument, type SpellHit } from '@/ui/spell-dialog';
+import { scanAll, itemKey, type LintItem } from './items';
+import { LintPanel } from './panel';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { VirtualScroll } from '@/view/virtual-scroll';
 import type { EventBus } from '@/core/event-bus';
@@ -19,42 +20,25 @@ import type { EventBus } from '@/core/event-bus';
 /** 타이핑이 멈춘 것으로 보는 시간 — 이보다 짧으면 글자마다 검사가 돌아 산만하다. */
 const IDLE_MS = 400;
 
-/** 무시한 항목 키 — 같은 문단의 같은 글자를 다시 지적하지 않는다. */
-function hitKey(h: SpellHit): string {
-  return `${h.sectionIndex}:${h.paragraphIndex}:${h.text}:${h.msg}`;
-}
-
-/**
- * 규칙 둘이 같은 글자를 물면 앞의 것만 남긴다.
- * 겹친 채로 [전부 적용]을 하면 뒤 교정이 이미 바뀐 글자를 덮어 문장이 깨진다.
- * (입력은 (구역, 문단, 오프셋) 오름차순 — scanDocument 가 정렬해서 준다)
- */
-function dropOverlaps(hits: SpellHit[]): SpellHit[] {
-  const out: SpellHit[] = [];
-  for (const h of hits) {
-    const prev = out[out.length - 1];
-    const sameP = prev && prev.sectionIndex === h.sectionIndex
-      && prev.paragraphIndex === h.paragraphIndex;
-    if (sameP && h.charOffset < prev.charOffset + prev.length) continue;
-    out.push(h);
-  }
-  return out;
-}
-
 interface LintHost {
   wasm: WasmBridge;
   getZoom(): number;
-  /** 고침 하나를 적용한다 — 스냅샷 1회로 기록되어 Ctrl+Z 한 번에 되돌아간다 */
-  applyFix(h: SpellHit): void;
+  /** 고침 하나를 적용한다 — 한 번의 되돌리기로 되돌아간다 */
+  applyFix(it: LintItem): void;
+  /** 여러 고침을 **한 번의 되돌리기**로 묶어 적용한다 */
+  applyBatch(items: LintItem[]): void;
 }
 
 export class LintOverlay {
   private layer: HTMLDivElement;
   private card: HTMLDivElement | null = null;
-  private hits: SpellHit[] = [];
+  private items: LintItem[] = [];
   private ignored = new Set<string>();
   private timer: number | null = null;
   private enabled = true;
+  /** 서식 규정 검사 — 기본 꺼짐(실제 문서에서 수백 건이 뜬다, 근거는 items.ts) */
+  private formatOn = false;
+  private panel: LintPanel;
 
   constructor(
     private container: HTMLElement,
@@ -65,11 +49,17 @@ export class LintOverlay {
     this.layer.className = 'lint-layer';
     // 레이어 자체는 통과시키고 밑줄만 받는다 — 본문 클릭/드래그를 가로채면 안 된다.
     this.layer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:8;';
+    this.panel = new LintPanel(container, {
+      onApplyAll: () => this.applyAll(),
+      onPick: (it) => this.focusItem(it),
+      onToggleFormat: (on) => { this.formatOn = on; this.scan(); },
+      isFormatOn: () => this.formatOn,
+    });
   }
 
   setEnabled(on: boolean): void {
     this.enabled = on;
-    if (!on) { this.hits = []; this.closeCard(); this.paint(); }
+    if (!on) { this.items = []; this.closeCard(); this.paint(); this.panel.render([]); }
     else this.scheduleScan(0);
   }
 
@@ -82,17 +72,27 @@ export class LintOverlay {
     this.timer = window.setTimeout(() => { this.timer = null; this.scan(); }, delay);
   }
 
+  /**
+   * 문서가 새로 열렸을 수 있다 — 아직 예약이 없을 때만 건다.
+   * 여기서도 예약을 리셋하면(command-state-changed 는 자주 온다) 검사가 영영 밀린다.
+   * ⚠ 문서 로드 완료 신호가 따로 없어 command-state-changed 를 쓴다(우측 패널과 같은 관례).
+   */
+  armScan(): void {
+    if (this.timer === null) this.scheduleScan();
+  }
+
   /** 지금 바로 훑는다(검사 시각 측정·테스트용). 반환값 = 걸린 ms */
   scan(): number {
     if (!this.enabled) return 0;
     const t0 = performance.now();
     try {
-      this.hits = dropOverlaps(
-        scanDocument(this.host.wasm).filter((h) => !this.ignored.has(hitKey(h))));
+      this.items = scanAll(this.host.wasm as never, this.formatOn)
+        .filter((it) => !this.ignored.has(itemKey(it)));
     } catch {
-      this.hits = [];
+      this.items = [];
     }
     this.paint();
+    this.panel.render(this.items);
     return performance.now() - t0;
   }
 
@@ -100,24 +100,18 @@ export class LintOverlay {
   paint(): void {
     this.ensureAttached();
     this.layer.innerHTML = '';
-    if (!this.enabled || this.hits.length === 0) return;
+    this.card = null;
+    if (!this.enabled || this.items.length === 0) return;
     const scrollContent = this.container.querySelector('#scroll-content') as HTMLElement | null;
     const contentWidth = scrollContent?.clientWidth ?? 0;
     const zoom = this.host.getZoom();
 
-    this.hits.forEach((h, i) => {
-      let rects: Array<{ pageIndex: number; x: number; y: number; width: number; height: number }> = [];
-      try {
-        rects = this.host.wasm.getSelectionRects(
-          h.sectionIndex, h.paragraphIndex, h.charOffset,
-          h.paragraphIndex, h.charOffset + h.length);
-      } catch { return; }
-      for (const r of rects) {
+    for (const it of this.items) {
+      for (const r of this.rectsOf(it)) {
         if (r.width <= 0) continue;
         const el = document.createElement('div');
-        el.className = 'lint-mark lint-mark--spell';
-        el.dataset.lintIdx = String(i);
-        el.title = h.msg;
+        el.className = `lint-mark lint-mark--${it.kind}`;
+        el.title = it.detail ? `${it.msg} (${it.detail})` : it.msg;
         const left = this.virtualScroll.getPageLeftResolved(r.pageIndex, contentWidth) + r.x * zoom;
         const top = this.virtualScroll.getPageOffset(r.pageIndex) + r.y * zoom;
         el.style.cssText =
@@ -127,28 +121,61 @@ export class LintOverlay {
           // 본문 커서 이동을 막고 카드를 연다 — 밑줄은 '읽는 것'이 아니라 '누르는 것'이다.
           e.preventDefault();
           e.stopPropagation();
-          this.openCard(h, left, top + r.height * zoom);
+          this.openCard(it, left, top + r.height * zoom);
         });
         this.layer.appendChild(el);
       }
-    });
+    }
   }
 
   dispose(): void {
     if (this.timer !== null) clearTimeout(this.timer);
     this.closeCard();
+    this.panel.dispose();
     this.layer.remove();
   }
 
   /** 남은 지적 수 — 상태 표시·테스트용 */
-  count(): number { return this.hits.length; }
+  count(): number { return this.items.length; }
 
-  /** 고칠 수 있는 것을 전부 적용한다. 뒤에서부터 고쳐야 앞 항목 오프셋이 안 밀린다. */
+  /** 서식 규정 검사 on/off (도구 리본 · 패널 체크박스 · 테스트) */
+  setFormatChecks(on: boolean): void { this.formatOn = on; this.scan(); }
+  isFormatChecks(): boolean { return this.formatOn; }
+
+  /**
+   * 고칠 수 있는 것을 전부 적용한다 — **되돌리기 한 번**으로 통째로 복구된다.
+   * (건마다 기록하면 20건 고친 뒤 되돌리려면 Ctrl+Z 를 20번 눌러야 한다)
+   * 뒤에서부터 고쳐야 글자 치환으로 앞 항목의 오프셋이 밀리지 않는다.
+   */
   applyAll(): void {
-    const fixable = this.hits.filter((h) => h.suggestion != null).reverse();
-    for (const h of fixable) this.host.applyFix(h);
+    this.host.applyBatch(this.items.filter((x) => x.fix).reverse());
     this.closeCard();
     this.scheduleScan(0);
+  }
+
+  private rectsOf(it: LintItem): Array<{ pageIndex: number; x: number; y: number; width: number; height: number }> {
+    try {
+      const w = this.host.wasm;
+      return it.cell
+        ? w.getSelectionRectsInCell(it.sectionIndex, it.cell.ppi, it.cell.ci, it.cell.cei,
+            it.cell.cpi, it.charOffset, it.cell.cpi, it.charOffset + it.length)
+        : w.getSelectionRects(it.sectionIndex, it.paragraphIndex, it.charOffset,
+            it.paragraphIndex, it.charOffset + it.length);
+    } catch {
+      return [];
+    }
+  }
+
+  /** 목록에서 항목을 고르면 그 자리로 스크롤하고 카드를 연다 */
+  private focusItem(it: LintItem): void {
+    const r = this.rectsOf(it)[0];
+    if (!r) return;
+    const scrollContent = this.container.querySelector('#scroll-content') as HTMLElement | null;
+    const zoom = this.host.getZoom();
+    const left = this.virtualScroll.getPageLeftResolved(r.pageIndex, scrollContent?.clientWidth ?? 0) + r.x * zoom;
+    const top = this.virtualScroll.getPageOffset(r.pageIndex) + r.y * zoom;
+    this.container.querySelector('#scroll-container')?.scrollTo({ top: Math.max(0, top - 160), behavior: 'smooth' });
+    this.openCard(it, left, top + r.height * zoom);
   }
 
   private ensureAttached(): void {
@@ -162,7 +189,7 @@ export class LintOverlay {
   }
 
   /** 밑줄을 누르면 뜨는 교정 카드 — "이렇게 고칠까요?" */
-  private openCard(h: SpellHit, left: number, top: number): void {
+  private openCard(it: LintItem, left: number, top: number): void {
     this.closeCard();
     const card = document.createElement('div');
     card.className = 'lint-card';
@@ -170,52 +197,78 @@ export class LintOverlay {
 
     const msg = document.createElement('div');
     msg.className = 'lint-card-msg';
-    msg.textContent = h.msg;
+    msg.textContent = it.msg;
     card.appendChild(msg);
 
-    if (h.suggestion != null) {
+    if (it.detail) {
+      const [from, to] = it.detail.split(' → ');
       const diff = document.createElement('div');
       diff.className = 'lint-card-diff';
-      const from = document.createElement('span');
-      from.className = 'lint-card-from';
-      from.textContent = h.text;
-      const to = document.createElement('span');
-      to.className = 'lint-card-to';
-      to.textContent = h.suggestion;
-      diff.append(from, document.createTextNode(' → '), to);
+      const a = document.createElement('span');
+      a.className = 'lint-card-from';
+      a.textContent = from;
+      const b = document.createElement('span');
+      b.className = 'lint-card-to';
+      b.textContent = to ?? '';
+      diff.append(a, document.createTextNode(' → '), b);
       card.appendChild(diff);
     }
 
     const row = document.createElement('div');
     row.className = 'lint-card-row';
-    if (h.suggestion != null) {
-      row.appendChild(this.mkBtn('적용', 'is-primary', () => {
-        this.host.applyFix(h);
+    if (it.fix) {
+      row.appendChild(mkBtn('적용', 'is-primary', () => {
+        this.host.applyFix(it);
         this.closeCard();
         this.scheduleScan(0);
       }));
     }
-    row.appendChild(this.mkBtn('무시', '', () => { this.ignore(h); }));
+    row.appendChild(mkBtn('무시', '', () => this.ignore(it)));
     card.appendChild(row);
 
     this.layer.appendChild(card);
     this.card = card;
   }
 
-  private ignore(h: SpellHit): void {
-    this.ignored.add(hitKey(h));
-    this.hits = this.hits.filter((x) => hitKey(x) !== hitKey(h));
+  private ignore(it: LintItem): void {
+    this.ignored.add(itemKey(it));
+    this.items = this.items.filter((x) => itemKey(x) !== itemKey(it));
     this.closeCard();
     this.paint();
+    this.panel.render(this.items);
   }
+}
 
-  private mkBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
-    const b = document.createElement('button');
-    b.className = `lint-card-btn ${cls}`.trim();
-    b.textContent = label;
-    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); });
-    return b;
+function mkBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.className = `lint-card-btn ${cls}`.trim();
+  b.textContent = label;
+  b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); });
+  return b;
+}
+
+/** 고침 한 건을 wasm 에 직접 적용한다(일괄 적용의 스냅샷 안에서 쓴다). */
+function applyOne(wasm: WasmBridge, it: LintItem): void {
+  if (!it.fix) return;
+  if ('text' in it.fix) {
+    wasm.replaceText(it.sectionIndex, it.paragraphIndex, it.charOffset, it.length, it.fix.text);
+    return;
   }
+  const json = JSON.stringify(it.fix.props);
+  if (it.cell) {
+    wasm.applyCharFormatInCell(it.sectionIndex, it.cell.ppi, it.cell.ci, it.cell.cei,
+      it.cell.cpi, it.charOffset, it.charOffset + it.length, json);
+  } else {
+    wasm.applyCharFormat(it.sectionIndex, it.paragraphIndex, it.charOffset,
+      it.charOffset + it.length, json);
+  }
+}
+
+interface IhLike {
+  wasm: WasmBridge;
+  executeOperation(d: unknown): unknown;
+  applyCharPropsToRange(start: unknown, end: unknown, props: unknown): void;
+  viewportManager: { getZoom(): number };
 }
 
 /**
@@ -226,21 +279,45 @@ export function attachLinter(
   container: HTMLElement,
   eventBus: EventBus,
   virtualScroll: VirtualScroll,
-  getIh: () => { wasm: WasmBridge; executeOperation(d: unknown): unknown;
-                 viewportManager: { getZoom(): number } } | null,
+  getIh: () => IhLike | null,
 ): LintOverlay {
   const host: LintHost = {
     get wasm() { return getIh()!.wasm; },
     getZoom: () => getIh()?.viewportManager.getZoom() ?? 1,
-    applyFix: (h) => {
+    applyFix: (it) => {
       const ih = getIh();
-      if (!ih || h.suggestion == null) return;
-      // 기존 맞춤법 대화상자와 **같은 경로** — 스냅샷 1회라 Ctrl+Z 한 번에 되돌아간다.
+      if (!ih || !it.fix) return;
+      if ('text' in it.fix) {
+        // 기존 맞춤법 대화상자와 **같은 경로** — 스냅샷 1회라 되돌리기 한 번에 복구된다.
+        ih.executeOperation({
+          kind: 'snapshot',
+          operationType: 'lintFix',
+          operation: (wasm: WasmBridge) => {
+            wasm.replaceText(it.sectionIndex, it.paragraphIndex, it.charOffset, it.length,
+              (it.fix as { text: string }).text);
+            return null;
+          },
+        });
+        eventBus.emit('document-changed');
+        return;
+      }
+      // 서식 고침 — ApplyCharFormatCommand 가 셀 좌표까지 다루므로 그대로 태운다(undo 포함).
+      const pos = (off: number) => it.cell
+        ? { sectionIndex: it.sectionIndex, parentParaIndex: it.cell.ppi, controlIndex: it.cell.ci,
+            cellIndex: it.cell.cei, cellParaIndex: it.cell.cpi, paragraphIndex: it.cell.cpi, charOffset: off }
+        : { sectionIndex: it.sectionIndex, paragraphIndex: it.paragraphIndex, charOffset: off };
+      ih.applyCharPropsToRange(pos(it.charOffset), pos(it.charOffset + it.length), it.fix.props);
+      eventBus.emit('document-changed');
+    },
+    applyBatch: (items) => {
+      const ih = getIh();
+      if (!ih || items.length === 0) return;
+      // 스냅샷 하나에 전부 담는다 — 되돌리기 한 번이면 적용 전 문서로 통째로 돌아간다.
       ih.executeOperation({
         kind: 'snapshot',
-        operationType: 'lintFix',
+        operationType: 'lintFixAll',
         operation: (wasm: WasmBridge) => {
-          wasm.replaceText(h.sectionIndex, h.paragraphIndex, h.charOffset, h.length, h.suggestion!);
+          for (const it of items) applyOne(wasm, it);
           return null;
         },
       });
@@ -249,7 +326,10 @@ export function attachLinter(
   };
   const overlay = new LintOverlay(container, virtualScroll, host);
   eventBus.on('document-changed', () => overlay.scheduleScan());
+  // 문서를 **열었을 때도** 검사한다(편집을 해야 밑줄이 뜨던 실측 결함, 2026-07-31)
+  eventBus.on('command-state-changed', () => overlay.armScan());
   eventBus.on('zoom-changed', () => overlay.paint());
   eventBus.on('page-layout-changed', () => overlay.paint());
+  eventBus.on('lint:toggle-format', () => overlay.setFormatChecks(!overlay.isFormatChecks()));
   return overlay;
 }

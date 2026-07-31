@@ -161,6 +161,7 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       PP('microphone', '음성 녹음', 'tool:record-panel'),
       gap(),
       P('text-aa', '맞춤법 검사', 'edit:spellcheck'),
+      P('ruler', '서식 규정 검사', 'edit:format-lint'),
       P('books', '사전', 'tool:dictionary'),
       P('translate', '번역', 'tool:translate'),
       gap(),

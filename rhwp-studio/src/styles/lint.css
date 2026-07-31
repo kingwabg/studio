@@ -45,3 +45,50 @@
   background: var(--color-primary, #1971c2); border-color: transparent; color: #fff;
 }
 .lint-card-btn:hover { filter: brightness(.96); }
+
+/* 검사 결과 패널 — 편집 영역 오른쪽 아래 알약(어느 탭을 보고 있든 보인다) */
+.lint-panel {
+  position: absolute; right: 18px; bottom: 18px; z-index: 12;
+  width: 268px; max-width: calc(100% - 36px);
+  background: var(--color-surface-raised, #fff);
+  border: 1px solid var(--color-border, #d9d6d2);
+  border-radius: 10px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .15);
+  font-size: 12px; color: var(--color-text, #23201d);
+  overflow: hidden;
+}
+.lint-panel-head {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 9px 11px; background: transparent; border: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+}
+.lint-panel-head i { margin-left: auto; }
+.lint-panel-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #e03131; flex: none;
+}
+.lint-panel-sub { color: var(--color-text-muted, #8a857f); font-size: 11px; }
+.lint-panel-list { max-height: 216px; overflow-y: auto; border-top: 1px solid var(--color-border, #d9d6d2); }
+.lint-panel-row {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: 7px 11px 7px 16px; background: transparent; border: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: left; position: relative;
+}
+.lint-panel-row::before {
+  content: ''; position: absolute; left: 8px; top: 10px;
+  width: 4px; height: 4px; border-radius: 50%;
+}
+.lint-panel-row--spell::before { background: #e03131; }
+.lint-panel-row--format::before { background: #1971c2; }
+.lint-panel-row:hover { background: var(--color-bg-light, rgba(0, 0, 0, .04)); }
+.lint-panel-detail { color: var(--color-text-muted, #8a857f); font-size: 11px; }
+.lint-panel-more { padding: 6px 11px; color: var(--color-text-muted, #8a857f); font-size: 11px; }
+.lint-panel-foot {
+  display: flex; justify-content: flex-end;
+  padding: 8px 11px; border-top: 1px solid var(--color-border, #d9d6d2);
+}
+.lint-card-btn:disabled { opacity: .45; cursor: default; }
+.lint-panel-toggle {
+  display: flex; align-items: center; gap: 5px; margin-right: auto;
+  font-size: 11px; color: var(--color-text-muted, #8a857f); cursor: pointer;
+}
+.lint-panel-toggle input { accent-color: var(--color-primary, #1971c2); cursor: pointer; }

@@ -890,6 +890,12 @@ export class WasmBridge {
     return JSON.parse(this.doc.getTableDimensions(sec, parentPara, controlIdx));
   }
 
+  /** 구역 안 표 전부 열거 — 문서 전체 검사(서식 규정)용. 엔진 getTables. */
+  getTables(sec: number): Array<{ para: number; controlIdx: number; rowCount: number; colCount: number }> {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).getTables(sec));
+  }
+
   getCellInfo(sec: number, parentPara: number, controlIdx: number, cellIdx: number): CellInfo {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.getCellInfo(sec, parentPara, controlIdx, cellIdx));
