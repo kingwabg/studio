@@ -10,10 +10,23 @@ import { callMiniMax, aiErrorHint } from './canva-ai-client';
 import { mkEl, mkButton } from './canva-dom';
 import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
 import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
+/**
+ * 문서 모드의 작성법 — **본문에 바로 넣을 글**을 쓴다.
+ *
+ * ⚠ "되묻지 마세요" 를 못 박은 이유(2026-08-01 실측): "사업 계획서를 작성해줘" 에
+ *   "어떤 사업인지 알려 달라"고 되물었다. 문서 도우미가 되물으면 아무것도 안 써지고,
+ *   사용자는 두 번 말해야 한다. 정보가 없으면 **표준 목차로 초안**을 쓰고, 채워야 할
+ *   자리를 대괄호로 남기는 편이 훨씬 쓸모 있다.
+ */
 const SYSTEM_PROMPT =
   '당신은 한국어 문서(HWPX) 편집을 돕는 작성 도우미입니다. ' +
-  '사용자의 요청에 따라 문서에 바로 넣을 수 있는 깔끔한 한국어 본문 텍스트를 작성하세요. ' +
-  '군더더기 설명 없이 문서에 들어갈 내용만 출력합니다. 표/서식 마크업은 쓰지 않습니다.';
+  '사용자의 요청에 따라 문서에 바로 넣을 수 있는 깔끔한 한국어 본문을 작성하세요.\n' +
+  '규칙:\n' +
+  '① **되묻지 마세요.** 정보가 부족하면 그 문서의 표준 목차로 초안을 쓰고, 채워야 할 곳은 ' +
+  '[기관명] [기간] 처럼 대괄호로 남깁니다.\n' +
+  '② 제목 → 소제목 → 문단 순서로 구조를 갖춰 씁니다. 소제목은 「1. 」 「가. 」 같은 번호를 붙입니다.\n' +
+  '③ 마크다운(#, **, - )을 쓰지 마세요. 한글 문서에 그대로 들어갑니다.\n' +
+  '④ 설명·인사말 없이 문서에 들어갈 내용만 출력합니다.';
 
 // 캔버스식 문서 생성 — A4 지면 배치 계획(JSON)을 설계시킨다 (inline-ai의 문서 생성을 캔버스 문법으로)
 // [캔버스 한컴 포크] export — 녹음→회의록(canva-record-panel.ts)이 같은 배치 파이프라인을 재사용(중복 2회 룰 회피)
@@ -26,19 +39,39 @@ export const LAYOUT_PROMPT =
 
 interface Msg { role: 'user' | 'ai'; text: string; err?: boolean; }
 
+/** 지금 편집기가 캔버스 모드인가 — 저장된 값이 없으면 캔버스로 본다(기본 화면). */
+function readCanvasMode(): boolean {
+  try {
+    return localStorage.getItem('rhwpCanvasMode') !== '0';
+  } catch {
+    return true;
+  }
+}
+
 export class CanvaAiPanel {
   private log!: HTMLElement;
   private input!: HTMLTextAreaElement;
   private sendBtn!: HTMLButtonElement;
   private modelBadge!: HTMLElement;
   private busy = false;
-  private genMode = true; // 캔버스식 문서 생성 모드 (기본 ON — 캔버스 탭의 작성법)
+  /**
+   * 캔버스식(지면 배치) 모드인가.
+   * ⚠ 편집기의 캔버스/문서 전환을 **따라간다**(사용자 지적 2026-08-01: "캔버스·문서
+   *   둘 다 작성법이 달라야 한다"). 손으로 바꿀 수도 있지만, 모드를 전환하면 다시 맞춘다 —
+   *   문서 탭에서 지면 배치 JSON 이 나오면 아무 쓸모가 없다.
+   */
+  private genMode = readCanvasMode();
   // 상단 기능 버튼 줄: 문서 생성 ↔ 일반 글쓰기(모드 토글) + 문서 검토(실행)
   private genBtn!: HTMLButtonElement;
   private plainBtn!: HTMLButtonElement;
 
   constructor(private root: HTMLElement, private services: CanvaServices) {
     this.render();
+    // 편집기 모드가 바뀌면 작성법도 따라 바꾼다.
+    window.addEventListener('rhwp-canvas-mode', (e) => {
+      this.genMode = Boolean((e as CustomEvent<boolean>).detail);
+      this.syncMode();
+    });
   }
 
   private render(): void {

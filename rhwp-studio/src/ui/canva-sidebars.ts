@@ -128,6 +128,8 @@ function mountModeToggle(services: CanvaServices): void {
     bCanvas.querySelector('i')!.className = `${on ? 'ph-fill' : 'ph-duotone'} ph-selection-all`;
     bDoc.querySelector('i')!.className = `${on ? 'ph-duotone' : 'ph-fill'} ph-article`;
     if (persist) { try { localStorage.setItem(CANVAS_MODE_KEY, on ? '1' : '0'); } catch { /* ignore */ } }
+    // AI 도우미가 작성법을 여기 맞춘다 — 캔버스면 지면 배치, 문서면 본문 작성.
+    try { window.dispatchEvent(new CustomEvent('rhwp-canvas-mode', { detail: on })); } catch { /* ignore */ }
   };
   bCanvas.addEventListener('click', () => apply(true, true));
   bDoc.addEventListener('click', () => apply(false, true));
