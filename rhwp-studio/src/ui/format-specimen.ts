@@ -17,9 +17,6 @@ import { mkEl, mkButton } from './canva-dom';
 import type { CharProperties, ParaProperties } from '@/core/types';
 import type { FormatRun } from './selection-summary';
 
-/** 글자가 없을 때(빈 문단) 서식만 보여주는 예문. */
-const SAMPLE = '문서의 첫 줄은 읽는 사람의 시간을 아껴야 한다. 가나다라마바사 AaBbCc 0123';
-
 /** 정렬 값 → CSS. 배분·나눔은 CSS 로 표현할 수 없어 양쪽으로 근사한다(견본 한정). */
 function cssAlign(a: string | undefined): string {
   if (a === 'distribute' || a === 'split') return 'justify';
@@ -77,7 +74,7 @@ export class FormatSpecimen {
     this.root.appendChild(head);
 
     const body = mkEl('div', 'canva-specimen-body');
-    this.text = mkEl('p', 'canva-specimen-text', SAMPLE);
+    this.text = mkEl('p', 'canva-specimen-text');
     body.appendChild(this.text);
     this.root.appendChild(body);
 
@@ -92,14 +89,15 @@ export class FormatSpecimen {
 
   /**
    * 견본 내용을 **실제 글자**로 바꾼다 — 구간마다 자기 서식으로.
-   * 글자가 없으면 예문으로 돌아가 커서 서식만 보여준다.
+   * 글자가 없으면 **비운다**(사용자 결정 2026-07-31: 예문은 내가 쓰지도 않은 문장이라
+   * 혼란만 준다 — 빈 문서에선 빈 견본, 치는 대로 채워지는 게 맞다).
    */
   setContent(runs: FormatRun[], truncated: boolean): void {
     if (!this.text) return;
     const usable = runs.filter((r) => (r.text ?? '').length > 0);
     if (usable.length === 0) {
       this.live = false;
-      this.text.textContent = SAMPLE;
+      this.text.textContent = '';
       if (this.lastChar) applyCharStyle(this.text.style, this.lastChar);
       return;
     }
