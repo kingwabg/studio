@@ -40,3 +40,23 @@ test('빈 입력은 아무것도 만들지 않는다', () => {
   assert.deepEqual(classifyLines(''), []);
   assert.deepEqual(classifyLines('\n\n  \n'), []);
 });
+
+/**
+ * 표 문법 — AI 가 `|항목|내용|` 로 쓰면 실제 표가 되어야 한다.
+ * 줄마다 문단으로 넣으면 막대기만 늘어선 본문이 된다.
+ */
+test('연속한 | 줄을 표 한 덩어리로 묶는다', () => {
+  const got = classifyLines('사업 예산\n|항목|금액|\n|인건비|1,000|\n|재료비|500|\n이상입니다.');
+  assert.deepEqual(got.map((l) => l.kind), ['title', 'table', 'body']);
+  assert.deepEqual(got[1].rows, [['항목', '금액'], ['인건비', '1,000'], ['재료비', '500']]);
+});
+
+test('마크다운 구분선(|---|)은 표 데이터가 아니다', () => {
+  const got = classifyLines('제목\n|A|B|\n|---|---|\n|1|2|');
+  assert.deepEqual(got[1].rows, [['A', 'B'], ['1', '2']]);
+});
+
+test('표 사이에 낀 본문은 따로 문단이 된다', () => {
+  const got = classifyLines('제목\n|A|B|\n설명 문단\n|C|D|');
+  assert.deepEqual(got.map((l) => l.kind), ['title', 'table', 'body', 'table']);
+});
