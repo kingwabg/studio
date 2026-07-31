@@ -103,17 +103,24 @@ export async function polishParagraph(
         ],
         temperature: 0.7,
         max_tokens: 1024,
+        // ⚠ 추론(thinking) 모델은 생각에만 수천~수만 토큰을 쓴다(Nemotron 은 기본
+        //   reasoning_budget 16384). 문장 다듬기는 그럴 일이 아니고, 생각이 길어지면
+        //   답이 잘려 JSON 이 깨진다. 끄는 옵션을 함께 보낸다 — 모르는 모델은 무시한다.
+        chat_template_kwargs: { enable_thinking: false },
       }),
     });
     const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{ message?: { content?: string; reasoning_content?: string } }>;
       error?: string | { message?: string };
     };
     if (!res.ok) {
       const e = typeof json.error === 'string' ? json.error : json.error?.message;
       return { versions: [], error: e ?? `요청 실패 (${res.status})` };
     }
-    const raw = json.choices?.[0]?.message?.content ?? '';
+    const msg = json.choices?.[0]?.message;
+    // 추론 모델은 생각을 reasoning_content 에 따로 담는다 — 답이 비면 거기서라도 찾는다.
+    // (enable_thinking 을 못 끄는 모델 대비. 생각 안에도 우리가 시킨 JSON 이 들어 있다.)
+    const raw = msg?.content?.trim() ? msg.content : (msg?.reasoning_content ?? '');
     // 모델이 코드펜스를 붙이는 일이 잦다 — 첫 { 부터 마지막 } 까지만 본다.
     const s = raw.indexOf('{');
     const e = raw.lastIndexOf('}');

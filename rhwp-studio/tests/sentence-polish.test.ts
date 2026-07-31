@@ -34,3 +34,45 @@ test('가릴 이름이 없으면 원문 그대로', () => {
   assert.equal(m.masked, text);
   assert.equal(m.table.size, 0);
 });
+
+/**
+ * 추론(thinking) 모델 대비 — 사용자가 보내 준 NVIDIA 예제에서 확인한 응답 형태.
+ * 생각을 reasoning_content 에 따로 담는 모델이 있어, content 가 비면 거기서 찾아야 한다.
+ */
+test('요청에 thinking 끄기가 들어간다', async () => {
+  const seen: { body?: string } = {};
+  const orig = globalThis.fetch;
+  globalThis.fetch = (async (_u: unknown, init?: { body?: string }) => {
+    seen.body = init?.body;
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"versions":["가","나","다"]}' } }] }),
+    } as unknown as Response;
+  }) as typeof fetch;
+  try {
+    const { polishParagraph } = await import('../src/ui/sentence-polish.ts');
+    const r = await polishParagraph('테스트 문장입니다');
+    assert.deepEqual(r.versions, ['가', '나', '다']);
+    const body = JSON.parse(seen.body ?? '{}') as { chat_template_kwargs?: { enable_thinking?: boolean } };
+    assert.equal(body.chat_template_kwargs?.enable_thinking, false, 'thinking 을 꺼서 보내야 한다');
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test('content 가 비면 reasoning_content 에서 찾는다', async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = (async () => ({
+    ok: true,
+    json: async () => ({
+      choices: [{ message: { content: '', reasoning_content: '음… {"versions":["하나"]} 이렇게' } }],
+    }),
+  } as unknown as Response)) as typeof fetch;
+  try {
+    const { polishParagraph } = await import('../src/ui/sentence-polish.ts');
+    const r = await polishParagraph('테스트');
+    assert.deepEqual(r.versions, ['하나']);
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
