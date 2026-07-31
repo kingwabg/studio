@@ -13,6 +13,8 @@ import { mkEl, mkButton } from './canva-dom';
 import { FormatSpecimen } from './format-specimen';
 import { currentTextRuns, describeBodySelection, detectMixedFormat, scanFormatRuns, selectRun } from './selection-summary';
 import { buildFixParts, type LintItemLike } from './fix-preview';
+import { proofreadParagraph } from './para-proofread';
+import { openWordPop } from './word-pop';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -343,6 +345,8 @@ export class CanvaRightInspector {
       this.specimen.setContent(live.runs, live.truncated);
       // 「수정본」 — 지금 문단을 맞춤법대로 고치면 어떻게 되는지(사용자 요청 2026-07-31)
       this.paintCorrections(ihc);
+      // 「확인할 낱말」 — 사전이 모르는 말을 **이 문단에서만**(사용자 결정 2026-07-31)
+      this.paintWordChecks(ihc);
     }
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
@@ -371,6 +375,34 @@ export class CanvaRightInspector {
     this.specimen.setCorrections(
       buildFixParts(this.services.wasm as never, this.lintItems, pos.sectionIndex, pos.paragraphIndex));
     this.specimen.onFixAll = () => this.services.eventBus.emit('lint:fix-paragraph', pos);
+  }
+
+  /**
+   * 커서 문단만 사전으로 확인해 낱말 칩을 그린다.
+   * 문서 전체가 아닌 이유: 복합명사 때문에 공문 한 장에 78건이 떴다(실측).
+   */
+  private paintWordChecks(ihc: any): void {
+    const pos = ihc.getPosition?.();
+    if (!pos || pos.parentParaIndex !== undefined) { this.specimen.setWordChecks([]); return; }
+    const w = this.services.wasm as never;
+    const found = proofreadParagraph(w, pos.sectionIndex, pos.paragraphIndex);
+    this.specimen.setWordChecks(found.map((f) => f.word));
+    this.specimen.onWordPick = (word, anchor) => {
+      const hit = found.find((f) => f.word === word);
+      if (!hit) return;
+      openWordPop(word, anchor, (to) => {
+        const ih = this.services.getInputHandler() as any;
+        ih?.executeOperation({
+          kind: 'snapshot',
+          operationType: 'wordFix',
+          operation: (wasm: any) => {
+            wasm.replaceText(pos.sectionIndex, pos.paragraphIndex, hit.at, hit.len, to);
+            return null;
+          },
+        });
+        this.services.eventBus.emit('document-changed');
+      });
+    };
   }
 
   private reflectPara(p: ParaProperties): void {

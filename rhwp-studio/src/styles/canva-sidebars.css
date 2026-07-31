@@ -1104,3 +1104,28 @@
 }
 .canva-specimen-fixfrom { color: var(--color-text-muted); text-decoration: line-through; }
 .canva-specimen-fixto { color: #2f9e44; font-weight: 600; margin-left: 3px; }
+
+/* 「확인할 낱말」 — 사전이 모르는 말을 이 문단에서만 모아 보여준다(2026-07-31) */
+.canva-specimen-words { border-top: 1px solid var(--color-border); padding-top: 8px; margin-top: 8px; }
+.canva-specimen-wordbox { display: flex; flex-wrap: wrap; gap: 5px; }
+.canva-specimen-word {
+  padding: 3px 9px; border-radius: 100px; cursor: pointer; font-size: 12px;
+  border: 1px solid var(--color-border); background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-family: 'HCR Batang', '함초롬바탕', Batang, serif;
+}
+.canva-specimen-word:hover { border-color: #7048e8; color: #7048e8; }
+/* 후보 팝오버 */
+.canva-word-pop {
+  position: fixed; z-index: 2000; display: flex; flex-direction: column; gap: 5px;
+  padding: 9px; min-width: 150px;
+  background: var(--color-surface-raised); border: 1px solid var(--color-border);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.16);
+}
+.canva-word-pop-empty { font-size: 11px; color: var(--color-text-muted); }
+.canva-word-cand {
+  padding: 5px 9px; border-radius: 6px; cursor: pointer; text-align: left;
+  border: 1px solid var(--color-border); background: transparent; color: inherit;
+  font-family: 'HCR Batang', '함초롬바탕', Batang, serif; font-size: 13px;
+}
+.canva-word-cand:hover { background: var(--color-accent-bg); border-color: var(--color-primary); }

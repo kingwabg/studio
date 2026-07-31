@@ -10,11 +10,11 @@ import { scanFormat, DEFAULT_SPEC, type CellRef, type FormatSpec } from './forma
  * 지적 종류. 앞 셋은 **글자를 바꾸는** 교정이고 'format' 만 글자 속성을 바꾼다.
  * 철자/문법은 "틀렸다", 문장은 "이렇게 쓰면 낫다" — 무게가 달라 색과 묶음을 나눈다.
  */
-export type LintKind = 'spell' | 'grammar' | 'style' | 'format';
+export type LintKind = 'spell' | 'grammar' | 'style' | 'format' | 'dict';
 
 /** 글자를 치환하는 종류인가 — 겹침 판정·수정본이 이 셋만 본다 */
 export function isTextKind(k: LintKind): boolean {
-  return k === 'spell' || k === 'grammar' || k === 'style';
+  return k === 'spell' || k === 'grammar' || k === 'style' || k === 'dict';
 }
 
 export interface LintItem {
@@ -28,8 +28,15 @@ export interface LintItem {
   detail: string | null;
   /** 표 안 위반이면 셀 좌표(밑줄·적용 둘 다 이 좌표로 간다) */
   cell?: CellRef;
-  /** 고침 — 글자를 바꾸거나(맞춤법) 글자 속성을 입히거나(서식) */
+  /**
+   * 고침 — 글자를 바꾸거나(맞춤법) 글자 속성을 입히거나(서식).
+   * ⚠ 사전 지적은 **null 이다**. hunspell 의 후보가 한국어에선 자주 엉뚱해서
+   *   ("모드게" → "모드께/모드가/모드기", 정답 "모두가"는 없음) 자동 적용하면
+   *   [전부 적용]이 문서를 망친다. 후보는 카드에서 사람이 고른다(사용자 결정 2026-07-31).
+   */
   fix: { text: string } | { props: Partial<CharProperties> } | null;
+  /** 사전 지적일 때 그 어절 — 카드를 열 때 이 말로 후보를 뽑는다 */
+  word?: string;
 }
 
 /** 같은 지적을 두 번 세지 않기 위한 키 — [무시]도 이 키로 기억한다 */
@@ -81,7 +88,17 @@ function dropOverlaps(items: LintItem[]): LintItem[] {
  * 상시 감시가 아니다 — 상시로 켜면 화면이 밑줄로 덮여 맞춤법까지 같이 무시당한다.
  * 그래서 맞춤법은 늘 켜고, 서식은 사용자가 켤 때만 본다.
  */
-export function scanAll(wasm: never, withFormat = false, spec: FormatSpec = DEFAULT_SPEC): LintItem[] {
+/**
+ * ⚠ 사전 검사는 여기 없다. 문서 전체에 돌리면 복합명사 때문에 공문 한 장에 78건이
+ *   떴다(2026-07-31 실측: 십억원·통합재정수지·사회보장성기금 … 전부 맞는 말).
+ *   그래서 **커서가 있는 문단만** 보고 결과도 우측 패널에만 낸다 — ui/para-proofread.ts.
+ *   (사용자 결정: "카카오톡처럼 내가 쓴 것만, 원할 때")
+ */
+export function scanAll(
+  wasm: never,
+  withFormat = false,
+  spec: FormatSpec = DEFAULT_SPEC,
+): LintItem[] {
   const spell = scanDocument(wasm).map(fromSpell);
   let format: LintItem[] = [];
   try {

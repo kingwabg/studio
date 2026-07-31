@@ -14,6 +14,7 @@
 import { scanAll, itemKey, type LintItem } from './items';
 import { LintPanel } from './panel';
 import { loadSpecs, pickDefault, type NamedSpec } from './spec-source';
+import { prefetchDictionary } from './dict';
 import { DEFAULT_SPEC, type FormatSpec } from './format-rules';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { VirtualScroll } from '@/view/virtual-scroll';
@@ -372,6 +373,8 @@ export function attachLinter(
   };
   const overlay = new LintOverlay(container, virtualScroll, host);
   void overlay.loadCenterSpecs();
+  // 편집기가 떴으니 문서를 쓸 사람이 확실하다 — 한가할 때 사전을 미리 받아 둔다.
+  prefetchDictionary();
   // 우측 패널 견본이 「수정본」을 그린다 — 오버레이는 UI 를 모른 채 결과만 흘린다.
   overlay.onItems = (items) => eventBus.emit('lint:items', items);
   eventBus.on('lint:fix-paragraph', (pos) => {

@@ -137,3 +137,16 @@
   opacity: .75;
   cursor: default;
 }
+
+/* 사전 지적 — 보라 물결. 자동 고침이 없고 "확인해 보세요"라는 뜻이다 */
+.lint-mark--dict {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='3'><path d='M0 2 L1.5 0.5 L3 2 L4.5 0.5 L6 2' fill='none' stroke='%237048e8' stroke-width='1'/></svg>");
+}
+.lint-panel-row--dict::before { background: #7048e8; }
+/* 교정 후보 — 사람이 골라야 하므로 버튼으로 나열한다 */
+.lint-card-cands { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.lint-card-cands.is-empty { color: var(--color-text-muted, #8a857f); font-size: 11px; }
+.lint-card-btn.is-cand {
+  font-family: 'HCR Batang', '함초롬바탕', Batang, serif;
+  background: var(--color-bg-light, rgba(0, 0, 0, .04));
+}

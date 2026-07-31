@@ -64,7 +64,8 @@ const legacyBaselines = new Map([
   //     선언·attachLinter 호출·e2e 전역뿐. 기능 코드 반입 금지.
   // +1: 명령 디스패치 e2e 전역(2026-07-31)
   // +2: 상태바 배포 표식 배선(2026-07-31) — 본문은 ui/build-stamp.ts, 여긴 import·호출 각 1줄
-  ['src/main.ts', 1329],
+  // +1: 사전 e2e 전역(2026-07-31)
+  ['src/main.ts', 1330],
   ['src/engine/input-handler-picture.ts', 1215],
   // +28: 논리↔텍스트 좌표 변환(2026-07-30, TAC 신고③) — 모든 편집 명령이 지나는
   //      doInsertText/doDeleteText/doGetTextRange 3헬퍼 + 선택삭제·서식·병합·분할의
@@ -103,7 +104,9 @@ const legacyBaselines = new Map([
   //     렌더는 format-specimen.ts, 여긴 호출 3줄. 기능 코드 반입 금지.
   // +23: 「수정본」 배선(2026-07-31) — 문장 재구성은 ui/fix-preview.ts, 렌더는
   //      format-specimen.ts. 여긴 lint:items 구독 + paintCorrections 위임. 기능 반입 금지.
-  ['src/ui/canva-right-inspector.ts', 745],
+  // +32: 「확인할 낱말」 배선(2026-07-31) — 사전 검사는 ui/para-proofread.ts,
+  //      후보 팝오버는 ui/word-pop.ts. 여긴 위임 + 교체 명령. 기능 반입 금지.
+  ['src/ui/canva-right-inspector.ts', 777],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
 

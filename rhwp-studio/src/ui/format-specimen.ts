@@ -70,6 +70,10 @@ export class FormatSpecimen {
   private fixRow!: HTMLElement;
   /** [고치기] 를 누르면 호출부가 이 문단의 고침을 한 번에 적용한다 */
   onFixAll: (() => void) | null = null;
+  /** 「확인할 낱말」 줄 — 사전이 모르는 말이 있을 때만 보인다 */
+  private wordRow!: HTMLElement;
+  /** 낱말을 누르면 호출부가 후보를 뽑아 준다 */
+  onWordPick: ((word: string, anchor: HTMLElement) => void) | null = null;
   /** 칩을 누르면 그 구간만 선택하도록 호출부가 꽂는 훅 */
   onPickRun: ((run: FormatRun) => void) | null = null;
 
@@ -96,6 +100,10 @@ export class FormatSpecimen {
     this.fixRow = mkEl('div', 'canva-specimen-fix');
     this.fixRow.hidden = true;
     this.root.appendChild(this.fixRow);
+
+    this.wordRow = mkEl('div', 'canva-specimen-words');
+    this.wordRow.hidden = true;
+    this.root.appendChild(this.wordRow);
 
     host.appendChild(this.root);
     this.paintSub();
@@ -234,6 +242,29 @@ export class FormatSpecimen {
     }
     this.fixRow.appendChild(line);
     this.fixRow.hidden = false;
+  }
+
+  /**
+   * 「확인할 낱말」 — 사전이 모르는 말을 **이 문단에서만** 모아 보여준다.
+   * 캔버스에 밑줄을 긋지 않는 이유: 복합명사 오탐이 섞이는데, 본문에 흩어지면
+   * 무시하기 어렵고 한곳에 모이면 한눈에 넘길 수 있다(사용자 결정 2026-07-31).
+   */
+  setWordChecks(words: readonly string[]): void {
+    if (!this.wordRow) return;
+    this.wordRow.textContent = '';
+    if (words.length === 0) { this.wordRow.hidden = true; return; }
+    const head = mkEl('div', 'canva-specimen-fixhead');
+    head.innerHTML = '<i class="ph ph-book-open-text"></i><span>확인할 낱말</span>';
+    this.wordRow.appendChild(head);
+    const box = mkEl('div', 'canva-specimen-wordbox');
+    for (const w of words) {
+      const b = mkButton('canva-specimen-word', { title: `"${w}" — 사전에 없는 말입니다. 눌러서 후보를 봅니다.` });
+      b.textContent = w;
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.onWordPick?.(w, b); });
+      box.appendChild(b);
+    }
+    this.wordRow.appendChild(box);
+    this.wordRow.hidden = false;
   }
 
   private paintSub(): void {

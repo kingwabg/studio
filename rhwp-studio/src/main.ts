@@ -510,6 +510,7 @@ async function initialize(): Promise<void> {
       (window as any).__ruler = ruler; // 자 마커 드래그 e2e 판정용
       (window as any).__lint = lintOverlay; // 인라인 검사 e2e 판정용
       (window as any).__dispatcher = dispatcher; // 명령 디스패치 e2e 판정용
+      void import('@/lint/dict').then((m) => { (window as any).__dict = m; }); // 사전 e2e 판정용
       (window as any).__canvasView = canvasView;
       (window as any).__renderBackend = renderBackend;
       (window as any).__canvaskitRenderMode = canvaskitMode;

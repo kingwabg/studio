@@ -26,6 +26,11 @@ export default defineConfig(({ mode }) => {
       `${new Date().toLocaleString('sv', { dateStyle: 'short', timeStyle: 'short' })} 빌드`,
     ),
   },
+  optimizeDeps: {
+    // hunspell-wasm 은 자기 .wasm 을 모듈 상대 경로로 읽는다 — dep 최적화로 옮기면
+    // 경로가 깨져 동적 import 자체가 실패한다(2026-07-31 실측).
+    exclude: ['hunspell-wasm'],
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
