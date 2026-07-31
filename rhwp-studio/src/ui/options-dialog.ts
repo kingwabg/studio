@@ -5,6 +5,7 @@
  */
 import { ModalDialog } from './dialog';
 import { userSettings } from '@/core/user-settings';
+import { createAiPanel } from './ai-settings-panel';
 import { FontSetDialog } from './font-set-dialog';
 import {
   clearStoredLocalFonts,
@@ -48,6 +49,13 @@ export class OptionsDialog extends ModalDialog {
     fileTab.dataset.tab = 'file';
     tabs.appendChild(fileTab);
 
+    // AI — 모델 고르기·API 키(본문은 ui/ai-settings-panel.ts)
+    const aiTab = document.createElement('button');
+    aiTab.className = 'dialog-tab';
+    aiTab.textContent = 'AI';
+    aiTab.dataset.tab = 'ai';
+    tabs.appendChild(aiTab);
+
     body.appendChild(tabs);
 
     // 글꼴 탭 패널
@@ -60,6 +68,11 @@ export class OptionsDialog extends ModalDialog {
     filePanel.className = 'dialog-tab-panel opt-tab-panel';
     filePanel.dataset.tab = 'file';
     body.appendChild(filePanel);
+
+    const aiPanel = createAiPanel();
+    aiPanel.classList.add('dialog-tab-panel', 'opt-tab-panel');
+    aiPanel.dataset.tab = 'ai';
+    body.appendChild(aiPanel);
 
     // 탭 클릭 이벤트 (향후 탭 추가 대비)
     tabs.addEventListener('click', (e) => {
