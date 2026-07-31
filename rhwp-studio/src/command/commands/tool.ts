@@ -2,6 +2,14 @@ import type { CommandDef } from '../types';
 import { OptionsDialog } from '../../ui/options-dialog';
 import { showToast } from '@/ui/toast';
 
+import { SealMakerDialog } from '@/ui/seal-maker';
+import { EsignChecklistDialog, ConsentSimDialog, NdaGeneratorDialog } from '@/ui/esign-tools';
+
+let sealDialog: SealMakerDialog | null = null;
+let checklistDialog: EsignChecklistDialog | null = null;
+let consentDialog: ConsentSimDialog | null = null;
+let ndaDialog: NdaGeneratorDialog | null = null;
+
 export const toolCommands: CommandDef[] = [
   // ── 로드맵 자리 표시 ──────────────────────────────
   // 아직 구현이 없는 도구들. **버튼을 없애지 않는다** — 자리를 잡아 두는 것은 제품
@@ -21,6 +29,43 @@ export const toolCommands: CommandDef[] = [
     },
   })),
 
+  {
+    // 전자서명 도구 4종(2026-08-01) — 전부 로컬, 본문은 ui/seal-maker.ts·ui/esign-tools.ts
+    id: 'tool:seal-maker',
+    label: '도장 만들기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      if (!sealDialog) sealDialog = new SealMakerDialog(services);
+      sealDialog.show();
+    },
+  },
+  {
+    id: 'tool:esign-checklist',
+    label: '전자서명 체크리스트',
+    canExecute: () => true,
+    execute() {
+      if (!checklistDialog) checklistDialog = new EsignChecklistDialog();
+      checklistDialog.show();
+    },
+  },
+  {
+    id: 'tool:consent-sim',
+    label: '동의율 시뮬레이터',
+    canExecute: () => true,
+    execute() {
+      if (!consentDialog) consentDialog = new ConsentSimDialog();
+      consentDialog.show();
+    },
+  },
+  {
+    id: 'tool:nda-generator',
+    label: 'NDA 생성기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      if (!ndaDialog) ndaDialog = new NdaGeneratorDialog(services);
+      ndaDialog.show();
+    },
+  },
   {
     id: 'tool:ai-panel',
     label: 'AI 도우미',

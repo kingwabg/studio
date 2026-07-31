@@ -944,3 +944,23 @@
 .formula-error { margin-top: 8px; padding: 8px 12px; background: var(--ui-warning-bg); border: 1px solid var(--ui-warning-border); border-radius: 4px; color: var(--ui-warning-text); font-size: var(--font-size-base); }
 .formula-input-error { border-color: var(--ui-danger-strong) !important; box-shadow: 0 0 0 2px var(--ui-danger-soft) !important; }
 
+
+/* 전자서명 도구 4종 (2026-08-01) — 도장·체크리스트·동의율·NDA */
+.seal-body { display: flex; flex-direction: column; gap: 12px; }
+.seal-row { display: flex; gap: 8px; }
+.seal-name { flex: 1; height: 30px; padding: 0 8px; font: inherit; border: 1px solid var(--ui-border, #d9d6d2); border-radius: 5px; }
+.seal-shape { height: 30px; font: inherit; border: 1px solid var(--ui-border, #d9d6d2); border-radius: 5px; }
+.seal-preview { width: 150px; height: 150px; align-self: center; }
+.seal-foot { display: flex; justify-content: flex-end; gap: 6px; }
+.esign-check { display: flex; flex-direction: column; gap: 9px; max-height: 420px; overflow-y: auto; }
+.esign-check-intro { margin: 0 0 3px; font-size: 11px; color: var(--ui-text-muted, #8a857f); }
+.esign-check-row { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.esign-check-row input { margin-top: 3px; accent-color: var(--ui-link, #256ef4); }
+.esign-check-text { font-size: 12.5px; }
+.esign-check-hint { font-size: 11px; color: var(--ui-text-muted, #8a857f); }
+.consent-sim { display: flex; flex-direction: column; gap: 9px; }
+.consent-row { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.consent-row > span { width: 96px; color: var(--ui-text-muted, #8a857f); }
+.consent-row > input, .consent-row > select { flex: 1; height: 29px; padding: 0 8px; font: inherit; border: 1px solid var(--ui-border, #d9d6d2); border-radius: 5px; }
+.consent-out { padding: 9px 11px; border-radius: 7px; background: var(--ui-accent-bg-light, #eef4ff); font-size: 12.5px; }
+.consent-note { margin: 0; font-size: 11px; color: var(--ui-text-muted, #8a857f); }

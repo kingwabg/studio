@@ -124,7 +124,16 @@ export function insertFormatted(ih: Ih, raw: string): number {
     }) => {
       const sec = pos.sectionIndex;
       let para = pos.paragraphIndex;
+      // ⚠ 커서 오프셋은 **논리 좌표**(그림 등 인라인 컨트롤 = 1칸)인데 insertText 는
+      //   **텍스트 좌표**를 원한다. 도장을 넣은 문단에 이어 넣으면 어긋나 문단 순서가
+      //   뒤집혔다(2026-08-01 실측). 변환하고 시작한다.
+      const w2 = wasm as unknown as {
+        logicalToTextOffset?: (s: number, p: number, o: number) => number;
+      };
       let offset = pos.charOffset;
+      try {
+        offset = w2.logicalToTextOffset?.(sec, para, pos.charOffset) ?? pos.charOffset;
+      } catch { /* 변환 실패면 원값 — 인라인 컨트롤 없는 보통 문단에선 같다 */ }
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
