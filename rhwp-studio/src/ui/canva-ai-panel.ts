@@ -10,6 +10,7 @@ import { callMiniMax, aiErrorHint } from './canva-ai-client';
 import { mkEl, mkButton } from './canva-dom';
 import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
 import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
+import { insertFormatted } from './ai-doc-insert';
 /**
  * 문서 모드의 작성법 — **본문에 바로 넣을 글**을 쓴다.
  *
@@ -210,16 +211,25 @@ export class CanvaAiPanel {
 
   private addInsertAction(msgEl: HTMLElement, text: string): void {
     const actions = mkEl('div', 'canva-ai-actions');
+    // 제목·소제목에 서식을 입혀 넣는다 — 통째로 넣으면 사용자가 한 줄씩 다시 굵게 만들어야 한다.
     const insert = mkButton('canva-ai-act', { text: '본문에 삽입' });
     insert.addEventListener('click', () => {
       const ih = this.services.getInputHandler();
-      if (ih && this.services.wasm.pageCount > 0) {
-        (ih as any).insertPlainTextAtCursor(text);
-      }
+      if (!ih || this.services.wasm.pageCount === 0) return;
+      const n = insertFormatted(ih as never, text);
+      if (n === 0) return;
+      this.services.eventBus.emit('document-changed');
+      this.pushMsg({ role: 'ai', text: `본문에 넣었습니다 — ${n}줄 (Ctrl+Z로 취소 가능)` });
+    });
+    // 서식 없이 넣고 싶을 때 — 원문 그대로
+    const plain = mkButton('canva-ai-act', { text: '서식 없이' });
+    plain.addEventListener('click', () => {
+      const ih = this.services.getInputHandler();
+      if (ih && this.services.wasm.pageCount > 0) (ih as any).insertPlainTextAtCursor(text);
     });
     const copy = mkButton('canva-ai-act', { text: '복사' });
     copy.addEventListener('click', () => { void navigator.clipboard?.writeText(text); });
-    actions.append(insert, copy);
+    actions.append(insert, plain, copy);
     msgEl.appendChild(actions);
   }
 
