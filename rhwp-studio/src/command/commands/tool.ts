@@ -4,8 +4,10 @@ import { showToast } from '@/ui/toast';
 
 import { SealMakerDialog } from '@/ui/seal-maker';
 import { EsignChecklistDialog, ConsentSimDialog, NdaGeneratorDialog } from '@/ui/esign-tools';
+import { TableFillDialog } from '@/ui/table-fill';
 
 let sealDialog: SealMakerDialog | null = null;
+let tableFillDialog: TableFillDialog | null = null;
 let checklistDialog: EsignChecklistDialog | null = null;
 let consentDialog: ConsentSimDialog | null = null;
 let ndaDialog: NdaGeneratorDialog | null = null;
@@ -64,6 +66,16 @@ export const toolCommands: CommandDef[] = [
     execute(services) {
       if (!ndaDialog) ndaDialog = new NdaGeneratorDialog(services);
       ndaDialog.show();
+    },
+  },
+  {
+    // 표 빈칸 AI 채우기(2026-08-01) — 있는 양식의 **빈 셀만** 채운다. 본문 ui/table-fill.ts
+    id: 'tool:table-fill',
+    label: '표 빈칸 채우기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      if (!tableFillDialog) tableFillDialog = new TableFillDialog(services);
+      tableFillDialog.show();
     },
   },
   {

@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
   // ⚠ dev 서버 cwd는 부모(studio)일 수 있으므로 반드시 __dirname(=rhwp-studio) 기준으로 읽는다.
   // MINIMAX_API_KEY 우선, 기존 ANTHROPIC_API_KEY에 넣어둔 값도 그대로 인정(하위호환).
   const env = loadEnv(mode, __dirname, '');
+  const hostProxy = process.env.RHWP_AI_PROXY_TARGET ?? '';
   const aiKey = process.env.MINIMAX_API_KEY || env.MINIMAX_API_KEY
     || process.env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY || '';
   console.log(`[ai-proxy] MiniMax API key ${aiKey ? '로드됨' : '없음 — rhwp-studio/.env.local 에 MINIMAX_API_KEY 설정'}`);
@@ -48,13 +49,16 @@ export default defineConfig(({ mode }) => {
       // [캔버스 한컴 포크] AI 패널 프록시 — 브라우저는 같은 출처 /api/ai/* 로 부르고,
       // dev 서버가 api.minimax.io 로 전달하며 Authorization: Bearer 를 서버측에서 주입.
       // 키가 번들에 노출되지 않고, 브라우저 CORS/CSP 우회도 자연 해결. MiniMax는 OpenAI 호환.
+      // ⚠ 배포 경로는 **호스트(sc-)의 /api/ai** 다 — 거기서 공급자·키가 정해진다.
+      //   dev 에서도 같은 경로로 검증하려면 RHWP_AI_PROXY_TARGET=http://127.0.0.1:3000 을
+      //   주면 된다(경로 그대로 전달). 안 주면 옛 MiniMax 직결 경로를 쓴다.
       '/api/ai': {
-        target: 'https://api.minimax.io',
+        target: hostProxy || 'https://api.minimax.io',
         changeOrigin: true,
-        rewrite: (p: string) => p.replace(/^\/api\/ai/, ''),
+        rewrite: (p: string) => (hostProxy ? p : p.replace(/^\/api\/ai/, '')),
         configure: (proxy: { on: (ev: string, cb: (req: { setHeader: (k: string, v: string) => void; removeHeader: (k: string) => void }) => void) => void }) => {
           proxy.on('proxyReq', (proxyReq) => {
-            if (aiKey) proxyReq.setHeader('Authorization', `Bearer ${aiKey}`);
+            if (!hostProxy && aiKey) proxyReq.setHeader('Authorization', `Bearer ${aiKey}`);
             // 브라우저 Origin/Referer 제거 → 서버-서버 호출로 위장(CORS 취급 회피).
             proxyReq.removeHeader('origin');
             proxyReq.removeHeader('referer');

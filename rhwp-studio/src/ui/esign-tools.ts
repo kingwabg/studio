@@ -181,9 +181,22 @@ export class NdaGeneratorDialog extends ModalDialog {
 
   constructor(private services: CommandServices) {
     super('NDA 생성기', 420);
+    this.confirmLabel = '문서에 넣기';
   }
 
-  protected onConfirm(): boolean { return true; }
+  /** 확인 = 문서에 넣기 */
+  protected onConfirm(): boolean {
+    const ih = this.services.getInputHandler();
+    if (!ih || this.services.wasm.pageCount === 0) return true;
+    insertFormatted(ih as never, ndaText(
+      this.a.value.trim() || '[기관명]',
+      this.b.value.trim() || '[상대방]',
+      this.purpose.value.trim() || '[목적 업무]',
+      this.years.value || '3',
+    ));
+    this.services.eventBus.emit('document-changed');
+    return true;
+  }
 
   protected createBody(): HTMLElement {
     const body = document.createElement('div');
@@ -204,29 +217,6 @@ export class NdaGeneratorDialog extends ModalDialog {
       mk('갑 (기관)', this.a), mk('을 (상대방)', this.b),
       mk('목적 업무', this.purpose), mk('유지 기간(년)', this.years),
     );
-    const foot = document.createElement('div');
-    foot.className = 'seal-foot';
-    const insert = document.createElement('button');
-    insert.className = 'dialog-btn dialog-btn-primary';
-    insert.textContent = '문서에 넣기';
-    insert.addEventListener('click', () => {
-      const ih = this.services.getInputHandler();
-      if (!ih || this.services.wasm.pageCount === 0) return;
-      insertFormatted(ih as never, ndaText(
-        this.a.value.trim() || '[기관명]',
-        this.b.value.trim() || '[상대방]',
-        this.purpose.value.trim() || '[목적 업무]',
-        this.years.value || '3',
-      ));
-      this.services.eventBus.emit('document-changed');
-      this.hide();
-    });
-    const close = document.createElement('button');
-    close.className = 'dialog-btn';
-    close.textContent = '닫기';
-    close.addEventListener('click', () => this.hide());
-    foot.append(insert, close);
-    body.appendChild(foot);
     return body;
   }
 }

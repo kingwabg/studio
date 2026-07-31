@@ -50,10 +50,15 @@ export class SealMakerDialog extends ModalDialog {
 
   constructor(private services: CommandServices) {
     super('도장 만들기', 360);
+    this.confirmLabel = '문서에 넣기';
   }
 
-  /** 확인 버튼은 안 쓴다 — 넣기는 본문 버튼이 맡는다 */
-  protected onConfirm(): boolean { return true; }
+  /** 확인 = 문서에 넣기. 이름이 비면 대화상자를 유지한다. */
+  protected onConfirm(): boolean {
+    if (!this.nameInput.value.trim()) { this.nameInput.focus(); return false; }
+    void this.insert();
+    return false; // insert() 가 끝나고 스스로 닫는다(그림 삽입이 비동기다)
+  }
 
   protected createBody(): HTMLElement {
     const body = document.createElement('div');
@@ -78,19 +83,6 @@ export class SealMakerDialog extends ModalDialog {
     this.canvas.height = SIZE;
     this.canvas.className = 'seal-preview';
     body.appendChild(this.canvas);
-
-    const foot = document.createElement('div');
-    foot.className = 'seal-foot';
-    const insert = document.createElement('button');
-    insert.className = 'dialog-btn dialog-btn-primary';
-    insert.textContent = '문서에 넣기';
-    insert.addEventListener('click', () => void this.insert());
-    const close = document.createElement('button');
-    close.className = 'dialog-btn';
-    close.textContent = '닫기';
-    close.addEventListener('click', () => this.hide());
-    foot.append(insert, close);
-    body.appendChild(foot);
 
     return body;
   }

@@ -163,6 +163,8 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       gap(),
       P('text-aa', '맞춤법 검사', 'edit:spellcheck'),
       gap(),
+      P('table', '표 빈칸 채우기', 'tool:table-fill'),
+      gap(),
       P('stamp', '도장 만들기', 'tool:seal-maker'),
       P('list-checks', '전자서명 체크리스트', 'tool:esign-checklist'),
       P('chart-bar', '동의율 시뮬레이터', 'tool:consent-sim'),

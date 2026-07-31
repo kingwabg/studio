@@ -20,6 +20,8 @@ export abstract class ModalDialog {
   protected titleIcon: string | null = null;
   /** 선택 대상 표기 (예: '표 블록 · 3×3 · B2') */
   protected titleSubject: string | null = null;
+  /** 확인 버튼 문구 — 동작 이름이 '확인'보다 분명한 대화상자가 바꾼다(예: '문서에 넣기') */
+  protected confirmLabel = '확인';
 
   constructor(title: string, width: number, closeOnOverlayClick = false) {
     this.title = title;
@@ -82,7 +84,7 @@ export abstract class ModalDialog {
 
     const confirmBtn = document.createElement('button');
     confirmBtn.className = 'dialog-btn dialog-btn-primary';
-    confirmBtn.textContent = '확인';
+    confirmBtn.textContent = this.confirmLabel;
     confirmBtn.addEventListener('click', () => {
       const shouldClose = this.onConfirm();
       if (shouldClose !== false) this.hide();

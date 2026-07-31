@@ -22,7 +22,7 @@ runTest('전자서명 도구 4종', async ({ page }) => {
     const inputs = [...document.querySelectorAll('.consent-sim input')];
     inputs[0].value = '서창지역아동센터';
     inputs[1].value = '급식업체';
-    document.querySelector('.consent-sim .dialog-btn-primary').click();
+    document.querySelector('.dialog-wrap .dialog-btn-primary').click();
     await new Promise((r) => setTimeout(r, 1200));
     const w = window.__wasm;
     const first = w.getTextRange(0, 0, 0, w.getParagraphLength(0, 0));
@@ -47,7 +47,7 @@ runTest('전자서명 도구 4종', async ({ page }) => {
     name.value = '왕준하';
     name.dispatchEvent(new Event('input'));
     await new Promise((r) => setTimeout(r, 300));
-    document.querySelector('.seal-body .dialog-btn-primary').click();
+    document.querySelector('.dialog-wrap .dialog-btn-primary').click();
     await new Promise((r) => setTimeout(r, 1200));
     return {
       before: w.getParagraphLength(0, last),
