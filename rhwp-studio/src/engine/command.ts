@@ -168,6 +168,18 @@ function doGetTextRange(wasm: WasmBridge, pos: DocumentPosition, count: number):
 
 // ─── 텍스트 삽입 명령 ─────────────────────────────────
 
+/**
+ * 글자 수 — 커서 오프셋 단위와 같다.
+ *
+ * ⚠ `str.length` 를 쓰면 안 된다. JS 문자열 길이는 **UTF-16 단위**라 이모지 하나가 2 다
+ * (`'😀'.length === 2`). 그대로 커서를 밀면 두 칸을 건너뛰어 다음 입력이 엉뚱한 자리에
+ * 들어간다 — 이모지를 연달아 넣으면 뒤 글자를 넘어 문단 끝에 붙었다(2026-07-31 실측).
+ * BMP 문자만 쓰면 두 값이 같아 오래 드러나지 않았다.
+ */
+function charLen(s: string): number {
+  return [...s].length;
+}
+
 export class InsertTextCommand implements EditCommand {
   readonly type = 'insertText';
   readonly timestamp: number;
@@ -182,7 +194,7 @@ export class InsertTextCommand implements EditCommand {
 
   execute(wasm: WasmBridge): DocumentPosition {
     doInsertText(wasm, this.position, this.text);
-    return { ...this.position, charOffset: this.position.charOffset + this.text.length };
+    return { ...this.position, charOffset: this.position.charOffset + charLen(this.text) };
   }
 
   getPageLocalTextEditOptions(): { insertedText: string } {
@@ -190,7 +202,7 @@ export class InsertTextCommand implements EditCommand {
   }
 
   undo(wasm: WasmBridge): DocumentPosition {
-    doDeleteText(wasm, this.position, this.text.length);
+    doDeleteText(wasm, this.position, charLen(this.text));
     return { ...this.position };
   }
 
@@ -207,7 +219,7 @@ export class InsertTextCommand implements EditCommand {
       if (other.position.cellParaIndex !== this.position.cellParaIndex) return null;
     }
     // 연속 위치 확인
-    const expectedOffset = this.position.charOffset + this.text.length;
+    const expectedOffset = this.position.charOffset + charLen(this.text);
     if (other.position.charOffset !== expectedOffset) return null;
     // 300ms 이내
     if (other.timestamp - this.timestamp > 300) return null;

@@ -165,6 +165,7 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('books', '사전', 'tool:dictionary'),
       P('translate', '번역', 'tool:translate'),
       gap(),
+      P('smiley', '이모지', 'insert:emoji'),
       P('list-numbers', '차례 만들기', 'insert:toc'),
       P('text-align-left', '상용구', 'insert:snippet'),
       gap(),

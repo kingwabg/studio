@@ -114,3 +114,18 @@
   border: 1px solid var(--color-border, #d9d6d2); border-radius: 6px;
   background: var(--color-surface-raised, #fff);
 }
+
+/* 이모지 피커 팝업 — 본문은 emoji-picker-element(웹 컴포넌트) */
+.emoji-pop {
+  border-radius: 10px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .2);
+  overflow: hidden;
+}
+.emoji-pop emoji-picker {
+  --num-columns: 8;
+  --emoji-size: 1.35rem;
+  --background: var(--color-surface-raised, #fff);
+  --border-color: var(--color-border, #d9d6d2);
+  width: 340px;
+  height: 420px;
+}

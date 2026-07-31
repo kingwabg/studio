@@ -3,6 +3,7 @@ import { PicturePropsDialog } from '@/ui/picture-props-dialog';
 import { EquationEditorDialog } from '@/ui/equation-editor-dialog';
 import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
 import { SymbolsDialog } from '@/ui/symbols-dialog';
+import { EmojiPicker } from '@/ui/emoji-picker';
 import { BookmarkDialog } from '@/ui/bookmark-dialog';
 import { SnippetDialog } from '@/ui/snippet-dialog';
 import { TocDialog } from '@/ui/toc-dialog';
@@ -90,6 +91,7 @@ function stub(id: string, label: string, icon?: string, shortcut?: string): Comm
 let picturePropsDialog: PicturePropsDialog | null = null;
 let equationEditorDialog: EquationEditorDialog | null = null;
 let equationPropsDialog: EquationPropertiesDialog | null = null;
+let emojiPicker: EmojiPicker | null = null;
 let symbolsDialog: SymbolsDialog | null = null;
 let bookmarkDialog: BookmarkDialog | null = null;
 let endnoteShapeDialog: EndnoteShapeDialog | null = null;
@@ -354,6 +356,17 @@ export const insertCommands: CommandDef[] = [
         symbolsDialog = new SymbolsDialog(services);
       }
       symbolsDialog.show();
+    },
+  },
+  {
+    // 이모지 넣기 — 피커 본문은 ui/emoji-picker.ts (emoji-picker-element, 한국어 데이터)
+    id: 'insert:emoji',
+    label: '이모지',
+    icon: 'icon-symbols',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services, opts) {
+      if (!emojiPicker) emojiPicker = new EmojiPicker(services);
+      emojiPicker.toggle((opts as { anchorEl?: HTMLElement } | undefined)?.anchorEl ?? null);
     },
   },
   stub('insert:hyperlink', '하이퍼링크', 'icon-hyperlink', 'Ctrl+K+H'),
