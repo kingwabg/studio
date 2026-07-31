@@ -6,6 +6,7 @@ import { CanvasView } from '@/view/canvas-view';
 import { InputHandler } from '@/engine/input-handler';
 import { Toolbar } from '@/ui/toolbar';
 import { attachLinter, type LintOverlay } from '@/lint/overlay';
+import { mountBuildStamp } from '@/ui/build-stamp';
 // [배포 반영 2026-07-29] 서비스워커가 새 버전을 잡으면 **한 번만** 자동 새로고침한다.
 // skipWaiting 만으로는 이미 열린 페이지가 옛 캐시 화면을 그대로 들고 있어, 사용자가
 // 새로고침을 두 번 눌러야 새 배포가 보였다("안 보인다" 실사고 반복, 2026-07-29).
@@ -322,6 +323,7 @@ async function initialize(): Promise<void> {
       canvasView.getViewportManager(),
     );
     inputHandler.setEditMode(editMode);
+    mountBuildStamp(); // 상태바 배포 표식 — 지금 화면이 최신인지 눈으로 판별
     // 인라인 검사(맞춤법 밑줄·교정 카드) — 본문은 lint/overlay.ts (스펙 docs/plans/format-linter.md)
     lintOverlay = attachLinter(container, eventBus, canvasView.getVirtualScroll(), () => inputHandler as never);
 

@@ -129,3 +129,11 @@
   width: 340px;
   height: 420px;
 }
+
+/* 상태바 배포 표식 — 지금 화면이 최신 배포인지 한눈에(2026-07-31) */
+.stb-build {
+  color: var(--color-text-muted, #8a857f);
+  font-variant-numeric: tabular-nums;
+  opacity: .75;
+  cursor: default;
+}

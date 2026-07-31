@@ -63,7 +63,8 @@ const legacyBaselines = new Map([
   // +5: 인라인 검사 배선(2026-07-31) — 기능은 전부 src/lint/overlay.ts, 여긴 import·전역
   //     선언·attachLinter 호출·e2e 전역뿐. 기능 코드 반입 금지.
   // +1: 명령 디스패치 e2e 전역(2026-07-31)
-  ['src/main.ts', 1327],
+  // +2: 상태바 배포 표식 배선(2026-07-31) — 본문은 ui/build-stamp.ts, 여긴 import·호출 각 1줄
+  ['src/main.ts', 1329],
   ['src/engine/input-handler-picture.ts', 1215],
   // +28: 논리↔텍스트 좌표 변환(2026-07-30, TAC 신고③) — 모든 편집 명령이 지나는
   //      doInsertText/doDeleteText/doGetTextRange 3헬퍼 + 선택삭제·서식·병합·분할의

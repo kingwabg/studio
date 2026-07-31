@@ -19,6 +19,12 @@ export default defineConfig(({ mode }) => {
   return {
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // 상태바 배포 표식용 빌드 시각 — 단독 실행일 때의 유일한 단서다(ui/build-stamp.ts)
+    // 'sv' 로케일은 YYYY-MM-DD HH:mm 을 **현지 시각**으로 준다 — UTC 로 찍으면
+    // 화면 시계와 9시간 어긋나 "언제 빌드된 거지"가 다시 헷갈린다.
+    __BUILD_STAMP__: JSON.stringify(
+      `${new Date().toLocaleString('sv', { dateStyle: 'short', timeStyle: 'short' })} 빌드`,
+    ),
   },
   resolve: {
     alias: {
