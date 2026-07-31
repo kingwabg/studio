@@ -9,8 +9,9 @@
  * 크기는 pt 를 그대로 쓰지 않는다 — 패널이 좁아 20pt 견본이 줄을 넘긴다.
  * 디자인이 정한 압축 스케일 `min(26, 11 + pt*0.55)px` 을 그대로 따른다.
  */
-import { mkEl } from './canva-dom';
+import { mkEl, mkButton } from './canva-dom';
 import type { CharProperties, ParaProperties } from '@/core/types';
+import type { FormatRun } from './selection-summary';
 
 /** 정렬 값 → CSS. 배분·나눔은 CSS 로 표현할 수 없어 양쪽으로 근사한다(견본 한정). */
 function cssAlign(a: string | undefined): string {
@@ -27,6 +28,12 @@ export class FormatSpecimen {
   private fontPt = 10;
   /** 선택 안에 서로 다른 글자 서식이 섞였나 — 견본은 커서 값만 보여주므로 그 한계를 적는다 */
   private mixed = false;
+  /** 스캔으로 센 서식 조각 수(0 = 안 셈) */
+  private runCount = 0;
+  /** 「서식 조각」 칩 줄 — 섞였을 때만 보인다 */
+  private chips!: HTMLElement;
+  /** 칩을 누르면 그 구간만 선택하도록 호출부가 꽂는 훅 */
+  onPickRun: ((run: FormatRun) => void) | null = null;
 
   /** host 안에 견본 카드를 만들고 자기 루트를 돌려준다. */
   mount(host: HTMLElement): HTMLElement {
@@ -47,6 +54,10 @@ export class FormatSpecimen {
     this.text.appendChild(document.createTextNode(' 가나다라마바사 AaBbCc 0123'));
     body.appendChild(this.text);
     this.root.appendChild(body);
+
+    this.chips = mkEl('div', 'canva-specimen-chips');
+    this.chips.hidden = true;
+    this.root.appendChild(this.chips);
 
     host.appendChild(this.root);
     this.paintSub();
@@ -101,10 +112,70 @@ export class FormatSpecimen {
     this.paintSub();
   }
 
+  /**
+   * 「서식 조각」 칩을 그린다 — 각 칩을 **그 구간의 서식 그대로** 그려서, 색 같은
+   * 임의 기호를 해독할 필요 없이 칩 자체가 범례가 되게 한다(사용자 결정 2026-07-31:
+   * 본문에 색을 칠하면 선택 하이라이트·실제 글자색과 충돌한다).
+   * 칩을 누르면 그 구간만 선택된다 — "굵은 데만 골라 고치기"가 된다.
+   */
+  setRuns(runs: FormatRun[], truncated: boolean): void {
+    if (!this.chips) return;
+    this.chips.textContent = '';
+    // 조각이 하나뿐이면 섞이지 않은 것 — 칩을 감춘다(같은 정보의 중복 표시 금지).
+    if (runs.length < 2) {
+      this.chips.hidden = true;
+      this.runCount = 0;
+      this.paintSub();
+      return;
+    }
+    this.runCount = runs.length;
+    for (const r of runs) {
+      const b = mkButton('canva-fmt-chip', { title: describeRun(r) });
+      const glyph = mkEl('span', 'canva-fmt-chip-glyph', r.sample);
+      const p = r.props;
+      const st = glyph.style;
+      st.fontWeight = p.bold ? '700' : '400';
+      st.fontStyle = p.italic ? 'italic' : 'normal';
+      const dec = [p.underline && 'underline', p.strikethrough && 'line-through']
+        .filter(Boolean).join(' ');
+      st.textDecoration = dec || 'none';
+      if (p.fontSize !== undefined) {
+        st.fontSize = `${Math.min(19, 9 + (p.fontSize / 100) * 0.42).toFixed(1)}px`;
+      }
+      if (p.textColor) {
+        st.color = p.textColor.toLowerCase() === '#ffffff' ? '#c9c6c2' : p.textColor;
+      }
+      const hl = (p as unknown as { shadeColor?: string }).shadeColor;
+      if (hl && hl.toLowerCase() !== '#ffffff') st.background = hl;
+      b.appendChild(glyph);
+      b.appendChild(mkEl('span', 'canva-fmt-chip-len', `${r.len}자`));
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.onPickRun?.(r); });
+      this.chips.appendChild(b);
+    }
+    if (truncated) this.chips.appendChild(mkEl('span', 'canva-fmt-chip-more', '···'));
+    this.chips.hidden = false;
+    this.paintSub();
+  }
+
   private paintSub(): void {
     if (!this.sub) return;
-    this.sub.textContent = this.mixed
-      ? `${this.fontName} ${this.fontPt}pt · 서식 섞임`
-      : `${this.fontName} ${this.fontPt}pt`;
+    const base = `${this.fontName} ${this.fontPt}pt`;
+    // 조각 수를 셌으면 "섞임"보다 정확한 "N종"으로 말한다.
+    this.sub.textContent = this.runCount >= 2
+      ? `${base} · 서식 ${this.runCount}종`
+      : this.mixed ? `${base} · 서식 섞임` : base;
   }
+}
+
+/** 칩 툴팁 — 그 구간이 어떤 서식인지 말로도 적는다(아이콘만으론 모호하다). */
+function describeRun(r: FormatRun): string {
+  const p = r.props;
+  const bits: string[] = [];
+  if (p.fontSize !== undefined) bits.push(`${p.fontSize / 100}pt`);
+  if (p.bold) bits.push('굵게');
+  if (p.italic) bits.push('기울임');
+  if (p.underline) bits.push('밑줄');
+  if (p.strikethrough) bits.push('취소선');
+  if (p.textColor && p.textColor.toLowerCase() !== '#000000') bits.push(p.textColor);
+  return `${bits.join(' · ') || '기본'} — ${r.len}자 (누르면 이 구간만 선택)`;
 }

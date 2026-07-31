@@ -27,12 +27,51 @@ interface WasmLike {
   getLogicalLength(sec: number, para: number): number;
   getCharPropertiesAt(sec: number, para: number, off: number): CharProperties;
   getPageOfPosition?: (sec: number, para: number) => { ok: boolean; page?: number | null };
+  logicalToTextOffset?: (sec: number, para: number, off: number) => number;
+  getTextRange?: (sec: number, para: number, off: number, count: number) => string;
+}
+
+/** 선택 안의 「서식 조각」 — 같은 글자 서식이 이어지는 한 구간. */
+export interface FormatRun {
+  /** 구간 시작(문단, 논리 오프셋) */
+  para: number;
+  from: number;
+  /** 구간 끝(exclusive) — 문단을 넘지 않는다 */
+  to: number;
+  /** 글자 수 */
+  len: number;
+  /** 이 구간의 글자 서식(칩을 이 서식 그대로 그린다) */
+  props: CharProperties;
+  /** 미리보기용 앞글자 몇 자(없으면 '가') */
+  sample: string;
 }
 
 interface CursorLike {
   getPosition?: () => Pos | undefined;
   hasSelection?: () => boolean;
   getSelectionOrdered?: () => { start: Pos; end: Pos } | null;
+  clearSelection?: () => void;
+  moveTo?: (pos: Pos) => void;
+  setAnchor?: () => void;
+}
+
+/**
+ * 서식 조각 하나만 선택한다(칩 클릭).
+ * ⚠ setAnchor 는 **기존 앵커를 유지**하는 시맨틱(Shift+클릭 확장)이라 먼저 지워야
+ * 시작점이 이전 선택에 묶이지 않는다 — 실측으로 겪은 함정.
+ */
+export function selectRun(
+  ih: { updateSelection?: () => void; updateCaret?: () => void },
+  cursor: CursorLike,
+  run: FormatRun,
+): void {
+  const sec = cursor.getPosition?.()?.sectionIndex ?? 0;
+  cursor.clearSelection?.();
+  cursor.moveTo?.({ sectionIndex: sec, paragraphIndex: run.para, charOffset: run.from });
+  cursor.setAnchor?.();
+  cursor.moveTo?.({ sectionIndex: sec, paragraphIndex: run.para, charOffset: run.to });
+  ih.updateSelection?.();
+  ih.updateCaret?.();
 }
 
 /** 본문 선택의 글자 수. 셀 안 선택은 규격이 달라 null. */
@@ -105,5 +144,103 @@ export function detectMixedFormat(cursor: CursorLike, w: WasmLike): boolean {
     return new Set(samples).size > 1;
   } catch {
     return false;
+  }
+}
+
+
+/** 스캔 상한 — 배너는 커서 이동마다 갱신된다. 넘으면 잘라서 돌려준다. */
+const SCAN_PARAS = 20;
+const SCAN_RUNS = 8;
+const SCAN_CALLS = 400;
+
+/**
+ * 선택을 훑어 **서식이 바뀌는 지점**만 끊어 구간 목록을 만든다.
+ *
+ * 글자마다 조회하면 긴 선택에서 수천 번 호출된다 — 서식 구간은 연속이므로
+ * 지수 도약 + 이진 탐색으로 경계만 찾는다(구간 하나당 ~2·log n 회).
+ * 상한(문단 20 · 구간 8 · 호출 400)을 넘으면 truncated=true 로 알린다.
+ */
+export function scanFormatRuns(
+  cursor: CursorLike,
+  w: WasmLike,
+): { runs: FormatRun[]; truncated: boolean } {
+  const sel = cursor.hasSelection?.() ? cursor.getSelectionOrdered?.() ?? null : null;
+  if (!sel || sel.start.parentParaIndex !== undefined) return { runs: [], truncated: false };
+  const { start, end } = sel;
+  const sec = start.sectionIndex;
+
+  let calls = 0;
+  const cache = new Map<string, string>();
+  const propsAt = (para: number, off: number): CharProperties => {
+    calls++;
+    return w.getCharPropertiesAt(sec, para, off);
+  };
+  const sigAt = (para: number, off: number): string => {
+    const key = `${para}:${off}`;
+    const hit = cache.get(key);
+    if (hit !== undefined) return hit;
+    const v = sig(propsAt(para, off));
+    cache.set(key, v);
+    return v;
+  };
+
+  const runs: FormatRun[] = [];
+  let truncated = false;
+  const lastPara = Math.min(end.paragraphIndex, start.paragraphIndex + SCAN_PARAS);
+  if (lastPara < end.paragraphIndex) truncated = true;
+
+  try {
+    for (let para = start.paragraphIndex; para <= lastPara; para++) {
+      const from = para === start.paragraphIndex ? start.charOffset : 0;
+      const to = para === end.paragraphIndex
+        ? end.charOffset
+        : w.getLogicalLength(sec, para);
+      let i = from;
+      while (i < to) {
+        if (runs.length >= SCAN_RUNS || calls >= SCAN_CALLS) { truncated = true; break; }
+        const s0 = sigAt(para, i);
+        // 지수 도약으로 같은 서식의 끝을 넘어선 지점을 먼저 찾는다
+        let j = i;
+        let step = 1;
+        while (j + step < to && sigAt(para, j + step) === s0) { j += step; step *= 2; }
+        // 그 사이를 이진 탐색 — lo 가 같은 서식의 마지막 글자
+        let lo = j;
+        let hi = Math.min(j + step, to - 1);
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (sigAt(para, mid) === s0) lo = mid; else hi = mid - 1;
+        }
+        const runTo = lo + 1;
+        const prev = runs[runs.length - 1];
+        // 문단 경계에서 같은 서식이 이어지면 하나로 합친다(칩이 쪼개져 보이지 않게)
+        if (prev && sig(prev.props) === s0 && prev.para === para - 1) {
+          prev.len += runTo - i;
+        } else {
+          runs.push({ para, from: i, to: runTo, len: runTo - i, props: propsAt(para, i), sample: '' });
+        }
+        i = runTo;
+      }
+      if (runs.length >= SCAN_RUNS || calls >= SCAN_CALLS) break;
+    }
+    // 칩에 보일 앞글자 — 실제 글자가 있으면 그게 서식보다 잘 읽힌다
+    for (const r of runs) {
+      r.sample = sampleText(w, sec, r) || '가';
+    }
+  } catch {
+    return { runs, truncated: true };
+  }
+  return { runs, truncated };
+}
+
+/** 구간 앞 2글자. 논리→텍스트 변환이 없으면 빈 문자열(호출부가 '가'로 대체). */
+function sampleText(w: WasmLike, sec: number, r: FormatRun): string {
+  if (!w.logicalToTextOffset || !w.getTextRange) return '';
+  try {
+    const t0 = w.logicalToTextOffset(sec, r.para, r.from);
+    const t1 = w.logicalToTextOffset(sec, r.para, Math.min(r.to, r.from + 2));
+    const n = Math.max(0, t1 - t0);
+    return n > 0 ? w.getTextRange(sec, r.para, t0, n).trim() : '';
+  } catch {
+    return '';
   }
 }

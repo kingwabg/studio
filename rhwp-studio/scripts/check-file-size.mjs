@@ -88,7 +88,9 @@ const legacyBaselines = new Map([
   // +16: AI·녹음 진입 칩(2026-07-30)
   // +9: 「지금 서식」 견본 배선(2026-07-31 디자인 3a) — 본문은 ui/format-specimen.ts,
   //     여긴 mount 1줄 + reflectChar/reflectPara 위임 2줄 + 근거 주석. 기능 코드 반입 금지.
-  ['src/ui/canva-right-inspector.ts', 713],
+  // +6: 선택 요약·서식 조각 칩 배선(2026-07-31) — 스캔·문구·구간 선택 로직은 전부
+  //     ui/selection-summary.ts, 여긴 호출 6줄. 기능 코드 반입 금지.
+  ['src/ui/canva-right-inspector.ts', 719],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
 

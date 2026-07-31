@@ -11,7 +11,7 @@ import { TablePanelSections } from './table-panel-sections';
 import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
 import { FormatSpecimen } from './format-specimen';
-import { describeBodySelection, detectMixedFormat } from './selection-summary';
+import { describeBodySelection, detectMixedFormat, scanFormatRuns, selectRun } from './selection-summary';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -323,8 +323,14 @@ export class CanvaRightInspector {
 
   private reflectChar(p: CharProperties): void {
     this.specimen.reflectChar(p);
-    const ihc = (this.services.getInputHandler() as any)?.cursor;
-    if (ihc) this.specimen.setMixed(detectMixedFormat(ihc, this.services.wasm as never));
+    const ih = this.services.getInputHandler() as any;
+    const ihc = ih?.cursor;
+    if (ihc) {
+      this.specimen.setMixed(detectMixedFormat(ihc, this.services.wasm as never));
+      const { runs, truncated } = scanFormatRuns(ihc, this.services.wasm as never);
+      this.specimen.setRuns(runs, truncated);
+      this.specimen.onPickRun = (r) => selectRun(ih, ihc, r);
+    }
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
     this.biu.underline?.classList.toggle('is-active', !!p.underline);
