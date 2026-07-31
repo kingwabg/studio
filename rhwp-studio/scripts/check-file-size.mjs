@@ -68,7 +68,9 @@ const legacyBaselines = new Map([
   // +28: 논리↔텍스트 좌표 변환(2026-07-30, TAC 신고③) — 모든 편집 명령이 지나는
   //      doInsertText/doDeleteText/doGetTextRange 3헬퍼 + 선택삭제·서식·병합·분할의
   //      변환 지점이 전부 이 파일이라 정위치. 판정 = e2e/table-cursor-parity
-  ['src/engine/command.ts', 1197],
+  // +12: charLen() 도입(2026-07-31) — 커서 오프셋은 글자 수인데 str.length 는 UTF-16
+  //      단위라 이모지에서 두 칸씩 밀렸다. 근거 주석 9줄 + 함수 3줄.
+  ['src/engine/command.ts', 1209],
   ['src/ui/cell-border-bg-dialog.ts', 1120],
   // +18: 양각/음각 진입점 5종(2026-07-30 스윕) — ATTR_ICONS·상호배타·현재값 반영
   ['src/ui/char-shape-dialog.ts', 1134],
