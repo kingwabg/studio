@@ -6,8 +6,19 @@ import type { CharProperties } from '@/core/types';
 import { scanDocument, type SpellHit } from '@/ui/spell-dialog';
 import { scanFormat, DEFAULT_SPEC, type CellRef, type FormatSpec } from './format-rules';
 
+/**
+ * 지적 종류. 앞 셋은 **글자를 바꾸는** 교정이고 'format' 만 글자 속성을 바꾼다.
+ * 철자/문법은 "틀렸다", 문장은 "이렇게 쓰면 낫다" — 무게가 달라 색과 묶음을 나눈다.
+ */
+export type LintKind = 'spell' | 'grammar' | 'style' | 'format';
+
+/** 글자를 치환하는 종류인가 — 겹침 판정·수정본이 이 셋만 본다 */
+export function isTextKind(k: LintKind): boolean {
+  return k === 'spell' || k === 'grammar' || k === 'style';
+}
+
 export interface LintItem {
-  kind: 'spell' | 'format';
+  kind: LintKind;
   sectionIndex: number;
   paragraphIndex: number;
   charOffset: number;
@@ -27,9 +38,11 @@ export function itemKey(it: LintItem): string {
   return `${it.kind}:${it.sectionIndex}:${it.paragraphIndex}:${c}:${it.charOffset}:${it.msg}`;
 }
 
+const CAT_KIND: Record<string, LintKind> = { 철자: 'spell', 문법: 'grammar', 문장: 'style' };
+
 function fromSpell(h: SpellHit): LintItem {
   return {
-    kind: 'spell',
+    kind: CAT_KIND[h.cat] ?? 'spell',
     sectionIndex: h.sectionIndex, paragraphIndex: h.paragraphIndex,
     charOffset: h.charOffset, length: h.length,
     msg: h.msg,
@@ -39,8 +52,10 @@ function fromSpell(h: SpellHit): LintItem {
 }
 
 /**
- * **맞춤법**끼리 같은 글자를 물면 앞의 것만 남긴다. 겹친 채로 [전부 적용]하면
- * 뒤 교정이 이미 바뀐 글자를 덮어 문장이 깨지기 때문이다(글자 치환이라 길이가 변한다).
+ * **글자를 바꾸는 지적끼리** 같은 자리를 물면 앞의 것만 남긴다. 겹친 채로 [전부 적용]하면
+ * 뒤 교정이 이미 바뀐 글자를 덮어 문장이 깨진다(치환이라 길이가 변한다).
+ * ⚠ 철자·문법·문장은 서로도 겹칠 수 있으므로 **한 무리로** 본다(종류별로 나눠 보면
+ *   '되어지'(문법)와 '되요'(철자)가 같은 자리에서 둘 다 적용된다).
  *
  * ⚠ 서식 지적은 겹쳐도 그대로 둔다 — 같은 구간이 "글꼴도 다르고 크기도 다르다"인 것은
  * 정상이고, 속성 적용은 길이를 바꾸지 않아 순서에 안전하다. (여기서 걸렀다가
@@ -49,8 +64,8 @@ function fromSpell(h: SpellHit): LintItem {
 function dropOverlaps(items: LintItem[]): LintItem[] {
   const out: LintItem[] = [];
   for (const it of items) {
-    const clash = it.kind === 'spell' && out.some((p) =>
-      p.kind === 'spell' && p.sectionIndex === it.sectionIndex &&
+    const clash = isTextKind(it.kind) && out.some((p) =>
+      isTextKind(p.kind) && p.sectionIndex === it.sectionIndex &&
       p.paragraphIndex === it.paragraphIndex &&
       it.charOffset < p.charOffset + p.length && p.charOffset < it.charOffset + it.length);
     if (!clash) out.push(it);

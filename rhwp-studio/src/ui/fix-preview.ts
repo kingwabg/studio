@@ -9,7 +9,7 @@ import type { FixPart } from './format-specimen';
 
 /** lint 가 주는 항목 중 여기서 쓰는 부분만 (모듈 간 결합을 최소로) */
 export interface LintItemLike {
-  kind: 'spell' | 'format';
+  kind: 'spell' | 'grammar' | 'style' | 'format';
   sectionIndex: number;
   paragraphIndex: number;
   charOffset: number;
@@ -27,7 +27,7 @@ interface W {
 const MAX_CHARS = 160;
 
 /**
- * 커서 문단의 글자 치환 고침(맞춤법)을 문장 조각으로 만든다.
+ * 커서 문단의 글자 치환 고침(철자·문법·문장)을 문장 조각으로 만든다.
  * 서식 지적은 글자를 바꾸지 않으므로 여기서는 뺀다 — "수정본"은 문장이 어떻게 바뀌는지다.
  */
 export function buildFixParts(
@@ -37,7 +37,7 @@ export function buildFixParts(
   paragraphIndex: number,
 ): FixPart[] {
   const mine = items
-    .filter((it) => it.kind === 'spell' && !it.cell && it.fix && 'text' in it.fix
+    .filter((it) => it.kind !== 'format' && !it.cell && it.fix && 'text' in it.fix
       && it.sectionIndex === sectionIndex && it.paragraphIndex === paragraphIndex)
     .sort((a, b) => a.charOffset - b.charOffset);
   if (mine.length === 0) return [];

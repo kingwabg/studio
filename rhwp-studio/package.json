@@ -36,6 +36,7 @@
     "@types/diff": "^7.0.2",
     "canvaskit-wasm": "^0.41.1",
     "diff": "^9.0.0",
+    "emoji-picker-element": "^1.29.1",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0"
   }

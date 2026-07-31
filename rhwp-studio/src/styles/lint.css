@@ -14,6 +14,15 @@
 .lint-mark--spell {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='3'><path d='M0 2 L1.5 0.5 L3 2 L4.5 0.5 L6 2' fill='none' stroke='%23e03131' stroke-width='1'/></svg>");
 }
+/* 문법 — 틀린 건 맞지만 철자와 구분해 준다(주황) */
+.lint-mark--grammar {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='3'><path d='M0 2 L1.5 0.5 L3 2 L4.5 0.5 L6 2' fill='none' stroke='%23e8590c' stroke-width='1'/></svg>");
+}
+/* 문장 스타일 — 오류가 아니라 권장이라 점선으로 약하게(초록) */
+.lint-mark--style {
+  background-image: none;
+  border-bottom: 1px dotted #2f9e44;
+}
 /* 서식 규정 지적(2차) — 색으로 종류를 구분한다 */
 .lint-mark--format {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='3'><path d='M0 2 L1.5 0.5 L3 2 L4.5 0.5 L6 2' fill='none' stroke='%231971c2' stroke-width='1'/></svg>");
@@ -78,6 +87,8 @@
   width: 4px; height: 4px; border-radius: 50%;
 }
 .lint-panel-row--spell::before { background: #e03131; }
+.lint-panel-row--grammar::before { background: #e8590c; }
+.lint-panel-row--style::before { background: #2f9e44; }
 .lint-panel-row--format::before { background: #1971c2; }
 .lint-panel-row:hover { background: var(--color-bg-light, rgba(0, 0, 0, .04)); }
 .lint-panel-detail { color: var(--color-text-muted, #8a857f); font-size: 11px; }

@@ -43,11 +43,17 @@ export class LintPanel {
 
     const head = document.createElement('button');
     head.className = 'lint-panel-head';
-    const spell = items.filter((i) => i.kind === 'spell').length;
-    const fmt = items.length - spell;
+    // 종류별 건수 — 철자/문법은 "틀렸다", 문장은 "이렇게 쓰면 낫다"라 따로 센다.
+    const n = (k: string) => items.filter((i) => i.kind === k).length;
+    const parts = [
+      n('spell') ? `철자 ${n('spell')}` : '',
+      n('grammar') ? `문법 ${n('grammar')}` : '',
+      n('style') ? `문장 ${n('style')}` : '',
+      this.cb.isFormatOn() && n('format') ? `서식 ${n('format')}` : '',
+    ].filter(Boolean);
     head.innerHTML =
       `<span class="lint-panel-dot"></span><span>검사 ${items.length}건</span>` +
-      `<span class="lint-panel-sub">맞춤법 ${spell}${this.cb.isFormatOn() ? ` · 서식 ${fmt}` : ''}</span>` +
+      `<span class="lint-panel-sub">${parts.join(' · ')}</span>` +
       `<i class="ph ph-caret-${this.open ? 'down' : 'up'}"></i>`;
     head.addEventListener('click', () => { this.open = !this.open; this.render(items); });
     this.root.appendChild(head);
