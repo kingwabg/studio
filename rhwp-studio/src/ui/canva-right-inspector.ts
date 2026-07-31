@@ -81,6 +81,13 @@ export class CanvaRightInspector {
   private banner!: HTMLElement;
   /** lint 오버레이가 밀어 주는 검사 결과 — 「수정본」 줄의 재료 */
   private lintItems: LintItemLike[] = [];
+  /**
+   * 마지막으로 사전 검사를 돌린 문단(구역:문단:본문).
+   * ⚠ 커서만 움직여도 cursor-format-changed 가 온다. 그때마다 사전을 돌리면
+   *   어절마다 hunspell 조회 + 복합명사 분해라 클릭할 때마다 패널이 멎는다
+   *   (사용자 신고 2026-08-01). 문단 내용이 그대로면 결과도 그대로다 — 다시 안 돈다.
+   */
+  private lastProofKey = '';
   /** 「지금 서식」 견본(디자인 3a) — 본문은 format-specimen.ts */
   private specimen = new FormatSpecimen();
   private fmtPane!: HTMLElement;
@@ -387,8 +394,22 @@ export class CanvaRightInspector {
    */
   private paintWordChecks(ihc: any): void {
     const pos = ihc.getPosition?.();
-    if (!pos || pos.parentParaIndex !== undefined) { this.specimen.setWordChecks([]); return; }
+    if (!pos || pos.parentParaIndex !== undefined) {
+      this.specimen.setWordChecks([]);
+      this.lastProofKey = '';
+      return;
+    }
     const w = this.services.wasm as never;
+    // 같은 문단·같은 내용이면 다시 돌지 않는다(커서 이동만으로 재검사 금지).
+    const ww = this.services.wasm as any;
+    let text = '';
+    try {
+      text = ww.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0,
+        ww.getParagraphLength(pos.sectionIndex, pos.paragraphIndex));
+    } catch { /* 못 읽으면 아래에서 검사한다 */ }
+    const key = `${pos.sectionIndex}:${pos.paragraphIndex}:${text}`;
+    if (key === this.lastProofKey) return;
+    this.lastProofKey = key;
     const found = proofreadParagraph(w, pos.sectionIndex, pos.paragraphIndex);
     this.specimen.setWordChecks(found.map((f) => f.word));
     this.specimen.onWordPick = (word, anchor) => {

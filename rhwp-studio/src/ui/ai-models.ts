@@ -8,6 +8,13 @@
  *
  * 텍스트 생성만 담는다. 임베딩(nemotron-3-embed)·OCR·번역·이미지 모델은 문장 다듬기에
  * 쓸 수 없어 뺐다 — 목록에 있으면 누군가 고르고 실패한다.
+ *
+ * ⚠ 순서 = **한국어 교정 실측 결과**(2026-08-01, 같은 문장·같은 프롬프트로 비교).
+ *   "우울하다 박으로 나ㅆ다.타. … 날파리 들어 틀어와서"
+ *     Gemma 4 31B  → "우울해서 밖으로 나왔다. 작은 날파리가 들어와서…"  ✅
+ *     GLM-5.2      → "우울하다. 밖으로 나갔다. 아주 작은 날파리가…"     ✅
+ *     Nemotron Nano→ "박으로 나가"  ❌ 오타를 그대로 둠
+ *   크기보다 한국어 처리가 갈랐다 — 작다고 무조건 나쁜 게 아니라 모델마다 다르다.
  */
 
 export interface AiModelChoice {
@@ -22,24 +29,24 @@ export const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 
 export const NVIDIA_MODELS: AiModelChoice[] = [
   {
-    id: 'nvidia/nemotron-3-nano-30b-a3b',
-    label: 'Nemotron 3 Nano 30B',
-    hint: '가볍고 빠름 — 문장 다듬기 기본 추천',
-  },
-  {
     id: 'google/gemma-4-31b-it',
     label: 'Gemma 4 31B',
-    hint: '균형형. 지시 수행이 안정적',
+    hint: '한국어 교정 실측 1위 — 기본 추천',
+  },
+  {
+    id: 'z-ai/glm-5.2',
+    label: 'GLM-5.2',
+    hint: '한국어 교정 양호. 긴 문서에도 강함',
+  },
+  {
+    id: 'nvidia/nemotron-3-nano-30b-a3b',
+    label: 'Nemotron 3 Nano 30B',
+    hint: '가장 빠르지만 한국어 오타 교정은 약함',
   },
   {
     id: 'openai/gpt-oss-20b',
     label: 'gpt-oss 20B',
     hint: '가장 가벼움. 크레딧을 아낄 때',
-  },
-  {
-    id: 'z-ai/glm-5.2',
-    label: 'GLM-5.2',
-    hint: '긴 문서·복잡한 지시에 강함',
   },
   {
     id: 'deepseek-ai/deepseek-v4-pro',

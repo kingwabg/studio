@@ -108,7 +108,9 @@ const legacyBaselines = new Map([
   //      후보 팝오버는 ui/word-pop.ts. 여긴 위임 + 교체 명령. 기능 반입 금지.
   // +35: 「문장 다듬기」 배선(2026-07-31) — 호출·이름 가리기는 ui/sentence-polish.ts,
   //      팝오버는 ui/polish-pop.ts. 여긴 아동 기록 차단 판정 + 문단 교체. 기능 반입 금지.
-  ['src/ui/canva-right-inspector.ts', 812],
+  // +21: 사전 재검사 가드(2026-08-01) — 커서만 움직여도 사전이 돌아 패널이 멎던 결함.
+  //      문단 내용이 같으면 건너뛴다. 검사 로직은 ui/para-proofread.ts 그대로.
+  ['src/ui/canva-right-inspector.ts', 833],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
 
