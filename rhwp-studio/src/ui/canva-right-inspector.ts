@@ -15,6 +15,8 @@ import { currentTextRuns, describeBodySelection, detectMixedFormat, scanFormatRu
 import { buildFixParts, type LintItemLike } from './fix-preview';
 import { proofreadParagraph } from './para-proofread';
 import { openWordPop } from './word-pop';
+import { canPolish, currentDocKind } from './sentence-polish';
+import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -347,6 +349,8 @@ export class CanvaRightInspector {
       this.paintCorrections(ihc);
       // 「확인할 낱말」 — 사전이 모르는 말을 **이 문단에서만**(사용자 결정 2026-07-31)
       this.paintWordChecks(ihc);
+      // [문장 다듬기] — 아동 기록에서는 버튼 자체를 만들지 않는다
+      this.paintPolish(ihc);
     }
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
@@ -397,6 +401,37 @@ export class CanvaRightInspector {
           operationType: 'wordFix',
           operation: (wasm: any) => {
             wasm.replaceText(pos.sectionIndex, pos.paragraphIndex, hit.at, hit.len, to);
+            return null;
+          },
+        });
+        this.services.eventBus.emit('document-changed');
+      });
+    };
+  }
+
+  /**
+   * [문장 다듬기] 배선. 문장이 외부로 나가는 유일한 경로라 두 겹으로 막는다:
+   * 아동 기록이면 버튼을 안 만들고, 만들어도 **누를 때만** 호출한다.
+   */
+  private paintPolish(ihc: any): void {
+    const pos = ihc.getPosition?.();
+    const ok = pos && pos.parentParaIndex === undefined && canPolish(currentDocKind());
+    this.specimen.setPolishAvailable(!!ok);
+    if (!ok) return;
+    this.specimen.onPolish = (anchor) => {
+      const w = this.services.wasm as any;
+      let text = '';
+      try {
+        text = w.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0,
+          w.getParagraphLength(pos.sectionIndex, pos.paragraphIndex));
+      } catch { return; }
+      void openPolishPop(text, anchor, (to) => {
+        const ih = this.services.getInputHandler() as any;
+        ih?.executeOperation({
+          kind: 'snapshot',
+          operationType: 'polishParagraph',
+          operation: (wasm: any) => {
+            wasm.replaceText(pos.sectionIndex, pos.paragraphIndex, 0, text.length, to);
             return null;
           },
         });

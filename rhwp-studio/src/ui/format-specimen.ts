@@ -52,6 +52,7 @@ function applyCharStyle(st: CSSStyleDeclaration, p: CharProperties, sizePx?: str
 
 export class FormatSpecimen {
   private root!: HTMLElement;
+  private headEl!: HTMLElement;
   private sub!: HTMLElement;
   private text!: HTMLElement;
   private fontName = '함초롬바탕';
@@ -74,6 +75,9 @@ export class FormatSpecimen {
   private wordRow!: HTMLElement;
   /** 낱말을 누르면 호출부가 후보를 뽑아 준다 */
   onWordPick: ((word: string, anchor: HTMLElement) => void) | null = null;
+  /** [문장 다듬기] — 아동 기록 문서에서는 아예 안 만든다 */
+  onPolish: ((anchor: HTMLElement) => void) | null = null;
+  private polishBtn: HTMLButtonElement | null = null;
   /** 칩을 누르면 그 구간만 선택하도록 호출부가 꽂는 훅 */
   onPickRun: ((run: FormatRun) => void) | null = null;
 
@@ -87,6 +91,7 @@ export class FormatSpecimen {
     this.sub = mkEl('span', 'canva-specimen-sub');
     head.appendChild(this.sub);
     this.root.appendChild(head);
+    this.headEl = head;
 
     const body = mkEl('div', 'canva-specimen-body');
     this.text = mkEl('p', 'canva-specimen-text');
@@ -265,6 +270,22 @@ export class FormatSpecimen {
     }
     this.wordRow.appendChild(box);
     this.wordRow.hidden = false;
+  }
+
+  /**
+   * [문장 다듬기] 버튼을 보이거나 감춘다.
+   * ⚠ 아동 관찰기록에서는 **만들지 않는다** — 감추는 게 아니라 없어야 한다.
+   *   버튼이 DOM 에 있으면 언젠가 눌린다.
+   */
+  setPolishAvailable(on: boolean): void {
+    if (!this.headEl) return;
+    if (!on) { this.polishBtn?.remove(); this.polishBtn = null; return; }
+    if (this.polishBtn) return;
+    const b = mkButton('canva-specimen-polish', { title: '이 문단을 AI 로 3가지로 다듬습니다 (문장이 외부 서버로 전송됩니다)' });
+    b.textContent = '문장 다듬기';
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); this.onPolish?.(b); });
+    this.headEl.appendChild(b);
+    this.polishBtn = b;
   }
 
   private paintSub(): void {

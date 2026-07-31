@@ -106,7 +106,9 @@ const legacyBaselines = new Map([
   //      format-specimen.ts. 여긴 lint:items 구독 + paintCorrections 위임. 기능 반입 금지.
   // +32: 「확인할 낱말」 배선(2026-07-31) — 사전 검사는 ui/para-proofread.ts,
   //      후보 팝오버는 ui/word-pop.ts. 여긴 위임 + 교체 명령. 기능 반입 금지.
-  ['src/ui/canva-right-inspector.ts', 777],
+  // +35: 「문장 다듬기」 배선(2026-07-31) — 호출·이름 가리기는 ui/sentence-polish.ts,
+  //      팝오버는 ui/polish-pop.ts. 여긴 아동 기록 차단 판정 + 문단 교체. 기능 반입 금지.
+  ['src/ui/canva-right-inspector.ts', 812],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
 
