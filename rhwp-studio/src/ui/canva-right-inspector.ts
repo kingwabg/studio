@@ -16,6 +16,7 @@ import { buildFixParts, type LintItemLike } from './fix-preview';
 import { proofreadParagraph } from './para-proofread';
 import { openWordPop } from './word-pop';
 import { canPolish, currentDocKind } from './sentence-polish';
+import { applyPolishResult } from './change-review';
 import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
 
@@ -447,16 +448,10 @@ export class CanvaRightInspector {
           w.getParagraphLength(pos.sectionIndex, pos.paragraphIndex));
       } catch { return; }
       void openPolishPop(text, anchor, (to) => {
-        const ih = this.services.getInputHandler() as any;
-        ih?.executeOperation({
-          kind: 'snapshot',
-          operationType: 'polishParagraph',
-          operation: (wasm: any) => {
-            wasm.replaceText(pos.sectionIndex, pos.paragraphIndex, 0, text.length, to);
-            return null;
-          },
-        });
-        this.services.eventBus.emit('document-changed');
+        // [변경 검토] 이전(빨강)·새 글(초록)을 문서에서 비교 후 [진행]으로 확정 —
+        // 검토 불가 조건의 즉시 교체 폴백까지 change-review 가 맡는다.
+        applyPolishResult(this.services as never, pos, text, to,
+          () => this.specimen.onPolish?.(anchor));
       });
     };
   }
