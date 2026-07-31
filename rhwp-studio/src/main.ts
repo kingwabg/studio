@@ -5,6 +5,7 @@ import { assertRemoteDocumentBytes } from '@/core/document-signature';
 import { CanvasView } from '@/view/canvas-view';
 import { InputHandler } from '@/engine/input-handler';
 import { Toolbar } from '@/ui/toolbar';
+import { attachLinter, type LintOverlay } from '@/lint/overlay';
 // [배포 반영 2026-07-29] 서비스워커가 새 버전을 잡으면 **한 번만** 자동 새로고침한다.
 // skipWaiting 만으로는 이미 열린 페이지가 옛 캐시 화면을 그대로 들고 있어, 사용자가
 // 새로고침을 두 번 눌러야 새 배포가 보였다("안 보인다" 실사고 반복, 2026-07-29).
@@ -101,6 +102,7 @@ if (import.meta.env.DEV) {
 let canvasView: CanvasView | null = null;
 let inputHandler: InputHandler | null = null;
 let toolbar: Toolbar | null = null;
+let lintOverlay: LintOverlay | null = null;
 let ruler: Ruler | null = null;
 let editMode: EditorEditMode = 'normal';
 let extensionViewerSettings: ExtensionViewerSettings = {
@@ -320,6 +322,8 @@ async function initialize(): Promise<void> {
       canvasView.getViewportManager(),
     );
     inputHandler.setEditMode(editMode);
+    // 인라인 검사(맞춤법 밑줄·교정 카드) — 본문은 lint/overlay.ts (스펙 docs/plans/format-linter.md)
+    lintOverlay = attachLinter(container, eventBus, canvasView.getVirtualScroll(), () => inputHandler as never);
 
     // [자 드래그 2026-07-30] 마커를 끌어 여백·들여쓰기 조절 (한컴 패리티 확정 갭 — 리스너 0개였다).
     // inputHandler 는 위에서 만들어지므로 getter 로 늦게 참조한다.
@@ -502,6 +506,7 @@ async function initialize(): Promise<void> {
     if (import.meta.env.DEV) {
       (window as any).__inputHandler = inputHandler;
       (window as any).__ruler = ruler; // 자 마커 드래그 e2e 판정용
+      (window as any).__lint = lintOverlay; // 인라인 검사 e2e 판정용
       (window as any).__canvasView = canvasView;
       (window as any).__renderBackend = renderBackend;
       (window as any).__canvaskitRenderMode = canvaskitMode;

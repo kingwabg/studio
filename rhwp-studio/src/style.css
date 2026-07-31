@@ -28,6 +28,8 @@
 @import './styles/canva-sidebars.css';
 /* [캔버스 한컴 포크] 임베드 모드(?embed=1) — 크롬 숨기고 리본만 */
 @import './styles/embed.css';
+/* 인라인 검사(맞춤법·서식 규정) 밑줄·교정 카드 */
+@import './styles/lint.css';
 
 /* ── 리본 헤더 (디자인 재설계 2a) ──
    ⚠ Phosphor 아이콘 CSS 는 main.ts 에서 **모듈 import** 한다. 여기서 절대 경로

@@ -59,7 +59,9 @@ const legacyBaselines = new Map([
   ['src/core/types.ts', 1399],
   // +2: 변경 추적 명령 등록 · +14: 자 마커 드래그 배선(2026-07-30, 로직은 view/ruler-drag.ts)
   // +4: 리본 글자색·형광펜 슬롯 입양 2종(2026-07-30 스윕)
-  ['src/main.ts', 1321],
+  // +5: 인라인 검사 배선(2026-07-31) — 기능은 전부 src/lint/overlay.ts, 여긴 import·전역
+  //     선언·attachLinter 호출·e2e 전역뿐. 기능 코드 반입 금지.
+  ['src/main.ts', 1326],
   ['src/engine/input-handler-picture.ts', 1215],
   // +28: 논리↔텍스트 좌표 변환(2026-07-30, TAC 신고③) — 모든 편집 명령이 지나는
   //      doInsertText/doDeleteText/doGetTextRange 3헬퍼 + 선택삭제·서식·병합·분할의
