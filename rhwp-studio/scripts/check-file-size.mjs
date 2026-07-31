@@ -95,7 +95,9 @@ const legacyBaselines = new Map([
   //     ui/selection-summary.ts, 여긴 호출 6줄. 기능 코드 반입 금지.
   // +3: 견본에 실제 문단 글자 채우기(2026-07-31) — 구간 스캔은 selection-summary.ts,
   //     렌더는 format-specimen.ts, 여긴 호출 3줄. 기능 코드 반입 금지.
-  ['src/ui/canva-right-inspector.ts', 722],
+  // +23: 「수정본」 배선(2026-07-31) — 문장 재구성은 ui/fix-preview.ts, 렌더는
+  //      format-specimen.ts. 여긴 lint:items 구독 + paintCorrections 위임. 기능 반입 금지.
+  ['src/ui/canva-right-inspector.ts', 745],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
 

@@ -45,6 +45,8 @@ export class LintOverlay {
   private activeSpecId = 'builtin';
   private spec: FormatSpec = DEFAULT_SPEC;
   private panel: LintPanel;
+  /** 검사 결과가 갱신될 때마다 부르는 훅 — 우측 패널 견본이 '수정본'을 그린다 */
+  onItems: ((items: LintItem[]) => void) | null = null;
 
   constructor(
     private container: HTMLElement,
@@ -102,6 +104,8 @@ export class LintOverlay {
     }
     this.paint();
     this.panel.render(this.items);
+    // 우측 패널 견본이 '수정본'을 그릴 수 있게 알린다(오버레이가 UI 를 직접 알 필요는 없다)
+    this.onItems?.(this.items);
     return performance.now() - t0;
   }
 
@@ -179,6 +183,18 @@ export class LintOverlay {
    */
   applyAll(): void {
     this.host.applyBatch(this.items.filter((x) => x.fix).reverse());
+    this.closeCard();
+    this.scheduleScan(0);
+  }
+
+  /** 한 문단의 고침을 한 번에 적용한다 — 견본의 [고치기] 버튼이 쓴다(되돌리기 1회). */
+  applyParagraph(sectionIndex: number, paragraphIndex: number): void {
+    const target = this.items.filter(
+      (it) => it.fix && !it.cell
+        && it.sectionIndex === sectionIndex && it.paragraphIndex === paragraphIndex);
+    if (target.length === 0) return;
+    // 뒤에서부터 — 글자 치환은 길이를 바꿔 앞 항목의 오프셋을 민다.
+    this.host.applyBatch(target.reverse());
     this.closeCard();
     this.scheduleScan(0);
   }
@@ -356,6 +372,12 @@ export function attachLinter(
   };
   const overlay = new LintOverlay(container, virtualScroll, host);
   void overlay.loadCenterSpecs();
+  // 우측 패널 견본이 「수정본」을 그린다 — 오버레이는 UI 를 모른 채 결과만 흘린다.
+  overlay.onItems = (items) => eventBus.emit('lint:items', items);
+  eventBus.on('lint:fix-paragraph', (pos) => {
+    const p = pos as { sectionIndex: number; paragraphIndex: number };
+    overlay.applyParagraph(p.sectionIndex, p.paragraphIndex);
+  });
   eventBus.on('document-changed', () => overlay.scheduleScan());
   // 문서를 **열었을 때도** 검사한다(편집을 해야 밑줄이 뜨던 실측 결함, 2026-07-31)
   eventBus.on('command-state-changed', () => overlay.armScan());

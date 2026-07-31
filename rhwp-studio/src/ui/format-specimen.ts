@@ -17,6 +17,13 @@ import { mkEl, mkButton } from './canva-dom';
 import type { CharProperties, ParaProperties } from '@/core/types';
 import type { FormatRun } from './selection-summary';
 
+/** 견본 아래 「수정본」 한 줄에 그릴 조각 — 고칠 곳은 before→after 를 같이 보여준다. */
+export interface FixPart {
+  text: string;
+  /** 이 조각을 무엇으로 고치나 (없으면 그대로 두는 글자) */
+  to?: string;
+}
+
 /** 정렬 값 → CSS. 배분·나눔은 CSS 로 표현할 수 없어 양쪽으로 근사한다(견본 한정). */
 function cssAlign(a: string | undefined): string {
   if (a === 'distribute' || a === 'split') return 'justify';
@@ -59,6 +66,10 @@ export class FormatSpecimen {
   private lastChar: CharProperties | null = null;
   /** 「서식 조각」 칩 줄 — 섞였을 때만 보인다 */
   private chips!: HTMLElement;
+  /** 「수정본」 줄 — 고칠 곳이 있을 때만 보인다 */
+  private fixRow!: HTMLElement;
+  /** [고치기] 를 누르면 호출부가 이 문단의 고침을 한 번에 적용한다 */
+  onFixAll: (() => void) | null = null;
   /** 칩을 누르면 그 구간만 선택하도록 호출부가 꽂는 훅 */
   onPickRun: ((run: FormatRun) => void) | null = null;
 
@@ -81,6 +92,10 @@ export class FormatSpecimen {
     this.chips = mkEl('div', 'canva-specimen-chips');
     this.chips.hidden = true;
     this.root.appendChild(this.chips);
+
+    this.fixRow = mkEl('div', 'canva-specimen-fix');
+    this.fixRow.hidden = true;
+    this.root.appendChild(this.fixRow);
 
     host.appendChild(this.root);
     this.paintSub();
@@ -184,6 +199,41 @@ export class FormatSpecimen {
     if (truncated) this.chips.appendChild(mkEl('span', 'canva-fmt-chip-more', '···'));
     this.chips.hidden = false;
     this.paintSub();
+  }
+
+  /**
+   * 「수정본」 — 지금 문단을 맞춤법대로 고치면 어떻게 되는지 그 자리에서 보여준다
+   * (사용자 요청 2026-07-31: "여기 부분에 문장 수정·맞춤법 수정본이 나오는 것").
+   *
+   * 밑줄을 하나씩 눌러 확인하는 것과 달리, **문장 전체가 어떻게 바뀌는지**를 먼저 읽고
+   * 한 번에 고칠 수 있다. 틀린 글자는 흐리게 그어 두고 고친 글자를 옆에 붙인다.
+   */
+  setCorrections(parts: FixPart[]): void {
+    if (!this.fixRow) return;
+    this.fixRow.textContent = '';
+    if (parts.length === 0 || !parts.some((p) => p.to !== undefined)) {
+      this.fixRow.hidden = true;
+      return;
+    }
+    const head = mkEl('div', 'canva-specimen-fixhead');
+    head.innerHTML = '<i class="ph ph-check-circle"></i><span>수정본</span>';
+    const btn = mkButton('canva-specimen-fixbtn', { title: '이 문단의 맞춤법을 한 번에 고칩니다' });
+    btn.textContent = '고치기';
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); this.onFixAll?.(); });
+    head.appendChild(btn);
+    this.fixRow.appendChild(head);
+
+    const line = mkEl('p', 'canva-specimen-fixtext');
+    for (const p of parts) {
+      if (p.to === undefined) {
+        line.appendChild(document.createTextNode(p.text));
+        continue;
+      }
+      line.appendChild(mkEl('span', 'canva-specimen-fixfrom', p.text));
+      line.appendChild(mkEl('span', 'canva-specimen-fixto', p.to));
+    }
+    this.fixRow.appendChild(line);
+    this.fixRow.hidden = false;
   }
 
   private paintSub(): void {

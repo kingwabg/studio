@@ -12,6 +12,7 @@ import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
 import { FormatSpecimen } from './format-specimen';
 import { currentTextRuns, describeBodySelection, detectMixedFormat, scanFormatRuns, selectRun } from './selection-summary';
+import { buildFixParts, type LintItemLike } from './fix-preview';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -74,6 +75,8 @@ export class CanvaRightInspector {
   private lastMulti = false;
 
   private banner!: HTMLElement;
+  /** lint 오버레이가 밀어 주는 검사 결과 — 「수정본」 줄의 재료 */
+  private lintItems: LintItemLike[] = [];
   /** 「지금 서식」 견본(디자인 3a) — 본문은 format-specimen.ts */
   private specimen = new FormatSpecimen();
   private fmtPane!: HTMLElement;
@@ -310,6 +313,11 @@ export class CanvaRightInspector {
       if (chip.dataset.cmd) this.services.dispatcher.dispatch(chip.dataset.cmd, { anchorEl: chip });
     });
     const bus = this.services.eventBus;
+    bus.on('lint:items', (items) => {
+      this.lintItems = items as LintItemLike[];
+      const ihc = (this.services.getInputHandler() as any)?.cursor;
+      if (ihc) this.paintCorrections(ihc);
+    });
     bus.on('cursor-format-changed', (p) => this.reflectChar(p as CharProperties));
     bus.on('cursor-para-changed', (p) => this.reflectPara(p as ParaProperties));
     bus.on('cursor-cell-changed', () => this.refreshContext());
@@ -333,6 +341,8 @@ export class CanvaRightInspector {
       // 견본을 예문이 아니라 지금 문단의 실제 글자로 채운다(사용자 제안 2026-07-31).
       const live = currentTextRuns(ihc, this.services.wasm as never);
       this.specimen.setContent(live.runs, live.truncated);
+      // 「수정본」 — 지금 문단을 맞춤법대로 고치면 어떻게 되는지(사용자 요청 2026-07-31)
+      this.paintCorrections(ihc);
     }
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
@@ -348,6 +358,19 @@ export class CanvaRightInspector {
       const hex = p.textColor.toLowerCase();
       this.swatches.forEach((s) => s.classList.toggle('is-active', (s.style.background || '').length > 0 && rgbToHex(s.style.background) === hex));
     }
+  }
+
+  /**
+   * 커서 문단의 맞춤법 고침을 「수정본」 줄로 그린다.
+   * 검사 결과는 lint 오버레이가 밀어 준다(bus 'lint:items') — 인스펙터가 검사기를
+   * 직접 알지 않게 해서, 규칙이 늘어도 이 파일은 그대로다.
+   */
+  private paintCorrections(ihc: any): void {
+    const pos = ihc.getPosition?.();
+    if (!pos || pos.parentParaIndex !== undefined) { this.specimen.setCorrections([]); return; }
+    this.specimen.setCorrections(
+      buildFixParts(this.services.wasm as never, this.lintItems, pos.sectionIndex, pos.paragraphIndex));
+    this.specimen.onFixAll = () => this.services.eventBus.emit('lint:fix-paragraph', pos);
   }
 
   private reflectPara(p: ParaProperties): void {
