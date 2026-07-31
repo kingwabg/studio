@@ -1052,3 +1052,5 @@
   overflow-wrap: anywhere;
 }
 .canva-specimen-mark { padding: 0 1px; background: transparent; }
+/* 선택에 서식이 섞였을 때 — 견본이 커서 값만 보여준다는 신호(디자인 3a 후속) */
+.canva-specimen.is-mixed .canva-specimen-sub { color: var(--color-primary); }

@@ -25,6 +25,8 @@ export class FormatSpecimen {
   private mark!: HTMLElement;
   private fontName = '함초롬바탕';
   private fontPt = 10;
+  /** 선택 안에 서로 다른 글자 서식이 섞였나 — 견본은 커서 값만 보여주므로 그 한계를 적는다 */
+  private mixed = false;
 
   /** host 안에 견본 카드를 만들고 자기 루트를 돌려준다. */
   mount(host: HTMLElement): HTMLElement {
@@ -86,7 +88,23 @@ export class FormatSpecimen {
     if (ls !== undefined && ls > 0) this.text.style.lineHeight = String(ls / 100);
   }
 
+  /**
+   * 선택에 서식이 섞였음을 표시한다.
+   * 견본은 **커서 위치의 서식**만 그린다 — 여러 문단·혼합 서식을 잡으면 마치 전체가
+   * 그 서식인 것처럼 읽히므로, 부제에 한 마디를 붙여 거짓말을 막는다(사용자 결정
+   * 2026-07-31: 섞인 항목만 중립으로 그리는 '정확' 안 대신 이 '간단' 안).
+   */
+  setMixed(mixed: boolean): void {
+    if (this.mixed === mixed) return;
+    this.mixed = mixed;
+    this.root?.classList.toggle('is-mixed', mixed);
+    this.paintSub();
+  }
+
   private paintSub(): void {
-    if (this.sub) this.sub.textContent = `${this.fontName} ${this.fontPt}pt`;
+    if (!this.sub) return;
+    this.sub.textContent = this.mixed
+      ? `${this.fontName} ${this.fontPt}pt · 서식 섞임`
+      : `${this.fontName} ${this.fontPt}pt`;
   }
 }

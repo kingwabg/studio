@@ -11,6 +11,7 @@ import { TablePanelSections } from './table-panel-sections';
 import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
 import { FormatSpecimen } from './format-specimen';
+import { describeBodySelection, detectMixedFormat } from './selection-summary';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -322,6 +323,8 @@ export class CanvaRightInspector {
 
   private reflectChar(p: CharProperties): void {
     this.specimen.reflectChar(p);
+    const ihc = (this.services.getInputHandler() as any)?.cursor;
+    if (ihc) this.specimen.setMixed(detectMixedFormat(ihc, this.services.wasm as never));
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
     this.biu.underline?.classList.toggle('is-active', !!p.underline);
@@ -443,11 +446,8 @@ export class CanvaRightInspector {
     if (!ih) return '';
     try {
       if (c === 'body') {
-        const pos = ih.cursor?.getPosition?.();
-        if (!pos) return '';
-        const page = this.services.wasm.getPageOfPosition?.(pos.sectionIndex, pos.paragraphIndex);
-        const p = page?.ok && page.page != null ? `${page.page + 1}쪽 · ` : '';
-        return `${p}${pos.paragraphIndex + 1}번째 문단`;
+        // 선택을 반영한다 — 문단 범위 + 글자 수(본문은 ui/selection-summary.ts)
+        return ih.cursor ? describeBodySelection(ih.cursor, this.services.wasm as never) : '';
       }
       if (c === 'cell' || c === 'table') {
         const ref = ih.cursor?.getCellTableContext?.();
