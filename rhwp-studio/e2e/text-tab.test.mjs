@@ -19,12 +19,12 @@ runTest('텍스트 탭 — 탭 노출·섹션·문단 속성 반영', async ({ p
   await typeText(page, '문단 하나');
   await new Promise((r) => setTimeout(r, 600));
 
-  // ① 본문 = 속성·텍스트만
-  assert.deepStrictEqual(await visibleTabs(page), ['속성', '텍스트'], '본문에선 두 탭만');
+  // ① 본문 = 글자·문단만 (탭 이름 2026-07-31 변경: 속성/텍스트 → 글자/문단)
+  assert.deepStrictEqual(await visibleTabs(page), ['글자', '문단'], '본문에선 두 탭만');
 
-  // ③ 텍스트 탭 → 섹션 6종 + 미리보기
+  // ③ 문단 탭 → 섹션 6종 + 미리보기
   const txt = await page.evaluate(async () => {
-    [...document.querySelectorAll('.canva-tab')].find((b) => b.textContent.trim() === '텍스트').click();
+    [...document.querySelectorAll('.canva-tab')].find((b) => b.textContent.trim() === '문단').click();
     await new Promise((r) => setTimeout(r, 500));
     const host = document.querySelector('.canva-props-host');
     return {
@@ -92,7 +92,7 @@ runTest('텍스트 탭 — 탭 노출·섹션·문단 속성 반영', async ({ p
   });
   await page.mouse.click(pt.x, pt.y);
   await new Promise((r) => setTimeout(r, 700));
-  assert.deepStrictEqual(await visibleTabs(page), ['속성', '텍스트', '표', '셀'], '표 안에선 네 탭');
+  assert.deepStrictEqual(await visibleTabs(page), ['글자', '문단', '표', '셀'], '표 안에선 네 탭');
 
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);
 });

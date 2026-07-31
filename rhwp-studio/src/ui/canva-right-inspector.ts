@@ -11,7 +11,7 @@ import { TablePanelSections } from './table-panel-sections';
 import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
 import { FormatSpecimen } from './format-specimen';
-import { describeBodySelection, detectMixedFormat, scanFormatRuns, selectRun } from './selection-summary';
+import { currentTextRuns, describeBodySelection, detectMixedFormat, scanFormatRuns, selectRun } from './selection-summary';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -330,6 +330,9 @@ export class CanvaRightInspector {
       const { runs, truncated } = scanFormatRuns(ihc, this.services.wasm as never);
       this.specimen.setRuns(runs, truncated);
       this.specimen.onPickRun = (r) => selectRun(ih, ihc, r);
+      // 견본을 예문이 아니라 지금 문단의 실제 글자로 채운다(사용자 제안 2026-07-31).
+      const live = currentTextRuns(ihc, this.services.wasm as never);
+      this.specimen.setContent(live.runs, live.truncated);
     }
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);

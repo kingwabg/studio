@@ -1,7 +1,7 @@
 /**
  * 회귀: 컨텍스트 탭 — **보이는 탭 집합이 선택을 따라간다**(2026-07-30 갱신).
  *
- * 판정식: ①본문 = [속성, 텍스트] ②셀을 클릭하면 [속성, 텍스트, 표, 셀] + 셀 탭 자동
+ * 판정식: ①본문 = [글자, 문단] ②셀을 클릭하면 [글자, 문단, 표, 셀] + 셀 탭 자동
  * ③표 탭으로 손 전환하면 줄·칸 조작이 보임 ④본문으로 나가면 다시 두 탭
  * ⑤조작 칩이 실제로 명령을 디스패치(줄 지우기 → rowCount 감소 — 칩이 dataset.cmd 만 갖고
  * 리스너가 없어 '눌러도 무동작'이던 실결함의 회귀 방지).
@@ -21,8 +21,8 @@ runTest('컨텍스트 탭 — 셀 클릭=셀, 표 개체=표, 본문=서식', as
     [...document.querySelectorAll('.canva-rail--right .canva-tab')].filter((b) => !b.hidden)
       .map((b) => b.textContent.trim()));
 
-  // ① 본문 = 속성·텍스트
-  assert.deepStrictEqual(await visibleTabs(), ['속성', '텍스트'], '본문에선 속성·텍스트만');
+  // ① 본문 = 글자·문단 (탭 이름은 2026-07-31 디자인 3a에서 속성/텍스트 → 글자/문단)
+  assert.deepStrictEqual(await visibleTabs(), ['글자', '문단'], '본문에선 글자·문단만');
 
   // 표 생성 + 셀 클릭
   const t = await page.evaluate(() => {
@@ -52,7 +52,7 @@ runTest('컨텍스트 탭 — 셀 클릭=셀, 표 개체=표, 본문=서식', as
     section: document.querySelector('.canva-sec-btn.is-on')?.title ?? null,
     ops: [...document.querySelectorAll('.canva-tab-ops .canva-section-label')].map((e) => e.textContent),
   }));
-  assert.deepStrictEqual(await visibleTabs(), ['속성', '텍스트', '표', '셀'], '표 안에선 네 탭');
+  assert.deepStrictEqual(await visibleTabs(), ['글자', '문단', '표', '셀'], '표 안에선 네 탭');
   assert.strictEqual(cell.active, '셀', '셀 클릭 → 셀 탭 자동');
   assert.strictEqual(cell.section, '크기', '셀 탭 기본 섹션');
   assert.deepStrictEqual(cell.ops, ['셀 조작', '블록 계산'], '셀 탭 하단 조작');
@@ -85,7 +85,7 @@ runTest('컨텍스트 탭 — 셀 클릭=셀, 표 개체=표, 본문=서식', as
   });
   await page.mouse.click(out.x, out.y);
   await new Promise((r) => setTimeout(r, 600));
-  assert.deepStrictEqual(await visibleTabs(), ['속성', '텍스트'], '본문으로 나가면 두 탭');
+  assert.deepStrictEqual(await visibleTabs(), ['글자', '문단'], '본문으로 나가면 두 탭');
 
   console.log('  실측:', JSON.stringify({ cell, tbl, chip }));
   assert.deepStrictEqual(errors, [], `페이지 오류: ${JSON.stringify(errors)}`);

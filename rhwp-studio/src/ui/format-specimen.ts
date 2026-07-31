@@ -6,6 +6,10 @@
  * 아래 컨트롤(굵게·크기·색·정렬·줄 간격…)을 만지면 견본이 즉시 따라오므로,
  * 사용자가 "지금 무슨 서식인지"를 글자 모양 대화상자를 열지 않고 읽을 수 있다.
  *
+ * [2026-07-31 사용자 제안] 고정 예문 대신 **실제 문단**(선택이 있으면 선택분)을 그린다.
+ * 단 한 가지 서식으로 뭉뚱그리면 굵은 제목이 평범하게 보여 새 거짓말이 되므로 구간마다
+ * 자기 서식으로 그린다(구간 분해는 selection-summary.ts). 글자가 없으면 예문으로 복귀.
+ *
  * 크기는 pt 를 그대로 쓰지 않는다 — 패널이 좁아 20pt 견본이 줄을 넘긴다.
  * 디자인이 정한 압축 스케일 `min(26, 11 + pt*0.55)px` 을 그대로 따른다.
  */
@@ -13,23 +17,49 @@ import { mkEl, mkButton } from './canva-dom';
 import type { CharProperties, ParaProperties } from '@/core/types';
 import type { FormatRun } from './selection-summary';
 
+/** 글자가 없을 때(빈 문단) 서식만 보여주는 예문. */
+const SAMPLE = '문서의 첫 줄은 읽는 사람의 시간을 아껴야 한다. 가나다라마바사 AaBbCc 0123';
+
 /** 정렬 값 → CSS. 배분·나눔은 CSS 로 표현할 수 없어 양쪽으로 근사한다(견본 한정). */
 function cssAlign(a: string | undefined): string {
   if (a === 'distribute' || a === 'split') return 'justify';
   return a && ['left', 'right', 'center', 'justify'].includes(a) ? a : 'left';
 }
 
+/**
+ * 글자 서식 한 벌을 style 에 입힌다 — 견본 문단·구간 span·칩 글리프가 공유한다.
+ * 흰 글자는 흰 카드 위에서 사라지므로 견본에서만 회색으로 대신 보여준다.
+ */
+function applyCharStyle(st: CSSStyleDeclaration, p: CharProperties, sizePx?: string): void {
+  st.fontWeight = p.bold ? '700' : '400';
+  st.fontStyle = p.italic ? 'italic' : 'normal';
+  const dec = [p.underline && 'underline', p.strikethrough && 'line-through']
+    .filter(Boolean)
+    .join(' ');
+  st.textDecoration = dec || 'none';
+  if (sizePx) st.fontSize = sizePx;
+  else if (p.fontSize !== undefined) {
+    st.fontSize = `${Math.min(26, 11 + (p.fontSize / 100) * 0.55).toFixed(1)}px`;
+  }
+  if (p.textColor) st.color = p.textColor.toLowerCase() === '#ffffff' ? '#c9c6c2' : p.textColor;
+  const hl = (p as unknown as { shadeColor?: string }).shadeColor;
+  st.background = hl && hl.toLowerCase() !== '#ffffff' ? hl : 'transparent';
+}
+
 export class FormatSpecimen {
   private root!: HTMLElement;
   private sub!: HTMLElement;
   private text!: HTMLElement;
-  private mark!: HTMLElement;
   private fontName = '함초롬바탕';
   private fontPt = 10;
   /** 선택 안에 서로 다른 글자 서식이 섞였나 — 견본은 커서 값만 보여주므로 그 한계를 적는다 */
   private mixed = false;
   /** 스캔으로 센 서식 조각 수(0 = 안 셈) */
   private runCount = 0;
+  /** 실제 글자를 그리는 중인가 — 그럴 땐 문단 전체에 커서 서식을 덧칠하지 않는다 */
+  private live = false;
+  /** 마지막으로 받은 커서 글자 서식 — 예문으로 되돌아갈 때 다시 입힌다 */
+  private lastChar: CharProperties | null = null;
   /** 「서식 조각」 칩 줄 — 섞였을 때만 보인다 */
   private chips!: HTMLElement;
   /** 칩을 누르면 그 구간만 선택하도록 호출부가 꽂는 훅 */
@@ -47,11 +77,7 @@ export class FormatSpecimen {
     this.root.appendChild(head);
 
     const body = mkEl('div', 'canva-specimen-body');
-    this.text = mkEl('p', 'canva-specimen-text');
-    this.mark = mkEl('span', 'canva-specimen-mark');
-    this.mark.textContent = '문서의 첫 줄은 읽는 사람의 시간을 아껴야 한다.';
-    this.text.appendChild(this.mark);
-    this.text.appendChild(document.createTextNode(' 가나다라마바사 AaBbCc 0123'));
+    this.text = mkEl('p', 'canva-specimen-text', SAMPLE);
     body.appendChild(this.text);
     this.root.appendChild(body);
 
@@ -64,34 +90,52 @@ export class FormatSpecimen {
     return this.root;
   }
 
+  /**
+   * 견본 내용을 **실제 글자**로 바꾼다 — 구간마다 자기 서식으로.
+   * 글자가 없으면 예문으로 돌아가 커서 서식만 보여준다.
+   */
+  setContent(runs: FormatRun[], truncated: boolean): void {
+    if (!this.text) return;
+    const usable = runs.filter((r) => (r.text ?? '').length > 0);
+    if (usable.length === 0) {
+      this.live = false;
+      this.text.textContent = SAMPLE;
+      if (this.lastChar) applyCharStyle(this.text.style, this.lastChar);
+      return;
+    }
+    this.live = true;
+    this.text.textContent = '';
+    for (const r of usable) {
+      const sp = mkEl('span', 'canva-specimen-run', r.text ?? '');
+      applyCharStyle(sp.style, r.props);
+      this.text.appendChild(sp);
+    }
+    if (truncated) this.text.appendChild(mkEl('span', 'canva-specimen-more', ' …'));
+    // 구간 서식이 정본 — 문단 전체에 커서 서식을 덧칠하면 이중 적용이 된다.
+    const st = this.text.style;
+    st.fontWeight = '';
+    st.fontStyle = '';
+    st.textDecoration = '';
+    st.fontSize = '';
+    st.color = '';
+    st.background = '';
+  }
+
   /** 글자 서식 반영 — 굵기·기울임·밑줄/취소선·크기·색·형광펜. */
   reflectChar(p: CharProperties): void {
     if (!this.text) return;
-    const s = this.text.style;
-    s.fontWeight = p.bold ? '700' : '400';
-    s.fontStyle = p.italic ? 'italic' : 'normal';
-    const dec = [p.underline && 'underline', p.strikethrough && 'line-through']
-      .filter(Boolean)
-      .join(' ');
-    s.textDecoration = dec || 'none';
+    this.lastChar = p;
+    // 실제 글자를 그리는 중이면 구간 서식이 이미 정확하다 — 덧칠하지 않는다.
+    if (!this.live) applyCharStyle(this.text.style, p);
 
-    if (p.fontSize !== undefined) {
-      this.fontPt = p.fontSize / 100;
-      s.fontSize = `${Math.min(26, 11 + this.fontPt * 0.55).toFixed(1)}px`;
-    }
-    // 흰 글자는 흰 카드 위에서 사라진다 — 견본에서만 회색으로 대신 보여준다.
-    if (p.textColor) s.color = p.textColor.toLowerCase() === '#ffffff' ? '#c9c6c2' : p.textColor;
-
-    const hl = (p as unknown as { shadeColor?: string }).shadeColor;
-    this.mark.style.background = hl && hl.toLowerCase() !== '#ffffff' ? hl : 'transparent';
-
+    if (p.fontSize !== undefined) this.fontPt = p.fontSize / 100;
     const fam = (p as unknown as { fontFamily?: string; fontFamilies?: string[] }).fontFamily
       ?? (p as unknown as { fontFamilies?: string[] }).fontFamilies?.[0];
     if (fam) this.fontName = String(fam);
     this.paintSub();
   }
 
-  /** 문단 서식 반영 — 정렬·줄 간격. */
+  /** 문단 서식 반영 — 정렬·줄 간격(문단 전체 속성이라 실제 글자일 때도 p 에 건다). */
   reflectPara(p: ParaProperties): void {
     if (!this.text) return;
     this.text.style.textAlign = cssAlign(p.alignment);
@@ -132,21 +176,8 @@ export class FormatSpecimen {
     for (const r of runs) {
       const b = mkButton('canva-fmt-chip', { title: describeRun(r) });
       const glyph = mkEl('span', 'canva-fmt-chip-glyph', r.sample);
-      const p = r.props;
-      const st = glyph.style;
-      st.fontWeight = p.bold ? '700' : '400';
-      st.fontStyle = p.italic ? 'italic' : 'normal';
-      const dec = [p.underline && 'underline', p.strikethrough && 'line-through']
-        .filter(Boolean).join(' ');
-      st.textDecoration = dec || 'none';
-      if (p.fontSize !== undefined) {
-        st.fontSize = `${Math.min(19, 9 + (p.fontSize / 100) * 0.42).toFixed(1)}px`;
-      }
-      if (p.textColor) {
-        st.color = p.textColor.toLowerCase() === '#ffffff' ? '#c9c6c2' : p.textColor;
-      }
-      const hl = (p as unknown as { shadeColor?: string }).shadeColor;
-      if (hl && hl.toLowerCase() !== '#ffffff') st.background = hl;
+      const pt = r.props.fontSize !== undefined ? r.props.fontSize / 100 : 10;
+      applyCharStyle(glyph.style, r.props, `${Math.min(19, 9 + pt * 0.42).toFixed(1)}px`);
       b.appendChild(glyph);
       b.appendChild(mkEl('span', 'canva-fmt-chip-len', `${r.len}자`));
       b.addEventListener('mousedown', (e) => { e.preventDefault(); this.onPickRun?.(r); });

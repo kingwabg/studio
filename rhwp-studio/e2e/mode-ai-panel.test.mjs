@@ -42,7 +42,7 @@ runTest('모드 세그먼트 · AI 패널 진입/복귀', async ({ page }) => {
   });
   assert.ok(swapped[1].includes('ph-fill'), '전환 후 문서가 fill');
 
-  // ② 속성 탭 하단 도구 칩 → AI 패널
+  // ② 글자 탭 하단 도구 칩 → AI 패널
   const ai = await page.evaluate(async () => {
     [...document.querySelectorAll('.canva-chip')].find((c) => c.title === 'AI 도우미')
       ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -59,7 +59,7 @@ runTest('모드 세그먼트 · AI 패널 진입/복귀', async ({ page }) => {
   assert.strictEqual(ai.model, 'MiniMax M3', '모델 칩');
   assert.deepStrictEqual(ai.cards, ['문서 생성', '일반 글쓰기', '문서 검토'], '모드 카드 3종');
 
-  // ④ 뒤로가기 → 속성
+  // ④ 뒤로가기 → 글자
   const back = await page.evaluate(async () => {
     document.querySelector('.canva-ai-back').click();
     await new Promise((r) => setTimeout(r, 400));
@@ -69,7 +69,7 @@ runTest('모드 세그먼트 · AI 패널 진입/복귀', async ({ page }) => {
     };
   });
   assert.ok(back.hidden, '뒤로가기 → AI 패널 닫힘');
-  assert.strictEqual(back.tab, '속성', '속성 탭 복귀');
+  assert.strictEqual(back.tab, '글자', '글자 탭 복귀');
 
   // 녹음 패널도 같은 규약
   const rec = await page.evaluate(async () => {

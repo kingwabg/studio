@@ -44,6 +44,8 @@ export interface FormatRun {
   props: CharProperties;
   /** 미리보기용 앞글자 몇 자(없으면 '가') */
   sample: string;
+  /** 구간의 실제 글자(견본용 — 칩에는 sample 을 쓴다) */
+  text?: string;
 }
 
 interface CursorLike {
@@ -240,6 +242,106 @@ function sampleText(w: WasmLike, sec: number, r: FormatRun): string {
     const t1 = w.logicalToTextOffset(sec, r.para, Math.min(r.to, r.from + 2));
     const n = Math.max(0, t1 - t0);
     return n > 0 ? w.getTextRange(sec, r.para, t0, n).trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+
+/** 견본에 넣을 글자 상한 — 패널이 좁아 그 이상은 읽히지 않는다. */
+const SPECIMEN_CHARS = 90;
+
+/**
+ * 견본에 그릴 **실제 글자**를 구간별로 돌려준다(사용자 제안 2026-07-31).
+ *
+ * 선택이 있으면 선택분, 없으면 커서가 있는 문단. 한 가지 서식으로 뭉뚱그리면
+ * 굵은 제목이 평범하게 보여 새로운 거짓말이 되므로, 구간마다 자기 서식을 달아
+ * 돌려준다(호출부가 span 으로 그린다). 빈 문단이면 빈 배열 → 호출부가 예문으로 대체.
+ */
+export function currentTextRuns(
+  cursor: CursorLike,
+  w: WasmLike,
+): { runs: FormatRun[]; truncated: boolean } {
+  const pos = cursor.getPosition?.();
+  if (!pos || pos.parentParaIndex !== undefined) return { runs: [], truncated: false };
+  const sel = cursor.hasSelection?.() ? cursor.getSelectionOrdered?.() ?? null : null;
+
+  let scan: { runs: FormatRun[]; truncated: boolean };
+  if (sel) {
+    scan = scanFormatRuns(cursor, w);
+  } else {
+    // 선택 없음 — 커서 문단 전체를 같은 방식으로 훑는다.
+    let len = 0;
+    try { len = w.getLogicalLength(pos.sectionIndex, pos.paragraphIndex); } catch { return { runs: [], truncated: false }; }
+    if (len <= 0) return { runs: [], truncated: false };
+    scan = scanRange(w, pos.sectionIndex, pos.paragraphIndex, 0, len);
+  }
+
+  // 실제 글자 채우기 + 상한에서 자르기
+  let budget = SPECIMEN_CHARS;
+  const out: FormatRun[] = [];
+  for (const r of scan.runs) {
+    if (budget <= 0) { scan.truncated = true; break; }
+    const take = Math.min(r.len, budget);
+    const t = runText(w, pos.sectionIndex, r, take);
+    if (t) out.push({ ...r, text: t });
+    budget -= take;
+    if (take < r.len) { scan.truncated = true; break; }
+  }
+  return { runs: out, truncated: scan.truncated };
+}
+
+/** 한 문단의 [from,to) 를 훑어 서식 구간으로 나눈다(scanFormatRuns 의 문단 1개 판). */
+function scanRange(
+  w: WasmLike, sec: number, para: number, from: number, to: number,
+): { runs: FormatRun[]; truncated: boolean } {
+  const runs: FormatRun[] = [];
+  let truncated = false;
+  let calls = 0;
+  const cache = new Map<number, string>();
+  const sigAt = (off: number): string => {
+    const hit = cache.get(off);
+    if (hit !== undefined) return hit;
+    calls++;
+    const v = sig(w.getCharPropertiesAt(sec, para, off));
+    cache.set(off, v);
+    return v;
+  };
+  try {
+    let i = from;
+    while (i < to) {
+      if (runs.length >= SCAN_RUNS || calls >= SCAN_CALLS) { truncated = true; break; }
+      const s0 = sigAt(i);
+      let j = i;
+      let step = 1;
+      while (j + step < to && sigAt(j + step) === s0) { j += step; step *= 2; }
+      let lo = j;
+      let hi = Math.min(j + step, to - 1);
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (sigAt(mid) === s0) lo = mid; else hi = mid - 1;
+      }
+      const runTo = lo + 1;
+      runs.push({
+        para, from: i, to: runTo, len: runTo - i,
+        props: w.getCharPropertiesAt(sec, para, i), sample: '',
+      });
+      i = runTo;
+    }
+  } catch {
+    return { runs, truncated: true };
+  }
+  return { runs, truncated };
+}
+
+/** 구간 앞 n글자의 실제 텍스트. */
+function runText(w: WasmLike, sec: number, r: FormatRun, n: number): string {
+  if (!w.logicalToTextOffset || !w.getTextRange || n <= 0) return '';
+  try {
+    const t0 = w.logicalToTextOffset(sec, r.para, r.from);
+    const t1 = w.logicalToTextOffset(sec, r.para, r.from + n);
+    const count = Math.max(0, t1 - t0);
+    return count > 0 ? w.getTextRange(sec, r.para, t0, count) : '';
   } catch {
     return '';
   }

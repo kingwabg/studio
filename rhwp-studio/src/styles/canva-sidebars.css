@@ -1051,7 +1051,10 @@
   text-align: left; text-underline-offset: 3px;
   overflow-wrap: anywhere;
 }
-.canva-specimen-mark { padding: 0 1px; background: transparent; }
+/* 실제 문단을 그리면 길어질 수 있다 — 카드가 패널을 삼키지 않게 줄 수로 자른다 */
+.canva-specimen-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.canva-specimen-run { padding: 0 1px; background: transparent; }
+.canva-specimen-more { color: var(--color-text-muted); }
 /* 선택에 서식이 섞였을 때 — 견본이 커서 값만 보여준다는 신호(디자인 3a 후속) */
 .canva-specimen.is-mixed .canva-specimen-sub { color: var(--color-primary); }
 
