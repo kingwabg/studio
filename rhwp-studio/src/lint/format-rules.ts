@@ -10,31 +10,46 @@
  */
 import type { CharProperties } from '@/core/types';
 
-/** 센터 기본 서식 1벌 — 3차에서 센터별 편집으로 갈아끼운다(지금은 코드가 정본). */
+/**
+ * 「우리 센터 서식」 한 벌. 센터가 관리자 화면에서 만들고 고친다(3차) — sc- 의
+ * `lib/features/format-spec/types.ts` 와 **같은 모양**이라 변환 없이 그대로 받는다.
+ *
+ * 규칙마다 on/off 가 따로 있는 이유: 안 쓰는 규칙이 켜져 있으면 실제 문서에서 지적이
+ * 수백 건 쏟아져 아무도 안 본다(실측 2026-07-31 — 6쪽 문서 558건).
+ * ⚠ 끄기를 "절대 안 걸리는 값"(-1 등)으로 흉내내지 말 것 — `pt !== -1` 은 늘 참이라
+ *   오히려 전부 지적된다. on/off 는 명시 필드로 둔다.
+ */
 export interface FormatSpec {
   /** 본문 글꼴 */
   fontName: string;
+  fontNameOn: boolean;
   /** 본문 글자 크기(pt) */
   bodyPt: number;
+  bodyPtOn: boolean;
+  /** 이 글자 수 이상인 문단을 통째로 굵게 하면 지적 — 짧은 제목 줄은 봐준다 */
+  boldBodyMinChars: number;
+  boldBodyOn: boolean;
+  /** 표 머리글(첫 행)은 굵게 */
+  headerBoldOn: boolean;
   /**
    * 표 안 글자 최대 크기(pt).
    * ⚠ 기본값을 본문과 같은 10 으로 둔다 — 9 로 두면 **새로 만든 표가 전부 지적**된다
-   *   (엔진 기본 표 글자가 10pt). 규칙이 늘 켜져 있으면 아무도 안 본다.
-   *   센터 규격이 9pt 라면 3차(센터별 규격 편집)에서 낮춘다.
+   *   (엔진 기본 표 글자가 10pt). 센터 규격이 9pt 라면 관리자 화면에서 낮춘다.
    */
   tableMaxPt: number;
-  /** 표 머리글(첫 행)은 굵게 */
-  headerBold: boolean;
-  /** 이 글자 수 이상인 문단을 통째로 굵게 하면 지적 — 짧은 제목 줄은 봐준다 */
-  boldBodyMinChars: number;
+  tableMaxPtOn: boolean;
 }
 
 export const DEFAULT_SPEC: FormatSpec = {
   fontName: '함초롬바탕',
+  fontNameOn: true,
   bodyPt: 10,
-  tableMaxPt: 10,
-  headerBold: true,
+  bodyPtOn: true,
   boldBodyMinChars: 30,
+  boldBodyOn: true,
+  headerBoldOn: true,
+  tableMaxPt: 10,
+  tableMaxPtOn: true,
 };
 
 /** 셀 좌표 — 표 안 위반의 밑줄을 그리는 데 필요하다 */
@@ -124,17 +139,17 @@ function scanBody(w: W, spec: FormatSpec, sec: number, hits: FormatHit[]): void 
     for (const r of runs) {
       const base = { sectionIndex: sec, paragraphIndex: para, charOffset: r.from, length: r.to - r.from };
       const fam = famOf(r.p);
-      if (fam && fam !== spec.fontName) {
+      if (spec.fontNameOn && fam && fam !== spec.fontName) {
         hits.push({ ...base, msg: '본문 글꼴이 규격과 다릅니다',
           detail: `${fam} → ${spec.fontName}`, props: { fontFamily: spec.fontName } as Partial<CharProperties> });
       }
       const pt = r.p.fontSize !== undefined ? r.p.fontSize / 100 : spec.bodyPt;
-      if (pt !== spec.bodyPt) {
+      if (spec.bodyPtOn && pt !== spec.bodyPt) {
         hits.push({ ...base, msg: '본문 글자 크기가 규격과 다릅니다',
           detail: `${pt}pt → ${spec.bodyPt}pt`, props: { fontSize: spec.bodyPt * 100 } });
       }
       // 굵게는 제목 줄에 정당하게 쓰인다 — 긴 문장을 통째로 굵게 한 것만 지적한다.
-      if (r.p.bold && r.to - r.from >= spec.boldBodyMinChars) {
+      if (spec.boldBodyOn && r.p.bold && r.to - r.from >= spec.boldBodyMinChars) {
         hits.push({ ...base, msg: '본문을 길게 굵게 쓰지 않습니다',
           detail: '굵게 → 보통', props: { bold: false } });
       }
@@ -162,11 +177,11 @@ function scanTables(w: W, spec: FormatSpec, sec: number, hits: FormatHit[]): voi
       const cell: CellRef = { ppi: t.para, ci: t.controlIdx, cei: c.cellIdx, cpi: 0 };
       const base = { sectionIndex: sec, paragraphIndex: t.para, charOffset: 0, length: len, cell };
 
-      if (spec.headerBold && c.row === 0 && !p.bold) {
+      if (spec.headerBoldOn && c.row === 0 && !p.bold) {
         hits.push({ ...base, msg: '표 머리글은 굵게 씁니다', detail: '보통 → 굵게', props: { bold: true } });
       }
       const pt = p.fontSize !== undefined ? p.fontSize / 100 : spec.tableMaxPt;
-      if (pt > spec.tableMaxPt) {
+      if (spec.tableMaxPtOn && pt > spec.tableMaxPt) {
         hits.push({ ...base, msg: '표 안 글자가 규격보다 큽니다',
           detail: `${pt}pt → ${spec.tableMaxPt}pt`, props: { fontSize: spec.tableMaxPt * 100 } });
       }

@@ -13,6 +13,8 @@
  */
 import { scanAll, itemKey, type LintItem } from './items';
 import { LintPanel } from './panel';
+import { loadSpecs, pickDefault, type NamedSpec } from './spec-source';
+import { DEFAULT_SPEC, type FormatSpec } from './format-rules';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { VirtualScroll } from '@/view/virtual-scroll';
 import type { EventBus } from '@/core/event-bus';
@@ -38,6 +40,10 @@ export class LintOverlay {
   private enabled = true;
   /** 서식 규정 검사 — 기본 꺼짐(실제 문서에서 수백 건이 뜬다, 근거는 items.ts) */
   private formatOn = false;
+  /** 센터가 만든 규격 목록(호스트 sc- 에서 받는다) */
+  private specs: NamedSpec[] = [];
+  private activeSpecId = 'builtin';
+  private spec: FormatSpec = DEFAULT_SPEC;
   private panel: LintPanel;
 
   constructor(
@@ -54,6 +60,9 @@ export class LintOverlay {
       onPick: (it) => this.focusItem(it),
       onToggleFormat: (on) => { this.formatOn = on; this.scan(); },
       isFormatOn: () => this.formatOn,
+      specs: () => this.specs,
+      activeSpecId: () => this.activeSpecId,
+      onPickSpec: (id) => this.useSpec(id),
     });
   }
 
@@ -86,7 +95,7 @@ export class LintOverlay {
     if (!this.enabled) return 0;
     const t0 = performance.now();
     try {
-      this.items = scanAll(this.host.wasm as never, this.formatOn)
+      this.items = scanAll(this.host.wasm as never, this.formatOn, this.spec)
         .filter((it) => !this.ignored.has(itemKey(it)));
     } catch {
       this.items = [];
@@ -141,6 +150,27 @@ export class LintOverlay {
   /** 서식 규정 검사 on/off (도구 리본 · 패널 체크박스 · 테스트) */
   setFormatChecks(on: boolean): void { this.formatOn = on; this.scan(); }
   isFormatChecks(): boolean { return this.formatOn; }
+
+  /**
+   * 센터 규격 목록을 받아온다. 실패해도 내장 기본값으로 계속 돈다(spec-source.ts).
+   * 규격을 못 받았다고 검사가 멈추면 안 된다.
+   */
+  async loadCenterSpecs(): Promise<void> {
+    this.specs = await loadSpecs();
+    const chosen = pickDefault(this.specs);
+    this.activeSpecId = chosen.id;
+    this.spec = chosen.spec;
+    if (this.formatOn) this.scan(); else this.panel.render(this.items);
+  }
+
+  /** 쓸 규격을 바꾼다 — 고르는 즉시 다시 검사한다(안 그러면 바꾼 게 안 보인다). */
+  useSpec(id: string): void {
+    const found = this.specs.find((s) => s.id === id);
+    if (!found) return;
+    this.activeSpecId = id;
+    this.spec = found.spec;
+    this.scan();
+  }
 
   /**
    * 고칠 수 있는 것을 전부 적용한다 — **되돌리기 한 번**으로 통째로 복구된다.
@@ -325,6 +355,7 @@ export function attachLinter(
     },
   };
   const overlay = new LintOverlay(container, virtualScroll, host);
+  void overlay.loadCenterSpecs();
   eventBus.on('document-changed', () => overlay.scheduleScan());
   // 문서를 **열었을 때도** 검사한다(편집을 해야 밑줄이 뜨던 실측 결함, 2026-07-31)
   eventBus.on('command-state-changed', () => overlay.armScan());

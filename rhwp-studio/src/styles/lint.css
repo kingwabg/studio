@@ -92,3 +92,14 @@
   font-size: 11px; color: var(--color-text-muted, #8a857f); cursor: pointer;
 }
 .lint-panel-toggle input { accent-color: var(--color-primary, #1971c2); cursor: pointer; }
+.lint-panel-specrow {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 11px; border-top: 1px solid var(--color-border, #d9d6d2);
+  font-size: 11px; color: var(--color-text-muted, #8a857f);
+}
+.lint-panel-spec {
+  flex: 1; min-width: 0; padding: 3px 6px; font: inherit;
+  color: var(--color-text, #23201d);
+  border: 1px solid var(--color-border, #d9d6d2); border-radius: 6px;
+  background: var(--color-surface-raised, #fff);
+}

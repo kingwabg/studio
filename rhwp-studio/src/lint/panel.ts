@@ -7,6 +7,7 @@
  * 접힌 상태는 "검사 N건" 한 줄이라 자리를 거의 안 먹는다.
  */
 import type { LintItem } from './items';
+import type { NamedSpec } from './spec-source';
 
 const MAX_ROWS = 12;
 
@@ -21,6 +22,9 @@ export class LintPanel {
       onPick(it: LintItem): void;
       onToggleFormat(on: boolean): void;
       isFormatOn(): boolean;
+      specs(): NamedSpec[];
+      activeSpecId(): string;
+      onPickSpec(id: string): void;
     },
   ) {
     this.root = document.createElement('div');
@@ -80,6 +84,25 @@ export class LintPanel {
     box.addEventListener('change', () => this.cb.onToggleFormat(box.checked));
     tog.append(box, document.createTextNode('서식 규정도 검사'));
     foot.appendChild(tog);
+    // 어느 규격으로 검사하는지 — 센터가 여러 벌을 두므로 고르는 자리가 필요하다.
+    const specList = this.cb.specs();
+    if (this.cb.isFormatOn() && specList.length > 1) {
+      const pick = document.createElement('select');
+      pick.className = 'lint-panel-spec';
+      for (const s of specList) {
+        const o = document.createElement('option');
+        o.value = s.id;
+        o.textContent = s.name;
+        o.selected = s.id === this.cb.activeSpecId();
+        pick.appendChild(o);
+      }
+      pick.addEventListener('change', () => this.cb.onPickSpec(pick.value));
+      const wrap = document.createElement('div');
+      wrap.className = 'lint-panel-specrow';
+      wrap.append(document.createTextNode('규격'), pick);
+      this.root.appendChild(wrap);
+    }
+
     const fixable = items.filter((i) => i.fix).length;
     const all = document.createElement('button');
     all.className = 'lint-card-btn is-primary';
