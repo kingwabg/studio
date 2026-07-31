@@ -85,7 +85,10 @@ const legacyBaselines = new Map([
   // +3: 확인 대화상자 닫은 뒤 편집기 포커스 복귀(2026-07-30 e2e 실측 결함 — 키 입력 먹통)
   ['src/engine/input-handler-text.ts', 711],
   // +26: 텍스트 탭 배선(2026-07-30) — 섹션 본문은 text-panel-sections.ts, 여긴 탭 상태·분기뿐
-  ['src/ui/canva-right-inspector.ts', 704],  // +16: AI·녹음 진입 칩(2026-07-30)
+  // +16: AI·녹음 진입 칩(2026-07-30)
+  // +9: 「지금 서식」 견본 배선(2026-07-31 디자인 3a) — 본문은 ui/format-specimen.ts,
+  //     여긴 mount 1줄 + reflectChar/reflectPara 위임 2줄 + 근거 주석. 기능 코드 반입 금지.
+  ['src/ui/canva-right-inspector.ts', 713],
   ['src/ui/page-border-dialog.ts', 654],
 ]);
 

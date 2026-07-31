@@ -1023,3 +1023,32 @@
   border-top: 1.5px solid #e03131;
 }
 .track-change-bar { width: 3px; background: #e03131; border-radius: 2px; }
+
+/* ── 「지금 서식」 견본 (디자인 3a) ──────────────────────────────
+   상태 이름만 적힌 배너 대신 현재 서식이 적용된 예문을 글자 탭 맨 위에 둔다.
+   본문 서체는 편집 화면과 같은 한컴 계열을 우선 쓴다(견본이 실제와 달라 보이면 무의미). */
+.canva-specimen {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 0 14px; padding: 10px 11px 11px;
+  border-radius: 6px;
+  background: var(--color-bg-light);
+}
+.canva-specimen-head { display: flex; align-items: center; gap: 6px; }
+.canva-specimen-head i { font-size: 13px; color: var(--color-primary); }
+.canva-specimen-title {
+  font-size: 10.5px; letter-spacing: 0.06em; color: var(--color-text-muted);
+}
+.canva-specimen-sub {
+  margin-left: auto; font-size: 10px; color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.canva-specimen-body { border-top: 1px solid var(--color-border); padding-top: 9px; overflow: hidden; }
+.canva-specimen-text {
+  margin: 0;
+  font-family: 'HCR Batang', '함초롬바탕', Batang, serif;
+  font-size: 16.5px; line-height: 1.6; color: var(--color-text);
+  text-align: left; text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.canva-specimen-mark { padding: 0 1px; background: transparent; }

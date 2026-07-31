@@ -10,6 +10,7 @@ import { TableBorderSection } from './table-border-section';
 import { TablePanelSections } from './table-panel-sections';
 import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
 import { mkEl, mkButton } from './canva-dom';
+import { FormatSpecimen } from './format-specimen';
 import { openTablePanel } from './canva-sidebars';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
@@ -72,6 +73,8 @@ export class CanvaRightInspector {
   private lastMulti = false;
 
   private banner!: HTMLElement;
+  /** 「지금 서식」 견본(디자인 3a) — 본문은 format-specimen.ts */
+  private specimen = new FormatSpecimen();
   private fmtPane!: HTMLElement;
   private emptyEl!: HTMLElement;
   private extrasHost!: HTMLElement;
@@ -110,6 +113,10 @@ export class CanvaRightInspector {
 
     // 글자 서식
     this.fmtPane = mkEl('div', 'canva-pane');
+
+    // [지금 서식 견본 2026-07-30 디자인 3a] 상태 이름만 적힌 배너 대신 현재 서식이
+    // 그대로 적용된 예문을 맨 위에 둔다 — 아래 컨트롤을 만지면 즉시 따라온다.
+    this.specimen.mount(this.fmtPane);
 
     // [텍스트 스타일 프리셋 2026-07-30] 캔바식 '제목 추가' 카드 — 누르면 현재 문단
     // 전체에 크기·굵기(·번호)를 한 번에 입힌다. 카드 자체가 그 스타일로 그려져
@@ -314,6 +321,7 @@ export class CanvaRightInspector {
   }
 
   private reflectChar(p: CharProperties): void {
+    this.specimen.reflectChar(p);
     this.biu.bold?.classList.toggle('is-active', !!p.bold);
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
     this.biu.underline?.classList.toggle('is-active', !!p.underline);
@@ -331,6 +339,7 @@ export class CanvaRightInspector {
   }
 
   private reflectPara(p: ParaProperties): void {
+    this.specimen.reflectPara(p);
     const a = p.alignment;
     for (const key of Object.keys(this.aligns)) this.aligns[key].classList.toggle('is-active', a === key);
     const ls = (p as any).lineSpacing;
