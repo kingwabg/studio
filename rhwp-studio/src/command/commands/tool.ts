@@ -4,10 +4,9 @@ import { showToast } from '@/ui/toast';
 
 import { SealMakerDialog } from '@/ui/seal-maker';
 import { EsignChecklistDialog, ConsentSimDialog, NdaGeneratorDialog } from '@/ui/esign-tools';
-import { TableFillDialog } from '@/ui/table-fill';
+import { openTableFill } from '@/ui/table-fill';
 
 let sealDialog: SealMakerDialog | null = null;
-let tableFillDialog: TableFillDialog | null = null;
 let checklistDialog: EsignChecklistDialog | null = null;
 let consentDialog: ConsentSimDialog | null = null;
 let ndaDialog: NdaGeneratorDialog | null = null;
@@ -73,10 +72,7 @@ export const toolCommands: CommandDef[] = [
     id: 'tool:table-fill',
     label: '표 빈칸 채우기',
     canExecute: (ctx) => ctx.hasDocument,
-    execute(services) {
-      if (!tableFillDialog) tableFillDialog = new TableFillDialog(services);
-      tableFillDialog.show();
-    },
+    execute(services) { openTableFill(services); },
   },
   {
     id: 'tool:ai-panel',

@@ -144,6 +144,8 @@ export class TableFillDialog extends ModalDialog {
   private grids: TableGrid[] = [];
   private fills: Fill[] = [];
   private rows: Array<{ on: HTMLInputElement; input: HTMLInputElement; fill: Fill }> = [];
+  /** AI 도우미가 넘겨준 사용자 지시(예: "강사비는 주 3회 기준") — 1회성 */
+  private hint = '';
 
   constructor(private services: CommandServices) {
     super('표 빈칸 채우기', 620);
@@ -163,7 +165,8 @@ export class TableFillDialog extends ModalDialog {
     return this.body;
   }
 
-  show(): void {
+  show(hint = ''): void {
+    this.hint = hint;
     super.show();
     void this.scan();
   }
@@ -192,6 +195,9 @@ export class TableFillDialog extends ModalDialog {
       return;
     }
     this.grids = tables.filter((g) => blankCells(g).length > 0);
+    // 이미 채워진 표는 채울 대상이 아니라 **참고자료**다 — 총괄표를 보고 세부표를
+    // 채우는 표 간 일관성이 여기서 나온다.
+    const refTables = tables.filter((g) => blankCells(g).length === 0);
     const blanks = this.grids.reduce((n, g) => n + blankCells(g).length, 0);
     if (blanks === 0) {
       // 판정식 5 — 채울 게 없으면 AI 를 부르지 않는다(무의미한 과금 방지).
@@ -201,9 +207,14 @@ export class TableFillDialog extends ModalDialog {
     this.say(`빈칸 ${blanks}개를 찾았습니다. AI 에게 물어보는 중…`);
 
     const grid = this.grids.map((g, i) => gridToPrompt(g, i)).join('\n\n');
-    // 표만 보면 무슨 문서인지 모른다 — 앞 문단 몇 줄을 문맥으로 함께 준다.
+    const refs = refTables.length
+      ? '\n\n[참고 — 이미 완성된 표(수정 금지, 근거로만)]\n'
+        + refTables.map((g, i) => gridToPrompt(g, this.grids.length + i)).join('\n\n')
+      : '';
+    // 표만 보면 무슨 문서인지 모른다 — 본문 전체를 문맥으로 함께 준다.
     const ctx = this.docContext();
-    const mask = maskNames(`${ctx}\n\n${grid}`);
+    const hint = this.hint ? `\n\n[사용자 지시 — 최우선으로 따를 것]\n${this.hint}` : '';
+    const mask = maskNames(`${ctx}${refs}${hint}\n\n${grid}`);
     let fills: Array<{ table: number; row: number; col: number; text: string }> = [];
     try {
       const res = await fetch('/api/ai/v1/chat/completions', {
@@ -235,7 +246,11 @@ export class TableFillDialog extends ModalDialog {
     this.paint(fills);
   }
 
-  /** 문서 앞부분 본문 — 무슨 문서인지 알려주는 최소한의 문맥. */
+  /**
+   * 문서 본문 전체(상한 4000자) — "문서를 파악한 후 채운다"의 파악이 이것이다.
+   * 1쪽 개요의 수치("총 사업비 4,800만원")가 3쪽 표의 답이 되는 일이 흔해서,
+   * 앞부분만 주면 뒤쪽 표를 채울 근거가 끊긴다(1차: 12문단 → 전체로 확장).
+   */
   private docContext(): string {
     const w = this.services.wasm as unknown as {
       getParagraphCount(s: number): number;
@@ -243,14 +258,19 @@ export class TableFillDialog extends ModalDialog {
       getTextRange(s: number, p: number, a: number, b: number): string;
     };
     const out: string[] = [];
+    let total = 0;
     try {
-      const n = Math.min(w.getParagraphCount(0), 12);
-      for (let p = 0; p < n; p++) {
+      const n = w.getParagraphCount(0);
+      for (let p = 0; p < n && total < 4000; p++) {
         const len = w.getParagraphLength(0, p);
-        if (len > 0) out.push(w.getTextRange(0, p, 0, len));
+        if (len === 0) continue;
+        const t = w.getTextRange(0, p, 0, len);
+        out.push(t);
+        total += t.length;
       }
+      if (total >= 4000) out.push('…(본문이 길어 뒷부분 생략)');
     } catch { /* 문맥은 있으면 좋은 것 — 못 읽어도 표만으로 진행한다 */ }
-    return out.join('\n').slice(0, 1200);
+    return out.join('\n').slice(0, 4200);
   }
 
   /** 제안을 체크박스 + 수정 가능한 입력칸으로 보여준다(자동 적용 금지). */
@@ -305,4 +325,18 @@ export class TableFillDialog extends ModalDialog {
       this.services.eventBus.emit('document-changed');
     }
   }
+}
+
+/* ── 진입점 공유 ─────────────────────────────────────────── */
+
+let dialog: TableFillDialog | null = null;
+
+/**
+ * 도구 리본과 AI 도우미가 같은 대화상자를 연다.
+ * 도우미 경로는 사용자의 말(hint)을 프롬프트에 얹는다 — "강사비는 주 3회 기준으로"
+ * 같은 재요청이 대화만으로 가능해진다.
+ */
+export function openTableFill(services: CommandServices, hint = ''): void {
+  if (!dialog) dialog = new TableFillDialog(services);
+  dialog.show(hint);
 }

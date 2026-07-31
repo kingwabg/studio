@@ -102,4 +102,43 @@ runTest('표 빈칸 채우기', async ({ page }) => {
   });
   console.log('  ③ 아동 관찰기록:', guard.slice(0, 40));
   assert.ok(guard.includes('쓸 수 없습니다'), '판정식 3: 아동 관찰기록에서는 막혀야 한다');
+
+  // (가) 문서 파악 — 보낸 프롬프트에 본문 전체·완성된 표(참고)·지시가 실리는가
+  const sent = await page.evaluate(async () => {
+    history.replaceState(null, '', location.pathname); // child-record 해제
+    const w = window.__wasm;
+    // 완성된 참고 표 하나를 문서 끝에 추가
+    const last = w.getParagraphCount(0) - 1;
+    const res = w.createTableEx({ sectionIdx: 0, paraIdx: last, charOffset: 0, rowCount: 2, colCount: 2, treatAsChar: true });
+    const pp = res.paraIdx ?? last, ci = res.controlIdx;
+    const cell = (r, c) => w.getTableCellBboxes(0, pp, ci).find((x) => x.row === r && x.col === c).cellIdx;
+    w.insertTextInCell(0, pp, ci, cell(0, 0), 0, 0, '총사업비');
+    w.insertTextInCell(0, pp, ci, cell(0, 1), 0, 0, '4,800만원');
+    w.insertTextInCell(0, pp, ci, cell(1, 0), 0, 0, '대상');
+    w.insertTextInCell(0, pp, ci, cell(1, 1), 0, 0, '30명');
+    await new Promise((r) => setTimeout(r, 400));
+    // fetch 를 가로채 보낸 본문을 붙잡는다 — 응답은 빈 제안
+    let captured = '';
+    const real = window.fetch;
+    window.fetch = async (u, o) => {
+      if (!String(u).includes('/api/ai/')) return real(u, o);
+      captured = JSON.parse(o.body).messages[1].content;
+      return new Response(JSON.stringify({ choices: [{ message: { content: '{"fills":[]}' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    const m = await import('/src/ui/table-fill.ts');
+    const services = { wasm: w, getInputHandler: () => window.__inputHandler,
+      eventBus: { emit: () => {} } };
+    m.openTableFill(services, '강사비는 주 3회 기준으로');
+    await new Promise((r) => setTimeout(r, 900));
+    window.fetch = real;
+    document.querySelector('.dialog-wrap .dialog-btn')?.click(); // 닫기
+    return captured;
+  });
+  const has = (t) => sent.includes(t);
+  console.log('  (가) 프롬프트: 참고표', has('참고'), '/ 완성표값', has('4,800만원'),
+    '/ 지시', has('주 3회'), '/ 빈칸좌표', has('{{'), '/ 길이', sent.length);
+  assert.ok(has('참고') && has('4,800만원'), '완성된 표가 참고자료로 실린다');
+  assert.ok(has('주 3회'), '사용자 지시가 실린다');
+  assert.ok(has('{{'), '채울 표의 빈칸 좌표가 실린다');
 });

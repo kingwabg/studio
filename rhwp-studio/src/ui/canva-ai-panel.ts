@@ -11,6 +11,7 @@ import { mkEl, mkButton } from './canva-dom';
 import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
 import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
 import { insertFormatted } from './ai-doc-insert';
+import { openTableFill } from './table-fill';
 /**
  * 문서 모드의 작성법 — **본문에 바로 넣을 글**을 쓴다.
  *
@@ -29,7 +30,10 @@ const SYSTEM_PROMPT =
   '③ 마크다운(#, **, - )을 쓰지 마세요. 한글 문서에 그대로 들어갑니다.\n' +
   '④ 표가 필요하면 각 줄을 | 로 구분해 씁니다. 첫 줄이 머리글입니다.\n' +
   '   예: |항목|내용|  다음 줄 |사업비|1,000천원|\n' +
-  '⑤ 설명·인사말 없이 문서에 들어갈 내용만 출력합니다.';
+  '⑤ 설명·인사말 없이 문서에 들어갈 내용만 출력합니다.\n' +
+  '⑥ 예외 — 사용자가 **문서에 이미 있는 표의 빈칸을 채워 달라**고 하면(예: "표 채워줘", ' +
+  '"예산표 빈칸 완성해줘") 본문을 쓰지 말고 정확히 다음 JSON 만 출력합니다: ' +
+  '{"tool":"table-fill","hint":"<사용자 요청에서 채우기 방식에 대한 지시만 요약>"}';
 
 // 캔버스식 문서 생성 — A4 지면 배치 계획(JSON)을 설계시킨다 (inline-ai의 문서 생성을 캔버스 문법으로)
 // [캔버스 한컴 포크] export — 녹음→회의록(canva-record-panel.ts)이 같은 배치 파이프라인을 재사용(중복 2회 룰 회피)
@@ -178,6 +182,8 @@ export class CanvaAiPanel {
           const msgEl = this.pushMsg({ role: 'ai', text: reply });
           this.addInsertAction(msgEl, reply);
         }
+      } else if (this.tryToolCall(reply)) {
+        // 표 채우기 대화상자가 이어받았다 — 채팅에는 안내만 남긴다.
       } else {
         const msgEl = this.pushMsg({ role: 'ai', text: reply });
         this.addInsertAction(msgEl, reply);
@@ -281,6 +287,27 @@ export class CanvaAiPanel {
       this.pushMsg({ role: 'ai', err: true, text: `문서 검토에 실패했습니다.\n${detail}${aiErrorHint(detail)}` });
     } finally {
       this.setBusy(false);
+    }
+  }
+
+  /**
+   * 모델이 도구 호출(JSON)로 답했으면 실행한다. 지금 도구는 표 채우기 하나 —
+   * 대화상자가 문서 파악→제안→확인을 그대로 맡으니 패널은 여는 것까지만 한다.
+   */
+  private tryToolCall(reply: string): boolean {
+    const t = reply.trim();
+    if (!t.includes('"tool"')) return false;
+    const a = t.indexOf('{');
+    const b = t.lastIndexOf('}');
+    if (a < 0 || b <= a) return false;
+    try {
+      const o = JSON.parse(t.slice(a, b + 1)) as { tool?: string; hint?: string };
+      if (o.tool !== 'table-fill') return false;
+      this.pushMsg({ role: 'ai', text: '문서의 표 빈칸을 살펴보겠습니다 — 제안을 확인하고 적용해 주세요.' });
+      openTableFill(this.services as never, typeof o.hint === 'string' ? o.hint : '');
+      return true;
+    } catch {
+      return false;
     }
   }
 
