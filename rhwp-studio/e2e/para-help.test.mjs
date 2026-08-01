@@ -1,92 +1,103 @@
 /**
- * 문단 패널 설명 문구 — "봐도 이해가 안 된다"는 지적(2026-08-01)에 대한 회귀 검사.
- * 문구 정본 = src/ui/text-panel-help.ts.
+ * 문단 패널 — 「자주」 한 화면 + 설명 토글 + 「자세히」 접기.
+ * (사용자 결정 2026-08-01: 설명이 많아 보기 불편하고 섹션을 오가는 조작도 불편하다)
  *
- * ⚠ 섹션 버튼은 mousedown 으로 전환한다(click 은 안 먹는다 — 실측).
+ * ⚠ 섹션·토글 버튼은 mousedown 으로 동작한다(click 은 안 먹는다 — 실측).
  */
 import assert from 'node:assert';
 import { runTest, createNewDocument, clickEditArea } from './helpers.mjs';
 
-const SECTIONS = ['정렬', '여백·첫 줄', '간격', '문단 종류', '줄 나눔', '탭'];
+const md = (el) => el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
 
-runTest('문단 패널 설명', async ({ page }) => {
+runTest('문단 패널', async ({ page }) => {
   await createNewDocument(page);
   await clickEditArea(page);
   await new Promise((r) => setTimeout(r, 900));
   await page.evaluate(async () => {
+    localStorage.removeItem('rhwpParaHelp');
     [...document.querySelectorAll('.canva-rail--right *')]
       .find((e) => e.textContent.trim() === '문단' && e.children.length === 0)?.click();
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 500));
   });
 
-  const rows = [];
-  for (const name of SECTIONS) {
-    rows.push(await page.evaluate(async (n) => {
-      [...document.querySelectorAll('.canva-sec-btn')].find((x) => x.textContent.trim() === n)
-        ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      await new Promise((r) => setTimeout(r, 350));
-      const body = document.querySelector('.tps');
-      return {
-        sec: n,
-        secHint: document.querySelector('.tps-sec-hint')?.textContent ?? '',
-        hints: [...document.querySelectorAll('.tps-hint')].length,
-        // 한컴 대화상자 단축키 접미사 (K)(N)… 은 패널에서 눌리지 않는다 — 남아 있으면 잡음
-        accel: /\([A-Z]\)(?!\s*[:%])/.test(body?.textContent ?? ''),
-        // 화면은 textContent 라 마크다운 ** 은 별표로 찍힌다
-        star: /\*\*/.test(body?.textContent ?? ''),
-        tips: [...document.querySelectorAll('.tps-seg-btn')]
-          .filter((b) => b.title && b.title !== b.textContent).length,
-        segs: document.querySelectorAll('.tps-seg-btn').length,
-        // 옵션 그림 — 정렬·첫 줄·문단 종류에만 붙는다(줄 나눔은 일부러 없음)
-        glyphs: document.querySelectorAll('.tps-seg-btn svg.tps-glyph, .tps-seg-btn i.tps-glyph-ic').length,
-        // 그림이 세로로 눌려 안 보이는 사고 방지 — 실제 높이를 잰다
-        glyphH: (() => {
-          const g = document.querySelector('.tps-seg-btn svg.tps-glyph');
-          return g ? Math.round(g.getBoundingClientRect().height) : -1;
-        })(),
-      };
-    }, name));
-  }
-  for (const r of rows) {
-    console.log(`  ${r.sec}: 섹션설명 ${r.secHint ? '있음' : '없음'} · 행설명 ${r.hints}`
-      + ` · 옵션툴팁 ${r.tips}/${r.segs} · 그림 ${r.glyphs}(h=${r.glyphH}) · 단축키잔재 ${r.accel} · 별표 ${r.star}`);
-  }
-  for (const r of rows) {
-    assert.ok(r.secHint.length > 6, `${r.sec}: 섹션 설명이 있어야 한다`);
-    assert.ok(!r.accel, `${r.sec}: 한컴 단축키 접미사가 남으면 안 된다`);
-    assert.ok(!r.star, `${r.sec}: 마크다운 별표가 화면에 찍히면 안 된다`);
-    if (r.segs > 0) assert.strictEqual(r.tips, r.segs, `${r.sec}: 옵션 전부에 툴팁`);
-    // ⚠ .tps-seg-btn 은 height:26px + overflow:hidden 이라 그림이 눌려 **높이 0** 이
-    //   되었던 적이 있다(2026-08-01). DOM 에 있다고 보이는 게 아니다 — 높이를 못 박는다.
-    if (r.glyphH >= 0) assert.ok(r.glyphH >= 12, `${r.sec}: 그림이 눌리면 안 된다 (h=${r.glyphH})`);
-  }
-  const glyphed = Object.fromEntries(rows.map((r) => [r.sec, r.glyphs]));
-  console.log('  섹션별 그림 수:', JSON.stringify(glyphed));
-  assert.strictEqual(glyphed['정렬'], 6, '정렬 6종 전부 그림');
-  assert.strictEqual(glyphed['여백·첫 줄'], 3, '첫 줄 3종 전부 그림');
-  assert.strictEqual(glyphed['문단 종류'], 4, '문단 종류 4종 전부 그림');
-  assert.strictEqual(glyphed['줄 나눔'], 0,
-    '줄 나눔은 그림을 일부러 두지 않는다(정렬 그림과 뜻이 겹친다 — glyphs.ts 주석)');
-  // 설명이 실제로 붙는 섹션(정렬은 컨트롤 1개라 섹션 설명만 — 중복 제거)
-  const withHints = rows.filter((r) => r.hints > 0).map((r) => r.sec);
-  console.log('  행 설명이 붙은 섹션:', JSON.stringify(withHints));
-  assert.ok(withHints.length >= 4, '대부분의 섹션에 행 설명이 붙는다');
-  assert.strictEqual(rows.find((r) => r.sec === '정렬').hints, 0,
-    '정렬은 섹션 설명과 겹쳐 행 설명을 비운다');
+  // ① 기본: 설명 꺼짐 · 자주 한 화면 · 스크롤 없음 · 섹션 줄 감춤
+  const base = await page.evaluate(() => {
+    const t = document.querySelector('.tps');
+    const labels = [...t.querySelectorAll('.tps-label')].map((e) => e.textContent.trim());
+    return {
+      h: Math.round(t.scrollHeight),
+      view: Math.round(document.querySelector('.canva-rail-content').getBoundingClientRect().height),
+      hints: t.querySelectorAll('.tps-hint, .tps-sec-hint').length,
+      labels,
+      strip: document.querySelectorAll('.canva-sec-btn').length,
+      adv: !!document.querySelector('.canva-adv-toggle'),
+      // 설명을 꺼도 툴팁으로는 읽을 수 있어야 한다
+      tips: [...t.querySelectorAll('.tps-seg-btn')].filter((b) => b.title && b.title !== b.textContent).length,
+      segs: t.querySelectorAll('.tps-seg-btn').length,
+    };
+  });
+  console.log('  ① 높이', base.h, '/ 화면', base.view, '/ 설명', base.hints,
+    '/ 섹션버튼', base.strip, '/ 항목', JSON.stringify(base.labels), '/ 툴팁', `${base.tips}/${base.segs}`);
+  assert.ok(base.h <= base.view, `스크롤 없이 다 보여야 한다 (${base.h} > ${base.view})`);
+  assert.strictEqual(base.hints, 0, '기본은 설명 꺼짐');
+  assert.strictEqual(base.strip, 0, '고를 게 하나뿐이면 섹션 줄을 감춘다');
+  assert.deepStrictEqual(base.labels, ['정렬', '줄 간격', '문단 간격', '첫 줄'],
+    '자주 쓰는 넷이 한 화면에');
+  assert.strictEqual(base.tips, base.segs, '설명을 꺼도 툴팁은 살아 있다');
 
-  // 체크 항목은 이름 + "무엇을 막는지" 설명이 함께 있어야 한다
-  const flags = await page.evaluate(async () => {
-    [...document.querySelectorAll('.canva-sec-btn')].find((x) => x.textContent.trim() === '문단 종류')
+  // ② [설명] 토글 — 켜면 문구가 붙고, 기억된다
+  const on = await page.evaluate(async () => {
+    document.querySelector('.canva-help-btn').dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      hints: document.querySelectorAll('.tps-hint, .tps-sec-hint').length,
+      stored: localStorage.getItem('rhwpParaHelp'),
+      isOn: document.querySelector('.canva-help-btn').classList.contains('is-on'),
+    };
+  });
+  console.log('  ② 설명 켬 →', on.hints, '개 / 저장', on.stored, '/ 버튼 켜짐', on.isOn);
+  assert.ok(on.hints > 0 && on.isOn && on.stored === '1', '설명이 켜지고 기억된다');
+
+  const off = await page.evaluate(async () => {
+    document.querySelector('.canva-help-btn').dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    return document.querySelectorAll('.tps-hint, .tps-sec-hint').length;
+  });
+  console.log('  ② 설명 끔 →', off, '개');
+  assert.strictEqual(off, 0, '다시 끄면 사라진다');
+
+  // ③ 「자세히」 — 펴면 고급 섹션이 나오고, 접으면 「자주」로 돌아온다
+  const adv = await page.evaluate(async () => {
+    document.querySelector('.canva-adv-toggle').dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    const secs = [...document.querySelectorAll('.canva-sec-btn')].map((b) => b.textContent.trim());
+    // 고급 섹션으로 옮겨 간 뒤 접는다 — 빈 화면이 되면 안 된다
+    [...document.querySelectorAll('.canva-sec-btn')].find((b) => b.textContent.trim() === '줄 나눔')
       ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     await new Promise((r) => setTimeout(r, 350));
-    return [...document.querySelectorAll('.tps-switch-row')].map((r) => ({
-      label: r.querySelector('.tps-switch-label')?.textContent ?? '',
-      hint: r.querySelector('.tps-hint')?.textContent ?? '',
-    }));
+    const inAdv = [...document.querySelectorAll('.tps-label')].map((e) => e.textContent.trim());
+    document.querySelector('.canva-adv-toggle').dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    return { secs, inAdv, back: [...document.querySelectorAll('.tps-label')].map((e) => e.textContent.trim()) };
   });
-  console.log('  체크 항목', flags.length, '개 / 설명 없는 것',
-    flags.filter((f) => !f.hint).length, '/ 예:', JSON.stringify(flags[0]));
-  assert.ok(flags.length >= 8, '체크 항목 8종');
-  assert.strictEqual(flags.filter((f) => !f.hint).length, 0, '체크마다 설명이 붙는다');
-  assert.ok(flags.every((f) => !/\([A-Z]\)/.test(f.label)), '체크 이름에 단축키 접미사 없음');
+  console.log('  ③ 폄:', JSON.stringify(adv.secs), '/ 줄 나눔:', JSON.stringify(adv.inAdv),
+    '/ 접은 뒤:', JSON.stringify(adv.back));
+  assert.deepStrictEqual(adv.secs, ['자주', '문단 종류', '줄 나눔', '탭'], '고급 3종이 나온다');
+  assert.deepStrictEqual(adv.inAdv, ['한글', '영어'], '고급 섹션으로 전환된다');
+  assert.deepStrictEqual(adv.back, ['정렬', '줄 간격', '문단 간격', '첫 줄'],
+    '접으면 「자주」로 돌아온다 — 빈 화면이 되면 안 된다');
+
+  // ④ 옵션 그림은 그대로 살아 있다(눌리면 안 된다)
+  const g = await page.evaluate(() => {
+    const s = document.querySelector('.tps-seg-btn svg.tps-glyph');
+    return { n: document.querySelectorAll('.tps-seg-btn svg.tps-glyph').length,
+      h: s ? Math.round(s.getBoundingClientRect().height) : -1 };
+  });
+  console.log('  ④ 그림', g.n, '개 (h=' + g.h + ')');
+  assert.strictEqual(g.n, 9, '정렬 6 + 첫 줄 3');
+  assert.ok(g.h >= 12, '그림이 세로로 눌리면 안 된다');
 });

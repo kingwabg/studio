@@ -50,10 +50,27 @@ const FLAGS: Array<[keyof ParaProperties, string, boolean]> = [
   ['autoSpaceKrNum', '한글과 숫자 간격 자동 조절(R)', true],
 ];
 
+/**
+ * 섹션 줄 — **「자주」 하나로 시작**한다(사용자 결정 2026-08-01).
+ * 실측: 자주 쓰는 정렬·줄 간격·문단 간격·첫 줄이 서로 다른 섹션에 흩어져 있어
+ * 한 문단을 손보는 데 섹션을 3번 오갔다. 나머지는 「자세히」 아래로 접는다.
+ */
 export const TEXT_SECTIONS: Array<[string, string]> = [
-  ['정렬', 'text-align-left'], ['여백·첫 줄', 'text-indent'], ['간격', 'arrows-vertical'],
+  ['자주', 'text-align-left'],
   ['문단 종류', 'list-bullets'], ['줄 나눔', 'text-t'], ['탭', 'arrow-elbow-down-right'],
 ];
+
+/** 「자세히」에 접어 두는 섹션 — 섹션 줄에서는 감춘다 */
+export const ADVANCED_SECTIONS = ['문단 종류', '줄 나눔', '탭'];
+
+/** 설명 표시 여부 — [?] 토글, 기억한다 */
+const HELP_KEY = 'rhwpParaHelp';
+export function helpOn(): boolean {
+  try { return localStorage.getItem(HELP_KEY) === '1'; } catch { return false; }
+}
+export function setHelpOn(v: boolean): void {
+  try { localStorage.setItem(HELP_KEY, v ? '1' : '0'); } catch { /* 무시 */ }
+}
 
 export class TextPanelSections {
   private host!: HTMLElement;
@@ -80,16 +97,14 @@ export class TextPanelSections {
     this.host = mkEl('div', 'tps');
     host.appendChild(this.host);
     const sh = SECTION_HINT[section];
-    if (sh) this.host.appendChild(mkEl('div', 'tps-sec-hint', sh));
+    if (sh && helpOn()) this.host.appendChild(mkEl('div', 'tps-sec-hint', sh));
     build();
     return true;
   }
 
   private sections(): Record<string, () => void> {
     return {
-      정렬: () => this.buildAlign(),
-      '여백·첫 줄': () => this.buildIndent(),
-      간격: () => this.buildSpacing(),
+      자주: () => this.buildCommon(),
       '문단 종류': () => this.buildKind(),
       '줄 나눔': () => this.buildBreak(),
       탭: () => this.buildTab(),
@@ -97,6 +112,51 @@ export class TextPanelSections {
   }
 
   // ── 섹션 ────────────────────────────────────────
+
+  /**
+   * 「자주」 — 한 문단을 손볼 때 실제로 쓰는 넷을 한 화면에.
+   * 정렬(6) · 줄 간격 · 문단 간격(위/아래) · 첫 줄. 섹션 전환도 스크롤도 없다.
+   */
+  private buildCommon(): void {
+    this.host.appendChild(this.segRow('정렬', ALIGNS, this.pp.alignment ?? 'justify', (v) => {
+      this.para({ alignment: v });
+      this.paintPreview();
+    }));
+    this.host.appendChild(this.stepper('줄 간격', this.pp.lineSpacing ?? 160, '%', 50, 500, (next) => {
+      this.para({ lineSpacing: next });
+    }, 10));
+    const gap = mkEl('div', 'tps-row tps-row--pair');
+    gap.appendChild(mkEl('span', 'tps-label', '문단 간격'));
+    gap.appendChild(this.miniNum('위', toPt(this.pp.spacingBefore),
+      (v) => this.para({ spacingBefore: fromPt(v) })));
+    gap.appendChild(this.miniNum('아래', toPt(this.pp.spacingAfter),
+      (v) => this.para({ spacingAfter: fromPt(v) })));
+    this.host.appendChild(gap);
+    this.appendHint(gap, '문단 간격');
+
+    const cur = this.pp.indent ?? 0;
+    const kind = cur > 0 ? 'indent' : cur < 0 ? 'hang' : 'normal';
+    this.host.appendChild(this.segRow('첫 줄',
+      [['normal', '보통'], ['indent', '들여쓰기'], ['hang', '내어쓰기']] as Opt<string>[], kind, (v) => {
+        const mag = Math.abs(this.pp.indent ?? 0) || fromPt('10');
+        this.para({ indent: v === 'normal' ? 0 : v === 'indent' ? mag : -mag });
+        this.paintPreview();
+      }));
+    this.host.appendChild(this.buildPreview());
+  }
+
+  /** 라벨이 짧은 인라인 숫자칸 — 「위 0 아래 0」 처럼 한 줄에 둘 */
+  private miniNum(label: string, value: string, onChange: (v: string) => void): HTMLElement {
+    const wrap = mkEl('label', 'tps-mini');
+    wrap.appendChild(mkEl('span', 'tps-mini-label', label));
+    const input = mkEl('input', 'tps-input tps-input--mini') as HTMLInputElement;
+    input.type = 'number';
+    input.step = '0.5';
+    input.value = value;
+    input.addEventListener('change', () => onChange(input.value));
+    wrap.append(input, mkEl('span', 'tps-unit', 'pt'));
+    return wrap;
+  }
 
   private buildAlign(): void {
     this.host.appendChild(this.segRow('정렬 방식', ALIGNS, this.pp.alignment ?? 'justify', (v) => {
@@ -311,7 +371,7 @@ export class TextPanelSections {
     const text = mkEl('div', 'tps-switch-text');
     text.appendChild(mkEl('span', 'tps-switch-label', clean));
     const hint = FLAG_HINT[clean];
-    if (hint) text.appendChild(mkEl('span', 'tps-hint', hint));
+    if (hint && helpOn()) text.appendChild(mkEl('span', 'tps-hint', hint));
     row.append(input, mkEl('span', 'tps-switch-track'), text);
     if (hint) row.title = hint;
     return row;
@@ -319,14 +379,17 @@ export class TextPanelSections {
 
   /** 라벨 아래 한 줄 설명 — 문구 정본은 text-panel-help.ts */
   private appendHint(row: HTMLElement, label: string): void {
+    // ⚠ 꺼져 있어도 title 은 남는다 — 툴팁으로는 언제나 읽을 수 있어야 한다
     const h = FIELD_HINT[label];
-    if (h) row.appendChild(mkEl('span', 'tps-hint', h));
+    if (!h) return;
+    if (!row.title) row.title = h;
+    if (helpOn()) row.appendChild(mkEl('span', 'tps-hint', h));
   }
 
   /** −/값/+ 알약 스테퍼 (자간·장평) */
   private stepper(
     label: string, value: number, unit: string, min: number, max: number,
-    onChange: (next: number) => void,
+    onChange: (next: number) => void, stepBy = 1,
   ): HTMLElement {
     const row = mkEl('div', 'tps-row tps-row--stack');
     row.appendChild(mkEl('span', 'tps-label', label));
@@ -334,7 +397,7 @@ export class TextPanelSections {
     let cur = value;
     const val = mkEl('span', 'tps-pill-num', `${cur}${unit}`);
     const step = (d: number) => () => {
-      cur = Math.max(min, Math.min(max, cur + d));
+      cur = Math.max(min, Math.min(max, cur + d * stepBy));
       val.textContent = `${cur}${unit}`;
       onChange(cur);
       this.paintPreview();

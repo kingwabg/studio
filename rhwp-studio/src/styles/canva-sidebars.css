@@ -1201,3 +1201,31 @@
 }
 .tps-glyph { width: 22px; height: 16px; flex: none; display: block; }
 .tps-glyph-ic { font-size: 17px; line-height: 1; flex: none; }
+
+/* ── 문단 패널 재구성 (사용자 결정 2026-08-01: 설명은 토글, 자주 쓰는 것 한 화면) ── */
+.canva-help-bar { display: flex; justify-content: flex-end; margin: -2px 0 6px; }
+.canva-help-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 8px; border: 1px solid transparent; border-radius: 100px;
+  background: transparent; color: var(--color-text-muted);
+  font: inherit; font-size: 11px; cursor: pointer;
+}
+.canva-help-btn:hover { border-color: var(--color-border); color: var(--color-primary); }
+.canva-help-btn.is-on {
+  background: var(--color-accent-bg); color: var(--color-primary); border-color: transparent;
+}
+.canva-adv-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px;
+  height: 32px; margin-top: 10px; padding: 0 10px;
+  border: 1px solid var(--color-border); border-radius: 6px;
+  background: transparent; color: var(--color-text-muted);
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.canva-adv-toggle:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.canva-adv-toggle.is-open { color: var(--color-primary); border-color: var(--color-primary); }
+/* 「문단 간격」 위/아래를 한 줄에 */
+.tps-row--pair { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tps-row--pair .tps-label { flex: 1 0 100%; }
+.tps-mini { display: inline-flex; align-items: center; gap: 4px; }
+.tps-mini-label { font-size: 11px; color: var(--color-text-muted); }
+.tps-input--mini { width: 52px; }
