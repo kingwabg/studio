@@ -14,6 +14,7 @@ import { mkEl, mkButton } from './canva-dom';
 import {
   FIELD_HINT, OPTION_HINT, FLAG_HINT, SECTION_HINT, stripAccel,
 } from './text-panel-help';
+import { ALIGN_GLYPH, INDENT_GLYPH, KIND_ICON } from './text-panel-glyphs';
 import type { CanvaServices } from './canva-services';
 import type { ParaProperties, CharProperties } from '@/core/types';
 
@@ -227,6 +228,20 @@ export class TextPanelSections {
 
   // ── 컨트롤 ──────────────────────────────────────
 
+  /**
+   * 옵션 값에 붙는 미리보기 그림. 없으면 글자만 — 억지 아이콘은 오히려 방해다.
+   * (정렬·첫 줄·줄 나눔은 '줄이 어떻게 놓이나'라 막대 그림, 문단 종류는 Phosphor)
+   */
+  private glyphFor<T>(value: T, text: string): string {
+    const k = String(value);
+    if (k in ALIGN_GLYPH) return ALIGN_GLYPH[k];
+    if (k in INDENT_GLYPH) return INDENT_GLYPH[k];
+    if (k in KIND_ICON) return `<i class="ph-duotone ph-${KIND_ICON[k]} tps-glyph-ic"></i>`;
+    // 줄 나눔은 그림을 두지 않는다 — 이유는 text-panel-glyphs.ts 주석 참조
+    void text;
+    return '';
+  }
+
   private segRow<T>(label: string, opts: Opt<T>[], cur: T, onChange: (v: T) => void): HTMLElement {
     const row = mkEl('div', 'tps-field');
     if (label) {
@@ -236,7 +251,10 @@ export class TextPanelSections {
     const seg = mkEl('div', 'tps-seg tps-seg--wrap');
     for (const [value, text] of opts) {
       // 툴팁 — 배분·나눔·내어쓰기처럼 이름만으론 못 고르는 것들에 붙는다
-      const b = mkButton('tps-seg-btn', { text, title: OPTION_HINT[text] ?? text });
+      const b = mkButton('tps-seg-btn', { title: OPTION_HINT[text] ?? text });
+      const g = this.glyphFor(value, text);
+      b.innerHTML = `${g}<span>${text}</span>`;
+      if (g) b.classList.add('has-glyph');
       b.classList.toggle('is-on', value === cur);
       b.addEventListener('click', () => {
         seg.querySelectorAll('.tps-seg-btn').forEach((e) => e.classList.remove('is-on'));

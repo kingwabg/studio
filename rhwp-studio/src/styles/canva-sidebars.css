@@ -1188,3 +1188,16 @@
 .tps-switch-text .tps-hint { margin-top: 1px; }
 .tps-switch-row { align-items: flex-start; }
 .tps-switch-row .tps-switch-track { margin-top: 2px; flex: none; }
+
+/* ── 문단 패널 옵션 그림 (사용자 지적 2026-08-01: 내용에 아이콘이 없다) ──
+   그림 정본 = ui/text-panel-glyphs.ts. 색은 currentColor 라 선택 상태·다크에
+   자동으로 물든다 — 상태별 색 규칙을 따로 두지 않는다. */
+.tps-seg-btn.has-glyph {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  /* ⚠ 기본 .tps-seg-btn 은 height:26px + overflow:hidden 이라, 그림을 넣으면
+     세로로 눌려 **높이 0** 이 되어 안 보였다(2026-08-01 실측 h=0). 높이를 풀고
+     그림에 flex:none 을 준다. */
+  height: auto; min-height: 48px; padding: 6px 4px 5px; overflow: visible;
+}
+.tps-glyph { width: 22px; height: 16px; flex: none; display: block; }
+.tps-glyph-ic { font-size: 17px; line-height: 1; flex: none; }
