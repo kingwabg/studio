@@ -1,9 +1,13 @@
 /**
- * 리본 헤더 (디자인 "rhwp 헤더·리본 재설계" 2a — 2행 88px)
+ * 리본 헤더 (디자인 "rhwp 헤더·리본 재설계" 2a — 2행 106px)
  *
  * 기존 3단(메뉴바 + 아이콘 툴바 + 서식바)을 2행으로 합친다.
- *  1행 44px: 브랜드 · 파일 메뉴 · 작업 흐름 탭(홈·삽입·레이아웃·검토) · 문서 제목 · 테마
- *  2행 44px: 활성 탭의 리본 (Phosphor 아이콘 30px, 라벨은 툴팁)
+ *  1행 44px: 브랜드 · 파일 메뉴 · 작업 흐름 탭(홈·편집·삽입·레이아웃·도구·검토) · 문서 제목 · 테마
+ *  2행 62px: 활성 탭의 리본 — **모든 버튼에 아이콘 아래 이름**(50px 타일)
+ *
+ * 2행을 44 → 62px 로 키운 이유(디자인 2a): 아이콘만으로는 무슨 명령인지 배우는 데
+ * 툴팁을 기다려야 했다. 이름을 붙이면 한 번에 읽힌다 — 한컴·워드가 라벨을 다는 이유다.
+ * 자리가 모자라는 만큼은 「⋯ 편집」에서 탭별로 켜고 끈다(DEFAULT_OFF 가 초기값).
  *
  * 설계 원칙
  * - 한컴 스프라이트(920KB SVG 2장) → Phosphor 아이콘 폰트(로컬 벤더링, currentColor)
@@ -12,206 +16,12 @@
  * - 표 조작은 헤더 컨텍스트 탭이 아니라 우측 속성 패널로 (디자인 2c, 후속)
  */
 
-export type RibbonItem =
-  | { kind: 'btn'; icon: string; label: string; cmd?: string; primary?: boolean }
-  | { kind: 'gap' }
-  | { kind: 'combo'; label: string; width: number; cmd?: string }
-  /** 기존 Toolbar 가 소유한 실제 컨트롤(#font-name 등)을 이 자리로 옮겨 담는다 */
-  | { kind: 'slot'; slot: string; width: number }
-  | { kind: 'expander'; label: string; cmd?: string }
-  | { kind: 'over'; icon: string; label: string; key?: string; cmd?: string };
+import {
+  RIBBON_TABS, DEFAULT_OFF, loadHidden, saveHidden, type RibbonItem,
+} from './ribbon-tabs';
 
-const P = (icon: string, label: string, cmd?: string): RibbonItem =>
-  ({ kind: 'btn', icon, label, cmd });
-const PP = (icon: string, label: string, cmd?: string): RibbonItem =>
-  ({ kind: 'btn', icon, label, cmd, primary: true });
-const gap = (): RibbonItem => ({ kind: 'gap' });
-const combo = (label: string, width: number, cmd?: string): RibbonItem =>
-  ({ kind: 'combo', label, width, cmd });
-const slot = (name: string, width: number): RibbonItem => ({ kind: 'slot', slot: name, width });
-const O = (icon: string, label: string, key?: string, cmd?: string): RibbonItem =>
-  ({ kind: 'over', icon, label, key, cmd });
+export { RIBBON_TABS, type RibbonItem };
 
-export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[] }> = [
-  {
-    id: 'home',
-    label: '홈',
-    // 홈 = 편집 + 서식 필수를 한 줄에 (탭 전환 없이 "쓰기 → 꾸미기")
-    items: [
-      // 되돌리기·잘라내기 묶음은 '편집' 탭으로 옮겼다(2026-07-30) — 홈은 서식에 전념한다.
-      // 글꼴·크기는 Toolbar 가 소유한 실제 컨트롤을 옮겨 온다(상태 동기·이벤트 유지)
-      slot('font-name', 132),
-      slot('font-size', 68),
-      gap(),
-      P('text-b', '굵게', 'format:bold'),
-      P('text-italic', '기울임', 'format:italic'),
-      P('text-underline', '밑줄', 'format:underline'),
-      P('text-strikethrough', '취소선', 'format:strikethrough'),
-      // 글자 색·형광펜은 구 서식바(Toolbar)가 소유한 동작하는 피커를 입양한다
-      // (글꼴 콤보와 같은 adopt 패턴 — 이벤트·상태 동기가 그대로 산다. 배선은 main.ts).
-      slot('text-color', 40),
-      slot('highlight', 44),
-      gap(),
-      // 정렬 4종은 한컴·워드와 같은 순서(왼쪽·가운데·오른쪽·양쪽)로 나란히 둔다 —
-      // '오른쪽 정렬'만 「⋯」에 숨어 있어 정렬을 고르는 손이 두 곳으로 갈렸다(2026-07-30).
-      P('text-align-left', '왼쪽 정렬', 'format:align-left'),
-      P('text-align-center', '가운데 정렬', 'format:align-center'),
-      P('text-align-right', '오른쪽 정렬', 'format:align-right'),
-      P('text-align-justify', '양쪽 정렬', 'format:align-justify'),
-      P('arrows-vertical', '줄 간격', 'format:line-spacing'),
-      gap(),
-      P('list-numbers', '문단 번호', 'format:toggle-numbering'),
-      P('list-bullets', '글머리표', 'format:toggle-bullet'),
-      P('text-indent', '한 수준 증가', 'format:level-increase'),
-      P('text-outdent', '한 수준 감소', 'format:level-decrease'),
-      gap(),
-      // 「⋯」에 있던 두 대화상자를 꺼내 놓는다. 옛 '자세히' 확장 버튼은 글자 모양과
-      // 같은 명령이라 중복 — 버튼으로 대체하고 홈의 오버플로는 비운다(⋯ 자동 소멸).
-      P('text-aa', '글자 모양', 'format:char-shape'),
-      P('paragraph', '문단 모양', 'format:para-shape'),
-    ],
-  },
-  {
-    id: 'edit',
-    label: '편집',
-    // 되돌리기·오려두기 묶음의 집. 찾기 계열도 여기로 모아 홈·검토와 겹치지 않게 한다
-    // (헤더 재설계의 '같은 명령이 세 곳에 중복되지 않는다' 규칙).
-    items: [
-      PP('arrow-counter-clockwise', '되돌리기', 'edit:undo'),
-      PP('arrow-clockwise', '다시 실행', 'edit:redo'),
-      gap(),
-      P('scissors', '오려 두기', 'edit:cut'),
-      P('copy', '복사', 'edit:copy'),
-      P('clipboard-text', '붙이기', 'edit:paste'),
-      gap(),
-      P('paint-brush', '모양 복사', 'edit:format-copy'),
-      P('paint-bucket', '모양 붙여넣기', 'edit:format-paste'),
-      gap(),
-      P('selection-all', '모두 선택', 'edit:select-all'),
-      P('eraser', '지우기', 'edit:delete'),
-      gap(),
-      P('magnifying-glass', '찾기', 'edit:find'),
-      P('text-t', '찾아 바꾸기', 'edit:find-replace'),
-      P('crosshair', '찾아가기', 'edit:goto'),
-      O('arrow-counter-clockwise', '다시 찾기', 'Ctrl+L', 'edit:find-again'),
-    ],
-  },
-  {
-    id: 'insert',
-    label: '삽입',
-    items: [
-      PP('table', '표', 'table:create'),
-      PP('image', '그림', 'insert:image'),
-      PP('shapes', '도형', 'insert:shape'),
-      P('text-t', '글상자', 'insert:textbox'),
-      gap(),
-      P('math-operations', '수식', 'insert:equation'),
-      P('asterisk', '문자표', 'insert:symbols'),
-      P('smiley', '이모지', 'insert:emoji'),
-      P('brackets-curly', '필드 입력', 'insert:field'),
-      gap(),
-      P('link-simple', '하이퍼링크', 'insert:hyperlink'),
-      P('bookmark-simple', '책갈피', 'insert:bookmark'),
-      gap(),
-      P('note', '각주', 'insert:footnote'),
-      P('notebook', '미주', 'insert:endnote'),
-      gap(),
-      P('sliders-horizontal', '개체 속성', 'insert:picture-props'),
-      O('subtitles', '캡션 넣기', 'Ctrl+N,C', 'insert:caption-toggle'),
-      O('arrow-clockwise', '오른쪽 90° 회전', '', 'insert:rotate-cw'),
-      O('flip-horizontal', '좌우 대칭', '', 'insert:flip-horz'),
-      O('flip-vertical', '상하 대칭', '', 'insert:flip-vert'),
-      O('trash', '개체 지우기', 'Delete', 'insert:picture-delete'),
-    ],
-  },
-  {
-    id: 'layout',
-    label: '레이아웃',
-    items: [
-      PP('article', '편집 용지', 'file:page-setup'),
-      P('selection', '쪽 테두리/배경', 'page:page-border'),
-      gap(),
-      PP('arrow-line-up', '머리말', 'page:header-create'),
-      PP('arrow-line-down', '꼬리말', 'page:footer-create'),
-      P('hash', '쪽 번호', 'page:insert-field-pagenum'),
-      P('number-square-one', '새 번호로 시작', 'page:new-page-num'),
-      gap(),
-      P('rows', '쪽 나누기', 'page:break'),
-      P('columns', '단 나누기', 'page:column-break'),
-      P('columns-plus-right', '단 설정', 'page:col-settings'),
-      gap(),
-      P('grid-four', '격자 보기', 'view:toggle-grid'),
-      P('grid-nine', '격자 설정', 'view:grid-settings'),
-      gap(),
-      P('rectangle-dashed', '구역 설정', 'page:section-settings'),
-      P('arrows-out-line-horizontal', '구역 나누기', 'page:section-break'),
-      P('stack-simple', '바탕쪽', 'page:masterpage'),
-      P('printer', '인쇄', 'file:print'),
-      O('eye-slash', '현재 쪽만 감추기', '', 'page:hide-current'),
-      O('crop', '잘림 보기', '', 'view:toggle-clip'),
-    ],
-  },
-  {
-    id: 'tools',
-    label: '도구',
-    // 디자인의 tools 탭 그대로. AI·녹음은 `side:` 로 우측 패널을 여는 항목이라 명령으로 배선.
-    // ⚠ 아직 구현이 없는 도구(사전·번역·스크립트·문서 공유·함께 편집)도 **자리를 남긴다** —
-    //   누르면 '준비 중' 안내가 뜬다(tool.ts). 뺄지 말지는 제품 결정이다.
-    items: [
-      PP('sparkle', 'AI 도우미', 'tool:ai-panel'),
-      PP('microphone', '음성 녹음', 'tool:record-panel'),
-      gap(),
-      P('text-aa', '맞춤법 검사', 'edit:spellcheck'),
-      gap(),
-      P('table', '표 빈칸 채우기', 'tool:table-fill'),
-      gap(),
-      P('stamp', '도장 만들기', 'tool:seal-maker'),
-      P('list-checks', '전자서명 체크리스트', 'tool:esign-checklist'),
-      P('chart-bar', '동의율 시뮬레이터', 'tool:consent-sim'),
-      P('file-lock', 'NDA 생성기', 'tool:nda-generator'),
-      P('ruler', '서식 규정 검사', 'edit:format-lint'),
-      P('books', '사전', 'tool:dictionary'),
-      P('translate', '번역', 'tool:translate'),
-      gap(),
-      P('list-numbers', '차례 만들기', 'insert:toc'),
-      P('text-align-left', '상용구', 'insert:snippet'),
-      gap(),
-      P('command', '명령 팔레트', 'tool:command-palette'),
-      P('puzzle-piece', '스크립트', 'tool:script'),
-      P('gear-six', '환경 설정', 'tool:options'),
-      O('cloud-arrow-up', '문서 공유', '', 'tool:share'),
-      O('users-three', '함께 편집', '', 'tool:coedit'),
-    ],
-  },
-  {
-    id: 'review',
-    label: '검토',
-    items: [
-      PP('git-diff', '문서 비교', 'edit:compare-documents'),
-      PP('clock-counter-clockwise', '이력 관리', 'edit:document-history'),
-      gap(),
-      // 변경 내용 추적 (track-changes.md) — 토글·적용/취소·이동
-      PP('pencil-line', '변경 추적', 'review:track-toggle'),
-      P('check', '적용 후 다음', 'review:accept-change'),
-      P('x', '취소 후 다음', 'review:reject-change'),
-      P('caret-left', '이전 변경', 'review:prev-change'),
-      P('caret-right', '다음 변경', 'review:next-change'),
-      P('eye', '본 최종', 'review:view-final'),
-      O('checks', '모두 적용', '', 'review:accept-all'),
-      O('trash', '모두 취소', '', 'review:reject-all'),
-      gap(),
-      P('brackets-angle', '조판 부호', 'view:ctrl-mark'),
-      P('arrow-elbow-down-left', '문단 부호', 'view:para-mark'),
-      gap(),
-      P('magnifying-glass-plus', '확대', 'view:zoom-in'),
-      P('magnifying-glass-minus', '축소', 'view:zoom-out'),
-      gap(),
-      O('info', '제품 정보', '', 'file:about'),
-    ],
-  },
-];
-
-/** 아이콘 굵기 — 디자인 2b (기본값 듀오톤) */
 export type IconWeight = 'duotone' | 'regular' | 'fill' | 'bold';
 const WEIGHT_CLASS: Record<IconWeight, string> = {
   duotone: 'ph-duotone',
@@ -221,6 +31,9 @@ const WEIGHT_CLASS: Record<IconWeight, string> = {
 };
 
 export class RibbonHeader {
+  /** 탭별로 리본에서 접어 둔 명령 라벨 */
+  private hidden: Record<string, string[]> = loadHidden();
+
   private root: HTMLElement;
   private tabRow!: HTMLDivElement;
   private ribbonRow!: HTMLDivElement;
@@ -281,7 +94,8 @@ export class RibbonHeader {
   private placeAdopted(): void {
     for (const [name, el] of this.adopted) {
       const host = this.ribbonRow.querySelector<HTMLElement>(`.rb-slot[data-slot="${name}"]`);
-      if (host && el.parentElement !== host) host.appendChild(el);
+      // prepend — 라벨이 붙은 자리에서는 컨트롤이 이름 **위**에 와야 한다
+      if (host && el.parentElement !== host) host.prepend(el);
     }
   }
 
@@ -444,10 +258,18 @@ export class RibbonHeader {
     this.ribbonRow.innerHTML = '';
     this.closeOverflow();
 
-    const overItems = tab.items.filter((i): i is Extract<RibbonItem, { kind: 'over' }> => i.kind === 'over');
+    const off = new Set(this.hidden[tab.id] ?? []);
+    // 접어 둔 버튼은 「⋯ 편집」 목록으로 내려간다 — 사라지는 게 아니라 옮겨 간다.
+    const overItems: Array<Extract<RibbonItem, { kind: 'over' }>> = [
+      ...tab.items.filter((i): i is Extract<RibbonItem, { kind: 'over' }> => i.kind === 'over'),
+      ...tab.items.flatMap((i) => (i.kind === 'btn' && off.has(i.label)
+        ? [{ kind: 'over', icon: i.icon, label: i.label, cmd: i.cmd } as Extract<RibbonItem, { kind: 'over' }>]
+        : [])),
+    ];
 
     for (const item of tab.items) {
       if (item.kind === 'over') continue;
+      if (item.kind === 'btn' && off.has(item.label)) continue;
       if (item.kind === 'gap') {
         const s = document.createElement('span');
         s.className = 'rb-sep';
@@ -467,9 +289,15 @@ export class RibbonHeader {
       }
       if (item.kind === 'slot') {
         const host = document.createElement('span');
-        host.className = 'rb-slot';
+        host.className = item.label ? 'rb-slot has-label' : 'rb-slot';
         host.dataset.slot = item.slot;
         host.style.width = `${item.width}px`;
+        if (item.label) {
+          const l = document.createElement('span');
+          l.className = 'rb-btn-label';
+          l.textContent = item.label;
+          host.appendChild(l);
+        }
         this.ribbonRow.appendChild(host);
         continue;
       }
@@ -488,28 +316,31 @@ export class RibbonHeader {
       b.type = 'button';
       b.title = item.label;
       if (item.cmd) b.dataset.cmd = item.cmd;
-      b.appendChild(this.icon(item.icon));
-      if (item.primary) {
-        const l = document.createElement('span');
-        l.className = 'rb-btn-label';
-        l.textContent = item.label;
-        b.appendChild(l);
-      }
+      b.appendChild(this.icon(item.icon, 20));
+      // 라벨은 **모든 버튼**에 붙는다(디자인 2a). primary 는 이제 굵기 강조일 뿐이다.
+      const l = document.createElement('span');
+      l.className = 'rb-btn-label';
+      l.textContent = item.label;
+      b.appendChild(l);
       this.ribbonRow.appendChild(b);
     }
 
-    if (overItems.length > 0) {
-      const more = document.createElement('button');
-      more.className = 'rb-more';
-      more.type = 'button';
-      more.title = '더 보기';
-      more.appendChild(this.icon('dots-three', 17));
-      more.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleOverflow(more, overItems);
-      });
-      this.ribbonRow.appendChild(more);
-    }
+    // 「⋯ 편집」은 항상 있다 — 접어 둔 명령을 꺼내는 유일한 문이라 조건부로 숨기면
+    // 되돌릴 길이 사라진다(옛 구현은 overItems 가 0이면 버튼 자체가 없었다).
+    const more = document.createElement('button');
+    more.className = 'rb-more';
+    more.type = 'button';
+    more.title = '이 탭에 보일 명령 고르기';
+    more.appendChild(this.icon('dots-three', 20));
+    const ml = document.createElement('span');
+    ml.className = 'rb-btn-label';
+    ml.textContent = '편집';
+    more.appendChild(ml);
+    more.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleEditPanel(more, tab, overItems);
+    });
+    this.ribbonRow.appendChild(more);
 
     this.placeAdopted();
   }
@@ -519,37 +350,118 @@ export class RibbonHeader {
     this.overflowPanel = null;
   }
 
-  private toggleOverflow(anchor: HTMLElement, items: Array<Extract<RibbonItem, { kind: 'over' }>>): void {
+  /**
+   * 「⋯ 편집」 패널 — 위쪽은 접어 둔 명령(눌러서 바로 실행), 아래쪽은 이 탭의 모든
+   * 버튼을 켜고 끄는 목록. 디자인 2a 의 "이 탭에 보일 명령 · N개 · 기본값".
+   */
+  private toggleEditPanel(
+    anchor: HTMLElement,
+    tab: { id: string; label: string; items: RibbonItem[] },
+    overItems: Array<Extract<RibbonItem, { kind: 'over' }>>,
+  ): void {
     if (this.overflowPanel) { this.closeOverflow(); return; }
+    const off = new Set(this.hidden[tab.id] ?? []);
+    const all = tab.items.filter((i): i is Extract<RibbonItem, { kind: 'btn' }> => i.kind === 'btn');
+
     const panel = document.createElement('div');
-    panel.className = 'rb-overflow';
-    for (const it of items) {
+    panel.className = 'rb-overflow rb-editpanel';
+
+    // 위: 접어 둔 명령 — 목록에서 바로 실행할 수 있어야 '접기'가 감추기가 아니게 된다
+    if (overItems.length > 0) {
+      for (const it of overItems) {
+        const row = document.createElement('button');
+        row.className = 'rb-over-item';
+        row.type = 'button';
+        if (it.cmd) row.dataset.cmd = it.cmd;
+        row.appendChild(this.icon(it.icon, 16));
+        const label = document.createElement('span');
+        label.className = 'rb-over-label';
+        label.textContent = it.label;
+        row.appendChild(label);
+        if (it.key) {
+          const key = document.createElement('span');
+          key.className = 'rb-over-key';
+          key.textContent = it.key;
+          row.appendChild(key);
+        }
+        row.addEventListener('click', () => this.closeOverflow());
+        panel.appendChild(row);
+      }
+    }
+
+    // 아래: 켜고 끄기
+    const head = document.createElement('div');
+    head.className = 'rb-edit-head';
+    const ht = document.createElement('span');
+    ht.className = 'rb-edit-title';
+    ht.textContent = '이 탭에 보일 명령';
+    const cnt = document.createElement('span');
+    cnt.className = 'rb-edit-count';
+    const paintCount = () => {
+      const n = all.filter((x) => !(this.hidden[tab.id] ?? []).includes(x.label)).length;
+      cnt.textContent = `${n}개`;
+    };
+    paintCount();
+    const reset = document.createElement('button');
+    reset.className = 'rb-edit-reset';
+    reset.type = 'button';
+    reset.textContent = '기본값';
+    reset.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hidden[tab.id] = [...(DEFAULT_OFF[tab.id] ?? [])];
+      saveHidden(this.hidden);
+      this.closeOverflow();
+      this.renderRibbon();
+    });
+    head.append(ht, cnt, reset);
+    panel.appendChild(head);
+
+    const list = document.createElement('div');
+    list.className = 'rb-edit-list';
+    for (const it of all) {
       const row = document.createElement('button');
-      row.className = 'rb-over-item';
+      row.className = 'rb-edit-item';
       row.type = 'button';
-      if (it.cmd) row.dataset.cmd = it.cmd;
-      row.appendChild(this.icon(it.icon, 16));
+      row.appendChild(this.icon(it.icon, 17));
       const label = document.createElement('span');
       label.className = 'rb-over-label';
       label.textContent = it.label;
       row.appendChild(label);
-      if (it.key) {
-        const key = document.createElement('span');
-        key.className = 'rb-over-key';
-        key.textContent = it.key;
-        row.appendChild(key);
-      }
-      row.addEventListener('click', () => this.closeOverflow());
-      panel.appendChild(row);
+      const sw = document.createElement('span');
+      sw.className = 'rb-edit-switch';
+      sw.classList.toggle('is-on', !off.has(it.label));
+      sw.appendChild(document.createElement('i'));
+      row.appendChild(sw);
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cur = new Set(this.hidden[tab.id] ?? []);
+        if (cur.has(it.label)) cur.delete(it.label); else cur.add(it.label);
+        this.hidden[tab.id] = [...cur];
+        saveHidden(this.hidden);
+        sw.classList.toggle('is-on', !cur.has(it.label));
+        paintCount();
+        // 패널은 열어 둔 채 리본만 다시 그린다 — 여러 개를 연달아 켜고 끌 수 있게.
+        const keep = this.overflowPanel;
+        this.overflowPanel = null;
+        this.renderRibbon();
+        this.overflowPanel = keep;
+      });
+      list.appendChild(row);
     }
+    panel.appendChild(list);
+
     const r = anchor.getBoundingClientRect();
     panel.style.top = `${r.bottom + 4}px`;
-    panel.style.left = `${Math.max(8, r.right - 260)}px`;
+    panel.style.left = `${Math.max(8, r.right - 300)}px`;
     document.body.appendChild(panel);
     this.overflowPanel = panel;
-    const off = (ev: MouseEvent) => {
-      if (!panel.contains(ev.target as Node)) { this.closeOverflow(); document.removeEventListener('mousedown', off, true); }
+    const offClick = (ev: MouseEvent) => {
+      if (!panel.contains(ev.target as Node)) {
+        this.closeOverflow();
+        document.removeEventListener('mousedown', offClick, true);
+      }
     };
-    setTimeout(() => document.addEventListener('mousedown', off, true), 0);
+    setTimeout(() => document.addEventListener('mousedown', offClick, true), 0);
   }
+
 }
