@@ -26,6 +26,11 @@ runTest('이모지 폭 실측', async ({ page }) => {
     const adv = [];
     for (let i = 1; i < pos.length; i++) adv.push(Math.round((pos[i] - pos[i - 1]) * 10) / 10);
     // 브라우저(컬러 이모지 폰트)가 같은 크기에서 재는 폭 = 오라클
+    // ⚠ 웹폰트를 기다리지 않고 부팅하도록 바꾼 뒤(2026-08-01 perf) 이 오라클이
+    //   글꼴 도착 **전에** 재서 흔들렸다(✓ 12.9 → 7.9px). 엔진과 같은 글꼴로
+    //   재야 비교가 성립한다 — 도착을 기다린다.
+    await document.fonts.ready;
+    await new Promise((r) => setTimeout(r, 300));
     const cv = document.createElement('canvas').getContext('2d');
     const px = 10 * (96 / 72) * (w.getZoom?.() ?? 1);
     cv.font = `${px}px "함초롬바탕", serif`;
