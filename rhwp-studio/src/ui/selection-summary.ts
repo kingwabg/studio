@@ -266,15 +266,23 @@ export function currentTextRuns(
   if (!pos || pos.parentParaIndex !== undefined) return { runs: [], truncated: false };
   const sel = cursor.hasSelection?.() ? cursor.getSelectionOrdered?.() ?? null : null;
 
-  let scan: { runs: FormatRun[]; truncated: boolean };
-  if (sel) {
-    scan = scanFormatRuns(cursor, w);
-  } else {
-    // 선택 없음 — 커서 문단 전체를 같은 방식으로 훑는다.
+  const wholePara = (): { runs: FormatRun[]; truncated: boolean } => {
     let len = 0;
     try { len = w.getLogicalLength(pos.sectionIndex, pos.paragraphIndex); } catch { return { runs: [], truncated: false }; }
     if (len <= 0) return { runs: [], truncated: false };
-    scan = scanRange(w, pos.sectionIndex, pos.paragraphIndex, 0, len);
+    return scanRange(w, pos.sectionIndex, pos.paragraphIndex, 0, len);
+  };
+
+  let scan: { runs: FormatRun[]; truncated: boolean };
+  if (sel) {
+    scan = scanFormatRuns(cursor, w);
+    // ⚠ 클릭하는 **순간**에는 길이 0 짜리 선택이 잡힌다 — 그때 빈 결과를 그대로
+    //   내보내면 견본이 비었다가 다시 차며 깜빡였다(사용자 지적 2026-08-01
+    //   "클릭할 때마다 로딩되듯이"). 빈 선택이면 문단을 보여준다.
+    if (scan.runs.length === 0) scan = wholePara();
+  } else {
+    // 선택 없음 — 커서 문단 전체를 같은 방식으로 훑는다.
+    scan = wholePara();
   }
 
   // 실제 글자 채우기 + 상한에서 자르기

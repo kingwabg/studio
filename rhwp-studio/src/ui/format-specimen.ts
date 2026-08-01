@@ -55,6 +55,8 @@ export class FormatSpecimen {
   private headEl!: HTMLElement;
   private sub!: HTMLElement;
   private text!: HTMLElement;
+  /** 마지막으로 그린 내용 — 같으면 다시 그리지 않는다(깜빡임 방지) */
+  private lastContentKey = '';
   private fontName = '함초롬바탕';
   private fontPt = 10;
   /** 선택 안에 서로 다른 글자 서식이 섞였나 — 견본은 커서 값만 보여주므로 그 한계를 적는다 */
@@ -123,6 +125,12 @@ export class FormatSpecimen {
   setContent(runs: FormatRun[], truncated: boolean): void {
     if (!this.text) return;
     const usable = runs.filter((r) => (r.text ?? '').length > 0);
+    // ⚠ 내용이 같은데도 매번 다 지우고 새로 그리고 있었다 — 클릭 한 번에 견본이
+    //   4번씩 다시 쓰여 **깜빡였고**, 다시 그리는 찰나에 한글이 자모로 풀려 보였다
+    //   (사용자 지적 2026-08-01 "클릭할 때마다 로딩되듯이"). 같으면 손대지 않는다.
+    const key = JSON.stringify([usable.map((r) => [r.text, r.props]), truncated]);
+    if (key === this.lastContentKey) return;
+    this.lastContentKey = key;
     if (usable.length === 0) {
       this.live = false;
       this.text.textContent = '';
@@ -292,9 +300,12 @@ export class FormatSpecimen {
     if (!this.sub) return;
     const base = `${this.fontName} ${this.fontPt}pt`;
     // 조각 수를 셌으면 "섞임"보다 정확한 "N종"으로 말한다.
-    this.sub.textContent = this.runCount >= 2
+    const next = this.runCount >= 2
       ? `${base} · 서식 ${this.runCount}종`
       : this.mixed ? `${base} · 서식 섞임` : base;
+    // 같은 글자를 다시 넣으면 그때마다 텍스트 노드가 갈린다(클릭당 4회 — 실측)
+    if (this.sub.textContent === next) return;
+    this.sub.textContent = next;
   }
 }
 

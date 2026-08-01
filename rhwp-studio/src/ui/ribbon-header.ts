@@ -267,6 +267,8 @@ export class RibbonHeader {
     // 접어 둔 버튼은 「⋯ 편집」 목록으로 내려간다 — 사라지는 게 아니라 옮겨 간다.
     const overItems: Array<Extract<RibbonItem, { kind: 'over' }>> = [
       ...tab.items.filter((i): i is Extract<RibbonItem, { kind: 'over' }> => i.kind === 'over'),
+      // 접어 둔 버튼은 「⋯」 목록에서 바로 실행할 수 있다. 칸(콤보·피커)은 실행할
+      // 명령이 없어 목록에 올리지 않는다 — 켜야 쓸 수 있다는 걸 스위치가 말해 준다.
       ...tab.items.flatMap((i) => (i.kind === 'btn' && off.has(i.label)
         ? [{ kind: 'over', icon: i.icon, label: i.label, cmd: i.cmd } as Extract<RibbonItem, { kind: 'over' }>]
         : [])),
@@ -275,6 +277,8 @@ export class RibbonHeader {
     for (const item of tab.items) {
       if (item.kind === 'over') continue;
       if (item.kind === 'btn' && off.has(item.label)) continue;
+      // 칸(스타일·글꼴·크기·색)도 접을 수 있다 — 버튼만 되던 것을 넓혔다(2026-08-01)
+      if (item.kind === 'slot' && item.label && off.has(item.label)) continue;
       if (item.kind === 'gap') {
         const s = document.createElement('span');
         s.className = 'rb-sep';
@@ -366,7 +370,12 @@ export class RibbonHeader {
   ): void {
     if (this.overflowPanel) { this.closeOverflow(); return; }
     const off = new Set(this.hidden[tab.id] ?? []);
-    const all = tab.items.filter((i): i is Extract<RibbonItem, { kind: 'btn' }> => i.kind === 'btn');
+    // 켜고 끌 수 있는 것 = 이름을 가진 버튼과 칸 전부(순서는 리본에 놓인 순서 그대로)
+    const all: Array<{ icon: string; label: string }> = tab.items.flatMap((i) => {
+      if (i.kind === 'btn') return [{ icon: i.icon, label: i.label }];
+      if (i.kind === 'slot' && i.label) return [{ icon: i.icon ?? 'square', label: i.label }];
+      return [];
+    });
 
     const panel = document.createElement('div');
     panel.className = 'rb-overflow rb-editpanel';

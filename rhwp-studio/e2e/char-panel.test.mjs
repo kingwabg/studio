@@ -29,8 +29,9 @@ runTest('글자 탭', async ({ page }) => {
     }));
     return {
       view: Math.round(pr.height),
-      sections: Object.fromEntries(['텍스트 스타일', '글자', '글자색', '형광펜', '도구']
-        .map((t) => [t, box(t)])),
+      // 「글자」·「글자색」·「형광펜」은 리본에 같은 것이 있어 뺐다(2026-08-01)
+      sections: Object.fromEntries(['텍스트 스타일', '도구'].map((t) => [t, box(t)])),
+      removed: ['글자', '글자색', '형광펜'].filter((t) => box(t) !== null),
       hasAlign: !!titled('문단 정렬'),
       cards,
       cols: getComputedStyle(pane.querySelector('.canva-styles')).gridTemplateColumns.split(' ').length,
@@ -40,7 +41,7 @@ runTest('글자 탭', async ({ page }) => {
   for (const [k, v] of Object.entries(o.sections)) {
     console.log(`  ${k}: ${v ? `y=${v.y} ${v.visible ? '보임' : '❌ 잘림'}` : '(없음)'}`);
   }
-  console.log('  문단 정렬 중복:', o.hasAlign, '/ 프리셋 열 수:', o.cols,
+  console.log('  중복 섹션 잔존:', JSON.stringify(o.removed), '/ 문단 정렬 중복:', o.hasAlign, '/ 프리셋 열 수:', o.cols,
     '/ 잘린 카드:', JSON.stringify(o.cards.filter((c) => c.cut).map((c) => c.label)));
 
   for (const [k, v] of Object.entries(o.sections)) {
@@ -49,6 +50,8 @@ runTest('글자 탭', async ({ page }) => {
   }
   assert.ok(!o.hasAlign,
     '문단 정렬·줄 간격은 문단 탭이 집이다 — 글자 탭에 중복되면 안 된다');
+  assert.deepStrictEqual(o.removed, [],
+    `리본에 있는 것을 패널에도 두지 않는다 (남아 있음: ${o.removed.join(', ')})`);
   assert.strictEqual(o.cols, 2, '프리셋 카드는 2열');
   assert.deepStrictEqual(o.cards.filter((c) => c.cut).map((c) => c.label), [],
     '카드 이름이 잘리면 뜻이 사라진다');

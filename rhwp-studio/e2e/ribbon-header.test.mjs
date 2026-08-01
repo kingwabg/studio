@@ -217,4 +217,43 @@ runTest('리본 헤더', async ({ page }) => {
   const styleW = hs.find((r) => r.n === 'style-name').w;
   console.log('     스타일 칸 폭:', styleW);
   assert.ok(styleW >= 100, `스타일 칸이 좁아 이름이 잘린다 (${styleW}px)`);
+
+  // ⑧ 스타일 아이콘 — 콤보 옆에서 기존 스타일 모달(F6)을 연다(사용자 요청 2026-08-01)
+  const st = await page.evaluate(async () => {
+    const names = [...document.querySelectorAll('.rb-row-ribbon .rb-btn-label')].map((e) => e.textContent);
+    document.querySelector('[data-cmd="format:style-dialog"]')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 800));
+    const title = document.querySelector('.dialog-wrap .dialog-title')?.textContent?.trim() ?? '';
+    document.querySelector('.dialog-wrap .dialog-btn:not(.dialog-btn-primary)')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    return { has: names.includes('스타일 설정'), title };
+  });
+  console.log('  ⑧ 스타일 설정 버튼:', st.has, '/ 모달:', st.title);
+  assert.ok(st.has, '리본에 스타일 설정 아이콘이 있어야 한다');
+  assert.ok(st.title.includes('스타일'), '기존 스타일 모달이 열려야 한다');
+
+  // ⑨ 「⋯ 편집」에 리본의 **모든** 항목(버튼 + 칸)이 들어 있고 칸도 켜고 끌 수 있다
+  //    (사용자 요청 2026-08-01 "새로 추가된 기능들을 편집에 토글 방식 다 넣자")
+  //    ⚠ ⋯ 버튼과 목록 행은 click 이다(mousedown 아님 — 실측).
+  const tog = await page.evaluate(async () => {
+    document.querySelector('.rb-more').click();
+    await new Promise((r) => setTimeout(r, 400));
+    const list = [...document.querySelectorAll('.rb-edit-item .rb-over-label')].map((e) => e.textContent);
+    const row = [...document.querySelectorAll('.rb-edit-item')]
+      .find((e) => e.querySelector('.rb-over-label').textContent === '스타일');
+    if (!row) return { list, err: '칸(스타일)이 목록에 없다' };
+    row.click();
+    await new Promise((r) => setTimeout(r, 400));
+    const gone = !document.querySelector('.rb-slot[data-slot="style-name"]');
+    row.click();
+    await new Promise((r) => setTimeout(r, 400));
+    return { list, gone, back: !!document.querySelector('.rb-slot[data-slot="style-name"]') };
+  });
+  console.log('  ⑨ 편집 목록', tog.list.length, '개 / 칸 끄기', tog.gone, '켜기', tog.back);
+  assert.ok(!tog.err, tog.err ?? '');
+  for (const n of ['되돌리기', '스타일', '스타일 설정', '글꼴', '크기', '글자 색', '형광펜', '자간 줄이기'])
+    assert.ok(tog.list.includes(n), `${n} 이 편집 목록에 있어야 한다`);
+  assert.ok(tog.gone && tog.back, '칸(콤보·피커)도 켜고 끌 수 있어야 한다');
 });

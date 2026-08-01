@@ -11,7 +11,7 @@ export type RibbonItem =
   | { kind: 'gap' }
   | { kind: 'combo'; label: string; width: number; cmd?: string }
   /** 기존 Toolbar 가 소유한 실제 컨트롤(#font-name 등)을 이 자리로 옮겨 담는다 */
-  | { kind: 'slot'; slot: string; width: number; label?: string }
+  | { kind: 'slot'; slot: string; width: number; label?: string; icon?: string }
   | { kind: 'expander'; label: string; cmd?: string }
   | { kind: 'over'; icon: string; label: string; key?: string; cmd?: string };
 
@@ -22,8 +22,8 @@ const PP = (icon: string, label: string, cmd?: string): RibbonItem =>
 const gap = (): RibbonItem => ({ kind: 'gap' });
 const combo = (label: string, width: number, cmd?: string): RibbonItem =>
   ({ kind: 'combo', label, width, cmd });
-const slot = (name: string, width: number, label?: string): RibbonItem =>
-  ({ kind: 'slot', slot: name, width, label });
+const slot = (name: string, width: number, label?: string, icon?: string): RibbonItem =>
+  ({ kind: 'slot', slot: name, width, label, icon });
 const O = (icon: string, label: string, key?: string, cmd?: string): RibbonItem =>
   ({ kind: 'over', icon, label, key, cmd });
 
@@ -41,9 +41,13 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       PP('arrow-counter-clockwise', '되돌리기', 'edit:undo'),
       PP('arrow-clockwise', '다시 실행', 'edit:redo'),
       gap(),
-      slot('style-name', 116, '스타일'),
-      slot('font-name', 132, '글꼴'),
-      slot('font-size', 74, '크기'),
+      slot('style-name', 116, '스타일', 'cards-three'),
+      // 콤보 옆의 아이콘 = 스타일 대화상자(F6) — 콤보는 고르기, 아이콘은 만들기·고치기.
+      // 한컴도 같은 짝(목록 + 스타일 설정)을 둔다(사용자 요청 2026-08-01).
+      P('cards-three', '스타일 설정', 'format:style-dialog',
+        '스타일을 만들고 고칩니다 — 목록에서 고르는 건 왼쪽 칸입니다 (F6)'),
+      slot('font-name', 132, '글꼴', 'text-aa'),
+      slot('font-size', 74, '크기', 'text-t'),
       gap(),
       P('text-b', '굵게', 'format:bold'),
       P('text-italic', '기울임', 'format:italic'),
@@ -52,8 +56,8 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       // 글자 색·형광펜은 구 서식바(Toolbar)가 소유한 동작하는 피커를 입양한다
       // (글꼴 콤보와 같은 adopt 패턴 — 이벤트·상태 동기가 그대로 산다. 배선은 main.ts).
       // 색 피커는 Toolbar 의 살아 있는 컨트롤을 입양한다 — 나머지 타일처럼 이름을 붙인다
-      slot('text-color', 44, '글자 색'),
-      slot('highlight', 46, '형광펜'),
+      slot('text-color', 44, '글자 색', 'palette'),
+      slot('highlight', 46, '형광펜', 'highlighter'),
       gap(),
       // 정렬 4종은 한컴·워드와 같은 순서(왼쪽·가운데·오른쪽·양쪽)로 나란히 둔다 —
       // '오른쪽 정렬'만 「⋯」에 숨어 있어 정렬을 고르는 손이 두 곳으로 갈렸다(2026-07-30).

@@ -150,91 +150,11 @@ export class CanvaRightInspector {
     styleSec.appendChild(styles);
     this.fmtPane.appendChild(styleSec);
 
-    // B / I / U
-    const biuSec = this.section('글자');
-    const biuRow = mkEl('div', 'canva-btn-row');
-    // [디자인 2c] 가·가·가 → 4등분 버튼(굵게·기울임·밑줄·취소선). 붙은 세그먼트가 아니라
-    // 각자 테두리를 가진 넓은 버튼이다 — 좁은 패널에서 눌러야 할 곳이 분명해진다.
-    biuRow.classList.add('canva-tog-row');
-    const mkTog = (key: 'bold' | 'italic' | 'underline' | 'strike', icon: string, cmd: string, title: string) => {
-      const b = mkButton('canva-tog-btn', { title, html: `<i class="ph ph-${icon}"></i>` });
-      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch(cmd); });
-      this.biu[key] = b;
-      return b;
-    };
-    biuRow.appendChild(mkTog('bold', 'text-b', 'format:bold', '굵게'));
-    biuRow.appendChild(mkTog('italic', 'text-italic', 'format:italic', '기울임'));
-    biuRow.appendChild(mkTog('underline', 'text-underline', 'format:underline', '밑줄'));
-    biuRow.appendChild(mkTog('strike', 'text-strikethrough', 'format:strikethrough', '취소선'));
-    biuSec.appendChild(biuRow);
-
-    // 크기 스테퍼
-    const sizeRow = mkEl('div', 'canva-btn-row');
-    const stepper = mkEl('div', 'canva-stepper');
-    const dec = mkButton('', { text: '−' });
-    const inp = document.createElement('input'); inp.type = 'number'; inp.value = '10'; inp.min = '1'; inp.step = '0.5';
-    const inc = mkButton('', { text: '+' });
-    dec.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:font-size-decrease'); });
-    inc.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:font-size-increase'); });
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const pt = parseFloat(inp.value);
-        if (pt > 0) this.services.eventBus.emit('format-char', { fontSize: Math.round(pt * 100) } as CharProperties);
-      }
-    });
-    stepper.append(dec, inp, inc);
-    this.sizeInput = inp;
-    // [디자인 2c] 글꼴 이름과 크기 스테퍼를 한 줄에
-    sizeRow.classList.add('canva-font-row');
-    this.fontNameBtn = mkButton('canva-font-name', { title: '글꼴' });
-    this.fontNameBtn.innerHTML = '<span>함초롬바탕</span><i class="ph ph-caret-down"></i>';
-    this.fontNameBtn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      this.services.dispatcher.dispatch('format:char-shape');
-    });
-    sizeRow.insertBefore(this.fontNameBtn, sizeRow.firstChild);
-    sizeRow.appendChild(stepper);
-    biuSec.appendChild(sizeRow);
-    this.fmtPane.appendChild(biuSec);
-
-    // 정렬
-    // ⚠ 「문단 정렬 · 줄 간격」은 여기서 뺐다(2026-08-01). 문단 탭 「자주」에 같은
-    //   컨트롤이 그림까지 붙어 있어 **같은 기능이 두 탭에** 있었고, 그만큼 아래가
-    //   밀려 「도구」(AI·녹음) 진입점이 화면 밖(y=849 > 738)으로 잘려 있었다.
-    //   탭 이름이 약속한 것만 담는다 — 정렬은 리본 홈 탭에도 있다.
-
-    // 글자색
-    const colorSec = this.section('글자색', {
-      text: '팔레트',
-      onClick: () => this.services.dispatcher.dispatch('format:char-shape'),
-    });
-    const sw = mkEl('div', 'canva-swatches');
-    for (const c of COLORS) {
-      const b = mkButton('canva-swatch', { title: c });
-      b.style.background = c;
-      b.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        this.services.eventBus.emit('format-char', { textColor: c } as CharProperties);
-        this.swatches.forEach((s) => s.classList.toggle('is-active', s === b));
-      });
-      this.swatches.push(b);
-      sw.appendChild(b);
-    }
-    colorSec.appendChild(sw);
-    // [디자인 2c] 나머지 색은 섹션 머리의 '팔레트' 링크로 — 형광펜 4색만 같은 섹션에
-    const hlRow = mkEl('div', 'canva-swatches canva-highlights');
-    for (const c of ['#fff59d', '#a5d6a7', '#90caf9', '#f48fb1']) {
-      const b = mkButton('canva-swatch canva-swatch--hl', { title: `형광펜 ${c}` });
-      b.style.background = c;
-      b.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        this.services.eventBus.emit('format-char', { shadeColor: c } as CharProperties);
-      });
-      hlRow.appendChild(b);
-    }
-    const hlLabel = mkEl('div', 'canva-sub-label', '형광펜');
-    colorSec.append(hlLabel, hlRow);
-    this.fmtPane.appendChild(colorSec);
+    // ⚠ 「글자」(B·I·U·취소선·글꼴·크기)·「글자색」·「형광펜」 섹션은 **뺐다**
+    //   (사용자 요청 2026-08-01 "없어도 될 거 같아"). 리본 홈 탭에 같은 것이 전부
+    //   있어 한 화면에 두 벌이 있었다. 남는 것: 지금 서식 견본 · 텍스트 스타일 ·
+    //   글자/문단 모양 자세히 · 도구.
+    //   상태 반영(reflectChar)은 이 요소들이 없어도 되게 옵셔널로 두었다.
 
     // 전체 글자 모양 다이얼로그
     const full = mkButton('canva-full-btn', {
@@ -343,7 +263,7 @@ export class CanvaRightInspector {
     this.biu.italic?.classList.toggle('is-active', !!p.italic);
     this.biu.underline?.classList.toggle('is-active', !!p.underline);
     this.biu.strike?.classList.toggle('is-active', !!p.strikethrough);
-    if (p.fontSize !== undefined) this.sizeInput.value = String(p.fontSize / 100);
+    if (p.fontSize !== undefined && this.sizeInput) this.sizeInput.value = String(p.fontSize / 100);
     const fam = (p as any).fontFamily ?? (p as any).fontFamilies?.[0];
     if (fam && this.fontNameBtn) {
       const sp = this.fontNameBtn.querySelector('span');
