@@ -12,6 +12,7 @@
  */
 import { ModalDialog } from './dialog';
 import { currentDocKind, canPolish, maskNames, unmaskNames } from './sentence-polish';
+import { readSourceFile, type SourceDoc } from './table-fill-source';
 import type { CommandServices } from '@/command/types';
 
 /** 한 번에 볼 표 개수 상한 — 넘으면 알리고 자른다(조용한 누락 금지). */
@@ -95,6 +96,22 @@ const SYSTEM = [
   '설명·코드펜스·인사말을 붙이지 않는다.',
 ].join('\n');
 
+/** 자료를 첨부했을 때만 얹는 규칙 — 첨부가 있으면 "그럴듯한 값"이 아니라 그 값이 답이다. */
+const SOURCE_RULE = [
+  '',
+  '[첨부 자료]가 주어졌다. 이때는 아래가 위 규칙보다 우선한다.',
+  'A) 표의 왼쪽 항목명과 같은(또는 거의 같은) 행이 첨부 자료에 있으면, 그 행에서 같은 뜻의',
+  '   열 값을 **그대로 옮겨 적는다**. 이것은 판단이 아니라 옮겨 적기다 — 망설이지 않는다.',
+  '   (자료의 머리글 행을 보고 어느 열이 수량이고 어느 열이 금액인지 맞춘다.)',
+  'B) 옮길 때 값 자체를 바꾸지 않는다. 반올림·재계산 금지(자릿점·단위 표기만 허용).',
+  'C) 첨부 자료에 **그 항목의 행 자체가 없을 때만** `(확인 필요)` 로 둔다. 추정 금지.',
+  // 실측 실패 2건(2026-08-01): ①본문의 "총 사업비 4,800만원"에 합을 맞추려 첨부의
+  // 12,500,000 을 버리고 10,800,000 을 지어냄 ②총액과 안 맞자 아예 (확인 필요)로 보류함.
+  // 둘 다 "총액을 맞춰야 한다"는 착각이라 한 줄로 함께 막는다.
+  'D) 본문의 총액·목표치와 첨부 값이 안 맞아도 **첨부 값을 그대로 쓴다**.',
+  '   합계를 맞추려고 배분·역산하거나, 안 맞는다는 이유로 보류하지 않는다.',
+].join('\n');
+
 /** 모델 응답에서 채울 값 목록을 꺼낸다. 코드펜스·앞뒤 잡담을 방어한다. */
 export function parseFills(raw: string): Array<{ table: number; row: number; col: number; text: string }> {
   const s = raw.indexOf('{');
@@ -141,11 +158,22 @@ export function applyFills(ih: { executeOperation(d: unknown): unknown }, grids:
 
 export class TableFillDialog extends ModalDialog {
   private body!: HTMLElement;
+  /** 첨부 줄 아래의 갈아끼우는 영역 — say()/paint() 는 여기만 건드린다. */
+  private content!: HTMLElement;
+  private picker!: HTMLInputElement;
+  private srcInfo!: HTMLElement;
+  private source: SourceDoc | null = null;
   private grids: TableGrid[] = [];
   private fills: Fill[] = [];
   private rows: Array<{ on: HTMLInputElement; input: HTMLInputElement; fill: Fill }> = [];
   /** AI 도우미가 넘겨준 사용자 지시(예: "강사비는 주 3회 기준") — 1회성 */
   private hint = '';
+  /**
+   * scan 세대 번호. 자료를 붙이면 scan 이 다시 도는데, **먼저 뜬 호출(자료 없음)의 응답이
+   * 늦게 도착해 덮어쓰는** 경합이 실제로 났다 — 첨부를 붙였는데 첨부를 안 본 답이 화면에
+   * 남아, 프롬프트 탓으로 오인하기 딱 좋았다(2026-08-01 실측). 옛 세대 결과는 버린다.
+   */
+  private scanSeq = 0;
 
   constructor(private services: CommandServices) {
     super('표 빈칸 채우기', 620);
@@ -162,6 +190,29 @@ export class TableFillDialog extends ModalDialog {
   protected createBody(): HTMLElement {
     this.body = document.createElement('div');
     this.body.className = 'tfill';
+
+    // 자료 첨부 — **파일 선택**으로 했다. 브라우저 기본 <input type="file"> 은 접근성·
+    // 키보드·모바일이 공짜고, 끌어놓기는 모달 위 드롭존이 편집 캔버스의 drop 과 얽힌다.
+    const bar = document.createElement('div');
+    bar.className = 'tfill-src';
+    const pick = document.createElement('label');
+    pick.className = 'tfill-pick';
+    pick.innerHTML = '<i class="ph ph-paperclip"></i>자료 첨부';
+    this.picker = document.createElement('input');
+    this.picker.type = 'file';
+    this.picker.accept = '.csv,.xlsx,.txt';
+    this.picker.hidden = true;
+    this.picker.addEventListener('change', () => void this.attach());
+    pick.appendChild(this.picker);
+    this.srcInfo = document.createElement('span');
+    this.srcInfo.className = 'tfill-srcinfo';
+    bar.append(pick, this.srcInfo);
+    this.body.appendChild(bar);
+
+    this.content = document.createElement('div');
+    this.content.className = 'tfill-content';
+    this.body.appendChild(this.content);
+    this.resetSrcInfo();
     return this.body;
   }
 
@@ -172,16 +223,61 @@ export class TableFillDialog extends ModalDialog {
   }
 
   private say(html: string): void {
-    this.body.innerHTML = `<div class="tfill-msg">${html}</div>`;
+    this.content.innerHTML = `<div class="tfill-msg">${html}</div>`;
+  }
+
+  /** 첨부 없음 상태의 안내 — PDF 제외를 여기서 못 박는다(사용자에게 화면으로 알리기). */
+  private resetSrcInfo(): void {
+    this.srcInfo.className = 'tfill-srcinfo';
+    this.srcInfo.textContent = '엑셀(.xlsx)·CSV 만 됩니다 (PDF 제외). 첨부한 자료는 표·본문과 함께 AI 서버로 전송됩니다.';
+  }
+
+  /**
+   * 고른 파일을 읽어 붙이고 다시 물어본다.
+   * ⚠ 자료가 통째로 외부로 나가므로 **몇 행·몇 자가 나가는지** 화면에 숫자로 밝힌다.
+   */
+  private async attach(): Promise<void> {
+    const file = this.picker.files?.[0];
+    this.picker.value = ''; // 같은 파일을 다시 골라도 change 가 오게
+    if (!file) return;
+    if (!canPolish(currentDocKind())) return; // 아동 관찰기록에서는 첨부도 막는다
+    try {
+      this.source = await readSourceFile(file);
+    } catch (err) {
+      this.source = null;
+      this.srcInfo.className = 'tfill-srcinfo is-error';
+      this.srcInfo.textContent = err instanceof Error ? err.message : String(err);
+      return;
+    }
+    const s = this.source;
+    this.srcInfo.className = 'tfill-srcinfo is-on';
+    this.srcInfo.textContent = `${s.name} · ${s.rows.length}행 ${s.text.length}자 전송`
+      + (s.truncated ? ` (전체 ${s.totalRows}행 중 앞 ${s.rows.length}행만)` : '')
+      + ' · 이 내용이 AI 서버로 나갑니다';
+    const off = document.createElement('button');
+    off.className = 'tfill-srcoff';
+    off.type = 'button';
+    off.textContent = '떼기';
+    off.addEventListener('click', () => {
+      this.source = null;
+      this.resetSrcInfo();
+      void this.scan();
+    });
+    this.srcInfo.appendChild(off);
+    void this.scan();
   }
 
   /** 표를 읽고 빈칸을 세고, 있으면 AI 를 부른다. 빈칸이 없으면 부르지 않는다. */
   private async scan(): Promise<void> {
+    const seq = ++this.scanSeq;
     this.rows = [];
     if (!canPolish(currentDocKind())) {
+      this.picker.disabled = true; // 자료 첨부 경로로도 못 새게 함께 막는다
+      this.source = null;
       this.say('아동 관찰기록에서는 AI 표 채우기를 쓸 수 없습니다.<br>기록 내용이 외부로 나가지 않도록 막아 둔 기능입니다.');
       return;
     }
+    this.picker.disabled = false;
     const wasm = this.services.wasm as unknown as TableWasm;
     let tables: TableGrid[] = [];
     try {
@@ -214,14 +310,20 @@ export class TableFillDialog extends ModalDialog {
     // 표만 보면 무슨 문서인지 모른다 — 본문 전체를 문맥으로 함께 준다.
     const ctx = this.docContext();
     const hint = this.hint ? `\n\n[사용자 지시 — 최우선으로 따를 것]\n${this.hint}` : '';
-    const mask = maskNames(`${ctx}${refs}${hint}\n\n${grid}`);
+    const src = this.source
+      ? `\n\n[첨부 자료 — ${this.source.name}]\n${this.source.text}`
+      : '';
+    const mask = maskNames(`${ctx}${refs}${src}${hint}\n\n${grid}`);
     let fills: Array<{ table: number; row: number; col: number; text: string }> = [];
     try {
       const res = await fetch('/api/ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: mask.masked }],
+          messages: [
+            { role: 'system', content: this.source ? SYSTEM + SOURCE_RULE : SYSTEM },
+            { role: 'user', content: mask.masked },
+          ],
           temperature: 0.3, // 표 값은 창의성이 아니라 일관성이다
           max_tokens: 2048,
           chat_template_kwargs: { enable_thinking: false },
@@ -231,6 +333,7 @@ export class TableFillDialog extends ModalDialog {
         choices?: Array<{ message?: { content?: string; reasoning_content?: string } }>;
         error?: string | { message?: string };
       };
+      if (seq !== this.scanSeq) return; // 그 사이 자료를 붙였다 — 이 답은 헌 것이다
       if (!res.ok) {
         const e = typeof json.error === 'string' ? json.error : json.error?.message;
         this.say(`AI 호출에 실패했습니다.<br>${e ?? res.status}`);
@@ -240,6 +343,7 @@ export class TableFillDialog extends ModalDialog {
       const raw = m?.content?.trim() ? m.content : (m?.reasoning_content ?? '');
       fills = parseFills(unmaskNames(raw, mask));
     } catch (err) {
+      if (seq !== this.scanSeq) return;
       this.say(`AI 호출에 실패했습니다.<br>${String(err)}`);
       return;
     }
@@ -287,11 +391,12 @@ export class TableFillDialog extends ModalDialog {
       this.say('AI 가 채울 값을 내놓지 못했습니다. 다시 시도해 보세요.');
       return;
     }
-    this.body.innerHTML = '';
+    this.content.innerHTML = '';
     const head = document.createElement('p');
     head.className = 'tfill-head';
-    head.textContent = `${this.fills.length}칸 제안입니다. 확인하고 고친 뒤 적용하세요 — 이미 채워진 칸은 건드리지 않습니다.`;
-    this.body.appendChild(head);
+    head.textContent = `${this.fills.length}칸 제안입니다. 확인하고 고친 뒤 적용하세요 — 이미 채워진 칸은 건드리지 않습니다.`
+      + (this.source ? ` (첨부 ${this.source.name} 참조)` : '');
+    this.content.appendChild(head);
 
     const list = document.createElement('div');
     list.className = 'tfill-list';
@@ -311,7 +416,7 @@ export class TableFillDialog extends ModalDialog {
       list.appendChild(row);
       this.rows.push({ on, input, fill: f });
     }
-    this.body.appendChild(list);
+    this.content.appendChild(list);
   }
 
   /** 체크된 칸만 쓴다. */
