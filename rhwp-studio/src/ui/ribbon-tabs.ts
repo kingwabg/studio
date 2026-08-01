@@ -61,6 +61,13 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('text-indent', '한 수준 증가', 'format:level-increase'),
       P('text-outdent', '한 수준 감소', 'format:level-decrease'),
       gap(),
+      // 글자 간격(자간·장평) — 문단 수준(들여쓰기)과 같은 '간격' 무리라 옆에 둔다.
+      // 명령은 이미 있었다(format:char-spacing-*/char-ratio-*, 단축키 Shift+Alt+N/W/J/K).
+      P('arrows-in-line-horizontal', '자간 줄이기', 'format:char-spacing-decrease'),
+      P('arrows-out-line-horizontal', '자간 늘리기', 'format:char-spacing-increase'),
+      P('arrows-in-simple', '장평 줄이기', 'format:char-ratio-decrease'),
+      P('arrows-out-simple', '장평 늘리기', 'format:char-ratio-increase'),
+      gap(),
       // 「⋯」에 있던 두 대화상자를 꺼내 놓는다. 옛 '자세히' 확장 버튼은 글자 모양과
       // 같은 명령이라 중복 — 버튼으로 대체하고 홈의 오버플로는 비운다(⋯ 자동 소멸).
       P('text-aa', '글자 모양', 'format:char-shape'),
@@ -215,7 +222,9 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
  * 나머지는 접는다. 사용자가 켜면 그 선택이 이긴다(아래 hidden 저장).
  */
 export const DEFAULT_OFF: Record<string, string[]> = {
-  home: ['취소선', '한 수준 증가', '한 수준 감소'],
+  // 한 수준 증가·감소는 사용자 요청으로 기본 노출(2026-08-01). 자간·장평 4종 중
+  // 자주 쓰는 '자간'만 남기고 '장평'은 접는다 — 홈 한 줄에 다 들어가지 않는다.
+  home: ['취소선', '장평 줄이기', '장평 늘리기'],
   edit: ['모양 붙여넣기', '찾아가기'],
   insert: ['필드 입력', '미주', '이모지'],
   layout: ['격자 설정', '새 번호로 시작', '구역 나누기', '쪽 테두리/배경', '바탕쪽'],

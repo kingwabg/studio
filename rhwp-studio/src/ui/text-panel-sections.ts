@@ -121,9 +121,7 @@ export class TextPanelSections {
       this.para({ alignment: v });
       this.paintPreview();
     }));
-    this.host.appendChild(this.stepper('줄 간격', this.pp.lineSpacing ?? 160, '%', 50, 500, (next) => {
-      this.para({ lineSpacing: next });
-    }, 10));
+    this.host.appendChild(this.lineSpacingRow());
     const gap = mkEl('div', 'tps-row tps-row--pair');
     gap.appendChild(mkEl('span', 'tps-label', '문단 간격'));
     gap.appendChild(this.miniNum('위', toPt(this.pp.spacingBefore),
@@ -156,6 +154,71 @@ export class TextPanelSections {
     this.appendHint(sp, '글자 간격');
 
     this.host.appendChild(this.buildPreview());
+  }
+
+  /**
+   * 줄 간격 — 프리셋 드롭다운 + −/+ 조절을 한 줄에(사용자 요청 2026-08-01).
+   * 자주 쓰는 값은 고르는 게 빠르고, 미세 조정은 눌러야 빠르다 — 둘 다 둔다.
+   * ⚠ 100% 아래는 줄이 겹친다. 그래도 목록에 두는 이유는 표 칸·서명란처럼
+   *   일부러 눌러 담아야 하는 자리가 있어서다 — 겹칠 수 있음을 툴팁으로 알린다.
+   */
+  private lineSpacingRow(): HTMLElement {
+    const PRESETS = [10, 25, 50, 80, 100, 120, 160, 200];
+    const row = mkEl('div', 'tps-row tps-row--pair');
+    row.appendChild(mkEl('span', 'tps-label', '줄 간격'));
+
+    const sel = mkEl('select', 'tps-select tps-select--mini') as HTMLSelectElement;
+    const cur = this.pp.lineSpacing ?? 160;
+    for (const v of PRESETS) {
+      const o = mkEl('option', '', `${v}%`) as HTMLOptionElement;
+      o.value = String(v);
+      if (v < 100) o.title = `${v}% — 줄이 겹칠 수 있습니다(칸에 눌러 담을 때)`;
+      sel.appendChild(o);
+    }
+    // 목록에 없는 값(대화상자로 정한 값)도 고른 상태를 유지한다
+    if (!PRESETS.includes(cur)) {
+      const o = mkEl('option', '', `${cur}%`) as HTMLOptionElement;
+      o.value = String(cur);
+      sel.appendChild(o);
+    }
+    sel.value = String(cur);
+
+    const box = mkEl('div', 'tps-pill-stepper tps-pill-stepper--mini');
+    const val = mkEl('span', 'tps-pill-num', `${cur}%`);
+    let v = cur;
+    const paint = () => {
+      val.textContent = `${v}%`;
+      sel.value = PRESETS.includes(v) ? String(v) : sel.value;
+      this.para({ lineSpacing: v });
+      this.paintPreview();
+    };
+    const step = (d: number) => (e: Event) => {
+      e.preventDefault();
+      v = Math.max(10, Math.min(500, v + d * 10));
+      // 목록에 없는 값이면 '직접' 항목으로 보여 준다 — 드롭다운이 거짓말하지 않게
+      if (!PRESETS.includes(v)) {
+        let extra = sel.querySelector<HTMLOptionElement>('option[data-custom]');
+        if (!extra) {
+          extra = mkEl('option', '', '') as HTMLOptionElement;
+          extra.dataset.custom = '1';
+          sel.appendChild(extra);
+        }
+        extra.textContent = `${v}%`;
+        extra.value = String(v);
+        sel.value = String(v);
+      }
+      paint();
+    };
+    const dec = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-minus"></i>', title: '줄 간격 줄이기' });
+    const inc = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-plus"></i>', title: '줄 간격 늘리기' });
+    dec.addEventListener('mousedown', step(-1));
+    inc.addEventListener('mousedown', step(1));
+    box.append(dec, val, inc);
+
+    sel.addEventListener('change', () => { v = Number(sel.value); paint(); });
+    row.append(sel, box);
+    this.appendHint(row, '줄 간격');
+    return row;
   }
 
   /** 좁은 알약 스테퍼 두 개를 한 줄에 — 자간·장평용 */

@@ -44,7 +44,10 @@ runTest('리본 헤더', async ({ page }) => {
     '/ 스위치 꺼짐:', JSON.stringify(off.swOff));
   assert.ok(!off.before.includes('취소선'), '기본 접힘은 리본에 없다');
   assert.ok(off.folded.includes('취소선'), '접힌 명령이 패널 위쪽에 나온다');
-  assert.deepStrictEqual(off.swOff.sort(), ['취소선', '한 수준 감소', '한 수준 증가'], '스위치가 접힘 상태를 보여준다');
+  // 기본 접힘 목록은 DEFAULT_OFF(ribbon-tabs.ts)가 정본 — 한 수준 증가·감소는
+  // 2026-08-01 사용자 요청으로 노출로 바뀌었고, 대신 장평 둘이 접힌다
+  assert.deepStrictEqual(off.swOff.sort(), ['장평 늘리기', '장평 줄이기', '취소선'],
+    '스위치가 접힘 상태를 보여준다');
   assert.ok(off.inPanel.includes('취소선') && off.inPanel.includes('굵게'), '탭의 모든 버튼이 목록에 있다');
 
   // ③ 켜면 리본에 즉시 나타나고 저장된다
@@ -107,6 +110,32 @@ runTest('리본 헤더', async ({ page }) => {
   assert.deepStrictEqual(color.labels, ['글자 색', '형광펜'], '이름이 붙는다');
   assert.ok(!color.legacyGlyph, "리본 안에 옛 글리프('간'·✏)가 남아 있지 않다");
   assert.ok(color.opened, '아이콘만 바뀌고 팔레트 동작은 산다');
+
+  // ⑤b 「간격」 무리 — 한 수준 증가·감소가 기본 노출이고, 자간이 그 옆에 붙는다
+  //     (사용자 요청 2026-08-01: 문단 간격 버튼이니 기존 것과 같이 쓰자)
+  const spacing = await page.evaluate(() => {
+    localStorage.removeItem('rhwpRibbonHidden');
+    return null;
+  });
+  void spacing;
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await new Promise((r) => setTimeout(r, 3500));
+  const grp = await page.evaluate(() => {
+    const bs = [...document.querySelectorAll('.rb-row-ribbon .rb-btn')];
+    const titles = bs.map((b) => b.title);
+    return {
+      titles,
+      // 한 수준 증가 다음에 자간 둘이 이어지는가(순서가 곧 '같은 무리'다)
+      order: titles.filter((t) => /한 수준|자간|장평/.test(t)),
+      cmds: bs.filter((b) => /자간/.test(b.title)).map((b) => b.dataset.cmd),
+    };
+  });
+  console.log('  ⑤b 간격 무리:', JSON.stringify(grp.order), '/ 명령', JSON.stringify(grp.cmds));
+  assert.deepStrictEqual(grp.order,
+    ['한 수준 증가', '한 수준 감소', '자간 줄이기', '자간 늘리기'],
+    '한 수준 증가·감소가 기본 노출이고 자간이 옆에 붙는다');
+  assert.deepStrictEqual(grp.cmds,
+    ['format:char-spacing-decrease', 'format:char-spacing-increase'], '자간 명령 배선');
 
   // ⑥ 우측 패널이 헤더와 같은 면인가 + 손잡이가 패널 **바깥**인가 (사용자 요청 2026-08-01)
   const panel = await page.evaluate(async () => {
