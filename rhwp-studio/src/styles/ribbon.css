@@ -8,6 +8,10 @@
 /* Phosphor 아이콘 폰트는 main.ts 의 모듈 import 가 담당한다(경로는 Vite 가 재작성).
    여기에 @font-face 를 절대 경로로 쓰면 배포 base 아래에서 폰트가 404 난다. */
 
+:root[data-theme-effective='dark'] .ribbon-header {
+  --rb-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 L6 8 L9.5 4.5' fill='none' stroke='%23b6c0cc' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
 :root[data-theme-effective='dark'] .rb-slot.has-label {
   --rb-bar-ring: rgba(255, 255, 255, .45);
 }
@@ -21,6 +25,7 @@
   --rb-fg: var(--color-text, #33302e);
   --rb-fg-dim: var(--color-text-muted, #7a7673);
   --rb-bg: var(--color-surface-raised, #ffffff);
+  --rb-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 L6 8 L9.5 4.5' fill='none' stroke='%23555' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
   display: flex;
   flex-direction: column;
@@ -89,6 +94,11 @@
 }
 .rb-slot > .rb-adopted:focus { outline: none; border-color: var(--rb-accent); }
 .rb-slot > select.rb-adopted { padding-right: 2px; }
+/* 색 피커 두 자리도 같은 28px 로 — 27·25px 이라 옆 칸과 밑선이 어긋났다 */
+.rb-slot.has-label > .sb-color-wrap.rb-adopted,
+.rb-slot.has-label > #highlight-dropdown.rb-adopted { height: 28px; }
+.rb-slot.has-label .sb-btn { height: 100%; justify-content: center; }
+
 /* 이름이 붙는 자리(색 피커) — 아이콘 위·이름 아래로 다른 타일과 같은 모양.
    구 서식바의 한컴식 글리프('간'·✏)를 Phosphor 아이콘으로 갈아끼웠고(index.html),
    색 막대는 디자인 2a 의 17×3px 로 맞춘다. ▾ 는 뺀다 — 막대가 곧 '색이 달린다'는
@@ -113,6 +123,40 @@
 }
 /* 타일 전체가 하나의 버튼처럼 반응한다 */
 .rb-slot.has-label:hover { background: var(--rb-fill); color: var(--rb-accent); border-radius: 3px; }
+/* ── 앞머리 칸의 공통 높이 ──
+   실측 전(2026-08-01): 스타일 19 · 글꼴 19 · 크기 28 · 글자색 27 · 형광펜 25px 로
+   다섯이 다 달라 줄이 들쭉날쭉했다(사용자 지적 "이미지 높이를 다 동일하게").
+   ⚠ 입양한 select 는 구 서식바의 .sb-combo(height:22px)가 이기고 있었다 —
+     여기서 명시적으로 덮는다. */
+/* ⚠ `.rb-slot.has-label > .rb-adopted { height: auto }`(클래스 3개)가 더 구체적이라
+   `.rb-slot > select.rb-adopted`(클래스 2 + 요소 1)를 이겼다 — 높이가 17px 로
+   눌려 있었다(2026-08-01 계산값 실측). 같은 무게로 맞춰 적는다. */
+.rb-slot.has-label > select.rb-adopted,
+.rb-slot.has-label > .sb-size-group.rb-adopted,
+.rb-slot > select.rb-adopted,
+.rb-slot > .sb-size-group.rb-adopted { height: 28px; box-sizing: border-box; }
+
+/* 네이티브 select 는 macOS 에서 늘 눌린 단추처럼 보인다 — 리본의 평평한 면과
+   어긋나 "드롭다운이 계속 켜져 있다"로 읽혔다. 우리 화살표로 바꿔 단다. */
+.rb-slot > select.rb-adopted {
+  appearance: none; -webkit-appearance: none;
+  padding: 0 22px 0 8px;
+  /* 가는 갈매기 — 채운 삼각형은 리본의 가벼운 선들 사이에서 혼자 무겁다.
+     ⚠ SVG data URI 는 currentColor 를 못 받는다(외부 문서로 취급). 색을 박아야 하니
+     다크에서 묻히지 않게 --rb-caret 로 테마마다 갈아 끼운다(실측 2026-08-01). */
+  background-image: var(--rb-caret);
+  background-position: right 6px center;
+  background-size: 11px 11px;
+  background-repeat: no-repeat;
+  color: var(--rb-fg);
+  min-width: 0;
+}
+.rb-slot > select.rb-adopted:hover { border-color: var(--rb-accent); }
+/* ⚠ 구 서식바가 `#style-name { width: 60px }` 를 박아 「바탕글」이 잘렸다 —
+   ID 규칙이라 클래스로는 못 이긴다. 자리 폭(slot)에 맞춰 늘린다. */
+.rb-slot > select#style-name.rb-adopted,
+.rb-slot > select#font-name.rb-adopted { width: 100%; }
+
 /* 크기 스피너 입양분 — 한컴처럼 [값][pt][▲▼] 한 덩어리 */
 .rb-slot > .sb-size-group.rb-adopted {
   display: inline-flex; align-items: center; gap: 2px;
@@ -127,7 +171,11 @@
   font-variant-numeric: tabular-nums;
 }
 .rb-slot .sb-size:focus { outline: none; }
-.rb-slot .sb-size-unit { font-size: 11px; color: var(--rb-fg-dim); flex: none; }
+.rb-slot .sb-size-unit {
+  font-size: 11px; color: var(--rb-fg-dim); flex: none;
+  /* 구 서식바는 이 자리에 테두리+배경을 줘 'pt' 가 선택된 글자처럼 회색 상자로 보였다 */
+  background: none; border: 0; padding: 0 0 0 2px; height: auto; line-height: 1;
+}
 .rb-slot .sb-size-arrows {
   display: flex; flex-direction: column; flex: none; margin-left: 2px;
 }

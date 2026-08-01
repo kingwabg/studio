@@ -181,4 +181,40 @@ runTest('리본 헤더', async ({ page }) => {
     Math.round(document.querySelector('.canva-rail--right').getBoundingClientRect().width));
   console.log('  ⑥ 드래그', panel.w0, '→', w1);
   assert.ok(w1 > panel.w0 + 30, '왼쪽으로 끌면 패널이 넓어진다');
+
+  // ⑦ 앞머리 다섯 칸의 높이·밑선이 같은가 (사용자 지적 2026-08-01 "높이를 다 동일하게")
+  //    실측 전: 스타일 19 · 글꼴 19 · 크기 28 · 글자색 27 · 형광펜 25px
+  const heads = await page.evaluate(() => {
+    const rows = ['style-name', 'font-name', 'font-size', 'text-color', 'highlight'].map((n) => {
+      const el = document.querySelector(`.rb-slot[data-slot="${n}"] .rb-adopted`);
+      if (!el) return { n, miss: true };
+      const r = el.getBoundingClientRect();
+      return { n, h: Math.round(r.height), y: Math.round(r.y), w: Math.round(r.width) };
+    });
+    const sel = document.querySelector('.rb-slot select#style-name');
+    return {
+      rows,
+      // 네이티브 select 크롬을 끄고 우리 화살표를 단다 — 늘 눌린 단추처럼 보였다
+      appearance: sel ? getComputedStyle(sel).appearance : '',
+      // 'pt' 가 회색 상자(선택된 글자처럼)로 보이면 안 된다
+      unitBg: getComputedStyle(document.querySelector('.rb-slot .sb-size-unit')).backgroundColor,
+      unitBorder: getComputedStyle(document.querySelector('.rb-slot .sb-size-unit')).borderTopWidth,
+    };
+  });
+  console.log('  ⑦ 앞머리:', JSON.stringify(heads.rows));
+  console.log('     select appearance:', heads.appearance, '/ pt 배경', heads.unitBg, heads.unitBorder);
+  const hs = heads.rows.filter((r) => !r.miss);
+  assert.strictEqual(hs.length, 5, '앞머리 다섯 칸이 다 있어야 한다');
+  const h0 = hs[0].h;
+  for (const r of hs) {
+    assert.strictEqual(r.h, h0, `${r.n} 높이가 다르다 (${r.h} vs ${h0})`);
+    assert.strictEqual(r.y, hs[0].y, `${r.n} 윗선이 어긋난다`);
+  }
+  assert.strictEqual(heads.appearance, 'none', 'select 는 네이티브 크롬을 끈다');
+  assert.ok(/rgba\(0, 0, 0, 0\)|transparent/.test(heads.unitBg), "'pt' 에 배경이 없어야 한다");
+  assert.strictEqual(heads.unitBorder, '0px', "'pt' 에 테두리가 없어야 한다");
+  // 스타일 이름이 잘리지 않는가 — 구 서식바가 #style-name 에 60px 를 박아 뒀었다
+  const styleW = hs.find((r) => r.n === 'style-name').w;
+  console.log('     스타일 칸 폭:', styleW);
+  assert.ok(styleW >= 100, `스타일 칸이 좁아 이름이 잘린다 (${styleW}px)`);
 });
