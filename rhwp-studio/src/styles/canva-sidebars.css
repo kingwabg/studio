@@ -1031,6 +1031,34 @@
 .canva-tpl-name { font-size: 12.5px; font-weight: 600; }
 .canva-tpl-hint { font-size: 10.5px; color: var(--color-text-muted, #888); line-height: 1.3; }
 
+/* 템플릿 카드의 작은 「용지」 미리보기 — 실제 조판이 아닌 시각 근사 */
+.canva-tpl-preview {
+  background: #fff;
+  border: 1px solid var(--ui-border, #ddd);
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  aspect-ratio: 1 / 1.414;      /* A4 비율 */
+  padding: 9px 8px;
+  margin-bottom: 5px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;         /* 카드 클릭이 미리보기에 막히지 않게 */
+}
+.tpl-pv-line {
+  font-size: 4.5px;
+  line-height: 1.5;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tpl-pv-title { font-size: 6px; font-weight: 700; text-align: center; margin-bottom: 2px; }
+.tpl-pv-head { font-weight: 700; }
+.tpl-pv-sub  { font-weight: 700; padding-left: 4px; }
+.tpl-pv-body { color: #888; }
+
 /* 스타일 탭 — 이름이 길 수 있어 한 열(넓은 카드) 세로 목록 */
 .canva-style-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .canva-style-item { font-size: 12.5px; font-weight: 500; }

@@ -28,6 +28,25 @@ export const DOC_TEMPLATES: DocTemplate[] = [
     body: '회의록\n1. 일시·장소\n2. 참석자\n3. 안건\n4. 결정 사항' },
 ];
 
+/**
+ * 템플릿 body 를 작은 「용지」 미리보기 DOM 으로 그린다. 줄 분류는 insertFormatted
+ * (ai-doc-insert)의 classifyLines 와 같은 규칙 — 첫 줄=제목(가운데·굵게), `숫자.`=대제목
+ * (굵게), `가.`류=소제목, 그 외=본문. 실제 조판이 아니라 시각 근사다.
+ */
+export function buildTemplatePreview(body: string): HTMLElement {
+  const page = mkEl('div', 'canva-tpl-preview');
+  const lines = body.split('\n');
+  lines.forEach((raw, i) => {
+    const text = raw.trim();
+    let cls = 'tpl-pv-body';
+    if (i === 0) cls = 'tpl-pv-title';
+    else if (/^\d+\./.test(text)) cls = 'tpl-pv-head';
+    else if (/^[가-힣]\./.test(text)) cls = 'tpl-pv-sub';
+    page.appendChild(mkEl('div', `tpl-pv-line ${cls}`, text || ' '));
+  });
+  return page;
+}
+
 export class TemplatePickerModal extends ModalDialog {
   constructor(private opts: { onPick: (t: DocTemplate) => void }) {
     super('문단 템플릿', 460);
@@ -38,8 +57,10 @@ export class TemplatePickerModal extends ModalDialog {
     const grid = mkEl('div', 'canva-tpl-grid');
     for (const t of DOC_TEMPLATES) {
       const card = mkButton('canva-style-card canva-tpl-pick', { title: t.hint });
-      card.innerHTML = `<span class="canva-tpl-name">${t.label}</span>`
-        + `<span class="canva-tpl-hint">${t.hint}</span>`;
+      card.appendChild(buildTemplatePreview(t.body));
+      const name = mkEl('span', 'canva-tpl-name', t.label);
+      const hint = mkEl('span', 'canva-tpl-hint', t.hint);
+      card.append(name, hint);
       card.addEventListener('click', () => { this.opts.onPick(t); this.hide(); });
       grid.appendChild(card);
     }
