@@ -4,10 +4,16 @@
  * 표/셀 탭과 같은 계약: 섹션 하나만 그리고, 값이 바뀌면 즉시 저장(확인 버튼 없음).
  * 저장은 전부 커맨드 경로(applyParaPropsToRange / format-char)라 Ctrl+Z 로 되돌아간다.
  *
+ * 설명 문구는 text-panel-help.ts 가 정본이다 — 라벨만으로는 무엇이 달라지는지 알 수
+ * 없다는 지적(2026-08-01)에 따라 행마다 한 줄 설명, 헷갈리는 옵션마다 툴팁을 붙인다.
+ *
  * ⚠ 자간·장평은 **글자 모양** 속성이라 선택 글자에만 걸린다(디자인의 주석과 동일) —
  * 선택이 없으면 대기 서식(pending-format.ts)으로 흘러 다음 입력에 붙는다.
  */
 import { mkEl, mkButton } from './canva-dom';
+import {
+  FIELD_HINT, OPTION_HINT, FLAG_HINT, SECTION_HINT, stripAccel,
+} from './text-panel-help';
 import type { CanvaServices } from './canva-services';
 import type { ParaProperties, CharProperties } from '@/core/types';
 
@@ -72,6 +78,8 @@ export class TextPanelSections {
     this.preview = null;
     this.host = mkEl('div', 'tps');
     host.appendChild(this.host);
+    const sh = SECTION_HINT[section];
+    if (sh) this.host.appendChild(mkEl('div', 'tps-sec-hint', sh));
     build();
     return true;
   }
@@ -221,10 +229,14 @@ export class TextPanelSections {
 
   private segRow<T>(label: string, opts: Opt<T>[], cur: T, onChange: (v: T) => void): HTMLElement {
     const row = mkEl('div', 'tps-field');
-    if (label) row.appendChild(mkEl('span', 'tps-label', label));
+    if (label) {
+      row.appendChild(mkEl('span', 'tps-label', stripAccel(label)));
+      this.appendHint(row, stripAccel(label));
+    }
     const seg = mkEl('div', 'tps-seg tps-seg--wrap');
     for (const [value, text] of opts) {
-      const b = mkButton('tps-seg-btn', { text });
+      // 툴팁 — 배분·나눔·내어쓰기처럼 이름만으론 못 고르는 것들에 붙는다
+      const b = mkButton('tps-seg-btn', { text, title: OPTION_HINT[text] ?? text });
       b.classList.toggle('is-on', value === cur);
       b.addEventListener('click', () => {
         seg.querySelectorAll('.tps-seg-btn').forEach((e) => e.classList.remove('is-on'));
@@ -240,30 +252,33 @@ export class TextPanelSections {
   private selectRow<T extends string | number>(
     label: string, opts: Opt<T>[], cur: T, onChange: (v: T) => void,
   ): HTMLElement {
-    const row = mkEl('div', 'tps-row');
-    row.appendChild(mkEl('span', 'tps-label', label));
+    const row = mkEl('div', 'tps-row tps-row--stack');
+    row.appendChild(mkEl('span', 'tps-label', stripAccel(label)));
     const sel = mkEl('select', 'tps-select');
     for (const [value, text] of opts) {
-      const o = mkEl('option', '', text);
+      const o = mkEl('option', '', text) as HTMLOptionElement;
       o.value = String(value);
+      if (OPTION_HINT[text]) o.title = OPTION_HINT[text];
       sel.appendChild(o);
     }
     sel.value = String(cur);
     sel.addEventListener('change', () =>
       onChange((typeof cur === 'number' ? Number(sel.value) : sel.value) as T));
     row.appendChild(sel);
+    this.appendHint(row, stripAccel(label));
     return row;
   }
 
   private numRow(label: string, value: string, unit: string, onChange: (v: string) => void): HTMLElement {
-    const row = mkEl('div', 'tps-row');
-    row.appendChild(mkEl('span', 'tps-label', label));
+    const row = mkEl('div', 'tps-row tps-row--stack');
+    row.appendChild(mkEl('span', 'tps-label', stripAccel(label)));
     const input = mkEl('input', 'tps-input');
     input.type = 'number';
     input.step = '0.1';
     input.value = value;
     input.addEventListener('change', () => onChange(input.value));
     row.append(input, mkEl('span', 'tps-unit', unit));
+    this.appendHint(row, stripAccel(label));
     return row;
   }
 
@@ -273,8 +288,21 @@ export class TextPanelSections {
     input.type = 'checkbox';
     input.checked = on;
     input.addEventListener('change', () => onChange(input.checked));
-    row.append(input, mkEl('span', 'tps-switch-track'), mkEl('span', 'tps-switch-label', label));
+    // 한컴 대화상자 단축키 (K)(N)… 은 패널에서 눌리지 않는다 — 잡음이라 뗀다
+    const clean = stripAccel(label);
+    const text = mkEl('div', 'tps-switch-text');
+    text.appendChild(mkEl('span', 'tps-switch-label', clean));
+    const hint = FLAG_HINT[clean];
+    if (hint) text.appendChild(mkEl('span', 'tps-hint', hint));
+    row.append(input, mkEl('span', 'tps-switch-track'), text);
+    if (hint) row.title = hint;
     return row;
+  }
+
+  /** 라벨 아래 한 줄 설명 — 문구 정본은 text-panel-help.ts */
+  private appendHint(row: HTMLElement, label: string): void {
+    const h = FIELD_HINT[label];
+    if (h) row.appendChild(mkEl('span', 'tps-hint', h));
   }
 
   /** −/값/+ 알약 스테퍼 (자간·장평) */
@@ -282,7 +310,7 @@ export class TextPanelSections {
     label: string, value: number, unit: string, min: number, max: number,
     onChange: (next: number) => void,
   ): HTMLElement {
-    const row = mkEl('div', 'tps-row');
+    const row = mkEl('div', 'tps-row tps-row--stack');
     row.appendChild(mkEl('span', 'tps-label', label));
     const box = mkEl('div', 'tps-pill-stepper');
     let cur = value;
@@ -298,6 +326,7 @@ export class TextPanelSections {
     dec.addEventListener('click', step(-1));
     inc.addEventListener('click', step(1));
     box.append(dec, val, inc);
+    this.appendHint(row, label);
     row.appendChild(box);
     return row;
   }
