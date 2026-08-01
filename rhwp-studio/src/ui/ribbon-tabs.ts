@@ -67,6 +67,10 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('list-bullets', '글머리표', 'format:toggle-bullet'),
       P('text-indent', '한 수준 증가', 'format:level-increase'),
       P('text-outdent', '한 수준 감소', 'format:level-decrease'),
+      // 일반 문단 들여쓰기/내어쓰기 — '한 수준' 은 개요/번호용이라 일반 문단엔 안 먹는다.
+      // 아이콘은 text-indent/outdent 와 겹치지 않게 arrow-line-right/left 사용.
+      P('arrow-line-right', '들여쓰기', 'format:indent-increase'),
+      P('arrow-line-left', '내어쓰기', 'format:indent-decrease'),
       gap(),
       // 글자 간격(자간·장평) — 문단 수준(들여쓰기)과 같은 '간격' 무리라 옆에 둔다.
       // 명령은 이미 있었다(format:char-spacing-*/char-ratio-*, 단축키 Shift+Alt+N/W/J/K).

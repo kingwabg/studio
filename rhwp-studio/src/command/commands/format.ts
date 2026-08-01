@@ -416,6 +416,23 @@ export const formatCommands: CommandDef[] = [
       services.getInputHandler()?.changeOutlineLevel(1);
     },
   },
+  // 일반 문단 왼쪽 여백 들여쓰기/내어쓰기 (목록 아닌 문단용)
+  {
+    id: 'format:indent-increase',
+    label: '들여쓰기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      services.getInputHandler()?.increaseParaIndent();
+    },
+  },
+  {
+    id: 'format:indent-decrease',
+    label: '내어쓰기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      services.getInputHandler()?.decreaseParaIndent();
+    },
+  },
   // 스타일 대화상자
   {
     id: 'format:style-dialog',

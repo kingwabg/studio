@@ -1172,6 +1172,9 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
         this.executeOperation({ kind: 'command', command: new InsertLineBreakCommand(this.cursor.getPosition()) });
       } else if (inCell) {
         this.executeOperation({ kind: 'command', command: new SplitParagraphInCellCommand(this.cursor.getPosition()) });
+      } else if (this.tryExitEmptyListOnEnter()) {
+        // [한컴 패리티] 빈 자동번호/글머리표 문단에서 Enter → 목록 이탈(분할 안 함).
+        // 처리됐으면 SplitParagraph 를 건너뛴다.
       } else {
         this.executeOperation({ kind: 'command', command: new SplitParagraphCommand(this.cursor.getPosition()) });
       }

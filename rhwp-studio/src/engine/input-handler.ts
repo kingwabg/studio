@@ -4554,6 +4554,73 @@ export class InputHandler {
     }
   }
 
+  /**
+   * [일반 문단 들여쓰기 2026-08-02] 목록이 아닌 일반 문단을 원클릭으로 왼쪽 여백
+   * (marginLeft) 한 스텝 증감. 개요/번호 문단은 changeOutlineLevel 이 수준을 바꾸지만,
+   * 일반 문단엔 안 먹어서(headType==='None' 이면 return) 매번 문단모양 대화상자를
+   * 열어야 했다.
+   *
+   * 단위: 이 경로의 marginLeft 은 **px(96dpi, zoom=1)** 다 — getParaProperties() 도,
+   * applyParaFormat/applyParaPropsToRange(→ executeParaFormatCommand → wasm.applyParaFormat)
+   * 도 px 로 주고받는다(2026-08-02 실측: marginLeft=28 → 화면 28px 들여쓰기, =4000 이면
+   * 4000px 로 화면 밖). ※ para-shape-dialog 의 ptToRaw2x(여백 set)는 별개 버그다.
+   * 스텝은 한컴 기본 들여쓰기 ≈ 2글자 ≈ 20pt = 27px.
+   */
+  private static readonly INDENT_STEP_PX = Math.round(20 * 96 / 72); // 20pt ≈ 27px
+
+  increaseParaIndent(): void {
+    try {
+      const curPx = this.getParaProperties().marginLeft ?? 0;
+      this.applyParaFormat({
+        marginLeft: curPx + InputHandler.INDENT_STEP_PX,
+      } as Partial<import('@/core/types').ParaProperties>);
+      this.focusTextarea();
+    } catch (err) {
+      console.warn('[InputHandler] increaseParaIndent 실패:', err);
+    }
+  }
+
+  decreaseParaIndent(): void {
+    try {
+      const curPx = this.getParaProperties().marginLeft ?? 0;
+      const next = Math.max(0, curPx - InputHandler.INDENT_STEP_PX); // 0 미만 clamp
+      this.applyParaFormat({
+        marginLeft: next,
+      } as Partial<import('@/core/types').ParaProperties>);
+      this.focusTextarea();
+    } catch (err) {
+      console.warn('[InputHandler] decreaseParaIndent 실패:', err);
+    }
+  }
+
+  /**
+   * [한컴 패리티 2026-08-01] 빈 자동번호/글머리표 문단에서 Enter → 목록 이탈.
+   * 한컴은 빈 번호 항목에서 Enter 를 누르면 새 항목을 만드는 대신 그 문단의 번호/
+   * 글머리표를 뗀다(수준>0 이면 한 수준 낮추고, 0 이면 완전히 해제). 우리는 여태
+   * 무조건 문단 분할만 해 빈 번호 항목이 계속 쌓였다(사용자 신고). 재료는
+   * toggleNumbering 과 동일(applyParaFormat).
+   * @returns 이탈을 처리했으면 true(= Enter 소비, 분할 안 함), 아니면 false.
+   */
+  tryExitEmptyListOnEnter(): boolean {
+    try {
+      const pos = this.cursor.getPosition();
+      if (this.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex) !== 0) return false;
+      const props = this.getParaProperties();
+      if (!props.headType || props.headType === 'None') return false;
+      const lvl = props.paraLevel ?? 0;
+      if (lvl > 0) {
+        this.applyParaFormat({ paraLevel: lvl - 1 } as Partial<import('@/core/types').ParaProperties>);
+      } else {
+        this.applyParaFormat({ headType: 'None' } as Partial<import('@/core/types').ParaProperties>);
+      }
+      this.focusTextarea();
+      return true;
+    } catch (err) {
+      console.warn('[InputHandler] tryExitEmptyListOnEnter 실패:', err);
+      return false;
+    }
+  }
+
   /** 글머리표 토글: None→Bullet, Bullet→None */
   toggleBullet(bulletChar = '●'): void {
     try {
