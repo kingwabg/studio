@@ -20,6 +20,7 @@ import { canPolish, currentDocKind } from './sentence-polish';
 import { applyPolishResult } from './change-review';
 import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
+import { insertFormatted } from './ai-doc-insert';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
 export type PanelTab = 'props' | 'text' | 'table' | 'cell';
@@ -68,6 +69,23 @@ const TEXT_STYLES: TextStyle[] = [
   { id: 'body', label: '본문', hint: '본문 — 10pt', pt: 10, bold: false },
   { id: 'num1', label: '1. 번호 제목', hint: '개요 번호 1수준 — 13pt 굵게', pt: 13, bold: true, level: 0 },
   { id: 'num2', label: '가. 번호', hint: '개요 번호 2수준 — 10pt', pt: 10, bold: false, level: 1 },
+];
+
+/**
+ * 문서 템플릿 — 누르면 커서 자리에 서식된 시작 골격(제목+번호목록 등)을 통째로 넣는다.
+ * body 는 ai-doc-insert 의 classifyLines 규칙대로 해석된다:
+ *   첫 줄=제목(16pt 가운데), `1.`=대제목(13pt 굵게), `가.`=소제목(11pt 굵게), 그 외=본문(10pt).
+ * 번호는 자동번호가 아니라 리터럴 텍스트(예시 이미지의 굵은 번호 제목과 같은 모양) —
+ * numberingId/paraLevel 좌표 이슈를 피한다.
+ * ponytail: 자동 renumber 필요하면 insertFormatted 에 headType:'Number' 경로 추가.
+ */
+const DOC_TEMPLATES: { id: string; label: string; hint: string; body: string }[] = [
+  { id: 'numlist', label: '제목 + 번호목록', hint: '제목 아래 굵은 번호 항목 3개',
+    body: '제목을 입력하세요\n1. 첫 번째 항목\n2. 두 번째 항목\n3. 세 번째 항목' },
+  { id: 'report', label: '제목 + 소제목 + 본문', hint: '제목·소제목·본문 한 줄',
+    body: '문서 제목\n1. 개요\n여기에 본문 내용을 입력하세요.' },
+  { id: 'minutes', label: '회의록', hint: '일시·참석자·안건·결정 사항',
+    body: '회의록\n1. 일시·장소\n2. 참석자\n3. 안건\n4. 결정 사항' },
 ];
 
 function svg(inner: string): string {
@@ -158,6 +176,20 @@ export class CanvaRightInspector {
     styleSec.appendChild(styleManage);
 
     this.fmtPane.appendChild(styleSec);
+
+    // [문서 템플릿 2026-08-02] 캔바식 '시작 골격' 카드 — 누르면 커서 자리에 제목+번호목록
+    // 등 서식된 문단을 통째로 넣는다. 삽입은 기존 insertFormatted(ai-doc-insert) 재사용:
+    // 제목/번호/본문 분류·좌표 변환·단일 undo 가 이미 처리돼 있다.
+    const tplSec = this.section('문서 템플릿');
+    const tpls = mkEl('div', 'canva-styles');
+    for (const t of DOC_TEMPLATES) {
+      const b = mkButton('canva-style-card canva-tpl-card', { title: t.hint });
+      b.textContent = t.label;
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.applyTemplate(t.body); });
+      tpls.appendChild(b);
+    }
+    tplSec.appendChild(tpls);
+    this.fmtPane.appendChild(tplSec);
 
     // ⚠ 「글자」(B·I·U·취소선·글꼴·크기)·「글자색」·「형광펜」 섹션은 **뺐다**
     //   (사용자 요청 2026-08-01 "없어도 될 거 같아"). 리본 홈 탭에 같은 것이 전부 있다.
@@ -434,6 +466,33 @@ export class CanvaRightInspector {
       }
     } catch (err) {
       console.warn('[inspector] 텍스트 스타일 적용 실패:', err);
+    }
+  }
+
+  /**
+   * 문서 템플릿 삽입 — 커서 자리에 서식된 문단 골격을 한 스냅샷으로 넣는다.
+   * 본문 삽입은 기존 ai-doc-insert 의 insertFormatted 를 그대로 쓴다(분류·좌표 변환·
+   * 단일 undo 가 이미 처리돼 있다). v1 은 본문만 — 셀 안·빈 문서면 넣지 않는다.
+   */
+  private applyTemplate(body: string): void {
+    const ih = this.services.getInputHandler() as any;
+    if (!ih || this.services.wasm.pageCount === 0) return;
+    try {
+      const start = ih.cursor.getPosition();
+      if (start.parentParaIndex !== undefined) return;
+      insertFormatted(ih, body);
+      // insertFormatted 는 wasm 만 조작하고 cursor 객체는 갱신하지 않아 삽입 후 커서가
+      //   stale 해진다("NaN번째 문단"). 삽입 시작점(=삽입된 제목의 앞)으로 커서를 놓아
+      //   유효화한다 — 사용자가 곧바로 제목부터 편집할 수 있다.
+      ih.cursor.moveTo({
+        sectionIndex: start.sectionIndex ?? 0,
+        paragraphIndex: start.paragraphIndex ?? 0,
+        charOffset: start.charOffset ?? 0,
+      });
+      ih.updateCaret?.();
+      this.services.eventBus.emit('document-changed');
+    } catch (err) {
+      console.warn('[inspector] 템플릿 삽입 실패:', err);
     }
   }
 

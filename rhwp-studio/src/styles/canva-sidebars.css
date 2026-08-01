@@ -1025,6 +1025,8 @@
 .canva-style--body { font-size: 11.5px; }
 .canva-style--num1 { font-size: 13px; font-weight: 700; }
 .canva-style--num2 { font-size: 11.5px; }
+/* 문서 템플릿 카드 — 라벨이 길어 한 줄 전체폭(2열 텍스트 스타일 카드와 구분) */
+.canva-styles > .canva-tpl-card { grid-column: 1 / -1; font-size: 12.5px; font-weight: 600; }
 
 /* 변경 추적 오버레이 — 한컴식(2026-07-30): 삽입=빨간 밑줄, 삭제=빨간 취소선,
    왼쪽 여백 빨간 변경 막대. 색은 한컴 기본 검토색(#e03131 계열). */
