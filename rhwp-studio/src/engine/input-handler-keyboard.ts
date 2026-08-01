@@ -15,6 +15,7 @@ import type { DocumentPosition, CellBbox, CellPathLike } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import { buildCellGrid, gridToTsv, gridToHtml } from './cell-copy';
 import { clearCellRange, fillCellsFrom, parseHtmlTableGrid } from './cell-paste';
+import { showPasteFormatPopup } from '@/ui/paste-format-popup';
 
 const RHWP_CLIPBOARD_MARKER_RE = /<!--\s*rhwp-studio-clipboard:([A-Za-z0-9._:-]+)\s*-->/;
 
@@ -1858,30 +1859,40 @@ export function onPaste(this: any, e: ClipboardEvent): void {
     }
   }
 
-  // 외부 클립보드: HTML이 있으면 pasteHtml로 표/서식 보존 붙여넣기
+  // 외부 클립보드: HTML이 있으면 서식 정수기 팝업으로 "서식 유지" vs "순수 텍스트" 선택.
+  // (내부 클립보드·컨트롤·표 셀·이미지 붙여넣기는 위에서 이미 return 됨 — 여기는 외부 HTML만.)
   if (html) {
-    this.executeOperation({ kind: 'snapshot', operationType: 'pasteHtml', operation: (wasm: WasmBridge) => {
-      if (hasSelection) this.deleteSelection();
-      const p = this.cursor.getPosition();
-      let result: string;
-      if (isNestedCellPosition(p)) {
-        result = wasm.pasteHtmlInCellByPath(
-          p.sectionIndex, p.parentParaIndex!, JSON.stringify(p.cellPath), p.charOffset, html,
-        );
-      } else if (p.parentParaIndex !== undefined) {
-        result = wasm.pasteHtmlInCell(
-          p.sectionIndex, p.parentParaIndex, p.controlIndex!,
-          p.cellIndex!, p.cellParaIndex!, p.charOffset, html,
-        );
-      } else {
-        result = wasm.pasteHtml(p.sectionIndex, p.paragraphIndex, p.charOffset, html);
-      }
-      const parsed = JSON.parse(result);
-      if (parsed.ok) {
-        return positionAfterPasteResult(p, parsed);
-      }
-      return p;
-    }});
+    const pasteRich = (): void => {
+      this.executeOperation({ kind: 'snapshot', operationType: 'pasteHtml', operation: (wasm: WasmBridge) => {
+        if (hasSelection) this.deleteSelection();
+        const p = this.cursor.getPosition();
+        let result: string;
+        if (isNestedCellPosition(p)) {
+          result = wasm.pasteHtmlInCellByPath(
+            p.sectionIndex, p.parentParaIndex!, JSON.stringify(p.cellPath), p.charOffset, html,
+          );
+        } else if (p.parentParaIndex !== undefined) {
+          result = wasm.pasteHtmlInCell(
+            p.sectionIndex, p.parentParaIndex, p.controlIndex!,
+            p.cellIndex!, p.cellParaIndex!, p.charOffset, html,
+          );
+        } else {
+          result = wasm.pasteHtml(p.sectionIndex, p.paragraphIndex, p.charOffset, html);
+        }
+        const parsed = JSON.parse(result);
+        if (parsed.ok) {
+          return positionAfterPasteResult(p, parsed);
+        }
+        return p;
+      }});
+    };
+    // e.clipboardData 는 이벤트 중에만 유효 → html/text/hasSelection 은 이미 동기 캡처됨.
+    // 팝업 await 후 삽입 시점 커서는 executeOperation 안에서 getPosition() 으로 재계산된다.
+    void showPasteFormatPopup().then((choice) => {
+      if (choice === 'rich') pasteRich();
+      else if (choice === 'plain') pastePlainText.call(this, text, hasSelection);
+      // null → 취소: 아무것도 하지 않음
+    });
     return;
   }
 
