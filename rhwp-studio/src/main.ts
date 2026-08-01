@@ -28,7 +28,7 @@ import '@/styles/phosphor/fill.css';
 import '@/styles/phosphor/bold.css';
 import { MenuBar } from '@/ui/menu-bar';
 import { RibbonHeader } from '@/ui/ribbon-header';
-import { loadWebFonts } from '@/core/font-loader';
+import { startWebFonts } from '@/core/start-web-fonts';
 import { loadExtensionViewerSettings, type ExtensionViewerSettings } from '@/core/extension-settings';
 import { CommandRegistry } from '@/command/registry';
 import { CommandDispatcher } from '@/command/dispatcher';
@@ -263,10 +263,7 @@ async function initialize(): Promise<void> {
     if (extensionViewerSettings.disableExternalWebFonts) {
       console.info('[main] 외부 웹폰트 사용 안 함 옵션이 켜져 있습니다.');
     }
-    msg.textContent = extensionViewerSettings.disableExternalWebFonts
-      ? '로컬 폰트 준비 중...'
-      : '웹폰트 로딩 중...';
-    await loadWebFonts([], undefined, extensionViewerSettings);  // CSS @font-face 등록 + CRITICAL 폰트만 로드
+    startWebFonts(undefined, extensionViewerSettings, () => canvasView?.loadDocument());
     msg.textContent = 'WASM 로딩 중...';
     await wasm.initialize();
     if (import.meta.env.DEV) {
@@ -869,10 +866,8 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
     console.log('[initDoc] 1. 폰트 로딩 시작');
     await updateLoadProgress(55, '폰트 준비 중...');
     if (docInfo.fontsUsed?.length) {
-      await loadWebFonts(docInfo.fontsUsed, (loaded, total) => {
-        const fontPercent = total > 0 ? 55 + Math.round((loaded / total) * 20) : 65;
-        msg.textContent = `파일 로딩 ${fontPercent}% - 폰트 로딩 중... (${loaded}/${total})`;
-      }, extensionViewerSettings);
+      startWebFonts(docInfo.fontsUsed, extensionViewerSettings,
+        () => canvasView?.loadDocument(), msg);
     }
     console.log('[initDoc] 2. 폰트 로딩 완료');
     await updateLoadProgress(75, '문서 상태 적용 중...');

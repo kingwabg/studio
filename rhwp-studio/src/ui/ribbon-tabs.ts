@@ -42,10 +42,6 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       PP('arrow-clockwise', '다시 실행', 'edit:redo'),
       gap(),
       slot('style-name', 116, '스타일', 'cards-three'),
-      // 콤보 옆의 아이콘 = 스타일 대화상자(F6) — 콤보는 고르기, 아이콘은 만들기·고치기.
-      // 한컴도 같은 짝(목록 + 스타일 설정)을 둔다(사용자 요청 2026-08-01).
-      P('cards-three', '스타일 설정', 'format:style-dialog',
-        '스타일을 만들고 고칩니다 — 목록에서 고르는 건 왼쪽 칸입니다 (F6)'),
       slot('font-name', 132, '글꼴', 'text-aa'),
       slot('font-size', 74, '크기', 'text-t'),
       gap(),
@@ -88,6 +84,10 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       gap(),
       // 「⋯」에 있던 두 대화상자를 꺼내 놓는다. 옛 '자세히' 확장 버튼은 글자 모양과
       // 같은 명령이라 중복 — 버튼으로 대체하고 홈의 오버플로는 비운다(⋯ 자동 소멸).
+      // 「스타일 설정」은 대화상자 3형제(스타일·글자 모양·문단 모양)의 맏이 자리에 둔다
+      // (사용자 요청 2026-08-01: 글자 모양 왼쪽). 앞머리 콤보는 고르기, 여기는 만들기·고치기.
+      P('cards-three', '스타일 설정', 'format:style-dialog',
+        '스타일을 만들고 고칩니다 — 목록에서 고르는 건 앞머리 칸입니다 (F6)'),
       P('text-aa', '글자 모양', 'format:char-shape'),
       P('paragraph', '문단 모양', 'format:para-shape'),
     ],
