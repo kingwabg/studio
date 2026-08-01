@@ -50,6 +50,13 @@
   border-color: var(--ui-border-light);
 }
 
+/* [활성 상태 2026-08-02] 현재 문단에 적용된 문단번호·글머리표를 눈에 보이게
+   — sb-btn.active 와 같은 강조. updateParaState 가 토글한다. */
+.tb-btn.active {
+  background: var(--ui-active);
+  border-color: var(--ui-border-strong);
+}
+
 /* 한컴 SVG 스프라이트 아이콘 시스템 */
 .tb-sprite {
   display: block;

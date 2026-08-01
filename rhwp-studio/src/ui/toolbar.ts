@@ -571,6 +571,23 @@ export class Toolbar {
       this.ensureLsOption(val);
       this.lsSelect.value = String(val);
     }
+    // [활성 상태 2026-08-02] 현재 문단의 정렬·문단번호·글머리표를 눈에 보이게 반영한다.
+    //   글자 서식(굵게 등)은 updateState 가, 문단 서식은 여기가 담당 — 서식별 자연 단위
+    //   (글자=선택/커서 앞 글자, 문단=커서 문단). props 는 cursor-para-changed 가 밀어 준다.
+    const align = props.alignment ?? 'justify';
+    const alignSel: Record<string, string> = {
+      left: '#btn-align-left', center: '#btn-align-center', right: '#btn-align-right',
+      justify: '#btn-align-justify', distribute: '#btn-align-distribute', split: '#btn-align-split',
+    };
+    for (const [key, sel] of Object.entries(alignSel)) {
+      const btn = this.container.querySelector<HTMLElement>(sel);
+      if (btn) this.setActive(btn, key === align);
+    }
+    const head = props.headType ?? 'None';
+    const numBtn = document.getElementById('tb-numbering');
+    if (numBtn) this.setActive(numBtn, head === 'Number' || head === 'Outline');
+    const bulBtn = document.getElementById('tb-bullet');
+    if (bulBtn) this.setActive(bulBtn, head === 'Bullet');
   }
 
   /** 커서 위치의 스타일을 드롭다운에 반영한다 */
