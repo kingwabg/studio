@@ -148,27 +148,22 @@ export class CanvaRightInspector {
       styles.appendChild(b);
     }
     styleSec.appendChild(styles);
+
+    // 스타일 설정 — 이름 있는 스타일을 만들고·고치고·적용한다(한글 스타일 관리, F6).
+    // 프리셋 카드가 "빠른 적용"이면 이건 "스타일 자체를 편집"하는 진입점이다.
+    const styleManage = mkButton('canva-full-btn', {
+      html: svg('<path d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/>') + '<span>스타일 설정…</span>',
+    });
+    styleManage.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:style-dialog'); });
+    styleSec.appendChild(styleManage);
+
     this.fmtPane.appendChild(styleSec);
 
     // ⚠ 「글자」(B·I·U·취소선·글꼴·크기)·「글자색」·「형광펜」 섹션은 **뺐다**
-    //   (사용자 요청 2026-08-01 "없어도 될 거 같아"). 리본 홈 탭에 같은 것이 전부
-    //   있어 한 화면에 두 벌이 있었다. 남는 것: 지금 서식 견본 · 텍스트 스타일 ·
-    //   글자/문단 모양 자세히 · 도구.
+    //   (사용자 요청 2026-08-01 "없어도 될 거 같아"). 리본 홈 탭에 같은 것이 전부 있다.
+    // ⚠ 「글자 모양 자세히」·「문단 모양 자세히」 버튼도 **뺐다**(사용자 요청 2026-08-01)
+    //   — 스타일 설정으로 대체. 남는 것: 지금 서식 견본 · 텍스트 스타일(+스타일 설정) · 도구.
     //   상태 반영(reflectChar)은 이 요소들이 없어도 되게 옵셔널로 두었다.
-
-    // 전체 글자 모양 다이얼로그
-    const full = mkButton('canva-full-btn', {
-      html: svg('<path d="M4 7V4h16v3M9 20h6M12 4v16"/>') + '<span>글자 모양 자세히…</span>',
-    });
-    full.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:char-shape'); });
-    this.fmtPane.appendChild(full);
-
-    // [디자인 2c] 문단 모양 자세히 — 글자 모양과 짝으로 항상 함께 노출
-    const fullPara = mkButton('canva-full-btn', {
-      html: svg('<path d="M4 6h16M4 12h10M4 18h13"/>') + '<span>문단 모양 자세히…</span>',
-    });
-    fullPara.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:para-shape'); });
-    this.fmtPane.appendChild(fullPara);
 
     // [디자인 2c] AI·녹음은 탭에서 빠졌다 → 속성 탭 하단이 그 진입점이다.
     // (탭만 없애고 진입점을 안 만들어 AI 패널이 열리지 않던 상태를 여기서 메운다.)
