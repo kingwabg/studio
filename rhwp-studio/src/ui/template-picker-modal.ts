@@ -5,12 +5,23 @@
  */
 import { ModalDialog } from './dialog';
 import { mkEl, mkButton } from './canva-dom';
+import { listTemplates, type CustomTemplate } from '@/media/template-store';
 
 export interface DocTemplate {
   id: string;
   label: string;
   hint: string;
   body: string;
+}
+
+export interface TemplatePickerOpts {
+  onPick: (t: DocTemplate) => void;
+  /** 커스텀 카드 연필 — 호출자가 새 문서를 열어 body 를 채운다. */
+  onEdit?: (t: DocTemplate) => void;
+  /** 상단 「현재 문서를 템플릿으로 저장」. */
+  onSaveCurrent?: (name: string) => void;
+  /** 커스텀 카드 × — 삭제 후 목록 갱신. */
+  onDelete?: (id: string) => void;
 }
 
 /**
@@ -47,24 +58,86 @@ export function buildTemplatePreview(body: string): HTMLElement {
   return page;
 }
 
+function customToDoc(c: CustomTemplate): DocTemplate {
+  const lines = c.body.split('\n').length;
+  return { id: c.id, label: c.label, hint: `${lines}줄 · 내 템플릿`, body: c.body };
+}
+
 export class TemplatePickerModal extends ModalDialog {
-  constructor(private opts: { onPick: (t: DocTemplate) => void }) {
+  private grid!: HTMLElement;
+
+  constructor(private opts: TemplatePickerOpts) {
     super('문단 템플릿', 460);
     this.titleIcon = 'layout';
   }
 
   protected createBody(): HTMLElement {
-    const grid = mkEl('div', 'canva-tpl-grid');
-    for (const t of DOC_TEMPLATES) {
-      const card = mkButton('canva-style-card canva-tpl-pick', { title: t.hint });
-      card.appendChild(buildTemplatePreview(t.body));
-      const name = mkEl('span', 'canva-tpl-name', t.label);
-      const hint = mkEl('span', 'canva-tpl-hint', t.hint);
-      card.append(name, hint);
-      card.addEventListener('click', () => { this.opts.onPick(t); this.hide(); });
-      grid.appendChild(card);
+    const wrap = mkEl('div', 'canva-tpl-wrap');
+
+    // 상단: 현재 문서를 템플릿으로 저장 — 인라인 input(⚠ prompt/confirm 금지)
+    if (this.opts.onSaveCurrent) {
+      const save = mkEl('div', 'canva-tpl-save');
+      const input = mkEl('input', 'canva-tpl-save-input');
+      input.type = 'text';
+      input.placeholder = '이 문서를 템플릿 이름으로 저장';
+      const btn = mkButton('dialog-btn dialog-btn-primary canva-tpl-save-btn', { text: '＋ 저장' });
+      const doSave = () => {
+        this.opts.onSaveCurrent?.(input.value.trim());
+        input.value = '';
+      };
+      btn.addEventListener('click', doSave);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSave(); } });
+      save.append(input, btn);
+      wrap.appendChild(save);
     }
-    return grid;
+
+    this.grid = mkEl('div', 'canva-tpl-grid');
+    wrap.appendChild(this.grid);
+    void this.renderCards();
+    return wrap;
+  }
+
+  /** 저장/삭제 후 외부에서 목록을 다시 그리게 한다. */
+  refresh(): void {
+    void this.renderCards();
+  }
+
+  private makeCard(t: DocTemplate, custom: boolean): HTMLElement {
+    const cell = mkEl('div', 'canva-tpl-cell');
+    const card = mkButton('canva-style-card canva-tpl-pick', { title: t.hint });
+    card.appendChild(buildTemplatePreview(t.body));
+    card.append(mkEl('span', 'canva-tpl-name', t.label), mkEl('span', 'canva-tpl-hint', t.hint));
+    card.addEventListener('click', () => { this.opts.onPick(t); this.hide(); });
+    cell.appendChild(card);
+
+    if (custom) {
+      const actions = mkEl('div', 'canva-tpl-actions');
+      if (this.opts.onEdit) {
+        const edit = mkButton('canva-tpl-act', { title: '새 문서로 수정', text: '✎' });
+        edit.addEventListener('click', (e) => { e.stopPropagation(); this.opts.onEdit?.(t); this.hide(); });
+        actions.appendChild(edit);
+      }
+      if (this.opts.onDelete) {
+        const del = mkButton('canva-tpl-act', { title: '삭제', text: '×' });
+        del.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await this.opts.onDelete?.(t.id);
+          this.refresh();
+        });
+        actions.appendChild(del);
+      }
+      cell.appendChild(actions);
+    }
+    return cell;
+  }
+
+  private async renderCards(): Promise<void> {
+    this.grid.replaceChildren();
+    for (const t of DOC_TEMPLATES) this.grid.appendChild(this.makeCard(t, false));
+    // 커스텀은 async — 빌트인 먼저 그리고 채운다
+    const custom = await listTemplates();
+    if (!this.grid.isConnected) return; // 모달이 닫혔으면 버린다
+    for (const c of custom) this.grid.appendChild(this.makeCard(customToDoc(c), true));
   }
 
   protected onConfirm(): void {

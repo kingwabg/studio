@@ -22,6 +22,8 @@ import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
 import { insertFormatted } from './ai-doc-insert';
 import { TemplatePickerModal } from './template-picker-modal';
+import { extractDocBody, saveTemplate, deleteTemplate, createTemplateId } from '@/media/template-store';
+import { showToast } from './toast';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
 export type PanelTab = 'props' | 'text' | 'table' | 'cell' | 'style';
@@ -170,7 +172,26 @@ export class CanvaRightInspector {
     });
     tplBtn.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      new TemplatePickerModal({ onPick: (t) => this.applyTemplate(t.body) }).show();
+      const modal = new TemplatePickerModal({
+        onPick: (t) => this.applyTemplate(t.body),
+        // 수정: 새 문서를 열고 body 를 채운다 → 사용자가 편집 후 다시 「현재 문서 저장」
+        onEdit: (t) => {
+          this.services.eventBus.emit('create-new-document');
+          this.applyTemplate(t.body);
+        },
+        onSaveCurrent: async (name) => {
+          const body = extractDocBody(this.services.wasm);
+          if (!body.trim()) {
+            showToast({ message: '저장할 본문이 없습니다.', durationMs: 2200 });
+            return;
+          }
+          await saveTemplate({ id: createTemplateId(), label: name || '내 템플릿', body, addedAt: Date.now() });
+          showToast({ message: '현재 문서를 템플릿으로 저장했습니다.', durationMs: 2200 });
+          modal.refresh();
+        },
+        onDelete: (id) => deleteTemplate(id),
+      });
+      modal.show();
     });
     tplSec.appendChild(tplBtn);
     this.fmtPane.appendChild(tplSec);

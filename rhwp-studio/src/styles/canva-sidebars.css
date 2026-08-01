@@ -1031,6 +1031,25 @@
 .canva-tpl-name { font-size: 12.5px; font-weight: 600; }
 .canva-tpl-hint { font-size: 10.5px; color: var(--color-text-muted, #888); line-height: 1.3; }
 
+/* 커스텀 템플릿 저장/수정/삭제 (v1) */
+.canva-tpl-save { display: flex; gap: 6px; margin-bottom: 10px; }
+.canva-tpl-save-input {
+  flex: 1; min-width: 0; padding: 6px 9px; font-size: 12.5px;
+  border: 1px solid var(--color-border, #ddd); border-radius: 6px;
+  background: var(--color-bg, #fff); color: var(--color-text, #222);
+}
+.canva-tpl-save-btn { white-space: nowrap; }
+.canva-tpl-cell { position: relative; display: flex; }
+.canva-tpl-cell .canva-tpl-pick { flex: 1; }
+.canva-tpl-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 3px; }
+.canva-tpl-act {
+  width: 18px; height: 18px; line-height: 16px; padding: 0;
+  font-size: 12px; text-align: center; border-radius: 4px;
+  border: 1px solid var(--color-border, #ccc);
+  background: rgba(255, 255, 255, 0.92); color: #555; cursor: pointer;
+}
+.canva-tpl-act:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
 /* 템플릿 카드의 작은 「용지」 미리보기 — 실제 조판이 아닌 시각 근사 */
 .canva-tpl-preview {
   background: #fff;
