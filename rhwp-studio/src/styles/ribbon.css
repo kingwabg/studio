@@ -113,6 +113,30 @@
 }
 /* 타일 전체가 하나의 버튼처럼 반응한다 */
 .rb-slot.has-label:hover { background: var(--rb-fill); color: var(--rb-accent); border-radius: 3px; }
+/* 크기 스피너 입양분 — 한컴처럼 [값][pt][▲▼] 한 덩어리 */
+.rb-slot > .sb-size-group.rb-adopted {
+  display: inline-flex; align-items: center; gap: 2px;
+  height: 28px; padding: 0 4px 0 6px;
+  border: 1px solid var(--rb-border); border-radius: 3px;
+  background: var(--rb-bg); width: 100%; box-sizing: border-box;
+}
+.rb-slot > .sb-size-group.rb-adopted:focus-within { border-color: var(--rb-accent); }
+.rb-slot .sb-size {
+  width: 100%; min-width: 0; flex: 1; border: 0; background: transparent;
+  color: var(--rb-fg); font: inherit; font-size: 12px; text-align: right; padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+.rb-slot .sb-size:focus { outline: none; }
+.rb-slot .sb-size-unit { font-size: 11px; color: var(--rb-fg-dim); flex: none; }
+.rb-slot .sb-size-arrows {
+  display: flex; flex-direction: column; flex: none; margin-left: 2px;
+}
+.rb-slot .sb-arrow {
+  border: 0; background: transparent; color: var(--rb-fg-dim);
+  font-size: 7px; line-height: 1; padding: 1px 2px; cursor: pointer;
+}
+.rb-slot .sb-arrow:hover { color: var(--rb-accent); }
+
 /* 색 피커 입양분(버튼 묶음)은 입력형 스타일(테두리·고정 높이)을 받지 않는다 */
 .rb-slot > .sb-color-wrap.rb-adopted,
 .rb-slot > #highlight-dropdown.rb-adopted {

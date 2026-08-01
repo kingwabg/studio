@@ -399,8 +399,8 @@ async function initialize(): Promise<void> {
     // Toolbar 는 생성 시 잡아 둔 엘리먼트 참조로 동작하므로, DOM 을 옮겨도
     // 상태 동기(updateState)·change 리스너가 그대로 살아 있다.
     for (const [slotName, sel] of [
-      ['font-name', '#font-name'], ['font-size', '#font-size'],
-      // 글자 색·형광펜 피커 입양 — 리본 버튼이 글자 모양 대화상자로 낙하하던 갭 수리
+      // ⚠ 크기는 묶음 전체(.sb-size-group) — 입력칸만 옮기면 pt·▲▼ 가 남는다(ribbon.css)
+      ['style-name', '#style-name'], ['font-name', '#font-name'], ['font-size', '.sb-size-group'],
       ['text-color', '.sb-color-wrap'], ['highlight', '#highlight-dropdown'],
     ] as const) {
       const el = document.querySelector<HTMLElement>(sel);

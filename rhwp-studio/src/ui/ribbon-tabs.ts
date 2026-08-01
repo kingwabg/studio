@@ -35,8 +35,15 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
     items: [
       // 되돌리기·잘라내기 묶음은 '편집' 탭으로 옮겼다(2026-07-30) — 홈은 서식에 전념한다.
       // 글꼴·크기는 Toolbar 가 소유한 실제 컨트롤을 옮겨 온다(상태 동기·이벤트 유지)
-      slot('font-name', 132),
-      slot('font-size', 68),
+      // 한컴 순서(사용자 요청 2026-08-01): 되돌리기·다시 실행 │ 스타일 · 글꼴 · 크기 │ …
+      // 되돌리기 둘은 '편집' 탭에도 있지만 여기서도 첫 자리를 준다 — 손이 가장 많이
+      // 가는 두 명령이라 탭을 옮겨 다니게 하지 않는다(한컴·워드가 같은 이유로 그렇다).
+      PP('arrow-counter-clockwise', '되돌리기', 'edit:undo'),
+      PP('arrow-clockwise', '다시 실행', 'edit:redo'),
+      gap(),
+      slot('style-name', 116, '스타일'),
+      slot('font-name', 132, '글꼴'),
+      slot('font-size', 74, '크기'),
       gap(),
       P('text-b', '굵게', 'format:bold'),
       P('text-italic', '기울임', 'format:italic'),

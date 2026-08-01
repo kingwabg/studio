@@ -1279,3 +1279,25 @@
 .tps-switch-row { justify-content: space-between; }
 .tps-switch-row > .tps-switch-track { order: 2; margin-left: 8px; }
 .tps-switch-row > .tps-switch-text { order: 1; flex: 1; }
+
+/* 줄 간격 스피너 — 리본 크기 칸과 같은 모양 [값][%][▲▼] (사용자 요청 2026-08-01) */
+.tps-spin {
+  display: flex; align-items: center; gap: 2px; min-width: 0;
+  height: 28px; padding: 0 3px 0 8px;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-surface-raised);
+}
+.tps-spin:focus-within { border-color: var(--color-primary); }
+.tps-spin-num {
+  flex: 1; min-width: 0; width: 100%; border: 0; background: transparent;
+  color: var(--color-text); font: inherit; font-size: 12.5px; font-weight: 600;
+  text-align: right; padding: 0; font-variant-numeric: tabular-nums;
+}
+.tps-spin-num:focus { outline: none; }
+.tps-spin-unit { font-size: 11px; color: var(--color-text-muted); flex: none; }
+.tps-spin-arrows { display: flex; flex-direction: column; flex: none; margin-left: 2px; }
+.tps-spin-arrow {
+  border: 0; background: transparent; color: var(--color-text-muted);
+  font-size: 7px; line-height: 1; padding: 1px 3px; cursor: pointer;
+}
+.tps-spin-arrow:hover { color: var(--color-primary); }

@@ -97,7 +97,9 @@ runTest('리본 헤더', async ({ page }) => {
         Array.from(i.classList).find((c) => c.startsWith('ph-') && !/duotone|regular|fill|bold/.test(c))),
       bar: rect('#color-bar'),
       caret: getComputedStyle(q('.rb-slot.has-label .sb-dd')).display,
-      labels: [...document.querySelectorAll('.rb-slot.has-label .rb-btn-label')].map((x) => x.textContent),
+      // 색 피커 두 자리만 본다(스타일·글꼴·크기도 이제 이름을 갖는다 — 2026-08-01)
+      labels: ['text-color', 'highlight'].map((n) =>
+        document.querySelector(`.rb-slot[data-slot="${n}"] .rb-btn-label`)?.textContent ?? ''),
       legacyGlyph: legacy,
       opened,
     };

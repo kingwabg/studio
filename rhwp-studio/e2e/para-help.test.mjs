@@ -105,19 +105,22 @@ runTest('문단 패널', async ({ page }) => {
   const ls = await page.evaluate(async () => {
     const sel = document.querySelector('.tps-select--mini');
     if (!sel) return { err: '드롭다운 없음' };
-    const box = sel.parentElement.querySelector('.tps-pill-stepper');
-    const num = box.querySelector('.tps-pill-num');
-    const before = num.textContent;
+    // 스피너 = [값][%][▲▼] — 리본 크기 칸과 같은 모양(2026-08-01)
+    const box = sel.parentElement.querySelector('.tps-spin');
+    const num = box.querySelector('.tps-spin-num');
+    const before = num.value;
     sel.value = '120';
     sel.dispatchEvent(new Event('change'));
     await new Promise((r) => setTimeout(r, 300));
-    const afterSel = num.textContent;
-    box.querySelectorAll('.tps-pill-btn')[1]
+    const afterSel = num.value;
+    box.querySelectorAll('.tps-spin-arrow')[0]   // ▲ = 늘리기
       .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     await new Promise((r) => setTimeout(r, 300));
     return {
       opts: [...sel.options].map((o) => o.textContent),
-      before, afterSel, afterStep: num.textContent,
+      before, afterSel, afterStep: num.value,
+      // 값을 직접 칠 수도 있어야 한다
+      typed: (() => { num.value = '175'; num.dispatchEvent(new Event('change')); return num.value; })(),
       // 조절로 목록에 없는 값이 되면 드롭다운도 그 값을 보여야 한다(거짓말 금지)
       selShows: sel.options[sel.selectedIndex].textContent,
       sameLine: new Set([sel, box].map((e) => Math.round(e.getBoundingClientRect().y / 4))).size === 1,
@@ -126,9 +129,10 @@ runTest('문단 패널', async ({ page }) => {
   console.log('  ③a 줄 간격:', JSON.stringify(ls));
   assert.deepStrictEqual(ls.opts.slice(0, 6), ['10%', '25%', '50%', '80%', '100%', '120%'],
     '요청한 프리셋 6종이 앞에 온다');
-  assert.strictEqual(ls.afterSel, '120%', '드롭다운으로 고르면 값이 바뀐다');
-  assert.strictEqual(ls.afterStep, '130%', '+ 로 10%씩 조절된다');
+  assert.strictEqual(ls.afterSel, '120', '드롭다운으로 고르면 값이 바뀐다');
+  assert.strictEqual(ls.afterStep, '130', '▲ 로 10%씩 조절된다');
   assert.strictEqual(ls.selShows, '130%', '조절한 값을 드롭다운도 보여준다');
+  assert.strictEqual(ls.typed, '175', '값을 직접 칠 수 있다');
   assert.ok(ls.sameLine, '드롭다운과 조절 버튼이 한 줄에');
 
   // ③b 자간·장평 — 「자주」에 있고 실제로 값이 바뀐다(사용자 요청 2026-08-01)

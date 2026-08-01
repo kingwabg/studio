@@ -199,15 +199,25 @@ export class TextPanelSections {
     }
     sel.value = String(cur);
 
-    const box = mkEl('div', 'tps-pill-stepper tps-pill-stepper--mini');
-    const val = mkEl('span', 'tps-pill-num', `${cur}%`);
+    // 리본 크기 칸과 같은 모양 — [값][%][▲▼] 한 덩어리(사용자 요청 2026-08-01)
+    const box = mkEl('div', 'tps-spin');
+    const val = mkEl('input', 'tps-spin-num') as HTMLInputElement;
+    val.type = 'text';
+    val.value = String(cur);
+    box.appendChild(val);
+    box.appendChild(mkEl('span', 'tps-spin-unit', '%'));
     let v = cur;
     const paint = () => {
-      val.textContent = `${v}%`;
+      val.value = String(v);
       sel.value = PRESETS.includes(v) ? String(v) : sel.value;
       this.para({ lineSpacing: v });
       this.paintPreview();
     };
+    val.addEventListener('change', () => {
+      const n = parseFloat(val.value);
+      if (Number.isFinite(n)) { v = Math.max(10, Math.min(500, Math.round(n))); paint(); }
+      else val.value = String(v);
+    });
     const step = (d: number) => (e: Event) => {
       e.preventDefault();
       v = Math.max(10, Math.min(500, v + d * 10));
@@ -225,11 +235,13 @@ export class TextPanelSections {
       }
       paint();
     };
-    const dec = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-minus"></i>', title: '줄 간격 줄이기' });
-    const inc = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-plus"></i>', title: '줄 간격 늘리기' });
+    const arrows = mkEl('div', 'tps-spin-arrows');
+    const inc = mkButton('tps-spin-arrow', { text: '▲', title: '줄 간격 늘리기' });
+    const dec = mkButton('tps-spin-arrow', { text: '▼', title: '줄 간격 줄이기' });
     dec.addEventListener('mousedown', step(-1));
     inc.addEventListener('mousedown', step(1));
-    box.append(dec, val, inc);
+    arrows.append(inc, dec);
+    box.appendChild(arrows);
 
     sel.addEventListener('change', () => { v = Number(sel.value); paint(); });
     row.append(sel, box);
