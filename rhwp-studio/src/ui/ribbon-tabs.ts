@@ -123,6 +123,7 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
     items: [
       PP('table', '표', 'table:create'),
       PP('image', '그림', 'insert:image'),
+      P('images', '내 사진', 'insert:my-photos'),
       PP('shapes', '도형', 'insert:shape'),
       P('text-t', '글상자', 'insert:textbox'),
       gap(),

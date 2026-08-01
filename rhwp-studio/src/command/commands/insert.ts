@@ -11,6 +11,7 @@ import { userSettings } from '@/core/user-settings';
 import { EndnoteShapeDialog } from '@/ui/endnote-shape-dialog';
 import { FieldInsertDialog } from '@/ui/field-insert-dialog';
 import { showShapePicker } from '@/ui/shape-picker';
+import { showPhotoPicker } from '@/ui/photo-picker';
 import { showToast } from '@/ui/toast';
 import type { ShapeType } from '@/ui/shape-picker';
 import type { CellPathLike } from '@/core/types';
@@ -18,6 +19,47 @@ import type { CellPathLike } from '@/core/types';
 /** 캡션 기본 크기 — insert:caption-toggle 과 같은 값(30mm / 3mm)을 쓴다. */
 const CAPTION_DEFAULT_WIDTH = Math.round(30 * 283.46);
 const CAPTION_DEFAULT_SPACING = Math.round(3 * 283.46);
+
+/** 파일 선택 → 배치 모드 진입 (insert:image 와 '내 사진'의 "파일에서 추가" 공용). */
+function pickAndPlaceImageFile(ih: any): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/bmp,image/webp';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    let objectUrl = '';
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const img = new Image();
+      objectUrl = URL.createObjectURL(file);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          if (img.naturalWidth <= 0 || img.naturalHeight <= 0) {
+            reject(new Error('이미지 크기를 확인할 수 없습니다.'));
+            return;
+          }
+          resolve();
+        };
+        img.onerror = () => reject(new Error('브라우저가 이 이미지 파일을 읽지 못했습니다.'));
+        img.src = objectUrl;
+      });
+      ih.enterImagePlacementMode(data, ext, img.naturalWidth, img.naturalHeight, file.name);
+      showToast({
+        message: '그림을 넣을 위치를 문서 본문 또는 표 셀 안에서 클릭하거나 드래그하세요.',
+        durationMs: 3500,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[insert:image] 이미지 준비 실패:', err);
+      showToast({ message: `그림을 삽입할 수 없습니다.\n${msg}`, durationMs: 6000 });
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    }
+  };
+  input.click();
+}
 
 /**
  * 캡션 위치 프리셋 커맨드. direction=null 이면 "캡션 없음"(해제).
@@ -147,46 +189,31 @@ export const insertCommands: CommandDef[] = [
     execute(services) {
       const ih = services.getInputHandler();
       if (!ih) return;
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/bmp,image/webp';
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        let objectUrl = '';
-        try {
-          const data = new Uint8Array(await file.arrayBuffer());
-          const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-          const img = new Image();
-          objectUrl = URL.createObjectURL(file);
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => {
-              if (img.naturalWidth <= 0 || img.naturalHeight <= 0) {
-                reject(new Error('이미지 크기를 확인할 수 없습니다.'));
-                return;
-              }
-              resolve();
-            };
-            img.onerror = () => reject(new Error('브라우저가 이 이미지 파일을 읽지 못했습니다.'));
-            img.src = objectUrl;
-          });
-          ih.enterImagePlacementMode(data, ext, img.naturalWidth, img.naturalHeight, file.name);
+      pickAndPlaceImageFile(ih);
+    },
+  },
+  {
+    id: 'insert:my-photos',
+    label: '내 사진',
+    icon: 'icon-image',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      const ih = services.getInputHandler();
+      if (!ih) return;
+      const anchor = document.querySelector<HTMLElement>('[data-cmd="insert:my-photos"]');
+      if (!anchor) return;
+      showPhotoPicker(anchor, {
+        onPick(entry) {
+          ih.enterImagePlacementMode(entry.data, entry.ext, entry.width, entry.height, entry.name);
           showToast({
             message: '그림을 넣을 위치를 문서 본문 또는 표 셀 안에서 클릭하거나 드래그하세요.',
             durationMs: 3500,
           });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn('[insert:image] 이미지 준비 실패:', err);
-          showToast({
-            message: `그림을 삽입할 수 없습니다.\n${msg}`,
-            durationMs: 6000,
-          });
-        } finally {
-          if (objectUrl) URL.revokeObjectURL(objectUrl);
-        }
-      };
-      input.click();
+        },
+        onAddFromFile() {
+          pickAndPlaceImageFile(ih);
+        },
+      });
     },
   },
   {

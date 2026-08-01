@@ -1,0 +1,102 @@
+/* ─── 로컬 사진첩("내 사진") 드롭다운 ─── */
+.photo-picker {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-primary-subtle);
+  box-shadow: var(--shadow-dropdown);
+  z-index: 10000;
+  font-size: var(--font-size-base);
+  width: 300px;
+}
+.photo-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 4px 10px;
+  background: var(--color-accent-bg);
+  border-bottom: 1px solid var(--ui-border);
+}
+.photo-picker-title {
+  font-weight: bold;
+  font-size: var(--font-size-sm);
+  color: var(--color-primary-dark);
+}
+.photo-picker-add {
+  border: 1px solid var(--color-primary-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-primary-dark);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: var(--font-size-sm);
+}
+.photo-picker-add:hover {
+  background: var(--color-primary-subtle);
+}
+.photo-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.photo-picker-tile {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+  aspect-ratio: 1 / 1;
+}
+.photo-picker-tile:hover {
+  background: var(--color-accent-bg);
+  border-color: var(--color-primary-subtle);
+}
+.photo-picker-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.photo-picker-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.photo-picker-thumb-empty {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  background: var(--color-accent-bg);
+  border-radius: var(--radius-sm);
+}
+.photo-picker-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-inverse, #fff);
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 0 var(--radius-md) 0 var(--radius-md);
+  opacity: 0;
+}
+.photo-picker-tile:hover .photo-picker-del {
+  opacity: 1;
+}
+.photo-picker-del:hover {
+  background: var(--color-danger, #d33);
+}
+.photo-picker-empty {
+  grid-column: 1 / -1;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}

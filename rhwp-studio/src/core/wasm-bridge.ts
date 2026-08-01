@@ -1,4 +1,5 @@
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
+import { capturePhoto } from '@/media/photo-capture';
 import type { DocumentInfo, PageInfo, PageDef, SectionDef, PageBorderFillSettings, EndnoteShapeSettings, NoteEditInfo, CursorRect, HitTestResult, BodyFootnoteMarkerHit, FootnoteAtCursorResult, DeleteFootnoteResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, CellPathLike, NavContextEntry, FieldInfoResult, BookmarkInfo, LayerRenderProfile, PageLayerTree } from './types';
 
 /** HWPX 비표준 감지 경고 리포트 (#177). */
@@ -1145,11 +1146,14 @@ export class WasmBridge {
                 // 셀 floating 분기에서 사용. undefined 면 셀 좌상단 default (기존 동작).
                 paperOffsetXHu?: number, paperOffsetYHu?: number): { ok: boolean; paraIdx: number; controlIdx: number; logicalOffset?: number } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).insertPicture(
+    const result = JSON.parse((this.doc as any).insertPicture(
       sec, paraIdx, charOffset, cellPathJson, imageData,
       width, height, naturalWidthPx, naturalHeightPx, extension, description,
       paperOffsetXHu, paperOffsetYHu,
     ));
+    // 삽입 성공 시 로컬 사진첩("내 사진")에 자동 축적 (fire-and-forget).
+    if (result?.ok) capturePhoto(imageData, extension, naturalWidthPx, naturalHeightPx, description);
+    return result;
   }
 
   // ── 그림 속성 API ─────────────────────────────────────
