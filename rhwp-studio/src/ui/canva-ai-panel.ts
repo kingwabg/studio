@@ -6,7 +6,7 @@
  */
 import type { CanvaServices } from './canva-services';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
-import { callMiniMax, aiErrorHint } from './canva-ai-client';
+import { callMiniMax, aiErrorHint, getSelectedModel, setSelectedModel } from './canva-ai-client';
 import { mkEl, mkButton } from './canva-dom';
 import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
 import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
@@ -135,6 +135,8 @@ export class CanvaAiPanel {
     this.sendBtn.addEventListener('click', () => void this.send());
     bar.append(this.input, this.sendBtn);
     pane.appendChild(bar);
+    // ── 모델 버튼(채팅 아래) — 호스트의 공급자 목록에서 고른다. 단독 실행이면 숨김. ──
+    pane.appendChild(this.buildModelBar());
     this.syncMode();
 
     this.root.appendChild(pane);
@@ -312,10 +314,57 @@ export class CanvaAiPanel {
   }
 
   private async callModel(userText: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {
-    // 공용 클라이언트(canva-ai-client) — AI 수정 대화상자와 공유
-    const out = await callMiniMax(systemPrompt, userText);
-    this.modelBadge.textContent = 'MiniMax M3';
-    return out;
+    // 공용 클라이언트(canva-ai-client) — AI 수정 대화상자와 공유.
+    // 배지는 모델 버튼이 그린다(하드코딩 'MiniMax M3' 는 호스트 배포에서 거짓말이었다).
+    return callMiniMax(systemPrompt, userText);
+  }
+
+  /**
+   * 모델 선택 줄 — 목록은 호스트 `/api/ai-providers` 가 정본(설정 화면과 같은 원천).
+   * 선택은 localStorage 에 남아 다음 열 때도 유지. 프록시가 허용 목록으로 재검증하므로
+   * 여기 값은 UI 편의일 뿐 보안 경계가 아니다.
+   */
+  private buildModelBar(): HTMLElement {
+    const wrap = mkEl('div', 'canva-ai-modelbar');
+    const chip = mkButton('canva-ai-modelchip', { title: 'AI 모델 고르기' });
+    const menu = mkEl('div', 'canva-ai-modelmenu');
+    menu.hidden = true;
+    const paint = (label: string) => {
+      chip.innerHTML = `<i class="ph ph-cpu"></i><span>${label}</span><i class="ph ph-caret-up"></i>`;
+      this.modelBadge.textContent = label;
+    };
+    wrap.append(chip, menu);
+    void (async () => {
+      try {
+        const res = await fetch('/api/ai-providers');
+        if (!res.ok) throw new Error(String(res.status));
+        const list = ((await res.json()) as {
+          providers?: Array<{ name: string; model: string; enabled: boolean; isDefault: boolean }>;
+        }).providers?.filter((x) => x.enabled) ?? [];
+        if (!list.length) { wrap.hidden = true; return; }
+        const chosen = getSelectedModel();
+        const cur = list.find((x) => x.model === chosen) ?? list.find((x) => x.isDefault) ?? list[0];
+        paint(cur.name);
+        for (const it of list) {
+          const b = mkButton('canva-ai-modelitem', { text: '' });
+          b.innerHTML = `<b>${it.name}</b><small>${it.model}</small>`;
+          b.classList.toggle('is-active', it.model === cur.model);
+          b.addEventListener('click', () => {
+            setSelectedModel(it.model);
+            paint(it.name);
+            menu.hidden = true;
+            menu.querySelectorAll('.canva-ai-modelitem').forEach((x) =>
+              x.classList.toggle('is-active', x === b));
+          });
+          menu.appendChild(b);
+        }
+        chip.addEventListener('click', () => { menu.hidden = !menu.hidden; });
+      } catch {
+        // 단독 실행(호스트 없음) — 종전 MiniMax 고정이므로 버튼을 숨긴다
+        wrap.hidden = true;
+      }
+    })();
+    return wrap;
   }
 
   private setBusy(b: boolean): void {

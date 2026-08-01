@@ -5,12 +5,25 @@
  */
 export const AI_MODEL = 'MiniMax-M3';
 
+/**
+ * 도우미가 쓸 모델 — 패널의 모델 버튼이 정한다(localStorage).
+ * 호스트 프록시는 이 값이 **설정된 공급자 목록에 있을 때만** 그 공급자로 태우고,
+ * 아니면 기본 공급자를 쓴다 — 임의 모델 호출은 여전히 막혀 있다.
+ */
+const MODEL_KEY = 'rhwpAiModel';
+export function getSelectedModel(): string {
+  try { return localStorage.getItem(MODEL_KEY) ?? ''; } catch { return ''; }
+}
+export function setSelectedModel(model: string): void {
+  try { localStorage.setItem(MODEL_KEY, model); } catch { /* 시크릿 모드 등 */ }
+}
+
 export async function callMiniMax(systemPrompt: string, userText: string, maxTokens = 2048): Promise<string> {
   const res = await fetch('/api/ai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: getSelectedModel() || AI_MODEL,
       max_completion_tokens: maxTokens,
       thinking: { type: 'disabled' }, // 사고 과정(<think>) 없이 본문만
       messages: [

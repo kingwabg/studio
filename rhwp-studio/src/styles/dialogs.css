@@ -987,3 +987,18 @@
 /* ⚠ .chg-bar 는 dialog 루트 밖(body 직속)이라 --color-primary 가 해석되지 않아
    진행 버튼이 투명 배경+흰 글씨 = 안 보였다(2026-08-01 실측). 명시값으로 고정. */
 .chg-bar .dialog-btn-primary { background: #3b6af0; color: #fff; border-color: #3b6af0; }
+
+/* AI 도우미 모델 선택(채팅 아래) */
+.canva-ai-modelbar { position: relative; padding: 4px 10px 8px; }
+.canva-ai-modelchip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+  padding: 4px 10px; border: 1px solid #d8dbe0; border-radius: 999px; background: #fff; cursor: pointer; color: #444; }
+.canva-ai-modelchip:hover { border-color: #9aa4b2; }
+.canva-ai-modelmenu { position: absolute; bottom: 34px; left: 10px; right: 10px; z-index: 30;
+  background: #fff; border: 1px solid #d8dbe0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.14);
+  padding: 4px; display: flex; flex-direction: column; }
+.canva-ai-modelitem { display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 7px 10px; border: 0; background: none; border-radius: 7px; cursor: pointer; text-align: left; }
+.canva-ai-modelitem:hover { background: #f2f4f7; }
+.canva-ai-modelitem.is-active { background: #eef3ff; }
+.canva-ai-modelitem b { font-size: 12px; }
+.canva-ai-modelitem small { font-size: 10px; color: #888; }
