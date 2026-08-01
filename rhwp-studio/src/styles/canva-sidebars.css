@@ -1316,6 +1316,10 @@
   border-radius: 6px; box-shadow: 0 8px 22px rgba(0, 0, 0, .14);
   padding: 3px; display: flex; flex-direction: column; max-height: 220px; overflow: auto;
 }
+/* ⚠ `display: flex` 는 [hidden] 의 UA `display:none` 을 **이긴다** — 그래서 누르지도
+   않았는데 목록이 늘 펼쳐져 있었다(2026-08-01 사용자 지적).
+   판정식이 el.hidden(true)만 보고 통과했던 자리다 — 이제 계산된 display 를 본다. */
+.tps-spin-menu[hidden] { display: none; }
 .tps-spin-item {
   border: 0; background: transparent; color: var(--color-text);
   font: inherit; font-size: 12px; text-align: right;

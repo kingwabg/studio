@@ -124,25 +124,29 @@ runTest('문단 패널', async ({ page }) => {
     const stepped = { shown: num.value, engine: get() };
 
     // ③ ▾ 프리셋
+    // ⚠ el.hidden 만 보면 안 된다 — display:flex 가 [hidden] 을 이겨 화면엔 열려
+    //   있는데 속성은 true 였다(2026-08-01). **계산된 display** 를 본다.
+    const shown = () => getComputedStyle(box.querySelector('.tps-spin-menu')).display !== 'none';
+    const openBefore = shown();
     M(box.querySelector('.tps-spin-caret'));
     await new Promise((r) => setTimeout(r, 200));
-    const opened = !box.querySelector('.tps-spin-menu').hidden;
+    const opened = shown();
     const items = [...box.querySelectorAll('.tps-spin-item')].map((b) => b.textContent);
     M([...box.querySelectorAll('.tps-spin-item')].find((b) => b.textContent === '120%'));
     await new Promise((r) => setTimeout(r, 300));
-    const picked = { shown: num.value, engine: get(),
-      closed: box.querySelector('.tps-spin-menu').hidden };
+    const picked = { shown: num.value, engine: get(), closed: !shown() };
 
     // ④ 키보드 위/아래
     num.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     await new Promise((r) => setTimeout(r, 300));
-    return { extraSelect, typed, stepped, opened, items, picked, byKey: num.value };
+    return { extraSelect, openBefore, typed, stepped, opened, items, picked, byKey: num.value };
   });
   console.log('  ③a 줄 간격:', JSON.stringify(ls));
   assert.ok(!ls.err, ls.err ?? '');
   assert.ok(!ls.extraSelect, '칸이 하나여야 한다 — 드롭다운이 따로 있으면 안 된다');
   assert.deepStrictEqual([ls.typed.shown, ls.typed.engine], ['175', 175], '직접 입력');
   assert.deepStrictEqual([ls.stepped.shown, ls.stepped.engine], ['185', 185], '▲ 로 10%');
+  assert.ok(!ls.openBefore, '누르기 전에는 목록이 닫혀 있어야 한다');
   assert.ok(ls.opened && ls.items.includes('120%'), '▾ 로 프리셋이 열린다');
   assert.deepStrictEqual([ls.picked.shown, ls.picked.engine], ['120', 120], '프리셋 선택');
   assert.ok(ls.picked.closed, '고르면 목록이 닫힌다');
