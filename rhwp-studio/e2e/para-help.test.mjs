@@ -101,39 +101,52 @@ runTest('문단 패널', async ({ page }) => {
   assert.deepStrictEqual(tabs.inAdv, ['한글', '영어'], '탭을 눌러 바로 옮겨간다');
   assert.deepStrictEqual(tabs.back.slice(0, 3), ['정렬', '줄 간격', '문단 간격'], '되돌아온다');
 
-  // ③a 줄 간격 — 프리셋 드롭다운 + 조절 버튼이 한 줄에서 값을 공유한다
+  // ③a 줄 간격 — **한 칸**에서 직접 입력 · ▾ 프리셋 · ▲▼ 조절이 다 된다
+  //     (사용자 요청 2026-08-01: "프리셋, 조절, 직접 입력 한번에 되게 — 한컴은 되던데")
   const ls = await page.evaluate(async () => {
-    const sel = document.querySelector('.tps-select--mini');
-    if (!sel) return { err: '드롭다운 없음' };
-    // 스피너 = [값][%][▲▼] — 리본 크기 칸과 같은 모양(2026-08-01)
-    const box = sel.parentElement.querySelector('.tps-spin');
+    const M = (el) => el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    const box = document.querySelector('.tps-spin--combo');
+    if (!box) return { err: '줄 간격 칸이 없다' };
+    // 칸이 하나뿐인가 — 드롭다운이 따로 있으면 안 된다
+    const extraSelect = !!box.parentElement.querySelector('select');
     const num = box.querySelector('.tps-spin-num');
-    const before = num.value;
-    sel.value = '120';
-    sel.dispatchEvent(new Event('change'));
+    const get = () => window.__inputHandler.getParaProperties().lineSpacing;
+
+    // ① 직접 입력
+    num.value = '175';
+    num.dispatchEvent(new Event('change'));
     await new Promise((r) => setTimeout(r, 300));
-    const afterSel = num.value;
-    box.querySelectorAll('.tps-spin-arrow')[0]   // ▲ = 늘리기
-      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    const typed = { shown: num.value, engine: get() };
+
+    // ② ▲ 조절
+    M(box.querySelectorAll('.tps-spin-arrow')[0]);
     await new Promise((r) => setTimeout(r, 300));
-    return {
-      opts: [...sel.options].map((o) => o.textContent),
-      before, afterSel, afterStep: num.value,
-      // 값을 직접 칠 수도 있어야 한다
-      typed: (() => { num.value = '175'; num.dispatchEvent(new Event('change')); return num.value; })(),
-      // 조절로 목록에 없는 값이 되면 드롭다운도 그 값을 보여야 한다(거짓말 금지)
-      selShows: sel.options[sel.selectedIndex].textContent,
-      sameLine: new Set([sel, box].map((e) => Math.round(e.getBoundingClientRect().y / 4))).size === 1,
-    };
+    const stepped = { shown: num.value, engine: get() };
+
+    // ③ ▾ 프리셋
+    M(box.querySelector('.tps-spin-caret'));
+    await new Promise((r) => setTimeout(r, 200));
+    const opened = !box.querySelector('.tps-spin-menu').hidden;
+    const items = [...box.querySelectorAll('.tps-spin-item')].map((b) => b.textContent);
+    M([...box.querySelectorAll('.tps-spin-item')].find((b) => b.textContent === '120%'));
+    await new Promise((r) => setTimeout(r, 300));
+    const picked = { shown: num.value, engine: get(),
+      closed: box.querySelector('.tps-spin-menu').hidden };
+
+    // ④ 키보드 위/아래
+    num.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    return { extraSelect, typed, stepped, opened, items, picked, byKey: num.value };
   });
   console.log('  ③a 줄 간격:', JSON.stringify(ls));
-  assert.deepStrictEqual(ls.opts.slice(0, 6), ['10%', '25%', '50%', '80%', '100%', '120%'],
-    '요청한 프리셋 6종이 앞에 온다');
-  assert.strictEqual(ls.afterSel, '120', '드롭다운으로 고르면 값이 바뀐다');
-  assert.strictEqual(ls.afterStep, '130', '▲ 로 10%씩 조절된다');
-  assert.strictEqual(ls.selShows, '130%', '조절한 값을 드롭다운도 보여준다');
-  assert.strictEqual(ls.typed, '175', '값을 직접 칠 수 있다');
-  assert.ok(ls.sameLine, '드롭다운과 조절 버튼이 한 줄에');
+  assert.ok(!ls.err, ls.err ?? '');
+  assert.ok(!ls.extraSelect, '칸이 하나여야 한다 — 드롭다운이 따로 있으면 안 된다');
+  assert.deepStrictEqual([ls.typed.shown, ls.typed.engine], ['175', 175], '직접 입력');
+  assert.deepStrictEqual([ls.stepped.shown, ls.stepped.engine], ['185', 185], '▲ 로 10%');
+  assert.ok(ls.opened && ls.items.includes('120%'), '▾ 로 프리셋이 열린다');
+  assert.deepStrictEqual([ls.picked.shown, ls.picked.engine], ['120', 120], '프리셋 선택');
+  assert.ok(ls.picked.closed, '고르면 목록이 닫힌다');
+  assert.strictEqual(ls.byKey, '130', '입력칸에서 ↑ 로도 조절된다');
 
   // ③b 자간·장평 — 「자주」에 있고 실제로 값이 바뀐다(사용자 요청 2026-08-01)
   const sp = await page.evaluate(async () => {
@@ -176,6 +189,10 @@ runTest('문단 패널', async ({ page }) => {
     const t = document.querySelector('.tps');
     const b = t.getBoundingClientRect();
     const w = Math.round(b.width);
+    // stack 행(줄 간격 등)도 전폭이어야 한다
+    const stacks = [...t.querySelectorAll('.tps-row--stack > .tps-spin, .tps-row--stack > .tps-select')]
+      .map((e) => { const r = e.getBoundingClientRect();
+        return { l: Math.round(r.x - b.x), r: Math.round(r.right - b.x) }; });
     // 값 행(2열 격자)의 두 칸이 좌우 끝에 붙는가
     const pairs = [...t.querySelectorAll('.tps-row--pair')].map((row) => {
       const cells = [...row.children].filter((c) => !c.classList.contains('tps-label')
@@ -190,13 +207,20 @@ runTest('문단 패널', async ({ page }) => {
       const r = e.getBoundingClientRect();
       return { l: Math.round(r.x - b.x), r: Math.round(r.right - b.x) };
     });
-    return { w, pairs, segs };
+    return { w, pairs, segs, stacks };
   });
-  console.log('  ⑤ 폭', grid.w, '/ 값 행', JSON.stringify(grid.pairs), '/ 타일 행', JSON.stringify(grid.segs));
-  assert.ok(grid.pairs.length >= 3, '값 행 3종(줄 간격·문단 간격·글자 간격)');
+  console.log('  ⑤ 폭', grid.w, '/ 2열 행', JSON.stringify(grid.pairs),
+    '/ 전폭 행', JSON.stringify(grid.stacks), '/ 타일 행', JSON.stringify(grid.segs));
+  // 줄 간격은 칸 하나로 합쳐져 stack 행이 됐다(2026-08-01) — pair 는 문단 간격·글자 간격·첫 줄 값
+  assert.ok(grid.pairs.length >= 2, `2열 값 행이 2종 이상이어야 한다 (${grid.pairs.length})`);
+  assert.ok(grid.stacks.length >= 1, '전폭 값 행(줄 간격)이 있어야 한다');
   for (const p of grid.pairs) {
     assert.strictEqual(p.l, 0, '값 행 왼쪽 끝이 0');
     assert.ok(Math.abs(p.r - grid.w) <= 2, `값 행 오른쪽 끝이 패널 끝과 같아야 한다 (${p.r} vs ${grid.w})`);
+  }
+  for (const st of grid.stacks) {
+    assert.strictEqual(st.l, 0, '전폭 행 왼쪽 끝이 0');
+    assert.ok(Math.abs(st.r - grid.w) <= 2, `전폭 행 오른쪽 끝이 패널 끝과 같아야 한다 (${st.r})`);
   }
   for (const g of grid.segs) {
     assert.strictEqual(g.l, 0, '타일 행 왼쪽 끝이 0');
