@@ -107,4 +107,41 @@ runTest('리본 헤더', async ({ page }) => {
   assert.deepStrictEqual(color.labels, ['글자 색', '형광펜'], '이름이 붙는다');
   assert.ok(!color.legacyGlyph, "리본 안에 옛 글리프('간'·✏)가 남아 있지 않다");
   assert.ok(color.opened, '아이콘만 바뀌고 팔레트 동작은 산다');
+
+  // ⑥ 우측 패널이 헤더와 같은 면인가 + 손잡이가 패널 **바깥**인가 (사용자 요청 2026-08-01)
+  const panel = await page.evaluate(async () => {
+    const g = document.querySelector('.canva-rail-grip');
+    const rail = document.querySelector('.canva-rail--right');
+    const cs = (e, k) => getComputedStyle(e)[k];
+    const w0 = Math.round(rail.getBoundingClientRect().width);
+    return {
+      bgSame: cs(document.querySelector('.ribbon-header'), 'backgroundColor')
+        === cs(rail, 'backgroundColor'),
+      borderSame: cs(document.querySelector('.rb-row-tabs'), 'borderBottomColor')
+        === cs(rail, 'borderLeftColor'),
+      gripOutside: g.getBoundingClientRect().right <= rail.getBoundingClientRect().x + 1,
+      gripWidth: Math.round(g.getBoundingClientRect().width),
+      w0,
+    };
+  });
+  console.log('  ⑥ 배경 동일', panel.bgSame, '/ 경계 동일', panel.borderSame,
+    '/ 손잡이 바깥', panel.gripOutside, `(${panel.gripWidth}px)`, '/ 패널', panel.w0);
+  assert.ok(panel.bgSame, '패널 배경이 헤더와 같다');
+  assert.ok(panel.borderSame, '패널 경계선이 헤더와 같다');
+  assert.ok(panel.gripOutside, '손잡이가 패널 안쪽 컨트롤을 덮지 않는다');
+
+  // 손잡이로 폭이 실제로 바뀐다 — 위치만 옮기고 기능이 죽으면 최악
+  const gp = await page.evaluate(() => {
+    const r = document.querySelector('.canva-rail-grip').getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+  });
+  await page.mouse.move(gp.x, gp.y);
+  await page.mouse.down();
+  await page.mouse.move(gp.x - 60, gp.y, { steps: 8 });
+  await page.mouse.up();
+  await new Promise((r) => setTimeout(r, 400));
+  const w1 = await page.evaluate(() =>
+    Math.round(document.querySelector('.canva-rail--right').getBoundingClientRect().width));
+  console.log('  ⑥ 드래그', panel.w0, '→', w1);
+  assert.ok(w1 > panel.w0 + 30, '왼쪽으로 끌면 패널이 넓어진다');
 });

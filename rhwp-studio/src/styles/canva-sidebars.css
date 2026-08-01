@@ -29,7 +29,11 @@
   /* [디자인 2c 갱신 2026-07-29] 가변 폭 — 왼쪽 가장자리 드래그. 284px 는 기본값. */
   width: 284px;
   position: relative;
-  border-left: 1px solid var(--ui-border);
+  /* 헤더와 같은 면으로 — 리본이 흰 판(--color-surface-raised)인데 패널만 회색
+     (--ui-bg-light #f8f9fa)이라 같은 화면에서 두 개의 흰색이 보였다(2026-08-01 실측).
+     경계선도 헤더가 쓰는 --color-border 로 맞춘다. */
+  background: var(--color-surface-raised, #fff);
+  border-left: 1px solid var(--color-border, #d5dbe3);
 }
 /* 레일 본문 컨테이너 — 인라인 display 대신 클래스로 둬야 접힘 시 display:none이 이긴다 */
 .canva-rail-content {
@@ -632,8 +636,11 @@
 
 /* 가변 폭 손잡이 — 우측 패널 왼쪽 가장자리 (디자인 2c 갱신) */
 /* 손잡이 하나로 폭 조절 + 접기 — 보이는 손잡이여야 잡을 수 있다(디자인 2c) */
+/* ⚠ 손잡이는 레일 **바깥**(문서 쪽)에 둔다. left:0 이면 패널 안쪽 첫 컨트롤과
+   겹쳐서, 폭을 줄이려다 패널 내용을 눌렀다(2026-08-01 사용자 지적).
+   접힘 상태와 같은 -10px 이라 규칙이 하나로 통일된다. */
 .canva-rail-grip {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
+  position: absolute; left: -10px; top: 0; bottom: 0; width: 10px;
   display: flex; align-items: center; justify-content: center;
   cursor: col-resize; z-index: 5;
 }
@@ -650,8 +657,8 @@
 .canva-rail-grip:hover .canva-grip-line,
 .canva-rail-grip:hover .canva-grip-dots { background: var(--color-primary); }
 .canva-rail-grip:hover .canva-grip-dots { box-shadow: 0 -6px 0 var(--color-primary), 0 6px 0 var(--color-primary); }
-/* 접혀도 손잡이는 남는다 — 이게 유일한 펼치기 수단이다(폭 0 레일의 왼쪽 가장자리) */
-.canva-rail--right.is-collapsed .canva-rail-grip { left: -10px; }
+/* 접혀도 손잡이는 남는다 — 이게 유일한 펼치기 수단이다(폭 0 레일의 왼쪽 가장자리).
+   위에서 이미 -10px 라 접힘 전용 규칙은 필요 없다. */
 
 /* 표/셀 탭의 섹션 스트립 — 대화상자 탭을 패널 안 아이콘 줄로 */
 .canva-sec-strip {
