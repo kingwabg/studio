@@ -660,6 +660,8 @@ export class CanvaRightInspector {
         ['칸 지우기', 'table:delete-col', 'columns'],
         ['바꿈 복사', 'table:transpose-copy', 'swap'],
         ['바꿈 붙여넣기', 'table:transpose-paste', 'clipboard-text'],
+        // 표 자체를 지우는 길이 패널에 아예 없었다 — 줄·칸만 지울 수 있었다(2026-08-01 실측).
+        ['표 지우기', 'table:delete', 'trash'],
       ]));
       host.appendChild(sec);
       return host;
@@ -681,7 +683,9 @@ export class CanvaRightInspector {
       ['합계', 'table:block-formula', 'sigma'],
       ['계산식', 'table:formula', 'math-operations'],
       ['1,000 단위', 'table:thousand-sep', 'currency-krw'],
-      ['자릿점 +', 'table:decimal-add', 'plus-minus'],
+      // 자릿점은 늘리기만 있고 줄이기가 없었다 — 한 번 늘리면 되돌릴 길이 없었다
+      ['자릿점 +', 'table:decimal-add', 'plus'],
+      ['자릿점 −', 'table:decimal-remove', 'minus'],
     ]));
     host.appendChild(calcSec);
     return host;
