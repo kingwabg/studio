@@ -58,4 +58,38 @@ runTest('표 패널 조작', async ({ page }) => {
   console.log('  표 지우기:', del.err ?? `${del.before}개 → ${del.after}개`);
   assert.ok(!del.err, del.err ?? '');
   assert.strictEqual(del.after, del.before - 1, '표 지우기가 실제로 표를 지워야 한다');
+
+  // 흐려진 컨트롤은 **왜 못 누르는지** 말해야 한다(2026-08-01 지적).
+  // 그냥 회색으로 두면 고장으로 읽힌다. 조건이 풀리면 문구도 사라져야 한다.
+  const why = await page.evaluate(async () => {
+    const w = window.__wasm;
+    w.createTableEx({ sectionIdx: 0, paraIdx: 0, charOffset: 0, rowCount: 3, colCount: 3, treatAsChar: true });
+    await new Promise((r) => setTimeout(r, 900));
+    return { made: w.getTables(0).length };
+  });
+  void why;
+  await page.mouse.click(400, 300);
+  await new Promise((r) => setTimeout(r, 900));
+
+  const hints = await page.evaluate(async () => {
+    [...document.querySelectorAll('.canva-rail--right *')]
+      .filter((e) => e.textContent.trim() === '표' && e.children.length === 0)[0]?.click();
+    await new Promise((r) => setTimeout(r, 700));
+    const shown = () => [...document.querySelectorAll('.tps-hint')]
+      .filter((e) => !e.hidden && e.textContent.trim()).map((e) => e.textContent.trim());
+    const on = shown();
+    const sw = [...document.querySelectorAll('.tps-switch-row')]
+      .find((r) => r.textContent.includes('글자처럼 취급'));
+    sw?.querySelector('input')?.click();
+    await new Promise((r) => setTimeout(r, 700));
+    return { on, off: shown(), stillDim: !!document.querySelector('.tps-dep.is-off') };
+  });
+  console.log('  흐린 이유 — 켰을 때', hints.on.length, '줄 / 껐을 때', hints.off.length, '줄');
+  assert.ok(hints.on.some((t) => t.includes('글자처럼')),
+    '「글자처럼 취급」이 켜져 배치를 못 쓴다는 설명이 있어야 한다');
+  assert.ok(!hints.off.some((t) => t.includes('글자처럼')),
+    '끄면 그 설명은 사라져야 한다 — 조건이 풀렸는데 남으면 거짓말이다');
+  assert.ok(!hints.stillDim, '끄면 배치 컨트롤이 살아나야 한다');
+  assert.ok(hints.off.some((t) => t.includes('어울림')),
+    '「본문 위치」가 왜 흐린지도 말해야 한다');
 });

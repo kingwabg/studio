@@ -115,22 +115,44 @@ export class TablePanelSections {
     const depRest = mkEl('div', 'tps-dep');
     for (const d of [depSeg, depRest]) d.classList.toggle('is-off', inline);
 
+    // ⚠ 흐려진 컨트롤은 **왜 못 누르는지**를 말해야 한다 — 그냥 회색으로 두면
+    //   고장으로 읽힌다(2026-08-01 지적). 조건이 풀리면 문구도 사라진다.
+    const whyOff = mkEl('div', 'tps-hint');
+    const paintWhy = (on: boolean) => {
+      whyOff.textContent = on
+        ? '표가 글자처럼 줄 안에 흐르므로 아래 배치는 정할 것이 없습니다 — 끄면 쓸 수 있습니다.'
+        : '';
+      whyOff.hidden = !on;
+    };
+    paintWhy(inline);
+
     this.host.appendChild(this.switchRow('글자처럼 취급', inline, (v) => {
       this.patchTable({ treatAsChar: v });
       for (const d of [depSeg, depRest]) d.classList.toggle('is-off', v);
+      paintWhy(v);
       this.refreshPos();
     }));
+    this.host.appendChild(whyOff);
 
-    // 본문 위치는 '어울림'일 때만 의미가 있다
+    // 본문 위치는 '어울림'일 때만 의미가 있다 — 이유도 같이 말한다
     const flowRow = this.segRow('본문 위치', FLOW, this.tp.textFlow ?? 'BothSides',
       (v) => { this.patchTable({ textFlow: v }); this.refreshPos(); });
+    const whyFlow = mkEl('div', 'tps-hint');
+    const paintFlow = (wrap: string) => {
+      const off = wrap !== 'Square';
+      whyFlow.textContent = off
+        ? '「어울림」일 때만 본문이 표 옆으로 흐릅니다 — 지금은 흐를 자리가 없습니다.'
+        : '';
+      whyFlow.hidden = !off;
+      flowRow.classList.toggle('is-off', off);
+    };
     depSeg.appendChild(this.segRow('본문과의 배치', WRAP, this.tp.textWrap ?? 'Square', (v) => {
       this.patchTable({ textWrap: v });
-      flowRow.classList.toggle('is-off', v !== 'Square');
+      paintFlow(v);
       this.refreshPos();
     }));
-    flowRow.classList.toggle('is-off', (this.tp.textWrap ?? 'Square') !== 'Square');
-    depSeg.appendChild(flowRow);
+    paintFlow(this.tp.textWrap ?? 'Square');
+    depSeg.append(flowRow, whyFlow);
     this.host.append(depSeg, this.posPreview(), depRest);
 
     depRest.appendChild(this.composeRow('가로', 'arrows-horizontal',
