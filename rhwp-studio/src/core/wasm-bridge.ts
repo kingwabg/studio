@@ -35,51 +35,8 @@ export interface TableTransposeResult {
   targetCols: number;
 }
 
-import { fontFamilyChainForDisplay } from './font-substitution';
+import { installCanvasFontSubstitution, isCanvasFontSubstitutionInstalled, substituteCssFontFamily } from './canvas-font-substitution';
 import type { FileSystemFileHandleLike } from '@/command/file-system-access';
-
-/**
- * CSS font 문자열에서 font-family를 추출하여 폰트 치환을 적용한다.
- *
- * 입력: 'bold 14.5px "안상수2006가는", sans-serif'
- * 출력: 'bold 14.5px "돋움", sans-serif'
- */
-function substituteCssFontFamily(cssFont: string): string {
-  const pxIdx = cssFont.indexOf('px ');
-  if (pxIdx < 0) return cssFont;
-
-  const prefix = cssFont.substring(0, pxIdx + 3);
-  const familyPart = cssFont.substring(pxIdx + 3);
-
-  const match = familyPart.match(/^"([^"]+)"/);
-  if (!match) return cssFont;
-
-  const fontName = match[1];
-  return prefix + fontFamilyChainForDisplay(fontName, 0, 0);
-}
-
-let canvasFontSubstitutionInstalled = false;
-
-function installCanvasFontSubstitution(): void {
-  if (canvasFontSubstitutionInstalled) return;
-  if (typeof CanvasRenderingContext2D === 'undefined') return;
-
-  const proto = CanvasRenderingContext2D.prototype;
-  const descriptor = Object.getOwnPropertyDescriptor(proto, 'font');
-  if (!descriptor?.get || !descriptor.set || descriptor.configurable === false) return;
-
-  Object.defineProperty(proto, 'font', {
-    configurable: true,
-    enumerable: descriptor.enumerable,
-    get() {
-      return descriptor.get!.call(this);
-    },
-    set(value: string) {
-      descriptor.set!.call(this, substituteCssFontFamily(String(value)));
-    },
-  });
-  canvasFontSubstitutionInstalled = true;
-}
 
 export class WasmBridge {
   private doc: HwpDocument | null = null;
@@ -105,7 +62,7 @@ export class WasmBridge {
       if (!ctx) {
         ctx = document.createElement('canvas').getContext('2d');
       }
-      const resolved = canvasFontSubstitutionInstalled ? font : substituteCssFontFamily(font);
+      const resolved = isCanvasFontSubstitutionInstalled() ? font : substituteCssFontFamily(font);
       if (resolved !== lastFont) {
         ctx!.font = resolved;
         lastFont = resolved;

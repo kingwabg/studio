@@ -43,7 +43,16 @@ export default defineConfig(({ mode }) => {
     port: 7700,
     fs: {
       // [Task #741 후속] 외부 file path 그림 영역 영역 samples/ dir 영역 영역 fetch 가능 영역.
-      allow: [__dirname, resolve(__dirname, '..', 'pkg'), resolve(__dirname, '..', 'samples')],
+      // ⚠ '..'/public 이 필요한 이유(2026-08-01 실측): public/fonts 는 ../../public/fonts 로
+      //   가는 심볼릭 링크인데, 그 대상이 allow 밖이라 **dev 에서만** 글꼴 요청이 전부
+      //   index.html(SPA 폴백)로 돌아왔다. 빌드는 심볼릭 링크를 따라 복사하므로 배포본은
+      //   멀쩡했고, 그래서 아무도 몰랐다 — 화면이 시스템 글꼴로 조용히 대체될 뿐이다.
+      allow: [
+        __dirname,
+        resolve(__dirname, '..', 'pkg'),
+        resolve(__dirname, '..', 'samples'),
+        resolve(__dirname, '..', 'public'),
+      ],
     },
     proxy: {
       // [캔버스 한컴 포크] AI 패널 프록시 — 브라우저는 같은 출처 /api/ai/* 로 부르고,

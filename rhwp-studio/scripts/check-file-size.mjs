@@ -36,7 +36,9 @@ const legacyBaselines = new Map([
   //      변환·insertTextLogical·getInlineControlIndexAtLogical, wasm 경계라 정위치
   // +6: deleteRangeLogical 래퍼(2026-07-30, 표 걸친 선택 삭제 O8)
   // +6: getTables 래퍼(2026-07-31, 서식 규정 검사) — wasm 경계 래퍼라 이 파일이 정위치
-  ['src/core/wasm-bridge.ts', 2366],
+  // −43: 캔버스 글꼴 치환을 core/canvas-font-substitution.ts 로 분리(2026-08-01).
+  //      wasm 경계와 무관한 글꼴 문제였고, 실제로 그 안에 서명 글꼴이 갇혀 있었다.
+  ['src/core/wasm-bridge.ts', 2323],
   // +9: 더블클릭 단어 선택 배선(2026-07-30 한컴 대조 실측 결함 수리) — dblclick 핸들러의 정위치
   ['src/engine/input-handler-mouse.ts', 2211],
   // +3: Ctrl+A 옛 anchor 승계 결함 수리(2026-07-30) — selectWholeDoc 의 정위치

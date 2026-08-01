@@ -946,12 +946,69 @@
 
 
 /* 전자서명 도구 4종 (2026-08-01) — 도장·체크리스트·동의율·NDA */
-.seal-body { display: flex; flex-direction: column; gap: 12px; }
-.seal-row { display: flex; gap: 8px; }
-.seal-name { flex: 1; height: 30px; padding: 0 8px; font: inherit; border: 1px solid var(--ui-border, #d9d6d2); border-radius: 5px; }
-.seal-shape { height: 30px; font: inherit; border: 1px solid var(--ui-border, #d9d6d2); border-radius: 5px; }
-.seal-preview { width: 150px; height: 150px; align-self: center; }
-.seal-foot { display: flex; justify-content: flex-end; gap: 6px; }
+
+/* 서명·도장 만들기 — 탭 3종(직접·글씨체·도장), 2026-08-01 재설계 */
+.sgn-body { display: flex; flex-direction: column; gap: 14px; }
+.sgn-lead { margin: -2px 0 0; font-size: 12px; color: var(--ui-text-muted, #8a857f); }
+
+.sgn-tabs { display: flex; border-bottom: 1px solid var(--ui-border, #e5e2de); }
+.sgn-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 4px 11px; background: none; border: 0;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  color: var(--ui-text-muted, #8a857f); cursor: pointer; font: inherit;
+}
+.sgn-tab:hover { color: var(--color-text); }
+.sgn-tab.is-on { color: var(--color-primary, #2c5aa0); border-bottom-color: var(--color-primary, #2c5aa0); }
+.sgn-tab-name { font-size: 13px; font-weight: 600; }
+.sgn-tab-sub { font-size: 11px; opacity: 0.85; }
+
+.sgn-panel { display: flex; flex-direction: column; gap: 10px; }
+.sgn-row { display: flex; gap: 8px; }
+.sgn-input, .sgn-select {
+  height: 32px; padding: 0 9px; font: inherit;
+  border: 1px solid var(--ui-border, #d9d6d2); border-radius: 6px;
+  background: var(--ui-surface, #fff); color: inherit;
+}
+.sgn-input { flex: 1; }
+
+/* 견본판 — 점선 테두리 안이 곧 만들어질 PNG 의 범위다 */
+.sgn-stage {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-height: 260px; padding: 8px;
+  border: 1px dashed var(--ui-border-strong, #cfcbc6); border-radius: 10px;
+  /* 투명 배경임을 눈으로 알리는 격자 — 결과 PNG 에는 들어가지 않는다.
+     칠한 바탕색을 두지 않아 밝은 테마·어두운 테마 모두에서 자연스럽다. */
+  background-image:
+    linear-gradient(45deg, rgb(0 0 0 / 3%) 25%, transparent 25% 75%, rgb(0 0 0 / 3%) 75%),
+    linear-gradient(45deg, rgb(0 0 0 / 3%) 25%, transparent 25% 75%, rgb(0 0 0 / 3%) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+.sgn-stage-sm { min-height: 200px; }
+.sgn-canvas { display: block; width: 100%; height: 260px; touch-action: none; cursor: crosshair; }
+.sgn-font .sgn-canvas, .sgn-seal .sgn-canvas { cursor: default; }
+.sgn-font .sgn-canvas { height: 180px; object-fit: contain; }
+.sgn-canvas-sq { width: 170px; height: 170px; }
+.sgn-placeholder {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; font-size: 13px; color: var(--ui-text-muted, #a09a93);
+}
+
+.sgn-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.sgn-chip {
+  padding: 6px 14px; font-size: 15px; line-height: 1.4;
+  border: 1px solid var(--ui-border, #d9d6d2); border-radius: 999px;
+  background: var(--ui-surface, #fff); color: inherit; cursor: pointer;
+}
+.sgn-chip:hover { border-color: var(--color-primary, #2c5aa0); }
+.sgn-chip.is-on {
+  border-color: var(--color-primary, #2c5aa0); color: var(--color-primary, #2c5aa0);
+  box-shadow: inset 0 0 0 1px var(--color-primary, #2c5aa0);
+}
+
+.sgn-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.sgn-foot { margin: -4px 0 0; font-size: 11px; color: var(--ui-text-muted, #8a857f); }
 .esign-check { display: flex; flex-direction: column; gap: 9px; max-height: 420px; overflow-y: auto; }
 .esign-check-intro { margin: 0 0 3px; font-size: 11px; color: var(--ui-text-muted, #8a857f); }
 .esign-check-row { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }

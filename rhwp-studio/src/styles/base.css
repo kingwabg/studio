@@ -223,6 +223,20 @@
   box-sizing: border-box;
 }
 
+/*
+ * hidden 속성은 언제나 이긴다.
+ *
+ * 왜 !important 인가(2026-08-01, 같은 사고 7번째): 브라우저 기본값 `[hidden]{display:none}`
+ * 은 우선순위가 낮아, 뒤에 나오는 `.어떤패널 { display: flex }` 한 줄이면 조용히 진다.
+ * 그러면 el.hidden 은 true 인데 **화면에는 그대로 보인다** — 속성만 확인하는 테스트는
+ * 통과하고 사용자는 열려 있는 드롭다운을 본다. 클래스마다 `.X[hidden]{display:none}` 을
+ * 덧대 막아 왔지만(canva-sidebars.css 5곳·dialogs.css 1곳) 새 패널을 만들 때마다 재발했다.
+ * 여기서 한 번 못 박으면 다시는 안 난다. 숨긴 요소를 보이게 하려면 hidden 을 떼면 된다.
+ */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: var(--font-family-ui);
   font-size: var(--font-size-base);
