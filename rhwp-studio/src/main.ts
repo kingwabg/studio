@@ -1084,9 +1084,11 @@ async function canReplaceCurrentDocument(skipUnsavedGuard?: boolean): Promise<bo
 // 커맨드에서 새 문서 생성 호출
 eventBus.on('create-new-document', (payload) => {
   void (async () => {
-    const options = payload as { skipUnsavedGuard?: boolean } | undefined;
+    const options = payload as { skipUnsavedGuard?: boolean; onReady?: () => void } | undefined;
     if (!await canReplaceCurrentDocument(options?.skipUnsavedGuard)) return;
     await createNewDocument();
+    // 새 문서 준비가 끝난 뒤에 실행할 후속(예: 템플릿 편집 — 빈 새 문서에 내용 채우기).
+    options?.onReady?.();
   })();
 });
 eventBus.on('open-document-bytes', async (payload) => {

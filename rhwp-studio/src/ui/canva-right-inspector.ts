@@ -22,6 +22,7 @@ import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
 import { insertFormatted } from './ai-doc-insert';
 import { TemplatePickerModal } from './template-picker-modal';
+import { openTemplateEditBar, closeTemplateEditBar } from './template-edit-bar';
 import { extractDocBody, saveTemplate, deleteTemplate, createTemplateId } from '@/media/template-store';
 import { showToast } from './toast';
 
@@ -174,10 +175,30 @@ export class CanvaRightInspector {
       e.preventDefault();
       const modal = new TemplatePickerModal({
         onPick: (t) => this.applyTemplate(t.body),
-        // 수정: 새 문서를 열고 body 를 채운다 → 사용자가 편집 후 다시 「현재 문서 저장」
+        // 수정: 새 문서에 body 를 채우고 「템플릿 편집 모드」 바를 띄운다 — 이름·저장
+        //   (같은 id 덮어쓰기)·삭제·닫기를 문서 위에서 바로. 저장이 딴 데로 새던 문제 해결.
         onEdit: (t) => {
-          this.services.eventBus.emit('create-new-document');
-          this.applyTemplate(t.body);
+          // 새 문서 준비가 끝난 뒤 내용을 채우고 편집 바를 띄운다(경합 방지 — create-new
+          //   는 async·저장가드 포함). 가드를 취소하면 onReady 가 안 불려 아무 일도 없다.
+          this.services.eventBus.emit('create-new-document', {
+            onReady: () => {
+              this.applyTemplate(t.body);
+              openTemplateEditBar({
+                label: t.label,
+                onSave: (name) => {
+                  const body = extractDocBody(this.services.wasm);
+                  if (!body.trim()) { showToast({ message: '저장할 본문이 없습니다.', durationMs: 2200 }); return; }
+                  void saveTemplate({ id: t.id, label: name || t.label, body, addedAt: Date.now() });
+                  showToast({ message: `템플릿 '${name || t.label}' 저장됨`, durationMs: 2200 });
+                },
+                onDelete: () => {
+                  void deleteTemplate(t.id);
+                  closeTemplateEditBar();
+                  showToast({ message: '템플릿을 삭제했습니다.', durationMs: 2200 });
+                },
+              });
+            },
+          });
         },
         onSaveCurrent: async (name) => {
           const body = extractDocBody(this.services.wasm);

@@ -1078,6 +1078,42 @@
 .tpl-pv-sub  { font-weight: 700; padding-left: 4px; }
 .tpl-pv-body { color: #888; }
 
+/* 템플릿 편집 모드 바 — 문서 위(#editor-area 최상단) 슬림 배너 */
+.tpl-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--color-accent-bg, #eef3ff);
+  border-bottom: 1px solid var(--color-primary-subtle, #cdddff);
+  font-size: 13px;
+}
+.tpl-edit-mark { font-weight: 600; color: var(--color-primary-dark, #2b6cb0); white-space: nowrap; }
+.tpl-edit-name {
+  padding: 4px 8px;
+  border: 1px solid var(--ui-border, #ccc);
+  border-radius: var(--radius-md, 4px);
+  font-size: 13px;
+  min-width: 160px;
+}
+.tpl-edit-spacer { flex: 1; }
+.tpl-edit-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--ui-border, #ccc);
+  border-radius: var(--radius-md, 4px);
+  background: #fff;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.tpl-edit-btn:hover { background: var(--ui-hover-strong, #f0f0f0); }
+.tpl-edit-save {
+  background: var(--color-primary, #2b6cb0);
+  color: #fff;
+  border-color: var(--color-primary, #2b6cb0);
+}
+.tpl-edit-del { color: var(--color-danger, #d33); }
+.tpl-edit-del:hover { background: #fde8e8; }
+
 /* 스타일 탭 — 이름이 길 수 있어 한 열(넓은 카드) 세로 목록 */
 .canva-style-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .canva-style-item { font-size: 12.5px; font-weight: 500; }
