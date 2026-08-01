@@ -319,7 +319,7 @@ export class RibbonHeader {
       const b = document.createElement('button');
       b.className = item.primary ? 'rb-btn is-primary' : 'rb-btn';
       b.type = 'button';
-      b.title = item.label;
+      b.title = item.hint ?? item.label;
       if (item.cmd) b.dataset.cmd = item.cmd;
       b.appendChild(this.icon(item.icon, 20));
       // 라벨은 **모든 버튼**에 붙는다(디자인 2a). primary 는 이제 굵기 강조일 뿐이다.

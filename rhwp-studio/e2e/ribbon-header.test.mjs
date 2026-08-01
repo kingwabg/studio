@@ -122,20 +122,26 @@ runTest('리본 헤더', async ({ page }) => {
   await new Promise((r) => setTimeout(r, 3500));
   const grp = await page.evaluate(() => {
     const bs = [...document.querySelectorAll('.rb-row-ribbon .rb-btn')];
-    const titles = bs.map((b) => b.title);
+    // ⚠ title 은 이제 설명문이다(자간/장평 차이를 담느라) — 이름은 라벨에서 읽는다
+    const name = (b) => b.querySelector('.rb-btn-label')?.textContent ?? '';
     return {
-      titles,
       // 한 수준 증가 다음에 자간 둘이 이어지는가(순서가 곧 '같은 무리'다)
-      order: titles.filter((t) => /한 수준|자간|장평/.test(t)),
-      cmds: bs.filter((b) => /자간/.test(b.title)).map((b) => b.dataset.cmd),
+      order: bs.map(name).filter((t) => /한 수준|자간|장평/.test(t)),
+      cmds: bs.filter((b) => /자간/.test(name(b))).map((b) => b.dataset.cmd),
+      // 자간·장평은 '기능이 비슷하다'는 지적을 받은 자리 — 툴팁이 차이를 설명해야 한다
+      hints: bs.filter((b) => /자간|장평/.test(name(b)))
+        .map((b) => (b.title.includes('사이') || b.title.includes('글자 자체'))),
     };
   });
-  console.log('  ⑤b 간격 무리:', JSON.stringify(grp.order), '/ 명령', JSON.stringify(grp.cmds));
+  console.log('  ⑤b 간격 무리:', JSON.stringify(grp.order), '/ 명령', JSON.stringify(grp.cmds),
+    '/ 툴팁 설명', JSON.stringify(grp.hints));
   assert.deepStrictEqual(grp.order,
     ['한 수준 증가', '한 수준 감소', '자간 줄이기', '자간 늘리기'],
     '한 수준 증가·감소가 기본 노출이고 자간이 옆에 붙는다');
   assert.deepStrictEqual(grp.cmds,
     ['format:char-spacing-decrease', 'format:char-spacing-increase'], '자간 명령 배선');
+  assert.ok(grp.hints.length > 0 && grp.hints.every(Boolean),
+    '자간·장평 툴팁이 차이(사이 vs 글자 자체)를 설명해야 한다');
 
   // ⑥ 우측 패널이 헤더와 같은 면인가 + 손잡이가 패널 **바깥**인가 (사용자 요청 2026-08-01)
   const panel = await page.evaluate(async () => {

@@ -7,7 +7,7 @@
  */
 
 export type RibbonItem =
-  | { kind: 'btn'; icon: string; label: string; cmd?: string; primary?: boolean }
+  | { kind: 'btn'; icon: string; label: string; cmd?: string; primary?: boolean; hint?: string }
   | { kind: 'gap' }
   | { kind: 'combo'; label: string; width: number; cmd?: string }
   /** 기존 Toolbar 가 소유한 실제 컨트롤(#font-name 등)을 이 자리로 옮겨 담는다 */
@@ -15,8 +15,8 @@ export type RibbonItem =
   | { kind: 'expander'; label: string; cmd?: string }
   | { kind: 'over'; icon: string; label: string; key?: string; cmd?: string };
 
-const P = (icon: string, label: string, cmd?: string): RibbonItem =>
-  ({ kind: 'btn', icon, label, cmd });
+const P = (icon: string, label: string, cmd?: string, hint?: string): RibbonItem =>
+  ({ kind: 'btn', icon, label, cmd, hint });
 const PP = (icon: string, label: string, cmd?: string): RibbonItem =>
   ({ kind: 'btn', icon, label, cmd, primary: true });
 const gap = (): RibbonItem => ({ kind: 'gap' });
@@ -63,10 +63,17 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       gap(),
       // 글자 간격(자간·장평) — 문단 수준(들여쓰기)과 같은 '간격' 무리라 옆에 둔다.
       // 명령은 이미 있었다(format:char-spacing-*/char-ratio-*, 단축키 Shift+Alt+N/W/J/K).
-      P('arrows-in-line-horizontal', '자간 줄이기', 'format:char-spacing-decrease'),
-      P('arrows-out-line-horizontal', '자간 늘리기', 'format:char-spacing-increase'),
-      P('arrows-in-simple', '장평 줄이기', 'format:char-ratio-decrease'),
-      P('arrows-out-simple', '장평 늘리기', 'format:char-ratio-increase'),
+      // ⚠ 자간과 장평은 "비슷해 보인다"는 지적을 받았다(2026-08-01). 둘 다 한 줄에
+      //   들어가는 글자 수를 바꿔서 그렇게 느껴지는데, 바꾸는 대상이 다르다 —
+      //   자간은 글자 **사이**, 장평은 글자 **자체의 폭**이다. 툴팁으로 못 박는다.
+      P('arrows-in-line-horizontal', '자간 줄이기', 'format:char-spacing-decrease',
+        '글자와 글자 사이를 좁힙니다 — 글자 모양은 그대로입니다 (Shift+Alt+N)'),
+      P('arrows-out-line-horizontal', '자간 늘리기', 'format:char-spacing-increase',
+        '글자와 글자 사이를 벌립니다 — 글자 모양은 그대로입니다 (Shift+Alt+W)'),
+      P('arrows-in-simple', '장평 줄이기', 'format:char-ratio-decrease',
+        '글자 자체를 홀쭉하게 만듭니다 — 사이 간격이 아니라 글자 폭입니다 (Shift+Alt+J)'),
+      P('arrows-out-simple', '장평 늘리기', 'format:char-ratio-increase',
+        '글자 자체를 넓적하게 만듭니다 — 사이 간격이 아니라 글자 폭입니다 (Shift+Alt+K)'),
       gap(),
       // 「⋯」에 있던 두 대화상자를 꺼내 놓는다. 옛 '자세히' 확장 버튼은 글자 모양과
       // 같은 명령이라 중복 — 버튼으로 대체하고 홈의 오버플로는 비운다(⋯ 자동 소멸).

@@ -58,8 +58,9 @@ runTest('문단 패널', async ({ page }) => {
   assert.ok(base.rowH <= 80, `탭 줄이 한 줄이어야 한다 (h=${base.rowH})`);
   assert.ok(base.helpInRow, '[설명]이 탭 줄 안에 있어야 한다 — 따로 한 줄을 먹으면 안 된다');
   assert.ok(base.helpH <= 26, `[설명]이 두 줄로 접히면 안 된다 (h=${base.helpH})`);
-  assert.deepStrictEqual(base.labels, ['정렬', '줄 간격', '문단 간격', '첫 줄'],
-    '자주 쓰는 넷이 한 화면에');
+  assert.deepStrictEqual(base.labels,
+    ['정렬', '줄 간격', '문단 간격', '첫 줄', '첫 줄 값'],
+    '자주 쓰는 것이 한 화면에 (첫 줄 값 포함)');
   assert.strictEqual(base.tips, base.segs, '설명을 꺼도 툴팁은 살아 있다');
 
   // ② [설명] 토글 — 켜면 문구가 붙고, 기억된다
@@ -98,7 +99,7 @@ runTest('문단 패널', async ({ page }) => {
   });
   console.log('  ③ 줄 나눔:', JSON.stringify(tabs.inAdv), '→ 자주:', JSON.stringify(tabs.back));
   assert.deepStrictEqual(tabs.inAdv, ['한글', '영어'], '탭을 눌러 바로 옮겨간다');
-  assert.deepStrictEqual(tabs.back, ['정렬', '줄 간격', '문단 간격', '첫 줄'], '되돌아온다');
+  assert.deepStrictEqual(tabs.back.slice(0, 3), ['정렬', '줄 간격', '문단 간격'], '되돌아온다');
 
   // ③a 줄 간격 — 프리셋 드롭다운 + 조절 버튼이 한 줄에서 값을 공유한다
   const ls = await page.evaluate(async () => {
@@ -219,4 +220,37 @@ runTest('문단 패널', async ({ page }) => {
         `${sec}: 옵션 ${g.n}개를 ${g.cols}열에 넣으면 마지막 줄이 빈다`);
     }
   }
+
+  // ⑥ 첫 줄 값 — "들여쓰기·내어쓰기는 내가 조절할 수도 있어야 해"(2026-08-01)
+  const ind = await page.evaluate(async () => {
+    const M = (el) => el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    // ⑤b 가 「문단 종류」로 옮겨 놨다 — 「자주」로 돌아와서 본다
+    [...document.querySelectorAll('.canva-sec-btn')].find((b) => b.textContent.trim() === '자주')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    const row = [...document.querySelectorAll('.tps-row--pair')]
+      .find((r) => r.querySelector('.tps-label')?.textContent === '첫 줄 값');
+    if (!row) return { err: '첫 줄 값 행이 없다' };
+    const offBefore = row.classList.contains('is-off');
+    [...document.querySelectorAll('.tps-seg-btn')].find((b) => b.textContent.trim() === '들여쓰기')?.click();
+    await new Promise((r) => setTimeout(r, 400));
+    const num = row.querySelector('.tps-pill-num');
+    const start = num.textContent;
+    for (let i = 0; i < 5; i++) M(row.querySelectorAll('.tps-pill-btn')[1]);
+    await new Promise((r) => setTimeout(r, 400));
+    const plus = { after: num.textContent, indent: window.__inputHandler.getParaProperties().indent };
+    // 내어쓰기로 바꾸면 같은 크기가 음수로 간다
+    [...document.querySelectorAll('.tps-seg-btn')].find((b) => b.textContent.trim() === '내어쓰기')?.click();
+    await new Promise((r) => setTimeout(r, 400));
+    return { offBefore, offAfter: row.classList.contains('is-off'), start, ...plus,
+      hang: window.__inputHandler.getParaProperties().indent };
+  });
+  console.log('  ⑥ 첫 줄 값:', JSON.stringify(ind));
+  assert.ok(!ind.err, ind.err ?? '');
+  assert.ok(ind.offBefore, '보통일 때는 값 조절이 꺼져 있다');
+  assert.ok(!ind.offAfter, '들여쓰기를 고르면 값 조절이 켜진다');
+  assert.strictEqual(ind.start, '10pt', '기본 10pt');
+  assert.strictEqual(ind.after, '15pt', '+ 다섯 번 → 15pt');
+  assert.strictEqual(ind.indent, 1500, '엔진에 1500(=15pt)으로 반영');
+  assert.ok(ind.hang < 0, '내어쓰기는 음수 — 같은 크기로 방향만 뒤집힌다');
 });

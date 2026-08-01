@@ -131,14 +131,30 @@ export class TextPanelSections {
     this.host.appendChild(gap);
     this.appendHint(gap, '문단 간격');
 
+    // 첫 줄 = 종류(보통/들여/내어) + **얼마나**. 값 조절이 없으면 10pt 고정이라
+    // "내가 조절할 수도 있어야 한다"는 요청을 못 받는다(2026-08-01).
     const cur = this.pp.indent ?? 0;
     const kind = cur > 0 ? 'indent' : cur < 0 ? 'hang' : 'normal';
+    const amountRow = mkEl('div', 'tps-row tps-row--pair');
+    amountRow.appendChild(mkEl('span', 'tps-label', '첫 줄 값'));
+    const setIndent = (k: string, mag: number) => {
+      this.para({ indent: k === 'normal' ? 0 : k === 'indent' ? mag : -mag });
+      this.paintPreview();
+    };
+    let curKind = kind;
+    const amount = this.miniStepPt('들여쓸 양',
+      Math.abs(cur) / HWPUNIT_PER_PT || 10, (n) => setIndent(curKind, fromPt(String(n))));
+    amountRow.appendChild(amount.el);
+    amountRow.classList.toggle('is-off', kind === 'normal');
+
     this.host.appendChild(this.segRow('첫 줄',
       [['normal', '보통'], ['indent', '들여쓰기'], ['hang', '내어쓰기']] as Opt<string>[], kind, (v) => {
+        curKind = v;
         const mag = Math.abs(this.pp.indent ?? 0) || fromPt('10');
-        this.para({ indent: v === 'normal' ? 0 : v === 'indent' ? mag : -mag });
-        this.paintPreview();
+        setIndent(v, mag);
+        amountRow.classList.toggle('is-off', v === 'normal');
       }));
+    this.host.appendChild(amountRow);
 
     // 자간·장평도 「자주」에(사용자 요청 2026-08-01). 문단이 아니라 **글자** 속성이라
     // 소제목으로 갈라 둔다 — 선택이 없으면 다음에 칠 글자에 걸린다는 주의도 함께.
@@ -219,6 +235,30 @@ export class TextPanelSections {
     row.append(sel, box);
     this.appendHint(row, '줄 간격');
     return row;
+  }
+
+  /** pt 단위 알약 스테퍼 (1pt 단위) — 첫 줄 값처럼 '얼마나'를 정하는 자리 */
+  private miniStepPt(
+    label: string, value: number, onChange: (n: number) => void,
+  ): { el: HTMLElement; set: (n: number) => void } {
+    const wrap = mkEl('label', 'tps-mini');
+    wrap.appendChild(mkEl('span', 'tps-mini-label', label));
+    const box = mkEl('div', 'tps-pill-stepper tps-pill-stepper--mini');
+    let cur = value;
+    const val = mkEl('span', 'tps-pill-num', `${cur}pt`);
+    const step = (d: number) => (e: Event) => {
+      e.preventDefault();
+      cur = Math.max(0, Math.min(200, Math.round((cur + d) * 10) / 10));
+      val.textContent = `${cur}pt`;
+      onChange(cur);
+    };
+    const dec = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-minus"></i>', title: `${label} 줄이기` });
+    const inc = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-plus"></i>', title: `${label} 늘리기` });
+    dec.addEventListener('mousedown', step(-1));
+    inc.addEventListener('mousedown', step(1));
+    box.append(dec, val, inc);
+    wrap.appendChild(box);
+    return { el: wrap, set: (n) => { cur = n; val.textContent = `${n}pt`; } };
   }
 
   /** 좁은 알약 스테퍼 두 개를 한 줄에 — 자간·장평용 */
