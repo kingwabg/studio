@@ -9,7 +9,7 @@ import type { CharProperties, ParaProperties } from '@/core/types';
 import { TableBorderSection } from './table-border-section';
 import { TablePanelSections } from './table-panel-sections';
 import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
-import { buildTextTab, toggleAdvanced, visibleSections } from './text-panel-chrome';
+import { buildTextTab } from './text-panel-chrome';
 import { mkEl, mkButton } from './canva-dom';
 import { FormatSpecimen } from './format-specimen';
 import { currentTextRuns, describeBodySelection, detectMixedFormat, scanFormatRuns, selectRun } from './selection-summary';
@@ -589,7 +589,7 @@ export class CanvaRightInspector {
   /** 표/셀 탭의 섹션 스트립 — 대화상자 탭을 패널 안 아이콘 줄로 (디자인 2c 갱신) */
   private buildSectionStrip(kind: 'text' | 'table' | 'cell'): HTMLElement {
     const strip = mkEl('div', 'canva-sec-strip');
-    for (const [label, icon] of visibleSections(SECTIONS[kind], kind)) {
+    for (const [label, icon] of SECTIONS[kind]) {
       const b = mkButton('canva-sec-btn', { title: label });
       b.innerHTML = `<i class="ph-duotone ph-${icon}"></i><span>${label}</span>`;
       b.classList.toggle('is-on', label === this.curSection[kind]);
@@ -654,7 +654,6 @@ export class CanvaRightInspector {
         buildTextTab(this.tabPane, {
           strip: this.buildSectionStrip('text'),
           mount: (host) => this.textSections.mount(host, this.services, this.curSection.text),
-          onAdv: () => { toggleAdvanced(this.curSection); this.applyContext(); },
           redraw: () => this.applyContext(),
         });
         return;

@@ -53,15 +53,14 @@ const FLAGS: Array<[keyof ParaProperties, string, boolean]> = [
 /**
  * 섹션 줄 — **「자주」 하나로 시작**한다(사용자 결정 2026-08-01).
  * 실측: 자주 쓰는 정렬·줄 간격·문단 간격·첫 줄이 서로 다른 섹션에 흩어져 있어
- * 한 문단을 손보는 데 섹션을 3번 오갔다. 나머지는 「자세히」 아래로 접는다.
+ * 한 문단을 손보는 데 섹션을 3번 오갔다. 나머지 셋은 옆에 그대로 둔다 —
+ * 「자세히」로 한 번 접었다가 뺐다(2026-08-01): 탭이 4개뿐이라 접을 이득이 없고,
+ * 접기 버튼이 오히려 한 줄을 더 먹었다.
  */
 export const TEXT_SECTIONS: Array<[string, string]> = [
   ['자주', 'text-align-left'],
   ['문단 종류', 'list-bullets'], ['줄 나눔', 'text-t'], ['탭', 'arrow-elbow-down-right'],
 ];
-
-/** 「자세히」에 접어 두는 섹션 — 섹션 줄에서는 감춘다 */
-export const ADVANCED_SECTIONS = ['문단 종류', '줄 나눔', '탭'];
 
 /** 설명 표시 여부 — [?] 토글, 기억한다 */
 const HELP_KEY = 'rhwpParaHelp';
@@ -142,7 +141,46 @@ export class TextPanelSections {
         this.para({ indent: v === 'normal' ? 0 : v === 'indent' ? mag : -mag });
         this.paintPreview();
       }));
+
+    // 자간·장평도 「자주」에(사용자 요청 2026-08-01). 문단이 아니라 **글자** 속성이라
+    // 소제목으로 갈라 둔다 — 선택이 없으면 다음에 칠 글자에 걸린다는 주의도 함께.
+    this.host.appendChild(mkEl('div', 'tps-sub-title', '글자 간격'));
+    const sp = mkEl('div', 'tps-row tps-row--pair');
+    sp.appendChild(this.miniStep('자간', this.cp.spacings?.[0] ?? 0, -50, 50, (n) => {
+      this.char({ spacings: Array(7).fill(n) } as Partial<CharProperties>);
+    }));
+    sp.appendChild(this.miniStep('장평', this.cp.ratios?.[0] ?? 100, 50, 200, (n) => {
+      this.char({ ratios: Array(7).fill(n) } as Partial<CharProperties>);
+    }));
+    this.host.appendChild(sp);
+    this.appendHint(sp, '글자 간격');
+
     this.host.appendChild(this.buildPreview());
+  }
+
+  /** 좁은 알약 스테퍼 두 개를 한 줄에 — 자간·장평용 */
+  private miniStep(
+    label: string, value: number, min: number, max: number, onChange: (n: number) => void,
+  ): HTMLElement {
+    const wrap = mkEl('label', 'tps-mini');
+    wrap.appendChild(mkEl('span', 'tps-mini-label', label));
+    const box = mkEl('div', 'tps-pill-stepper tps-pill-stepper--mini');
+    let cur = value;
+    const val = mkEl('span', 'tps-pill-num', `${cur}%`);
+    const step = (d: number) => (e: Event) => {
+      e.preventDefault();
+      cur = Math.max(min, Math.min(max, cur + d));
+      val.textContent = `${cur}%`;
+      onChange(cur);
+      this.paintPreview();
+    };
+    const dec = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-minus"></i>', title: `${label} 줄이기` });
+    const inc = mkButton('tps-pill-btn', { html: '<i class="ph-bold ph-plus"></i>', title: `${label} 늘리기` });
+    dec.addEventListener('mousedown', step(-1));
+    inc.addEventListener('mousedown', step(1));
+    box.append(dec, val, inc);
+    wrap.appendChild(box);
+    return wrap;
   }
 
   /** 라벨이 짧은 인라인 숫자칸 — 「위 0 아래 0」 처럼 한 줄에 둘 */

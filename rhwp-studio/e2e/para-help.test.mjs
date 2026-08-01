@@ -1,5 +1,5 @@
 /**
- * 문단 패널 — 「자주」 한 화면 + 설명 토글 + 「자세히」 접기.
+ * 문단 패널 — 「자주」 한 화면 + 탭 4개 항상 노출 + 탭 줄 오른쪽 [설명] 토글.
  * (사용자 결정 2026-08-01: 설명이 많아 보기 불편하고 섹션을 오가는 조작도 불편하다)
  *
  * ⚠ 섹션·토글 버튼은 mousedown 으로 동작한다(click 은 안 먹는다 — 실측).
@@ -29,18 +29,35 @@ runTest('문단 패널', async ({ page }) => {
       view: Math.round(document.querySelector('.canva-rail-content').getBoundingClientRect().height),
       hints: t.querySelectorAll('.tps-hint, .tps-sec-hint').length,
       labels,
-      strip: document.querySelectorAll('.canva-sec-btn').length,
+      secs: [...document.querySelectorAll('.canva-sec-btn')].map((b) => b.textContent.trim()),
       adv: !!document.querySelector('.canva-adv-toggle'),
+      // 탭 4개 + [설명] 이 **한 줄**인가 — y 좌표는 정렬 방식에 따라 다르므로
+      // 줄 전체 높이로 본다(한 줄 ≈ 65px, 두 줄이면 100px 을 넘는다)
+      rowH: Math.round(document.querySelector('.canva-sec-row').getBoundingClientRect().height),
+      // [설명]의 세로 중심이 탭 줄 안에 있나
+      helpInRow: (() => {
+        const r = document.querySelector('.canva-sec-row').getBoundingClientRect();
+        const h = document.querySelector('.canva-help-btn').getBoundingClientRect();
+        return h.top >= r.top - 1 && h.bottom <= r.bottom + 1;
+      })(),
+      // 좁은 줄에서 '설 명' 으로 접히지 않는가
+      helpH: Math.round(document.querySelector('.canva-help-btn').getBoundingClientRect().height),
       // 설명을 꺼도 툴팁으로는 읽을 수 있어야 한다
       tips: [...t.querySelectorAll('.tps-seg-btn')].filter((b) => b.title && b.title !== b.textContent).length,
       segs: t.querySelectorAll('.tps-seg-btn').length,
     };
   });
   console.log('  ① 높이', base.h, '/ 화면', base.view, '/ 설명', base.hints,
-    '/ 섹션버튼', base.strip, '/ 항목', JSON.stringify(base.labels), '/ 툴팁', `${base.tips}/${base.segs}`);
+    '/ 탭', JSON.stringify(base.secs), '/ 줄높이', base.rowH, `(설명 ${base.helpH}px, 줄 안 ${base.helpInRow})`,
+    '/ 항목', JSON.stringify(base.labels), '/ 툴팁', `${base.tips}/${base.segs}`);
   assert.ok(base.h <= base.view, `스크롤 없이 다 보여야 한다 (${base.h} > ${base.view})`);
   assert.strictEqual(base.hints, 0, '기본은 설명 꺼짐');
-  assert.strictEqual(base.strip, 0, '고를 게 하나뿐이면 섹션 줄을 감춘다');
+  assert.deepStrictEqual(base.secs, ['자주', '문단 종류', '줄 나눔', '탭'],
+    '탭 4개는 늘 보인다 — 접지 않는다');
+  assert.ok(!base.adv, '「자세히」 접기는 없앴다');
+  assert.ok(base.rowH <= 80, `탭 줄이 한 줄이어야 한다 (h=${base.rowH})`);
+  assert.ok(base.helpInRow, '[설명]이 탭 줄 안에 있어야 한다 — 따로 한 줄을 먹으면 안 된다');
+  assert.ok(base.helpH <= 26, `[설명]이 두 줄로 접히면 안 된다 (h=${base.helpH})`);
   assert.deepStrictEqual(base.labels, ['정렬', '줄 간격', '문단 간격', '첫 줄'],
     '자주 쓰는 넷이 한 화면에');
   assert.strictEqual(base.tips, base.segs, '설명을 꺼도 툴팁은 살아 있다');
@@ -68,28 +85,42 @@ runTest('문단 패널', async ({ page }) => {
   console.log('  ② 설명 끔 →', off, '개');
   assert.strictEqual(off, 0, '다시 끄면 사라진다');
 
-  // ③ 「자세히」 — 펴면 고급 섹션이 나오고, 접으면 「자주」로 돌아온다
-  const adv = await page.evaluate(async () => {
-    document.querySelector('.canva-adv-toggle').dispatchEvent(
-      new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    await new Promise((r) => setTimeout(r, 400));
-    const secs = [...document.querySelectorAll('.canva-sec-btn')].map((b) => b.textContent.trim());
-    // 고급 섹션으로 옮겨 간 뒤 접는다 — 빈 화면이 되면 안 된다
+  // ③ 탭 전환 — 접기 없이 바로 오갈 수 있다
+  const tabs = await page.evaluate(async () => {
     [...document.querySelectorAll('.canva-sec-btn')].find((b) => b.textContent.trim() === '줄 나눔')
       ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     await new Promise((r) => setTimeout(r, 350));
     const inAdv = [...document.querySelectorAll('.tps-label')].map((e) => e.textContent.trim());
-    document.querySelector('.canva-adv-toggle').dispatchEvent(
-      new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    await new Promise((r) => setTimeout(r, 400));
-    return { secs, inAdv, back: [...document.querySelectorAll('.tps-label')].map((e) => e.textContent.trim()) };
+    [...document.querySelectorAll('.canva-sec-btn')].find((b) => b.textContent.trim() === '자주')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 350));
+    return { inAdv, back: [...document.querySelectorAll('.tps-label')].map((e) => e.textContent.trim()) };
   });
-  console.log('  ③ 폄:', JSON.stringify(adv.secs), '/ 줄 나눔:', JSON.stringify(adv.inAdv),
-    '/ 접은 뒤:', JSON.stringify(adv.back));
-  assert.deepStrictEqual(adv.secs, ['자주', '문단 종류', '줄 나눔', '탭'], '고급 3종이 나온다');
-  assert.deepStrictEqual(adv.inAdv, ['한글', '영어'], '고급 섹션으로 전환된다');
-  assert.deepStrictEqual(adv.back, ['정렬', '줄 간격', '문단 간격', '첫 줄'],
-    '접으면 「자주」로 돌아온다 — 빈 화면이 되면 안 된다');
+  console.log('  ③ 줄 나눔:', JSON.stringify(tabs.inAdv), '→ 자주:', JSON.stringify(tabs.back));
+  assert.deepStrictEqual(tabs.inAdv, ['한글', '영어'], '탭을 눌러 바로 옮겨간다');
+  assert.deepStrictEqual(tabs.back, ['정렬', '줄 간격', '문단 간격', '첫 줄'], '되돌아온다');
+
+  // ③b 자간·장평 — 「자주」에 있고 실제로 값이 바뀐다(사용자 요청 2026-08-01)
+  const sp = await page.evaluate(async () => {
+    const wrap = [...document.querySelectorAll('.tps-mini')].filter((e) =>
+      ['자간', '장평'].includes(e.querySelector('.tps-mini-label')?.textContent ?? ''));
+    if (wrap.length !== 2) return { n: wrap.length };
+    const before = wrap.map((w) => w.querySelector('.tps-pill-num').textContent);
+    const md = (el) => el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    md(wrap[0].querySelectorAll('.tps-pill-btn')[1]);
+    md(wrap[0].querySelectorAll('.tps-pill-btn')[1]);
+    md(wrap[1].querySelectorAll('.tps-pill-btn')[0]);
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      n: 2, before, after: wrap.map((w) => w.querySelector('.tps-pill-num').textContent),
+      sameLine: new Set(wrap.map((w) => Math.round(w.getBoundingClientRect().y / 4))).size === 1,
+    };
+  });
+  console.log('  ③b 자간·장평:', JSON.stringify(sp));
+  assert.strictEqual(sp.n, 2, '자간·장평이 「자주」에 있다');
+  assert.deepStrictEqual(sp.before, ['0%', '100%'], '초기값');
+  assert.deepStrictEqual(sp.after, ['2%', '99%'], '± 로 값이 바뀐다');
+  assert.ok(sp.sameLine, '둘이 한 줄에 나란히');
 
   // ④ 옵션 그림은 그대로 살아 있다(눌리면 안 된다)
   const g = await page.evaluate(() => {
