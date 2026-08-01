@@ -61,8 +61,11 @@ const FONT_LIST: FontEntry[] = [
   { name: 'HY중고딕', file: 'fonts/NotoSansKR-Regular.woff2' },
   { name: '양재튼튼체B', file: 'fonts/NotoSansKR-Bold.woff2' },
   // === 한글 시스템 폰트 → 오픈소스 대체 (OS 폰트 없을 때 폴백) ===
-  { name: 'Malgun Gothic', file: 'fonts/Pretendard-Regular.woff2' },
-  { name: '맑은 고딕', file: 'fonts/Pretendard-Regular.woff2' },
+  // ⚠ 'Malgun Gothic'·'맑은 고딕' 을 Pretendard 로 등록했던 줄은 **뺐다**(2026-08-01).
+  //   이 둘은 UI 글꼴 체인(--font-family-ui)에도 들어 있어서, 파일이 없으면
+  //   **매 로드마다 404** 가 났다(실측). 파일이 있어도 UI 가 문서용 대체 글꼴을
+  //   내려받게 되는 건 의도가 아니다 — 이 두 이름은 OS 글꼴에 맡긴다.
+  //   (Pretendard 자체는 아래 'Pretendard' 항목으로 여전히 쓸 수 있다.)
   // Task #1224: 한컴 돋움/MS 돋움·굴림 계열은 한컴 돋움(획 두께 페이지밀도 0.265)에
   // 근접한 Noto Sans KR ExtraLight 로 대체. 기존 NotoSansKR-Regular(밀도 0.378)는
   // 획이 +43% 두꺼워 PDF 대비 과도하게 굵게 보였다(네이티브 generic_fallback 와 정합).
