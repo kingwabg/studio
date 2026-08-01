@@ -63,19 +63,15 @@ function pxToPt(px: number): number {
   return px * 72 / 96;
 }
 
-/** pt → raw HWPUNIT (2x 저장값) — 여백/들여쓰기 적용용 */
-function ptToRaw2x(pt: number): number {
-  return Math.round(pt * HWPUNIT_PER_PT * 2);
+/** pt → px (96dpi, zoom=1) — pxToPt 의 역함수. 여백/첫줄 들여쓰기 적용용
+ *  (ParaProperties.marginLeft/marginRight/indent 는 px 단위 — types.ts:381~383) */
+function ptToPx(pt: number): number {
+  return Math.round(pt * 96 / 72);
 }
 
 /** pt → raw HWPUNIT (1x) — spacing/lineSpacing 적용용 */
 function ptToRaw(pt: number): number {
   return Math.round(pt * HWPUNIT_PER_PT);
-}
-
-/** px → raw HWPUNIT (2x) — 비교용 */
-function pxToRaw2x(px: number): number {
-  return Math.round(px * 150);  // px * 72/96 * 100 * 2
 }
 
 /** px → raw HWPUNIT (1x) — 비교용 */
@@ -755,22 +751,22 @@ export class ParaShapeDialog {
       mods.alignment = newAlign;
     }
 
-    // 여백 (비교: 원본 px → HWPUNIT 2x 변환 후 비교)
-    const newML = ptToRaw2x(parseFloat(this.marginLeftInput.value) || 0);
-    if (newML !== pxToRaw2x(p.marginLeft ?? 0)) mods.marginLeft = newML;
+    // 여백 (marginLeft/marginRight 는 px 단위 — types.ts:381~382. 입력 pt → px 로 저장·비교)
+    const newML = ptToPx(parseFloat(this.marginLeftInput.value) || 0);
+    if (newML !== Math.round(p.marginLeft ?? 0)) mods.marginLeft = newML;
 
-    const newMR = ptToRaw2x(parseFloat(this.marginRightInput.value) || 0);
-    if (newMR !== pxToRaw2x(p.marginRight ?? 0)) mods.marginRight = newMR;
+    const newMR = ptToPx(parseFloat(this.marginRightInput.value) || 0);
+    if (newMR !== Math.round(p.marginRight ?? 0)) mods.marginRight = newMR;
 
-    // 첫 줄 (indent)
+    // 첫 줄 (indent 는 px 단위 — types.ts:383. 들여쓰기 양수 px, 내어쓰기 음수 px)
     let newIndent = 0;
     const checkedRadio = this.firstLineRadios.find(r => r.checked);
     if (checkedRadio?.value === 'indent') {
-      newIndent = ptToRaw2x(parseFloat(this.indentInput.value) || 0);
+      newIndent = ptToPx(parseFloat(this.indentInput.value) || 0);
     } else if (checkedRadio?.value === 'hanging') {
-      newIndent = -ptToRaw2x(parseFloat(this.indentInput.value) || 0);
+      newIndent = -ptToPx(parseFloat(this.indentInput.value) || 0);
     }
-    if (newIndent !== pxToRaw2x(p.indent ?? 0)) mods.indent = newIndent;
+    if (newIndent !== Math.round(p.indent ?? 0)) mods.indent = newIndent;
 
     // 줄 간격
     const newLSType = this.lineSpacingTypeSelect.value;
