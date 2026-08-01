@@ -64,9 +64,10 @@ interface TextStyle {
 const TEXT_STYLES: TextStyle[] = [
   { id: 'h1', label: '제목 추가', hint: '제목 1 — 20pt 굵게', pt: 20, bold: true },
   { id: 'h2', label: '부제목 추가', hint: '제목 2 — 15pt 굵게', pt: 15, bold: true },
-  { id: 'body', label: '약간의 본문 텍스트 추가', hint: '본문 — 10pt', pt: 10, bold: false },
+  // 2열로 바뀌며 카드가 좁아졌다 — 「약간의 본문 텍스트 추가」는 잘려서 뜻이 사라졌다
+  { id: 'body', label: '본문', hint: '본문 — 10pt', pt: 10, bold: false },
   { id: 'num1', label: '1. 번호 제목', hint: '개요 번호 1수준 — 13pt 굵게', pt: 13, bold: true, level: 0 },
-  { id: 'num2', label: '가. 번호 문단', hint: '개요 번호 2수준 — 10pt', pt: 10, bold: false, level: 1 },
+  { id: 'num2', label: '가. 번호', hint: '개요 번호 2수준 — 10pt', pt: 10, bold: false, level: 1 },
 ];
 
 function svg(inner: string): string {
@@ -197,33 +198,10 @@ export class CanvaRightInspector {
     this.fmtPane.appendChild(biuSec);
 
     // 정렬
-    const alignSec = this.section('문단 정렬');
-    const alignRow = mkEl('div', 'canva-btn-row');
-    for (const key of ['left', 'center', 'right', 'justify']) {
-      const b = mkButton('canva-icon-btn', { html: svg(ALIGN_ICONS[key]) });
-      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch(`format:align-${key}`); });
-      this.aligns[key] = b;
-      alignRow.appendChild(b);
-    }
-    alignSec.appendChild(alignRow);
-    // [디자인 2c] 줄 간격 — 정렬과 같은 섹션에
-    // 값 자체를 −/+ 로 바로 조절한다(디자인 2c) — 드롭다운은 한 번 더 눌러야 했다.
-    // 숫자를 누르면 기존 줄 간격 대화상자가 열려 정확한 값을 고를 수 있다.
-    const lsRow = mkEl('div', 'canva-line-row');
-    const lsLabel = mkEl('span', 'canva-line-label', '줄 간격');
-    const lsStep = mkEl('div', 'canva-stepper canva-stepper--wide');
-    const lsDec = mkButton('', { html: '<i class="ph ph-minus"></i>', title: '줄 간격 줄이기' });
-    this.lineSpacingBtn = mkButton('canva-step-value', { title: '줄 간격 자세히' });
-    this.lineSpacingBtn.innerHTML = '<span>160%</span>';
-    const lsInc = mkButton('', { html: '<i class="ph ph-plus"></i>', title: '줄 간격 늘리기' });
-    const dispatch = (cmd: string) => (e: Event) => { e.preventDefault(); this.services.dispatcher.dispatch(cmd); };
-    lsDec.addEventListener('mousedown', dispatch('format:line-spacing-decrease'));
-    lsInc.addEventListener('mousedown', dispatch('format:line-spacing-increase'));
-    this.lineSpacingBtn.addEventListener('mousedown', dispatch('format:line-spacing'));
-    lsStep.append(lsDec, this.lineSpacingBtn, lsInc);
-    lsRow.append(lsLabel, lsStep);
-    alignSec.appendChild(lsRow);
-    this.fmtPane.appendChild(alignSec);
+    // ⚠ 「문단 정렬 · 줄 간격」은 여기서 뺐다(2026-08-01). 문단 탭 「자주」에 같은
+    //   컨트롤이 그림까지 붙어 있어 **같은 기능이 두 탭에** 있었고, 그만큼 아래가
+    //   밀려 「도구」(AI·녹음) 진입점이 화면 밖(y=849 > 738)으로 잘려 있었다.
+    //   탭 이름이 약속한 것만 담는다 — 정렬은 리본 홈 탭에도 있다.
 
     // 글자색
     const colorSec = this.section('글자색', {
