@@ -21,9 +21,10 @@ import { applyPolishResult } from './change-review';
 import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
 import { insertFormatted } from './ai-doc-insert';
+import { TemplatePickerModal } from './template-picker-modal';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
-export type PanelTab = 'props' | 'text' | 'table' | 'cell';
+export type PanelTab = 'props' | 'text' | 'table' | 'cell' | 'style';
 
 /** 각 탭의 섹션 목차 (디자인 2c 갱신 2026-07-30 — 텍스트 탭 신설) */
 const SECTIONS: Record<'text' | 'table' | 'cell', Array<[string, string]>> = {
@@ -71,30 +72,13 @@ const TEXT_STYLES: TextStyle[] = [
   { id: 'num2', label: '가. 번호', hint: '개요 번호 2수준 — 10pt', pt: 10, bold: false, level: 1 },
 ];
 
-/**
- * 문서 템플릿 — 누르면 커서 자리에 서식된 시작 골격(제목+번호목록 등)을 통째로 넣는다.
- * body 는 ai-doc-insert 의 classifyLines 규칙대로 해석된다:
- *   첫 줄=제목(16pt 가운데), `1.`=대제목(13pt 굵게), `가.`=소제목(11pt 굵게), 그 외=본문(10pt).
- * 번호는 자동번호가 아니라 리터럴 텍스트(예시 이미지의 굵은 번호 제목과 같은 모양) —
- * numberingId/paraLevel 좌표 이슈를 피한다.
- * ponytail: 자동 renumber 필요하면 insertFormatted 에 headType:'Number' 경로 추가.
- */
-const DOC_TEMPLATES: { id: string; label: string; hint: string; body: string }[] = [
-  { id: 'numlist', label: '제목 + 번호목록', hint: '제목 아래 굵은 번호 항목 3개',
-    body: '제목을 입력하세요\n1. 첫 번째 항목\n2. 두 번째 항목\n3. 세 번째 항목' },
-  { id: 'report', label: '제목 + 소제목 + 본문', hint: '제목·소제목·본문 한 줄',
-    body: '문서 제목\n1. 개요\n여기에 본문 내용을 입력하세요.' },
-  { id: 'minutes', label: '회의록', hint: '일시·참석자·안건·결정 사항',
-    body: '회의록\n1. 일시·장소\n2. 참석자\n3. 안건\n4. 결정 사항' },
-];
-
 function svg(inner: string): string {
   return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
 
 export class CanvaRightInspector {
   private ctx: Ctx = 'none';
-  private panelTab: 'props' | 'text' | 'table' | 'cell' = 'props';
+  private panelTab: PanelTab = 'props';
   private painted = false;
   /** [캔버스 한컴 포크] 그림 컨텍스트 내 다중 선택 여부 — 단일↔다중 전환 시 정렬 섹션 재렌더 */
   private lastMulti = false;
@@ -177,18 +161,18 @@ export class CanvaRightInspector {
 
     this.fmtPane.appendChild(styleSec);
 
-    // [문서 템플릿 2026-08-02] 캔바식 '시작 골격' 카드 — 누르면 커서 자리에 제목+번호목록
-    // 등 서식된 문단을 통째로 넣는다. 삽입은 기존 insertFormatted(ai-doc-insert) 재사용:
-    // 제목/번호/본문 분류·좌표 변환·단일 undo 가 이미 처리돼 있다.
-    const tplSec = this.section('문서 템플릿');
-    const tpls = mkEl('div', 'canva-styles');
-    for (const t of DOC_TEMPLATES) {
-      const b = mkButton('canva-style-card canva-tpl-card', { title: t.hint });
-      b.textContent = t.label;
-      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.applyTemplate(t.body); });
-      tpls.appendChild(b);
-    }
-    tplSec.appendChild(tpls);
+    // [문단 템플릿 2026-08-02] 캔바식 '시작 골격' — 누르면 모달 그리드가 열리고, 고른 카드가
+    // 커서 자리에 제목+번호목록 등 서식된 문단을 통째로 넣는다. 삽입은 기존
+    // insertFormatted(ai-doc-insert) 재사용: 분류·좌표 변환·단일 undo 가 이미 처리돼 있다.
+    const tplSec = this.section('문단 템플릿');
+    const tplBtn = mkButton('canva-full-btn', {
+      html: svg('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 9h8M8 13h8M8 17h5"/>') + '<span>문단 템플릿…</span>',
+    });
+    tplBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      new TemplatePickerModal({ onPick: (t) => this.applyTemplate(t.body) }).show();
+    });
+    tplSec.appendChild(tplBtn);
     this.fmtPane.appendChild(tplSec);
 
     // ⚠ 「글자」(B·I·U·취소선·글꼴·크기)·「글자색」·「형광펜」 섹션은 **뺐다**
@@ -432,8 +416,8 @@ export class CanvaRightInspector {
 
   private visibleTabs(): PanelTab[] {
     if (this.ctx === 'none') return ['props'];
-    if (this.ctx === 'cell' || this.ctx === 'table') return ['props', 'text', 'table', 'cell'];
-    return ['props', 'text'];
+    if (this.ctx === 'cell' || this.ctx === 'table') return ['props', 'text', 'table', 'cell', 'style'];
+    return ['props', 'text', 'style'];
   }
 
   private syncTabs(): void {
@@ -494,6 +478,45 @@ export class CanvaRightInspector {
     } catch (err) {
       console.warn('[inspector] 템플릿 삽입 실패:', err);
     }
+  }
+
+  /**
+   * 스타일 탭 — 문서에 저장된 이름 있는 스타일 목록을 카드로 그린다. 카드를 누르면
+   * 커서 문단에 그 스타일을 입힌다(기존 applyStyle 재사용 — 스냅샷 undo·재렌더 포함).
+   * 하단 「스타일 설정…」은 기존 StyleDialog(만들기·편집)를 연다.
+   */
+  private buildStyleTab(host: HTMLElement): void {
+    const sec = this.section('스타일');
+    host.appendChild(sec);
+
+    let styles: Array<{ id: number; name: string }> = [];
+    if (this.services.wasm.pageCount > 0) {
+      try { styles = this.services.wasm.getStyleList(); } catch { styles = []; }
+    }
+
+    if (styles.length === 0) {
+      sec.appendChild(mkEl('div', 'canva-hint', '문서를 열면 스타일 목록이 여기 표시됩니다.'));
+    } else {
+      const list = mkEl('div', 'canva-style-list');
+      for (const s of styles) {
+        const b = mkButton('canva-style-card canva-style-item', { title: s.name });
+        b.textContent = s.name;
+        b.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          const ih = this.services.getInputHandler() as any;
+          ih?.applyStyle(s.id);
+          ih?.focus?.();
+        });
+        list.appendChild(b);
+      }
+      sec.appendChild(list);
+    }
+
+    const manage = mkButton('canva-full-btn', {
+      html: svg('<path d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/>') + '<span>스타일 설정…</span>',
+    });
+    manage.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:style-dialog'); });
+    sec.appendChild(manage);
   }
 
   /** 아이콘 칩 여러 개를 한 줄(줄바꿈 허용)로 — 디자인 2c 의 표 조작 섹션 */
@@ -630,6 +653,12 @@ export class CanvaRightInspector {
           mount: (host) => this.textSections.mount(host, this.services, this.curSection.text),
           redraw: () => this.applyContext(),
         });
+        return;
+      }
+
+      // 스타일 탭 = 문서 스타일 목록(이름 있는 스타일) — 카드 클릭으로 적용
+      if (this.panelTab === 'style') {
+        this.buildStyleTab(this.tabPane);
         return;
       }
 
