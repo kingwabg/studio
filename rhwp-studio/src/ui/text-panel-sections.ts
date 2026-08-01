@@ -410,6 +410,10 @@ export class TextPanelSections {
       this.appendHint(row, stripAccel(label));
     }
     const seg = mkEl('div', 'tps-seg tps-seg--wrap');
+    // 4개를 3열에 넣으면 하나가 혼자 아랫줄에 떨어진다(2026-08-01 스크린샷) —
+    // 나누어떨어지는 열 수로 맞춘다: 6·3→3열, 4·2→2열, 그 밖엔 3열.
+    const n = opts.length;
+    seg.style.setProperty('--tps-cols', String(n % 3 === 0 ? 3 : n % 2 === 0 ? 2 : 3));
     for (const [value, text] of opts) {
       // 툴팁 — 배분·나눔·내어쓰기처럼 이름만으론 못 고르는 것들에 붙는다
       const b = mkButton('tps-seg-btn', { title: OPTION_HINT[text] ?? text });

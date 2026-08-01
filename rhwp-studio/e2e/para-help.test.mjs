@@ -161,4 +161,62 @@ runTest('문단 패널', async ({ page }) => {
   console.log('  ④ 그림', g.n, '개 (h=' + g.h + ')');
   assert.strictEqual(g.n, 9, '정렬 6 + 첫 줄 3');
   assert.ok(g.h >= 12, '그림이 세로로 눌리면 안 된다');
+
+  // ⑤ 정렬선 — 값 행의 왼쪽·오른쪽 끝이 한 선에 서는가(사용자 지적 2026-08-01:
+  //    "위치가 너무 어지러워"). 실측 전: 값 행이 154·178·198 에서 제각각 끝났다.
+  const grid = await page.evaluate(async () => {
+    [...document.querySelectorAll('.canva-sec-btn')].find((b) => b.textContent.trim() === '자주')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 350));
+    const t = document.querySelector('.tps');
+    const b = t.getBoundingClientRect();
+    const w = Math.round(b.width);
+    // 값 행(2열 격자)의 두 칸이 좌우 끝에 붙는가
+    const pairs = [...t.querySelectorAll('.tps-row--pair')].map((row) => {
+      const cells = [...row.children].filter((c) => !c.classList.contains('tps-label')
+        && !c.classList.contains('tps-hint'));
+      if (cells.length < 2) return null;
+      const a = cells[0].getBoundingClientRect();
+      const z = cells[cells.length - 1].getBoundingClientRect();
+      return { l: Math.round(a.x - b.x), r: Math.round(z.right - b.x) };
+    }).filter(Boolean);
+    // 타일 행(정렬·첫 줄)은 전폭
+    const segs = [...t.querySelectorAll('.tps-seg')].map((e) => {
+      const r = e.getBoundingClientRect();
+      return { l: Math.round(r.x - b.x), r: Math.round(r.right - b.x) };
+    });
+    return { w, pairs, segs };
+  });
+  console.log('  ⑤ 폭', grid.w, '/ 값 행', JSON.stringify(grid.pairs), '/ 타일 행', JSON.stringify(grid.segs));
+  assert.ok(grid.pairs.length >= 3, '값 행 3종(줄 간격·문단 간격·글자 간격)');
+  for (const p of grid.pairs) {
+    assert.strictEqual(p.l, 0, '값 행 왼쪽 끝이 0');
+    assert.ok(Math.abs(p.r - grid.w) <= 2, `값 행 오른쪽 끝이 패널 끝과 같아야 한다 (${p.r} vs ${grid.w})`);
+  }
+  for (const g of grid.segs) {
+    assert.strictEqual(g.l, 0, '타일 행 왼쪽 끝이 0');
+    assert.ok(Math.abs(g.r - grid.w) <= 2, '타일 행 오른쪽 끝이 패널 끝과 같아야 한다');
+  }
+
+  // ⑤b 옵션 열 수 — 4개를 3열에 넣으면 하나가 혼자 떨어진다
+  const cols = await page.evaluate(async () => {
+    const out = {};
+    for (const n of ['자주', '문단 종류']) {
+      [...document.querySelectorAll('.canva-sec-btn')].find((b) => b.textContent.trim() === n)
+        ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      await new Promise((r) => setTimeout(r, 350));
+      out[n] = [...document.querySelectorAll('.tps-seg')].map((e) => ({
+        n: e.children.length,
+        cols: getComputedStyle(e).gridTemplateColumns.split(' ').length,
+      }));
+    }
+    return out;
+  });
+  console.log('  ⑤b 열 수:', JSON.stringify(cols));
+  for (const [sec, list] of Object.entries(cols)) {
+    for (const g of list) {
+      assert.strictEqual(g.n % g.cols, 0,
+        `${sec}: 옵션 ${g.n}개를 ${g.cols}열에 넣으면 마지막 줄이 빈다`);
+    }
+  }
 });

@@ -992,8 +992,9 @@
   min-width: 46px; text-align: center; font-size: 12px; font-weight: 600;
   font-variant-numeric: tabular-nums; color: var(--color-text);
 }
-.tps-seg--wrap { flex-wrap: wrap; }
-.tps-seg--wrap .tps-seg-btn { flex: 1 1 30%; }
+.tps-seg--wrap {
+  display: grid; grid-template-columns: repeat(var(--tps-cols, 3), 1fr); gap: 2px;
+}
 
 .tps-para-prev { display: flex; flex-direction: column; gap: 6px; }
 .tps-para-prev-body {
@@ -1224,16 +1225,57 @@
 /* 탭 줄 — 섹션 4개 + [설명] 이 한 줄 */
 .canva-sec-row { display: flex; }
 .canva-sec-row > .canva-sec-strip { flex: 1; flex-wrap: nowrap; align-items: center; }
-/* 「문단 간격」 위/아래를 한 줄에 */
-.tps-row--pair { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.tps-row--pair .tps-label { flex: 1 0 100%; }
-.tps-mini { display: inline-flex; align-items: center; gap: 4px; }
-.tps-mini-label { font-size: 11px; color: var(--color-text-muted); }
-.tps-input--mini { width: 52px; }
+/* ── 값 행의 공통 격자 (사용자 지적 2026-08-01: 위치가 어지럽다) ──
+   실측한 원인: 값 행들이 제각각 154·178·198px 에서 끝나 **공통 오른쪽 선이 없었다**.
+   타일 행(정렬·첫 줄)은 전폭(259px)이라 더 어긋나 보였다.
+   규칙: 값 행도 전폭 2열 격자 — 모든 행의 왼쪽·오른쪽 끝이 한 선에 선다. */
+.tps-row--pair {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center;
+}
+.tps-row--pair > .tps-label { grid-column: 1 / -1; }
+.tps-row--pair > .tps-hint { grid-column: 1 / -1; }
+/* 칸 하나를 통째로 쓰는 컨트롤 묶음 */
+.tps-mini { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.tps-mini > .tps-pill-stepper,
+.tps-mini > .tps-input { flex: 1; min-width: 0; }
+.tps-mini-label { font-size: 11px; color: var(--color-text-muted); flex: none; }
+.tps-input--mini { width: auto; }
 
-/* 자간·장평 — 좁은 알약 스테퍼 둘이 한 줄 */
-.tps-pill-stepper--mini { min-width: 0; }
-.tps-pill-stepper--mini .tps-pill-num { min-width: 34px; font-size: 11.5px; }
+/* 자간·장평·줄 간격 — 알약 스테퍼가 칸을 꽉 채운다(오른쪽 끝이 한 선에 서게) */
+.tps-pill-stepper--mini { min-width: 0; justify-content: space-between; }
+.tps-pill-stepper--mini .tps-pill-num { min-width: 0; flex: 1; font-size: 11.5px; }
+.tps-pill-stepper--mini .tps-pill-btn { flex: none; }
 
-/* 줄 간격 — 프리셋 드롭다운 + 조절 버튼이 한 줄 */
-.tps-select--mini { width: 74px; flex: none; }
+/* 소제목 — 라벨과 같은 글자로. CSS 가 없어 기본 div 로 떨어져 홀로 커 보였다 */
+.tps-sub-title {
+  font-size: 12px; color: var(--color-text-muted);
+  margin-top: 2px; font-weight: 600;
+}
+
+/* 줄 간격 — 프리셋 드롭다운 + 조절 버튼이 각각 반 칸 */
+.tps-select--mini { width: auto; min-width: 0; }
+
+/* ── 값 행 정렬 통일 (사용자 지적 2026-08-01) ──
+   규칙 하나: **라벨은 위, 컨트롤은 아래 전폭**. 어떤 행은 라벨 왼쪽·컨트롤 오른쪽,
+   어떤 행은 라벨 위였던 것이 어지러움의 정체였다. */
+.tps-row--stack {
+  display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+}
+.tps-row--stack > .tps-label { min-width: 0; }
+.tps-row--stack > .tps-select,
+.tps-row--stack > .tps-input { width: 100%; }
+/* 숫자 + 단위는 한 줄로 묶되 전폭 */
+.tps-row--stack > .tps-unit { position: absolute; right: 8px; pointer-events: none; }
+.tps-row--stack { position: relative; }
+
+/* 표·셀 탭의 값 행도 같은 오른쪽 선에 세운다 — 라벨이 남는 폭을 먹어 컨트롤을
+   오른쪽 끝으로 민다. 이 한 줄이 세 탭(문단·표·셀)에 함께 걸린다.
+   (실측 전: 셀 「너비」가 62→134 에서 끝나 아래 버튼들(0→259)과 어긋났다) */
+.tps-row > .tps-label { flex: 1; }
+.tps-row > .tps-input,
+.tps-row > .tps-select { flex: none; }
+
+/* 켬/끔은 라벨 왼쪽 · 스위치 오른쪽 끝 — 오른쪽 선을 다른 행과 맞춘다 */
+.tps-switch-row { justify-content: space-between; }
+.tps-switch-row > .tps-switch-track { order: 2; margin-left: 8px; }
+.tps-switch-row > .tps-switch-text { order: 1; flex: 1; }
