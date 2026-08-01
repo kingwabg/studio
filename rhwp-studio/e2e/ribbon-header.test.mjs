@@ -75,4 +75,36 @@ runTest('리본 헤더', async ({ page }) => {
   });
   console.log('  ④ 기본값 후 저장:', JSON.stringify(reset.stored), '/ 리본에:', reset.inRibbon);
   assert.ok(reset.stored.includes('취소선') && !reset.inRibbon, '기본값으로 복귀');
+
+  // ⑤ 색 피커 타일 — 한컴식 글리프('간'·✏)를 Phosphor 아이콘 + 색 막대로 갈아끼웠다.
+  //    아이콘만 바꾸고 동작(팔레트 열기)이 죽으면 최악이라 클릭까지 본다.
+  const color = await page.evaluate(async () => {
+    const q = (s2) => document.querySelector(s2);
+    const rect = (s2) => { const e = q(s2); const r = e.getBoundingClientRect();
+      return `${Math.round(r.width)}x${Math.round(r.height)}`; };
+    // 옛 글리프는 **리본 안**에서만 없으면 된다(숨은 구 서식바의 밑줄 '간' 은 그대로 산다)
+    const legacy = /(?:>간<|>✏<)/.test(document.querySelector('.rb-row-ribbon').innerHTML);
+    // 형광펜 버튼은 mousedown 으로 연다(click 은 안 먹는다 — 실측)
+    q('#btn-highlight').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 200));
+    const opened = q('#highlight-dropdown').classList.contains('open');
+    q('#btn-highlight').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    return {
+      icons: [...document.querySelectorAll('.rb-slot.has-label .rb-adopt-ic')].map((i) =>
+        Array.from(i.classList).find((c) => c.startsWith('ph-') && !/duotone|regular|fill|bold/.test(c))),
+      bar: rect('#color-bar'),
+      caret: getComputedStyle(q('.rb-slot.has-label .sb-dd')).display,
+      labels: [...document.querySelectorAll('.rb-slot.has-label .rb-btn-label')].map((x) => x.textContent),
+      legacyGlyph: legacy,
+      opened,
+    };
+  });
+  console.log('  ⑤ 아이콘', JSON.stringify(color.icons), '/ 막대', color.bar, '/ ▾', color.caret,
+    '/ 이름', JSON.stringify(color.labels), '/ 옛 글리프', color.legacyGlyph, '/ 팔레트 열림', color.opened);
+  assert.deepStrictEqual(color.icons, ['ph-palette', 'ph-highlighter'], 'Phosphor 아이콘으로 교체');
+  assert.strictEqual(color.bar, '17x3', '색 막대 17×3px (디자인 2a)');
+  assert.strictEqual(color.caret, 'none', '타일 안 ▾ 는 감춘다');
+  assert.deepStrictEqual(color.labels, ['글자 색', '형광펜'], '이름이 붙는다');
+  assert.ok(!color.legacyGlyph, "리본 안에 옛 글리프('간'·✏)가 남아 있지 않다");
+  assert.ok(color.opened, '아이콘만 바뀌고 팔레트 동작은 산다');
 });

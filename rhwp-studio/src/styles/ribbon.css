@@ -8,6 +8,10 @@
 /* Phosphor 아이콘 폰트는 main.ts 의 모듈 import 가 담당한다(경로는 Vite 가 재작성).
    여기에 @font-face 를 절대 경로로 쓰면 배포 base 아래에서 폰트가 404 난다. */
 
+:root[data-theme-effective='dark'] .rb-slot.has-label {
+  --rb-bar-ring: rgba(255, 255, 255, .45);
+}
+
 .ribbon-header {
   /* ⚠ 정본 토큰은 --color-* 다(styles/base.css). --ui-fg 같은 이름은 존재하지 않아
      다크에서 글자·아이콘이 배경에 묻혔다(2026-07-29 실사고). hex 는 최후 폴백. */
@@ -85,9 +89,30 @@
 }
 .rb-slot > .rb-adopted:focus { outline: none; border-color: var(--rb-accent); }
 .rb-slot > select.rb-adopted { padding-right: 2px; }
-/* 이름이 붙는 자리(색 피커) — 아이콘 위·이름 아래로 다른 타일과 같은 모양 */
+/* 이름이 붙는 자리(색 피커) — 아이콘 위·이름 아래로 다른 타일과 같은 모양.
+   구 서식바의 한컴식 글리프('간'·✏)를 Phosphor 아이콘으로 갈아끼웠고(index.html),
+   색 막대는 디자인 2a 의 17×3px 로 맞춘다. ▾ 는 뺀다 — 막대가 곧 '색이 달린다'는
+   표시라 화살표까지 있으면 타일 안이 시끄럽다. */
 .rb-slot.has-label { flex-direction: column; justify-content: center; gap: 2px; }
 .rb-slot.has-label > .rb-adopted { height: auto; }
+.rb-slot.has-label .sb-btn {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  width: auto; height: auto; min-width: 0; padding: 0; margin: 0;
+  border: 0; background: transparent; color: inherit; box-shadow: none;
+}
+.rb-slot.has-label .sb-btn:hover { background: transparent; }
+.rb-slot.has-label .sb-dd { display: none; }
+.rb-slot.has-label .rb-adopt-ic { font-size: 20px; line-height: 1; }
+.rb-slot.has-label #color-bar,
+.rb-slot.has-label #highlight-bar {
+  width: 17px; height: 3px; border-radius: 2px; margin: 0;
+  /* ⚠ 이 막대는 **현재 글자색/형광색 그 자체**라 어떤 색이든 올 수 있다 —
+     검정 막대는 다크 배경에서, 흰 막대는 라이트 배경에서 사라진다. 테두리 링이
+     그 둘을 다 살린다. 링 색은 배경 반대쪽으로(2026-08-01 다크 캡처에서 발견). */
+  box-shadow: inset 0 0 0 1px var(--rb-bar-ring, rgba(32, 30, 29, .35));
+}
+/* 타일 전체가 하나의 버튼처럼 반응한다 */
+.rb-slot.has-label:hover { background: var(--rb-fill); color: var(--rb-accent); border-radius: 3px; }
 /* 색 피커 입양분(버튼 묶음)은 입력형 스타일(테두리·고정 높이)을 받지 않는다 */
 .rb-slot > .sb-color-wrap.rb-adopted,
 .rb-slot > #highlight-dropdown.rb-adopted {

@@ -96,6 +96,11 @@ export class RibbonHeader {
       const host = this.ribbonRow.querySelector<HTMLElement>(`.rb-slot[data-slot="${name}"]`);
       // prepend — 라벨이 붙은 자리에서는 컨트롤이 이름 **위**에 와야 한다
       if (host && el.parentElement !== host) host.prepend(el);
+      // 입양 컨트롤 안의 Phosphor 아이콘도 리본과 같은 굵기를 따른다(2b Tweaks)
+      for (const ic of Array.from(el.querySelectorAll<HTMLElement>('.rb-adopt-ic'))) {
+        const glyph = Array.from(ic.classList).find((c) => c.startsWith('ph-') && c !== 'ph-duotone');
+        ic.className = `${WEIGHT_CLASS[this.weight]} ${glyph ?? ''} rb-adopt-ic`;
+      }
     }
   }
 
