@@ -266,9 +266,15 @@ export function handleBackspace(this: any, pos: DocumentPosition, inCell: boolea
       if (tryConfirmDeleteInlineControl.call(this, pos, charOffset - 1)) return;
       const deletePos = { ...pos, charOffset: charOffset - 1 };
       this.executeOperation({ kind: 'command', command: new DeleteTextCommand(deletePos, 1, 'backward') });
-    } else if (para > 0) {
-      // 문단 시작에서 Backspace → 이전 문단과 병합
-      this.executeOperation({ kind: 'command', command: new MergeParagraphCommand({ sectionIndex: sec, paragraphIndex: para, charOffset: 0 }) });
+    } else {
+      // [한컴 패리티 2026-08-02] 번호/글머리표 문단 시작에서 Backspace →
+      //   먼저 목록 이탈(번호 제거, 텍스트 유지), 병합하지 않는다. 첫 문단(para 0)
+      //   이어도 번호 제거는 적용된다. Enter 빈-목록 이탈과 짝(exitListLevelAtCursor).
+      if (this.exitListLevelAtCursor?.()) return;
+      if (para > 0) {
+        // 문단 시작에서 Backspace → 이전 문단과 병합
+        this.executeOperation({ kind: 'command', command: new MergeParagraphCommand({ sectionIndex: sec, paragraphIndex: para, charOffset: 0 }) });
+      }
     }
   }
 }

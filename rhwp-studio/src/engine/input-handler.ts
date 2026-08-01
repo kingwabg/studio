@@ -4602,9 +4602,19 @@ export class InputHandler {
    * @returns 이탈을 처리했으면 true(= Enter 소비, 분할 안 함), 아니면 false.
    */
   tryExitEmptyListOnEnter(): boolean {
+    const pos = this.cursor.getPosition();
+    if (this.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex) !== 0) return false;
+    return this.exitListLevelAtCursor();
+  }
+
+  /**
+   * [한컴 패리티] 현재 문단이 자동번호/글머리표면 한 수준 이탈한다
+   * (수준>0 → 수준-1, 수준 0 → 번호/글머리표 해제). 텍스트 유무는 보지 않는다.
+   * Enter(빈 문단 이탈)·Backspace(문단 시작 이탈) 공용 코어.
+   * @returns 번호/글머리표라 처리했으면 true, 아니면 false.
+   */
+  exitListLevelAtCursor(): boolean {
     try {
-      const pos = this.cursor.getPosition();
-      if (this.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex) !== 0) return false;
       const props = this.getParaProperties();
       if (!props.headType || props.headType === 'None') return false;
       const lvl = props.paraLevel ?? 0;
@@ -4616,7 +4626,7 @@ export class InputHandler {
       this.focusTextarea();
       return true;
     } catch (err) {
-      console.warn('[InputHandler] tryExitEmptyListOnEnter 실패:', err);
+      console.warn('[InputHandler] exitListLevelAtCursor 실패:', err);
       return false;
     }
   }
