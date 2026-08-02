@@ -174,20 +174,31 @@
 .rb-slot > .sb-size-group.rb-valuebox:focus-within { border-color: var(--rb-accent); }
 
 /* 값 상자 앞 아이콘 단추 — 누르면 한 번에 적용(들여쓰기 한 단계 등), 값은 옆에서 수정.
+   ⚠ 상자와 한 몸으로 보이면 **눌리는 단추인지 안 보인다**(사용자 지적 2026-08-03).
+     자기 테두리와 배경을 줘 상자 안의 단추로 읽히게 한다.
    적용돼 있으면 .is-active 로 켜진다(다른 리본 단추와 같은 규칙). */
 .rb-vb-lead {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 22px; flex: 0 0 auto;
-  border: 0; border-radius: 3px; background: transparent;
-  color: var(--rb-fg); cursor: pointer; padding: 0;
+  width: 22px; height: 22px; flex: 0 0 auto;
+  border: 1px solid var(--rb-border); border-radius: 3px;
+  background: var(--rb-fill);
+  color: var(--rb-fg); cursor: pointer; padding: 0; margin-right: 3px;
 }
-.rb-vb-lead:hover { background: var(--rb-fill); }
-.rb-vb-lead.is-active { background: var(--rb-fill); color: var(--rb-accent); }
+.rb-vb-lead:hover { background: var(--rb-bg); border-color: var(--rb-accent); color: var(--rb-accent); }
+.rb-vb-lead:active { background: color-mix(in srgb, var(--rb-accent) 18%, transparent); }
+.rb-vb-lead.is-active {
+  background: var(--rb-bg); border-color: var(--rb-accent); color: var(--rb-accent);
+}
 /* 아이콘은 Phosphor 글꼴(<i>)이다 — SVG 가 아니라 font-size 로 크기를 잡는다 */
 .rb-vb-lead > i { font-size: 15px; line-height: 1; }
 /* 아이콘이 자리를 먹으면 flex 가 값 칸을 최소폭 밑으로 눌러 숫자가 잘렸다(실측
    "10.0"→"1"). 값이 먼저다 — 최소폭을 박고 화살표·단위는 줄어들지 않게 고정한다. */
-.rb-slot > .sb-size-group.rb-valuebox > .sb-size { min-width: 30px; }
+.rb-slot > .sb-size-group.rb-valuebox { padding: 0 3px 0 3px; gap: 1px; }
+.rb-slot > .sb-size-group.rb-valuebox > .sb-size { min-width: 28px; }
+/* 폭을 조이는 만큼 곁다리(단위·⌄·▲▼)가 먼저 얇아져야 값이 산다 */
+.rb-slot > .sb-size-group.rb-valuebox > .sb-size-unit { padding-left: 1px; }
+.rb-slot > .sb-size-group.rb-valuebox > .rb-vb-caret { padding: 1px 1px; font-size: 9px; }
+.rb-slot > .sb-size-group.rb-valuebox > .sb-size-arrows { margin-left: 0; }
 .rb-slot > .sb-size-group.rb-valuebox > .sb-size-unit,
 .rb-slot > .sb-size-group.rb-valuebox > .rb-vb-caret,
 .rb-slot > .sb-size-group.rb-valuebox > .sb-size-arrows { flex: 0 0 auto; }
@@ -241,12 +252,15 @@
 }
 
 /* 아이콘 위 · 이름 아래. 모든 버튼이 같은 타일이라 나란히 놓았을 때 조용하다. */
+/* [폭 조이기 2026-08-03] 사용자 지시 "전체적으로 너비를 좀 줄이자".
+   값 상자 넷이 들어오면서 리본이 빡빡해졌다 — 타일 최소폭 50→44, 좌우 여백 5→3.
+   라벨이 잘리지 않는 선(한글 4자 ≈ 44px)까지만 조인다. */
 .rb-btn {
-  min-width: 50px; height: 50px; flex: none;
+  min-width: 44px; height: 50px; flex: none;
   display: inline-flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 2px;
   border: 0; border-radius: 3px; background: transparent;
-  color: var(--rb-fg); cursor: pointer; padding: 0 5px;
+  color: var(--rb-fg); cursor: pointer; padding: 0 3px;
   transition: background .12s ease;
 }
 .rb-btn:hover { background: var(--rb-fill); color: var(--rb-accent); }
