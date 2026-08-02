@@ -539,6 +539,8 @@ export class CanvaRightInspector {
         ih?.focus?.();
       },
       dispatch: (cmd) => this.services.dispatcher.dispatch(cmd),
+      // 편집 중 바는 「본문 편집」 헤더 오른쪽에 붙는다(사용자 지시 2026-08-03)
+      headerSlot: this.banner,
     });
   }
 
@@ -652,10 +654,14 @@ export class CanvaRightInspector {
       picture: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>', label: '그림 선택됨' },
     };
     const sub = this.describeSelection(c);
+    // ⚠ 스타일 편집 바(.sp-editbar)가 이 헤더에 얹혀 있다 — innerHTML 로 갈아엎으면
+    //   편집 중에 커서만 움직여도 저장·취소 단추가 사라진다. 떼어 뒀다 다시 붙인다.
+    const editBar = this.banner.querySelector('.sp-editbar');
     this.banner.innerHTML =
       `<span class="canva-ctx-tile">${svg(meta[c].icon)}</span>` +
       `<span class="canva-ctx-text"><span class="canva-ctx-label">${meta[c].label}</span>` +
       (sub ? `<span class="canva-ctx-sub">${sub}</span>` : '') + '</span>';
+    if (editBar) this.banner.appendChild(editBar);
   }
 
   private applyContext(): void {

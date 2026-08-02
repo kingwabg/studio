@@ -28,6 +28,11 @@ export interface StylePanelDeps {
   applyStyle: (id: number) => void;
   /** 새로 만들기·삭제는 기존 대화상자 경로를 그대로 쓴다 */
   dispatch: (cmd: string) => void;
+  /**
+   * 편집 중 바를 붙일 자리 —「본문 편집」 헤더 오른쪽(사용자 지시 2026-08-03).
+   * 목록 위에 두면 목록이 아래로 밀려 고르던 자리를 잃는다. 헤더는 안 움직인다.
+   */
+  headerSlot?: HTMLElement;
 }
 
 const PT = (px: number | undefined): number => Math.round(((px ?? 0) * 72) / 96 * 10) / 10;
@@ -69,17 +74,8 @@ export function buildStylePanel(host: HTMLElement, deps: StylePanelDeps): void {
   const render = (): void => {
     wrap.replaceChildren();
 
-    // ── 편집 중 바 ──────────────────────────────────
-    if (editing) {
-      const bar = mkEl('div', 'sp-editbar');
-      bar.appendChild(mkEl('span', 'sp-editmark', '✎ 스타일 편집 중'));
-      const save = mkButton('sp-btn sp-btn-primary', { text: '저장' });
-      const cancel = mkButton('sp-btn', { text: '취소' });
-      save.addEventListener('click', () => { commit(); editing = false; render(); });
-      cancel.addEventListener('click', () => { editing = false; render(); });
-      bar.append(save, cancel);
-      wrap.appendChild(bar);
-    }
+    // ── 편집 중 바 ──「본문 편집」 헤더 오른쪽에 붙인다 ──────────────
+    paintHeaderBar();
 
     // ── 스타일 목록 ────────────────────────────────
     const listLabel = mkEl('div', 'sp-label', '스타일 목록');
@@ -139,6 +135,29 @@ export function buildStylePanel(host: HTMLElement, deps: StylePanelDeps): void {
     );
     wrap.appendChild(foot);
   };
+
+  /**
+   * 편집 중 바를 헤더 오른쪽에 그린다(없으면 지운다).
+   * 헤더는 패널이 다시 그릴 때 innerHTML 로 갈아엎히므로, 우리 바는 매번 다시 붙인다.
+   */
+  function paintHeaderBar(): void {
+    const slot = deps.headerSlot;
+    if (!slot) return;
+    slot.querySelector('.sp-editbar')?.remove();
+    if (!editing) {
+      slot.classList.remove('has-sp-editbar');
+      return;
+    }
+    slot.classList.add('has-sp-editbar');
+    const bar = mkEl('div', 'sp-editbar');
+    bar.appendChild(mkEl('span', 'sp-editmark', '✎ 스타일 편집 중'));
+    const save = mkButton('sp-btn sp-btn-primary', { text: '저장' });
+    const cancel = mkButton('sp-btn', { text: '취소' });
+    save.addEventListener('click', () => { commit(); editing = false; render(); });
+    cancel.addEventListener('click', () => { editing = false; render(); });
+    bar.append(save, cancel);
+    slot.appendChild(bar);
+  }
 
   function card(title: string, lines: string[]): void {
     const c = mkEl('div', 'sp-card');
