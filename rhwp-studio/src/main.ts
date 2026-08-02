@@ -63,6 +63,13 @@ import { AutosaveManager, type AutosaveScheduleSettings, type AutosaveStatus } f
 import { clearAutosaveDrafts, deleteAutosaveDraft, listAutosaveDrafts, type AutosaveDraft } from '@/recovery/autosave-store';
 import { recoveryFileName } from '@/recovery/recovery-format';
 import { showAutosaveRecoveryDialog } from '@/recovery/recovery-ui';
+import { beginSession, type LastExit } from '@/recovery/shutdown-mark';
+
+/**
+ * 직전 종료가 어땠나 — 'crash' 일 때만 복구를 묻는다(한/글 방식).
+ * 부팅 맨 앞에서 한 번만 정한다(recovery/shutdown-mark.ts 참조).
+ */
+const lastExit: LastExit = beginSession();
 import { CellSelectionRenderer } from '@/engine/cell-selection-renderer';
 import { TableObjectRenderer } from '@/engine/table-object-renderer';
 import { TableHoverHandles } from '@/engine/table-hover-handles';
@@ -1042,6 +1049,14 @@ async function offerAutosaveRecoveryIfIdle(): Promise<void> {
     const drafts = (await listAutosaveDrafts()).filter((draft) => draft.data.byteLength > 0);
     if (drafts.length === 0) return;
     if (wasm.pageCount > 0 || documentState.isDirty()) return;
+
+    // [복구 나침반 2026-08-03] 한/글처럼 **사고로 꺼졌을 때만** 묻는다.
+    // 종전엔 초안이 남아 있으면 무조건 물어, 새로고침마다 창이 떴다(사용자 지적).
+    // 정상 종료(새로고침·탭 닫기)였다면 남은 초안은 사용자가 버리기로 한 것이니 조용히 치운다.
+    if (lastExit !== 'crash') {
+      await clearAutosaveDrafts();
+      return;
+    }
 
     const choice = await showAutosaveRecoveryDialog(drafts);
     if (choice.action === 'later') return;
