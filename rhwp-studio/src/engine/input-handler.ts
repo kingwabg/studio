@@ -3,6 +3,11 @@ import { EventBus } from '@/core/event-bus';
 import { CursorState } from './cursor';
 import { CaretRenderer } from './caret-renderer';
 import { MemoOverlay } from './memo-overlay';
+import { GhostOverlay } from './ghost-overlay';
+import { clearGhosts, createGhostId, deleteGhost, listGhosts, saveGhost } from '@/media/ghost-store';
+
+/** 고스트 앵커 재탐색용 문단 앞머리 길이 — 짧으면 오탐, 길면 사소한 편집에도 앵커를 잃는다 */
+const GHOST_HINT_LEN = 24;
 import { FieldMarkerRenderer } from './field-marker-renderer';
 import { SelectionRenderer } from './selection-renderer';
 import { CommandHistory } from './history';
@@ -272,6 +277,7 @@ export class InputHandler {
   private fieldMarker: FieldMarkerRenderer;
   /** 메모 말풍선 오버레이(읽기 전용) */
   private memoOverlay: MemoOverlay;
+  private ghostOverlay: GhostOverlay;
   /** 변경 추적 오버레이 — 구현 track-review.ts */
   private trackOverlay: _track.TrackOverlay;
   private selectionRenderer: SelectionRenderer;
@@ -504,6 +510,7 @@ export class InputHandler {
     this.caret = new CaretRenderer(container, virtualScroll);
     this.fieldMarker = new FieldMarkerRenderer(container, virtualScroll);
     this.memoOverlay = new MemoOverlay(container, virtualScroll);
+    this.ghostOverlay = new GhostOverlay(container, virtualScroll);
     this.trackOverlay = new _track.TrackOverlay(container, virtualScroll);
     this.selectionRenderer = new SelectionRenderer(container, virtualScroll);
     this.history = new CommandHistory();
@@ -617,6 +624,7 @@ export class InputHandler {
     // 문서 변경 후 그림/표 선택 마커 재렌더링
     eventBus.on('document-changed', () => {
       this.refreshMemoOverlay();
+      this.refreshGhostOverlay();
       this.refreshTrackOverlay();
       this.protectedCellHitCache = null;
       this.protectedCellHoverEl?.remove();
@@ -700,8 +708,124 @@ export class InputHandler {
     } catch { /* 메모 조회 실패는 무시 — 표시용 기능 */ }
   }
 
+  /**
+   * 커서 자리에 고스트 코멘트를 단다 — **문서는 전혀 안 바뀐다**(히스토리·dirty 무영향).
+   * 앵커는 (구역, 문단, 오프셋) + 문단 앞머리 텍스트. 저장은 브라우저 로컬.
+   */
+  addGhostComment(text: string): boolean {
+    const body = text.trim();
+    if (!body) return false;
+    const pos = this.cursor.getPosition();
+    if (!pos) return false;
+    const sec = pos.sectionIndex;
+    const para = pos.paragraphIndex;
+    let stableId = '';
+    try {
+      this.wasm.ensureParagraphStableIds();
+      stableId = this.wasm.getParagraphStableId(sec, para) ?? '';
+    } catch { /* 안정 id 없으면 좌표 앵커만으로 간다 */ }
+    let textHint = '';
+    try {
+      textHint = this.wasm.getTextRange(sec, para, 0, GHOST_HINT_LEN) ?? '';
+    } catch { /* 앞머리 못 읽으면 재탐색만 포기 */ }
+    void saveGhost({
+      id: createGhostId(),
+      docKey: this.wasm.fileName || '(제목 없음)',
+      stableId,
+      sectionIndex: sec,
+      paragraphIndex: para,
+      charOffset: pos.charOffset,
+      textHint,
+      text: body,
+      addedAt: Date.now(),
+    }).then(() => {
+      this.ghostOverlay.setVisible(true);
+      this.refreshGhostOverlay();
+    });
+    return true;
+  }
+
+  /** 고스트 코멘트 보기 토글 — 반환값은 토글 후 상태 */
+  toggleGhostComments(): boolean {
+    const next = !this.ghostOverlay.isVisible();
+    this.ghostOverlay.setVisible(next);
+    if (next) this.refreshGhostOverlay();
+    return next;
+  }
+
+  /** 이 문서의 고스트 코멘트를 모두 지운다 — 반환값은 지운 개수 */
+  async clearGhostComments(): Promise<number> {
+    const n = await clearGhosts(this.wasm.fileName || '(제목 없음)');
+    this.refreshGhostOverlay();
+    return n;
+  }
+
+  /** 고스트 코멘트(문서 무변경 로컬 메모) 다시 그리기 — 저장소 조회가 비동기라 fire-and-forget */
+  refreshGhostOverlay(): void {
+    const docKey = this.wasm.fileName || '(제목 없음)';
+    void listGhosts(docKey)
+      .then((ghosts) => {
+        this.ghostOverlay.render(
+          ghosts,
+          this.viewportManager.getZoom(),
+          (g) => {
+            // 앵커: 저장된 (구역, 문단) 을 먼저 쓰고, 문단이 밀렸으면 앞머리 텍스트로 다시 찾는다.
+            const target = this.resolveGhostAnchor(g);
+            if (!target) return null;
+            try {
+              const r = this.wasm.getCursorRect(target.sec, target.para, g.charOffset);
+              return r ? { pageIndex: r.pageIndex, x: r.x, y: r.y, height: r.height } : null;
+            } catch {
+              return null;
+            }
+          },
+          (id) => {
+            void deleteGhost(id).then(() => this.refreshGhostOverlay());
+          },
+        );
+      })
+      .catch(() => { /* 표시용 — 실패 무시 */ });
+  }
+
+  /**
+   * 고스트 앵커 해소 — 저장 좌표가 그대로면 그걸 쓰고, 문단이 밀렸으면 textHint 로 다시 찾는다.
+   * ponytail: 재탐색은 앞뒤 40문단만 훑는다. 문서 전체 스캔이 필요할 만큼 크게 밀리는 편집은
+   *   드물고, 못 찾으면 그 메모만 조용히 안 그린다(본문은 절대 안 건드리므로 손실 없음).
+   */
+  private resolveGhostAnchor(g: { sectionIndex: number; paragraphIndex: number; textHint: string }):
+    { sec: number; para: number } | null {
+    const sec = g.sectionIndex;
+    let count = 0;
+    try {
+      count = this.wasm.getParagraphCount(sec);
+    } catch {
+      return null;
+    }
+    if (count === 0) return null;
+    const hint = g.textHint;
+    const textAt = (p: number): string => {
+      try {
+        return this.wasm.getTextRange(sec, p, 0, GHOST_HINT_LEN) ?? '';
+      } catch {
+        return '';
+      }
+    };
+    if (g.paragraphIndex < count && (!hint || textAt(g.paragraphIndex) === hint)) {
+      return { sec, para: g.paragraphIndex };
+    }
+    if (!hint) return g.paragraphIndex < count ? { sec, para: g.paragraphIndex } : null;
+    for (let d = 1; d <= 40; d++) {
+      const back = g.paragraphIndex - d;
+      const fwd = g.paragraphIndex + d;
+      if (back >= 0 && textAt(back) === hint) return { sec, para: back };
+      if (fwd < count && textAt(fwd) === hint) return { sec, para: fwd };
+    }
+    return null;
+  }
+
   private refreshOverlayPositions(): void {
     this.refreshMemoOverlay();
+    this.refreshGhostOverlay();
     this.refreshTrackOverlay();
     if (this.active) {
       if (this.cursor.getRect()) {

@@ -231,6 +231,12 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       O('checks', '모두 적용', '', 'review:accept-all'),
       O('trash', '모두 취소', '', 'review:reject-all'),
       gap(),
+      // 고스트 코멘트 — 문서를 안 건드리는 검토 메모(인쇄·PDF 에 안 나온다)
+      P('ghost', '고스트 코멘트', 'review:ghost-add',
+        '커서 자리에 메모를 답니다. 문서에는 저장되지 않고 인쇄·PDF 에도 나오지 않습니다'),
+      P('eye-closed', '고스트 보기', 'review:ghost-toggle', '고스트 코멘트 표시를 켜고 끕니다'),
+      O('eraser', '고스트 비우기', '', 'review:ghost-clear'),
+      gap(),
       P('brackets-angle', '조판 부호', 'view:ctrl-mark'),
       P('arrow-elbow-down-left', '문단 부호', 'view:para-mark'),
       gap(),
