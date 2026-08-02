@@ -479,6 +479,40 @@ export const formatCommands: CommandDef[] = [
       services.getInputHandler()?.decreaseParaIndent();
     },
   },
+  // ── 값을 직접 정하는 판 (리본 값 상자용, 2026-08-03) ──────────────────
+  // 눈 먼 ± 대신 "지금 몇인지 보고 그 값을 고친다". 단위는 UI 관례대로 pt 로 받고
+  // 저장 단위로 바꿔 넘긴다 — 글자 크기는 HWPUNIT(1pt=100), 여백·첫 줄은 px.
+  {
+    id: 'format:font-size-set',
+    label: '글꼴 크기 지정',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services, params) {
+      const pt = params?.value as number | undefined;
+      if (pt === undefined || !Number.isFinite(pt) || pt <= 0) return;
+      services.getInputHandler()?.setFontSizePt(pt);
+    },
+  },
+  {
+    id: 'format:indent-set',
+    label: '들여쓰기 지정',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services, params) {
+      const pt = params?.value as number | undefined;
+      if (pt === undefined || !Number.isFinite(pt)) return;
+      services.getInputHandler()?.setParaIndentPt(pt);
+    },
+  },
+  {
+    id: 'format:outdent-set',
+    label: '내어쓰기 지정',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services, params) {
+      const pt = params?.value as number | undefined;
+      if (pt === undefined || !Number.isFinite(pt)) return;
+      // 내어쓰기는 첫 줄을 왼쪽으로 빼는 것 — 저장은 음수 indent 다.
+      services.getInputHandler()?.setParaOutdentPt(pt);
+    },
+  },
   // 스타일 대화상자
   {
     id: 'format:style-dialog',

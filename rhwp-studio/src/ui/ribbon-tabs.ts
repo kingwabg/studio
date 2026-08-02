@@ -13,6 +13,25 @@ export type RibbonItem =
   /** 기존 Toolbar 가 소유한 실제 컨트롤(#font-name 등)을 이 자리로 옮겨 담는다 */
   | { kind: 'slot'; slot: string; width: number; label?: string; icon?: string }
   | { kind: 'expander'; label: string; cmd?: string }
+  /**
+   * 값 상자 — 「값 + 프리셋(⌄) + 스피너(▲▼)」. 눈 먼 ± 대신 지금 값이 보인다.
+   * `key` 로 리본이 어떤 서식인지 알아 커서 값을 밀어 넣는다(ribbon-header.setParaState 등).
+   */
+  | {
+      kind: 'value';
+      key: 'font-size' | 'line-spacing' | 'indent' | 'outdent';
+      label: string;
+      icon: string;
+      unit: string;
+      presets: number[];
+      step: number;
+      min: number;
+      max: number;
+      decimals?: number;
+      width: number;
+      cmd: string;
+      hint?: string;
+    }
   | { kind: 'over'; icon: string; label: string; key?: string; cmd?: string };
 
 const P = (icon: string, label: string, cmd?: string, hint?: string): RibbonItem =>
@@ -26,6 +45,16 @@ const slot = (name: string, width: number, label?: string, icon?: string): Ribbo
   ({ kind: 'slot', slot: name, width, label, icon });
 const O = (icon: string, label: string, key?: string, cmd?: string): RibbonItem =>
   ({ kind: 'over', icon, label, key, cmd });
+/** 값 상자 — 크기·줄 간격·들여쓰기·내어쓰기가 같은 모양을 쓴다(사용자 지시 2026-08-03) */
+const V = (
+  key: 'font-size' | 'line-spacing' | 'indent' | 'outdent',
+  label: string, icon: string, unit: string, cmd: string,
+  o: { presets: number[]; step: number; min: number; max: number; decimals?: number; width?: number; hint?: string },
+): RibbonItem => ({
+  kind: 'value', key, label, icon, unit, cmd,
+  presets: o.presets, step: o.step, min: o.min, max: o.max,
+  decimals: o.decimals, width: o.width ?? 92, hint: o.hint,
+});
 
 export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[] }> = [
   {
@@ -43,7 +72,11 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       gap(),
       slot('style-name', 116, '스타일', 'cards-three'),
       slot('font-name', 132, '글꼴', 'text-aa'),
-      slot('font-size', 74, '크기', 'text-t'),
+      V('font-size', '크기', 'text-t', 'pt', 'format:font-size-set', {
+        presets: [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48],
+        step: 1, min: 1, max: 300, decimals: 1, width: 88,
+        hint: '글자 크기 — 값을 고치거나 ⌄ 에서 고릅니다',
+      }),
       gap(),
       P('text-b', '굵게', 'format:bold'),
       P('text-italic', '기울임', 'format:italic'),
@@ -61,16 +94,28 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('text-align-center', '가운데 정렬', 'format:align-center'),
       P('text-align-right', '오른쪽 정렬', 'format:align-right'),
       P('text-align-justify', '양쪽 정렬', 'format:align-justify'),
-      P('arrows-vertical', '줄 간격', 'format:line-spacing'),
+      // 종전엔 아이콘 버튼이었는데 값 없이 디스패치돼 **아무 동작도 안 했다**(2026-08-03 발견).
+      // 값 상자로 바꿔 실제로 쓰이게 한다.
+      V('line-spacing', '줄 간격', 'arrows-vertical', '%', 'format:line-spacing', {
+        presets: [100, 115, 130, 145, 160, 180, 200, 250, 300],
+        step: 5, min: 50, max: 500, width: 92,
+        hint: '줄 간격(%) — 값을 고치거나 ⌄ 에서 고릅니다',
+      }),
       gap(),
       P('list-numbers', '문단 번호', 'format:toggle-numbering'),
       P('list-bullets', '글머리표', 'format:toggle-bullet'),
       P('text-indent', '한 수준 증가', 'format:level-increase'),
       P('text-outdent', '한 수준 감소', 'format:level-decrease'),
       // 일반 문단 들여쓰기/내어쓰기 — '한 수준' 은 개요/번호용이라 일반 문단엔 안 먹는다.
-      // 아이콘은 text-indent/outdent 와 겹치지 않게 arrow-line-right/left 사용.
-      P('arrow-line-right', '들여쓰기', 'format:indent-increase'),
-      P('arrow-line-left', '내어쓰기', 'format:indent-decrease'),
+      // 값 상자로 바꿨다(2026-08-03): 종전 ± 버튼은 눌러도 지금 얼마가 들어갔는지 안 보였다.
+      V('indent', '들여쓰기', 'arrow-line-right', 'pt', 'format:indent-set', {
+        presets: [0, 10, 20, 30, 40], step: 5, min: 0, max: 400, width: 92,
+        hint: '문단 왼쪽 여백 — 값을 고치거나 ⌄ 에서 고릅니다',
+      }),
+      V('outdent', '내어쓰기', 'arrow-line-left', 'pt', 'format:outdent-set', {
+        presets: [0, 10, 20, 30], step: 5, min: 0, max: 400, width: 92,
+        hint: '첫 줄을 왼쪽으로 빼는 양 — 값을 고치거나 ⌄ 에서 고릅니다',
+      }),
       gap(),
       // 글자 간격(자간·장평) — 문단 수준(들여쓰기)과 같은 '간격' 무리라 옆에 둔다.
       // 명령은 이미 있었다(format:char-spacing-*/char-ratio-*, 단축키 Shift+Alt+N/W/J/K).

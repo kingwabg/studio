@@ -19,6 +19,7 @@
 import {
   RIBBON_TABS, DEFAULT_OFF, loadHidden, saveHidden, type RibbonItem,
 } from './ribbon-tabs';
+import { createValueBox, type ValueBox } from './ribbon-valuebox';
 
 export { RIBBON_TABS, type RibbonItem };
 
@@ -46,7 +47,7 @@ export class RibbonHeader {
   /** 현재 테마 모드 — system → light → dark 순환 */
   private themeMode: 'system' | 'light' | 'dark' = 'system';
   /** 테마 명령 실행 위임 (main.ts 가 디스패처를 물려준다) */
-  onCommand: ((cmd: string) => void) | null = null;
+  onCommand: ((cmd: string, params?: Record<string, unknown>) => void) | null = null;
   /** 슬롯 이름 → 옮겨 담을 실제 DOM (탭 전환마다 다시 꽂는다) */
   private adopted = new Map<string, HTMLElement>();
   /** 편집 모드 컨텍스트 리본(머리말/꼬리말·각주) — 켜지면 일반 리본을 덮는다 */
@@ -56,6 +57,10 @@ export class RibbonHeader {
    * 탭을 바꾸면 버튼이 다시 그려지므로, 상태를 여기 들고 있다가 렌더 끝에 다시 칠한다.
    */
   private activeCmds = new Set<string>();
+  /** 값 상자들 — 커서 자리 값이 바뀌면 여기로 밀어 넣는다. 탭 재렌더마다 새로 만든다 */
+  private valueBoxes = new Map<string, ValueBox>();
+  /** 값 상자에 마지막으로 밀어 넣은 값 — 재렌더 후 복원용 */
+  private valueState = new Map<string, number | undefined>();
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -76,7 +81,16 @@ export class RibbonHeader {
     on('format:italic', props.italic);
     on('format:underline', props.underline);
     on('format:strikethrough', props.strikethrough);
+    // 크기 값 상자 — 저장 단위는 HWPUNIT(1pt=100)
+    const fs = Number(props.fontSize ?? 0);
+    this.setValueBox('font-size', fs > 0 ? fs / 100 : undefined);
     this.paintActive();
+  }
+
+  /** 값 상자에 지금 값을 밀어 넣는다(상자가 아직 안 그려졌어도 상태는 남는다) */
+  private setValueBox(key: string, v: number | undefined): void {
+    this.valueState.set(key, v);
+    this.valueBoxes.get(key)?.setValue(v);
   }
 
   /**
@@ -110,6 +124,14 @@ export class RibbonHeader {
     else this.activeCmds.delete('format:indent-increase');
     if (indent < -0.5) this.activeCmds.add('format:indent-decrease');
     else this.activeCmds.delete('format:indent-decrease');
+    // 값 상자 — 저장은 px, 보여 주는 건 pt (패널과 같은 관례)
+    const toPt = (px: number): number => (px * 72) / 96;
+    this.setValueBox('indent', Math.round(toPt(marginLeft) * 10) / 10);
+    this.setValueBox('outdent', Math.round(toPt(Math.max(0, -indent)) * 10) / 10);
+    const ls = props.lineSpacingType === 'Percent' && props.lineSpacing !== undefined
+      ? Math.round(Number(props.lineSpacing))
+      : undefined;
+    this.setValueBox('line-spacing', ls);
     this.paintActive();
   }
 
@@ -374,6 +396,31 @@ export class RibbonHeader {
           host.appendChild(l);
         }
         this.ribbonRow.appendChild(host);
+        continue;
+      }
+      if (item.kind === 'value') {
+        // 값 상자 — 슬롯과 같은 테두리 칸에 담아 크기·줄 간격·들여쓰기가 한 모양이 된다.
+        const host = document.createElement('span');
+        host.className = 'rb-slot has-label';
+        host.style.width = `${item.width}px`;
+        const vb = createValueBox({
+          unit: item.unit,
+          presets: item.presets,
+          step: item.step,
+          min: item.min,
+          max: item.max,
+          decimals: item.decimals,
+          title: item.hint ?? item.label,
+          onCommit: (v) => this.onCommand?.(item.cmd, { value: v }),
+        });
+        host.appendChild(vb.el);
+        const l = document.createElement('span');
+        l.className = 'rb-slot-label';
+        l.textContent = item.label;
+        host.appendChild(l);
+        this.ribbonRow.appendChild(host);
+        this.valueBoxes.set(item.key, vb);
+        vb.setValue(this.valueState.get(item.key));
         continue;
       }
       if (item.kind === 'expander') {

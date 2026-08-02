@@ -374,7 +374,8 @@ async function initialize(): Promise<void> {
     // ── 리본 헤더 (디자인 재설계 2a) — 구 3단 헤더를 대체한다 ──
     const ribbon = new RibbonHeader(document.getElementById('ribbon-header')!);
     (window as any).__ribbon = ribbon; // e2e/디버그용
-    ribbon.onCommand = (cmd: string) => dispatcher.dispatch(cmd);
+    ribbon.onCommand = (cmd: string, params?: Record<string, unknown>) =>
+      dispatcher.dispatch(cmd, params);
     // [활성 상태 2026-08-03] 커서 자리에 적용된 서식을 리본 버튼에 켜서 보여 준다.
     // 신호는 이미 있던 것을 그대로 쓴다(input-handler.emitCursorFormatState) — 옛 툴바가
     // 듣던 두 이벤트를 리본도 듣게 하는 것뿐이다. 단위는 서식의 자연 단위:
@@ -408,8 +409,9 @@ async function initialize(): Promise<void> {
     // Toolbar 는 생성 시 잡아 둔 엘리먼트 참조로 동작하므로, DOM 을 옮겨도
     // 상태 동기(updateState)·change 리스너가 그대로 살아 있다.
     for (const [slotName, sel] of [
-      // ⚠ 크기는 묶음 전체(.sb-size-group) — 입력칸만 옮기면 pt·▲▼ 가 남는다(ribbon.css)
-      ['style-name', '#style-name'], ['font-name', '#font-name'], ['font-size', '.sb-size-group'],
+      // 크기는 2026-08-03 부터 리본 자체 값 상자를 쓴다 — 옛 툴바 .sb-size-group 은 안 옮긴다
+      // (옮기면 값 상자와 두 벌이 된다). 나머지는 그대로 옮겨 담는다.
+      ['style-name', '#style-name'], ['font-name', '#font-name'],
       ['text-color', '.sb-color-wrap'], ['highlight', '#highlight-dropdown'],
     ] as const) {
       const el = document.querySelector<HTMLElement>(sel);

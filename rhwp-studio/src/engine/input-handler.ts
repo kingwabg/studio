@@ -4647,6 +4647,24 @@ export class InputHandler {
     this.applyParaFormat({ lineSpacing: value, lineSpacingType: 'Percent' });
   }
 
+  /** 글자 크기 지정 (리본 값 상자용, pt) — 증감이 아니라 절대값 */
+  setFontSizePt(pt: number): void {
+    if (!Number.isFinite(pt) || pt <= 0) return;
+    this.applyCharFormat({ fontSize: Math.round(pt * 100) });
+  }
+
+  /** 문단 왼쪽 여백 지정 (리본 값 상자용, pt) — 증감이 아니라 절대값 */
+  setParaIndentPt(pt: number): void {
+    if (!Number.isFinite(pt)) return;
+    this.applyParaFormat({ marginLeft: (pt * 96) / 72 } as Partial<import('@/core/types').ParaProperties>);
+  }
+
+  /** 첫 줄 내어쓰기 양 지정 (리본 값 상자용, pt) — 저장은 음수 indent 다 */
+  setParaOutdentPt(pt: number): void {
+    if (!Number.isFinite(pt)) return;
+    this.applyParaFormat({ indent: (-pt * 96) / 72 } as Partial<import('@/core/types').ParaProperties>);
+  }
+
   /**
    * 쪽 줄이기 — 문서 전체에 줄간격(주 레버, 한컴 정합)을 조금씩 줄이고, 부족하면
    * 자간까지 좁혀 페이지 수를 줄인다.
