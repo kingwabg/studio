@@ -168,6 +168,8 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       gap(),
       P('arrows-in-line-vertical', '한 쪽 줄이기', 'format:auto-fit-page',
         '마지막 몇 줄이 다음 쪽으로 넘칠 때 줄 간격(부족하면 자간까지)을 조금 줄여 페이지 수를 1 줄입니다'),
+      P('arrows-in', '전체 쪽 줄이기', 'format:auto-fit-max',
+        '가독성 하한(줄 간격 130% · 자간 -12%)까지 줄여 문서 전체를 줄일 수 있는 만큼 줄입니다'),
       gap(),
       P('grid-four', '격자 보기', 'view:toggle-grid'),
       P('grid-nine', '격자 설정', 'view:grid-settings'),

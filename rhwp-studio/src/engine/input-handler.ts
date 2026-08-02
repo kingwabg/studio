@@ -4427,9 +4427,13 @@ export class InputHandler {
   }
 
   /**
-   * 한 쪽 줄이기 — 마지막 몇 줄이 다음 쪽으로 넘칠 때, 문서 전체에 줄간격(주 레버,
-   * 한컴 정합)을 조금씩 줄이고, 부족하면 자간까지 좁혀 페이지 수를 1 줄인다.
-   * (Word 'Shrink One Page' 와 같은 목표 = 현재 쪽수 - 1.)
+   * 쪽 줄이기 — 문서 전체에 줄간격(주 레버, 한컴 정합)을 조금씩 줄이고, 부족하면
+   * 자간까지 좁혀 페이지 수를 줄인다.
+   *
+   * - `mode:'one'` (한 쪽 줄이기): 목표 = 현재 쪽수 − 1. Word 'Shrink One Page' 정합.
+   *   목표를 채우는 **가장 약한** 조합에서 멈춘다 — 필요 이상으로 조이지 않는다.
+   * - `mode:'max'` (전체 쪽 줄이기): 가독 하한까지 가 보고 **가장 적은 쪽수**를 찾은 뒤,
+   *   그 쪽수를 내는 **가장 약한** 조합으로 확정한다(같은 결과면 덜 조인 쪽이 낫다).
    *
    * 후보 사다리: 줄간격 155→130%(5%p 스텝) → 그래도 부족하면 줄간격 130% 고정 +
    * 자간 -3→-12%(3%p 스텝). 가독성 하한: 줄간격 130%, 자간 -12%.
@@ -4441,10 +4445,12 @@ export class InputHandler {
    * ponytail: 후보마다 전체 문단×paginate = O(paras·candidates) 재조판. 보통 문서엔
    *   충분히 빠르다. 문제 되면 beginBatch/endBatch 로 조판을 후보당 1회로 묶을 것.
    */
-  autoFitToPage(): {
+  autoFitToPage(mode: 'one' | 'max' = 'one'): {
     status: 'already' | 'failed' | 'ok';
     lineSpacing?: number;
     charSpacing?: number;
+    pagesBefore?: number;
+    pagesAfter?: number;
   } {
     const LS_FLOOR = 130; // 줄간격 하한 (%)
     const LS_STEP = 5;
@@ -4486,14 +4492,25 @@ export class InputHandler {
     for (let c = -CS_STEP; c >= CS_FLOOR; c -= CS_STEP) ladder.push([lsFinal, c]);
     if (ladder.length === 0) return { status: 'failed' };
 
-    // 스냅샷 위에서 "어느 조합이면 되는지"만 탐색 (히스토리 무오염)
+    // 스냅샷 위에서 "어느 조합이면 되는지"만 탐색 (히스토리 무오염).
+    //   one: 목표(쪽수-1)를 채우는 첫(=가장 약한) 조합에서 멈춘다.
+    //   max: 사다리를 끝까지 훑어 최소 쪽수를 찾고, 그 쪽수를 처음 낸 조합을 쓴다
+    //        — 더 조여도 쪽수가 같으면 덜 조인 쪽이 낫다.
     const snap = this.wasm.saveSnapshot();
     let winner: [number, number] | null = null;
+    let bestPages = total;
     let prevCS = 0;
     for (const [ls, cs] of ladder) {
       applyLS(ls);
       if (cs !== prevCS) { applyCS(cs); prevCS = cs; }
-      if (this.wasm.pageCount <= target) { winner = [ls, cs]; break; }
+      const pages = this.wasm.pageCount;
+      if (mode === 'one') {
+        if (pages <= target) { winner = [ls, cs]; bestPages = pages; break; }
+      } else if (pages < bestPages) {
+        winner = [ls, cs];
+        bestPages = pages;
+        if (pages <= 1) break; // 더 줄일 곳이 없다
+      }
     }
     this.wasm.restoreSnapshot(snap);
     this.wasm.discardSnapshot(snap);
@@ -4512,7 +4529,13 @@ export class InputHandler {
         return cursorBefore;
       },
     });
-    return { status: 'ok', lineSpacing: lsWin, charSpacing: csWin };
+    return {
+      status: 'ok',
+      lineSpacing: lsWin,
+      charSpacing: csWin,
+      pagesBefore: total,
+      pagesAfter: bestPages,
+    };
   }
 
   /** 글꼴 크기 증감 (커맨드 시스템용, delta: HWPUNIT, 1pt=100) */

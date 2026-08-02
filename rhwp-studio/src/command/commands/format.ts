@@ -136,7 +136,7 @@ export const formatCommands: CommandDef[] = [
     execute(services) {
       const ih = services.getInputHandler();
       if (!ih) return;
-      const r = ih.autoFitToPage();
+      const r = ih.autoFitToPage('one');
       if (r.status === 'already') {
         showToast({ message: '이미 한 페이지입니다.', durationMs: 3000 });
       } else if (r.status === 'failed') {
@@ -146,6 +146,30 @@ export const formatCommands: CommandDef[] = [
           ? `줄 간격 ${r.lineSpacing}% · 자간 ${r.charSpacing}%`
           : `줄 간격 ${r.lineSpacing}%`;
         showToast({ message: `한 쪽을 줄였습니다 (${detail}).`, durationMs: 3000 });
+      }
+    },
+  },
+  // 전체 쪽 줄이기 — 가독 하한까지 압축해 줄일 수 있는 만큼 줄인다(같은 쪽수면 덜 조인 쪽으로)
+  {
+    id: 'format:auto-fit-max',
+    label: '전체 쪽 줄이기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      const ih = services.getInputHandler();
+      if (!ih) return;
+      const r = ih.autoFitToPage('max');
+      if (r.status === 'already') {
+        showToast({ message: '이미 한 페이지입니다.', durationMs: 3000 });
+      } else if (r.status === 'failed') {
+        showToast({ message: '더 줄이지 못했습니다. 글꼴 크기나 여백을 조절해 보세요.', durationMs: 4000 });
+      } else {
+        const detail = r.charSpacing
+          ? `줄 간격 ${r.lineSpacing}% · 자간 ${r.charSpacing}%`
+          : `줄 간격 ${r.lineSpacing}%`;
+        showToast({
+          message: `${r.pagesBefore}쪽 → ${r.pagesAfter}쪽으로 줄였습니다 (${detail}).`,
+          durationMs: 3500,
+        });
       }
     },
   },
