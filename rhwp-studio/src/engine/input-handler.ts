@@ -6,8 +6,14 @@ import { MemoOverlay } from './memo-overlay';
 import { GhostOverlay } from './ghost-overlay';
 import { clearGhosts, createGhostId, deleteGhost, listGhosts, saveGhost } from '@/media/ghost-store';
 
+import { listVersions, saveVersion, type ParaVersion } from '@/media/timemachine-store';
+
 /** 고스트 앵커 재탐색용 문단 앞머리 길이 — 짧으면 오탐, 길면 사소한 편집에도 앵커를 잃는다 */
 const GHOST_HINT_LEN = 24;
+/** 타임머신: 편집이 이만큼 멎으면 한 판 남긴다 — 타자 한 글자마다 쌓지 않으려는 값 */
+const TIME_MACHINE_IDLE_MS = 1500;
+/** 타임머신이 담는 문단 텍스트 상한 — 아주 긴 문단이 저장소를 삼키지 않게 */
+const TIME_MACHINE_MAX_CHARS = 4000;
 import { FieldMarkerRenderer } from './field-marker-renderer';
 import { SelectionRenderer } from './selection-renderer';
 import { CommandHistory } from './history';
@@ -278,6 +284,8 @@ export class InputHandler {
   /** 메모 말풍선 오버레이(읽기 전용) */
   private memoOverlay: MemoOverlay;
   private ghostOverlay: GhostOverlay;
+  /** 타임머신 포착 디바운스 타이머 */
+  private timeMachineTimer: number | undefined;
   /** 변경 추적 오버레이 — 구현 track-review.ts */
   private trackOverlay: _track.TrackOverlay;
   private selectionRenderer: SelectionRenderer;
@@ -626,6 +634,7 @@ export class InputHandler {
       this.refreshMemoOverlay();
       this.refreshGhostOverlay();
       this.refreshTrackOverlay();
+      this.scheduleTimeMachineCapture();
       this.protectedCellHitCache = null;
       this.protectedCellHoverEl?.remove();
       this.protectedCellHoverEl = null;
@@ -706,6 +715,94 @@ export class InputHandler {
         }
       });
     } catch { /* 메모 조회 실패는 무시 — 표시용 기능 */ }
+  }
+
+  /**
+   * 문단을 묶는 앵커 키 — 타임머신이 "같은 문단의 판들"을 모으는 기준.
+   *
+   * ⚠ **앞머리 텍스트를 키로 쓰면 안 된다**: 문단을 고칠 때마다 키가 갈라져 판이
+   *   흩어진다(2026-08-02 실측 — 3판이 서로 다른 키 2개로 쪼개짐). 정체성은 변하지
+   *   않는 값이어야 한다. 그래서 안정 id → 없으면 **위치**(구역/문단) 순으로 쓴다.
+   *   (텍스트 앞머리는 정체성이 아니라 재탐색 힌트로만 쓴다 — hint 로 따로 돌려준다.)
+   *
+   * ponytail: 위치 키는 문단이 삽입/삭제로 밀리면 갈라진다. 안정 id 가 wasm 에 들어오면
+   *   자동으로 그쪽이 쓰인다(이 함수만 보면 된다).
+   */
+  private paragraphAnchorKey(sec: number, para: number): { key: string; hint: string } {
+    let hint = '';
+    try {
+      hint = this.wasm.getTextRange(sec, para, 0, GHOST_HINT_LEN) ?? '';
+    } catch { /* 못 읽으면 힌트 없이 */ }
+    let sid = '';
+    try {
+      this.wasm.ensureParagraphStableIds();
+      sid = this.wasm.getParagraphStableId(sec, para) ?? '';
+    } catch { /* 안정 id 미구현이면 위치로 */ }
+    return { key: sid ? `s:${sid}` : `p:${sec}/${para}`, hint };
+  }
+
+  /**
+   * 편집이 멎으면 그 문단의 지금 모습을 타임머신에 한 판 남긴다.
+   * 문서에는 아무것도 안 쓴다(저장은 브라우저 로컬). 같은 내용이면 안 쌓인다.
+   *
+   * ponytail: 캐럿이 있는 문단 하나만 남긴다 — 붙여넣기로 여러 문단이 한꺼번에 바뀌면
+   *   그중 캐럿 문단만 기록된다. 문단별 dirty 추적이 생기면 그때 넓히면 된다.
+   */
+  private scheduleTimeMachineCapture(): void {
+    if (this.timeMachineTimer !== undefined) window.clearTimeout(this.timeMachineTimer);
+    this.timeMachineTimer = window.setTimeout(() => {
+      this.timeMachineTimer = undefined;
+      const pos = this.cursor.getPosition();
+      if (!pos) return;
+      const sec = pos.sectionIndex;
+      const para = pos.paragraphIndex;
+      let text = '';
+      try {
+        text = this.wasm.getTextRange(sec, para, 0, TIME_MACHINE_MAX_CHARS) ?? '';
+      } catch {
+        return;
+      }
+      const { key, hint } = this.paragraphAnchorKey(sec, para);
+      void saveVersion({
+        docKey: this.wasm.fileName || '(제목 없음)',
+        anchorKey: key,
+        sectionIndex: sec,
+        paragraphIndex: para,
+        textHint: hint,
+        text,
+        savedAt: Date.now(),
+      }).catch(() => { /* 기록 실패가 편집을 막으면 안 된다 */ });
+    }, TIME_MACHINE_IDLE_MS);
+  }
+
+  /** 커서 문단의 과거 판들 (최신 앞) */
+  async listParagraphVersions(): Promise<ParaVersion[]> {
+    const pos = this.cursor.getPosition();
+    if (!pos) return [];
+    const { key } = this.paragraphAnchorKey(pos.sectionIndex, pos.paragraphIndex);
+    return listVersions(this.wasm.fileName || '(제목 없음)', key);
+  }
+
+  /**
+   * 커서 문단을 그 판의 내용으로 되돌린다 — **그 문단만**. 스냅샷 커맨드라 Ctrl+Z 한 번에
+   * 되돌린 것 자체를 다시 취소할 수 있다.
+   */
+  restoreParagraphVersion(text: string): boolean {
+    const pos = this.cursor.getPosition();
+    if (!pos) return false;
+    const sec = pos.sectionIndex;
+    const para = pos.paragraphIndex;
+    this.executeOperation({
+      kind: 'snapshot',
+      operationType: 'timeMachineRestore',
+      operation: (): DocumentPosition => {
+        const len = this.wasm.getLogicalLength(sec, para);
+        if (len > 0) this.wasm.deleteText(sec, para, 0, len);
+        if (text) this.wasm.insertText(sec, para, 0, text);
+        return { sectionIndex: sec, paragraphIndex: para, charOffset: 0 };
+      },
+    });
+    return true;
   }
 
   /**

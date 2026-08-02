@@ -9,6 +9,7 @@
  */
 import type { CommandDef } from '../types';
 import { showToast } from '@/ui/toast';
+import { showTimeMachine } from '@/ui/timemachine-modal';
 
 export const ghostCommands: CommandDef[] = [
   {
@@ -49,6 +50,30 @@ export const ghostCommands: CommandDef[] = [
         showToast({
           message: n > 0 ? `고스트 코멘트 ${n}개를 지웠습니다.` : '지울 고스트 코멘트가 없습니다.',
           durationMs: 2500,
+        });
+      });
+    },
+  },
+  // 문단 타임머신 — 문서 전체가 아니라 **커서가 있는 문단**만 과거로 되돌린다
+  {
+    id: 'review:time-machine',
+    label: '문단 타임머신',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      const ih = services.getInputHandler() as any;
+      if (!ih) return;
+      const pos = ih.getCursorPosition?.() ?? ih.cursor?.getPosition?.();
+      if (!pos) return;
+      let current = '';
+      try {
+        current = services.wasm.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0, 4000) ?? '';
+      } catch { /* 못 읽으면 빈 문단으로 본다 */ }
+      void ih.listParagraphVersions().then((versions: any[]) => {
+        showTimeMachine(versions as any, current, (text: string) => {
+          if (ih.restoreParagraphVersion(text)) {
+            services.eventBus.emit('document-changed');
+            showToast({ message: '이 문단을 고른 판으로 되돌렸습니다.', durationMs: 3000 });
+          }
         });
       });
     },
