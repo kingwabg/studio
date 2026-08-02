@@ -25,6 +25,7 @@ import { TemplatePickerModal } from './template-picker-modal';
 import { openTemplateEditBar, closeTemplateEditBar } from './template-edit-bar';
 import { extractDocBody, saveTemplate, deleteTemplate, createTemplateId } from '@/media/template-store';
 import { showToast } from './toast';
+import { buildStylePanel } from './style-panel';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
 export type PanelTab = 'props' | 'text' | 'table' | 'cell' | 'style';
@@ -522,38 +523,23 @@ export class CanvaRightInspector {
    * 커서 문단에 그 스타일을 입힌다(기존 applyStyle 재사용 — 스냅샷 undo·재렌더 포함).
    * 하단 「스타일 설정…」은 기존 StyleDialog(만들기·편집)를 연다.
    */
+  /**
+   * 스타일 탭 — 대화상자와 같은 구조(목록 + 정보 카드 3장)를 패널에서, 그리고 ✎ 로
+   * **여기서 바로 고친다**(사용자 지시 2026-08-03). 본체는 ui/style-panel.ts.
+   */
   private buildStyleTab(host: HTMLElement): void {
     const sec = this.section('스타일');
     host.appendChild(sec);
-
-    let styles: Array<{ id: number; name: string }> = [];
-    if (this.services.wasm.pageCount > 0) {
-      try { styles = this.services.wasm.getStyleList(); } catch { styles = []; }
-    }
-
-    if (styles.length === 0) {
-      sec.appendChild(mkEl('div', 'canva-hint', '문서를 열면 스타일 목록이 여기 표시됩니다.'));
-    } else {
-      const list = mkEl('div', 'canva-style-list');
-      for (const s of styles) {
-        const b = mkButton('canva-style-card canva-style-item', { title: s.name });
-        b.textContent = s.name;
-        b.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          const ih = this.services.getInputHandler() as any;
-          ih?.applyStyle(s.id);
-          ih?.focus?.();
-        });
-        list.appendChild(b);
-      }
-      sec.appendChild(list);
-    }
-
-    const manage = mkButton('canva-full-btn', {
-      html: svg('<path d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/>') + '<span>스타일 설정…</span>',
+    buildStylePanel(sec, {
+      wasm: this.services.wasm,
+      eventBus: this.services.eventBus,
+      applyStyle: (id) => {
+        const ih = this.services.getInputHandler() as any;
+        ih?.applyStyle(id);
+        ih?.focus?.();
+      },
+      dispatch: (cmd) => this.services.dispatcher.dispatch(cmd),
     });
-    manage.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:style-dialog'); });
-    sec.appendChild(manage);
   }
 
   /** 아이콘 칩 여러 개를 한 줄(줄바꿈 허용)로 — 디자인 2c 의 표 조작 섹션 */

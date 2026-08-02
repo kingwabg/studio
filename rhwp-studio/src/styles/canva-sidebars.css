@@ -1419,3 +1419,62 @@
   font-variant-numeric: tabular-nums;
 }
 .tps-spin-item:hover { background: var(--color-accent-bg); color: var(--color-primary); }
+
+/* ── 스타일 탭 (ui/style-panel.ts) ──────────────────────────────
+   대화상자와 같은 구조를 패널 폭(≈300px)에 맞춰 세로로 쌓는다.
+   ✎ 를 누르면 같은 자리에서 카드가 입력칸으로 바뀐다 — 모달을 띄우지 않는다. */
+.sp-wrap { display: flex; flex-direction: column; gap: 10px; }
+.sp-label { font-size: 11px; color: var(--color-text-dim, #777); }
+.sp-list {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 200px; overflow: auto;
+  border: 1px solid var(--color-border, #ddd); border-radius: 6px; padding: 4px;
+}
+.sp-item {
+  text-align: left; border: 0; background: transparent; cursor: pointer;
+  padding: 5px 8px; border-radius: 4px; font-size: 12.5px;
+  /* ⚠ 버튼 기본 줄 상자에 눌려 글자가 잘렸다(실측 2026-08-03). box-sizing 을 안 맞추면
+     min-height 가 padding 을 안 품어 그대로 잘린다 — 둘을 같이 준다. */
+  box-sizing: content-box; line-height: 17px; min-height: 17px;
+  color: var(--color-text, #222); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-item:hover { background: var(--color-bg-soft, #f4f4f5); }
+.sp-item.is-sel { background: var(--color-accent-bg, #e4f1f6); color: var(--color-primary, #00647f); font-weight: 600; }
+
+.sp-tools { display: flex; gap: 6px; }
+.sp-tool {
+  width: 30px; height: 26px; border: 1px solid var(--color-border, #ddd);
+  border-radius: 5px; background: var(--color-bg, #fff); cursor: pointer;
+  font-size: 13px; line-height: 1; color: var(--color-text, #222);
+}
+.sp-tool:hover { border-color: var(--color-primary, #00647f); color: var(--color-primary, #00647f); }
+.sp-tool.is-on { background: var(--color-accent-bg, #e4f1f6); border-color: var(--color-primary, #00647f); color: var(--color-primary, #00647f); }
+
+.sp-card { border: 1px solid var(--color-border, #ddd); border-radius: 6px; padding: 8px 10px; }
+.sp-card-title { font-size: 11.5px; font-weight: 600; color: var(--color-primary, #00647f); margin-bottom: 5px; }
+.sp-card-body { display: flex; flex-direction: column; gap: 4px; font-size: 12px; line-height: 1.5; color: var(--color-text, #222); }
+
+.sp-field { display: flex; align-items: center; gap: 8px; }
+.sp-field-label { flex: 1; font-size: 11.5px; color: var(--color-text-dim, #666); }
+.sp-input {
+  flex: 0 0 108px; height: 24px; box-sizing: border-box;
+  border: 1px solid var(--color-border, #ddd); border-radius: 4px;
+  background: var(--color-bg, #fff); color: var(--color-text, #222);
+  font: inherit; font-size: 12px; padding: 0 6px; min-width: 0;
+}
+.sp-input:focus { outline: none; border-color: var(--color-primary, #00647f); }
+
+.sp-editbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px; border-radius: 6px;
+  background: var(--color-accent-bg, #e4f1f6); border: 1px solid var(--color-primary, #00647f);
+}
+.sp-editmark { flex: 1; font-size: 11.5px; font-weight: 600; color: var(--color-primary, #00647f); }
+.sp-btn {
+  border: 1px solid var(--color-border, #ddd); border-radius: 4px;
+  background: var(--color-bg, #fff); cursor: pointer; font-size: 12px; padding: 3px 10px;
+}
+.sp-btn-primary { background: var(--color-primary, #00647f); border-color: var(--color-primary, #00647f); color: #fff; }
+
+.sp-foot { font-size: 11.5px; color: var(--color-text-dim, #666); padding-top: 2px; }
+.sp-foot b { color: var(--color-primary, #00647f); }
