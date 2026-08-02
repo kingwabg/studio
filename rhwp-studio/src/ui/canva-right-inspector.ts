@@ -26,6 +26,13 @@ import { openTemplateEditBar, closeTemplateEditBar } from './template-edit-bar';
 import { extractDocBody, saveTemplate, deleteTemplate, createTemplateId } from '@/media/template-store';
 import { showToast } from './toast';
 import { buildStylePanel } from './style-panel';
+// 글자 탭 확장 섹션 — 각 기능이 파일 하나씩(ui/char-sections/)
+import type { CharSectionDeps } from './char-sections/types';
+import { buildSameFormatSection } from './char-sections/same-format';
+import { buildEmphasisSection } from './char-sections/emphasis-dot';
+import { buildLineDecorSection } from './char-sections/line-decor';
+import { buildCharShadeSection } from './char-sections/char-shade';
+import { buildRelativeSizeSection } from './char-sections/relative-size';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
 export type PanelTab = 'props' | 'text' | 'table' | 'cell' | 'style';
@@ -219,6 +226,28 @@ export class CanvaRightInspector {
     //   — 스타일 설정으로 대체. 남는 것: 지금 서식 견본 · 텍스트 스타일(+스타일 설정) · 도구.
     //   상태 반영(reflectChar)은 이 요소들이 없어도 되게 옵셔널로 두었다.
 
+    // [글자 탭 확장 2026-08-03] 리본에 **없는** 글자 서식들을 여기 모은다 — 패널은
+    // "고른 것을 자세히 손보는 자리"다(리본과 겹치면 오늘 「스타일 설정」처럼 지우게 된다).
+    // 각 기능은 ui/char-sections/ 안에 파일 하나씩 산다. 적용은 전부 아래 applyChar 한 경로.
+    {
+      const charDeps: CharSectionDeps = {
+        services: this.services,
+        section: (label, link) => {
+          const sec = this.section(label, link);
+          this.fmtPane.appendChild(sec);
+          return sec;
+        },
+        charProps: this.lastCharProps ?? null,
+        applyChar: (patch) => this.services.eventBus.emit('format-char', patch),
+        redraw: () => this.applyContext(),
+      };
+      buildSameFormatSection(this.fmtPane, charDeps);
+      buildEmphasisSection(this.fmtPane, charDeps);
+      buildLineDecorSection(this.fmtPane, charDeps);
+      buildCharShadeSection(this.fmtPane, charDeps);
+      buildRelativeSizeSection(this.fmtPane, charDeps);
+    }
+
     // [디자인 2c] AI·녹음은 탭에서 빠졌다 → 속성 탭 하단이 그 진입점이다.
     // (탭만 없애고 진입점을 안 만들어 AI 패널이 열리지 않던 상태를 여기서 메운다.)
     const toolSec = this.section('도구');
@@ -289,7 +318,11 @@ export class CanvaRightInspector {
     bus.on('command-state-changed', () => this.refreshContext());
   }
 
+  /** 마지막으로 받은 커서 글자 속성 — char-sections 가 "지금 값"을 보여줄 때 쓴다 */
+  private lastCharProps: CharProperties | null = null;
+
   private reflectChar(p: CharProperties): void {
+    this.lastCharProps = p;
     this.specimen.reflectChar(p);
     const ih = this.services.getInputHandler() as any;
     const ihc = ih?.cursor;
