@@ -133,8 +133,10 @@
    눌려 있었다(2026-08-01 계산값 실측). 같은 무게로 맞춰 적는다. */
 .rb-slot.has-label > select.rb-adopted,
 .rb-slot.has-label > .sb-size-group.rb-adopted,
+.rb-slot.has-label > .sb-size-group.rb-valuebox,
 .rb-slot > select.rb-adopted,
-.rb-slot > .sb-size-group.rb-adopted { height: 28px; box-sizing: border-box; }
+.rb-slot > .sb-size-group.rb-adopted,
+.rb-slot > .sb-size-group.rb-valuebox { height: 28px; box-sizing: border-box; }
 
 /* 네이티브 select 는 macOS 에서 늘 눌린 단추처럼 보인다 — 리본의 평평한 면과
    어긋나 "드롭다운이 계속 켜져 있다"로 읽혔다. 우리 화살표로 바꿔 단다. */
@@ -157,14 +159,19 @@
 .rb-slot > select#style-name.rb-adopted,
 .rb-slot > select#font-name.rb-adopted { width: 100%; }
 
-/* 크기 스피너 입양분 — 한컴처럼 [값][pt][▲▼] 한 덩어리 */
-.rb-slot > .sb-size-group.rb-adopted {
+/* 크기 스피너 입양분 — 한컴처럼 [값][pt][▲▼] 한 덩어리.
+   ⚠ 값 상자(.rb-valuebox, 2026-08-03)도 같은 네모 박스를 써야 한다 — 종전엔 이 규칙이
+     `.rb-adopted`(옛 툴바에서 옮겨 담은 것)만 잡아서, 새로 만든 값 상자는 테두리 없이
+     알맹이만 떠 있었다(사용자 지적 "네모 박스는 왜 안 만들었냐"). */
+.rb-slot > .sb-size-group.rb-adopted,
+.rb-slot > .sb-size-group.rb-valuebox {
   display: inline-flex; align-items: center; gap: 2px;
   height: 28px; padding: 0 4px 0 6px;
   border: 1px solid var(--rb-border); border-radius: 3px;
   background: var(--rb-bg); width: 100%; box-sizing: border-box;
 }
-.rb-slot > .sb-size-group.rb-adopted:focus-within { border-color: var(--rb-accent); }
+.rb-slot > .sb-size-group.rb-adopted:focus-within,
+.rb-slot > .sb-size-group.rb-valuebox:focus-within { border-color: var(--rb-accent); }
 .rb-slot .sb-size {
   width: 100%; min-width: 0; flex: 1; border: 0; background: transparent;
   color: var(--rb-fg); font: inherit; font-size: 12px; text-align: right; padding: 0;
