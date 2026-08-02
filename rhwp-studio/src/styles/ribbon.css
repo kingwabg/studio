@@ -21,6 +21,12 @@
      다크에서 글자·아이콘이 배경에 묻혔다(2026-07-29 실사고). hex 는 최후 폴백. */
   --rb-accent: var(--color-primary, #00647f);
   --rb-fill: var(--color-accent-bg, #e4f1f6);
+  /* 타일 세로 리듬 — 아이콘 버튼·콤보 슬롯·값 상자가 **같은 값을 쓴다**.
+     50 = 4(위) + 28(컨트롤) + 4(간격) + 12(라벨) + 2(아래 여유) */
+  --rb-tile-pad-top: 4px;
+  --rb-tile-ctrl: 28px;
+  --rb-tile-gap: 4px;
+  --rb-tile-label: 12px;
   --rb-border: var(--color-border, #d5dbe3);
   --rb-fg: var(--color-text, #33302e);
   --rb-fg-dim: var(--color-text-muted, #7a7673);
@@ -103,8 +109,16 @@
    구 서식바의 한컴식 글리프('간'·✏)를 Phosphor 아이콘으로 갈아끼웠고(index.html),
    색 막대는 디자인 2a 의 17×3px 로 맞춘다. ▾ 는 뺀다 — 막대가 곧 '색이 달린다'는
    표시라 화살표까지 있으면 타일 안이 시끄럽다. */
-.rb-slot.has-label { flex-direction: column; justify-content: center; gap: 2px; }
-.rb-slot.has-label > .rb-adopted { height: auto; }
+/* [세로 정렬 통일 2026-08-03] 사용자 지적 "ui 별로 정렬 높이가 균등했으면".
+   타일 높이는 셋 다 50px 로 같았는데, 유형마다 제 나름 가운데를 잡아 컨트롤과 라벨의
+   y 가 갈렸다(실측: 라벨 top 아이콘 80 · 콤보 84 · 값 상자 82). 한 리듬으로 못 박는다 —
+   위 여백 → 컨트롤 28px → 간격 → 라벨. 세 유형이 같은 변수를 쓴다. */
+.rb-slot.has-label {
+  flex-direction: column; justify-content: flex-start; gap: var(--rb-tile-gap);
+  padding-top: var(--rb-tile-pad-top);
+}
+.rb-slot.has-label > .rb-adopted,
+.rb-slot.has-label > .sb-size-group { height: var(--rb-tile-ctrl); flex: none; }
 .rb-slot.has-label .sb-btn {
   display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
   width: auto; height: auto; min-width: 0; padding: 0; margin: 0;
@@ -258,20 +272,25 @@
 .rb-btn {
   min-width: 44px; height: 50px; flex: none;
   display: inline-flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 2px;
+  align-items: center; justify-content: flex-start; gap: var(--rb-tile-gap);
   border: 0; border-radius: 3px; background: transparent;
-  color: var(--rb-fg); cursor: pointer; padding: 0 3px;
+  color: var(--rb-fg); cursor: pointer; padding: var(--rb-tile-pad-top) 3px 0;
   transition: background .12s ease;
 }
+/* 아이콘은 글꼴(<i>)이라 줄 상자 높이가 글꼴 크기를 따라간다 — 콤보·값 상자(28px)와
+   같은 칸을 차지하게 높이를 못 박아야 라벨이 같은 줄에 선다. */
+.rb-btn > i { height: var(--rb-tile-ctrl); display: inline-flex; align-items: center; }
 .rb-btn:hover { background: var(--rb-fill); color: var(--rb-accent); }
 .rb-btn:active { background: color-mix(in srgb, var(--rb-accent) 18%, transparent); }
 .rb-btn.is-active { background: var(--rb-fill); color: var(--rb-accent); }
 
 /* primary 는 이제 '라벨 유무'가 아니라 무게 강조다(라벨은 전부 붙는다) */
 .rb-btn.is-primary .rb-btn-label { font-weight: 600; }
-.rb-btn-label {
-  font-size: 10.5px; line-height: 1.1; white-space: nowrap;
-  letter-spacing: -0.02em;
+/* 라벨은 세 유형이 같은 줄에 서야 한다 — 높이를 못 박아 글꼴 차이로 어긋나지 않게 */
+.rb-btn-label,
+.rb-slot-label {
+  font-size: 10.5px; line-height: var(--rb-tile-label); height: var(--rb-tile-label);
+  white-space: nowrap; letter-spacing: -0.02em; flex: none;
 }
 
 .rb-sep {
@@ -304,13 +323,16 @@
 }
 .rb-icon-btn:hover { background: var(--rb-fill); color: var(--rb-accent); }
 
+/* 「⋯ 편집」도 같은 타일 리듬을 쓴다 — 혼자 가운데를 잡아 라벨이 6px 올라가 있었다 */
 .rb-more {
-  margin-left: auto; min-width: 50px; height: 50px; flex: none;
+  margin-left: auto; min-width: 44px; height: 50px; flex: none;
   display: inline-flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 2px;
+  align-items: center; justify-content: flex-start; gap: var(--rb-tile-gap);
   border: 0; border-radius: 3px; background: transparent;
-  color: var(--rb-fg-dim); cursor: pointer; padding: 0 6px;
+  color: var(--rb-fg-dim); cursor: pointer; padding: var(--rb-tile-pad-top) 4px 0;
 }
+.rb-more > i { height: var(--rb-tile-ctrl); display: inline-flex; align-items: center; }
+.rb-more > span { font-size: 10.5px; line-height: var(--rb-tile-label); height: var(--rb-tile-label); }
 .rb-more:hover { background: var(--rb-fill); color: var(--rb-accent); }
 
 /* ── 「⋯ 편집」 패널: 접힌 명령 + 켜고 끄기 ──

@@ -75,8 +75,8 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       PP('arrow-counter-clockwise', '되돌리기', 'edit:undo'),
       PP('arrow-clockwise', '다시 실행', 'edit:redo'),
       gap(),
-      slot('style-name', 116, '스타일', 'cards-three'),
-      slot('font-name', 132, '글꼴', 'text-aa'),
+      slot('style-name', 100, '스타일', 'cards-three'),
+      slot('font-name', 100, '글꼴', 'text-aa'),
       V('font-size', '크기', 'text-t', 'pt', 'format:font-size-set', {
         presets: [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48],
         step: 1, min: 1, max: 300, decimals: 1, width: 100,
@@ -115,12 +115,12 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       // 값 상자로 바꿨다(2026-08-03): 종전 ± 버튼은 눌러도 지금 얼마가 들어갔는지 안 보였다.
       // 아이콘을 누르면 한 단계 바로 적용되고, 값은 옆에서 바로 고친다(사용자 요청 2026-08-03)
       V('indent', '들여쓰기', 'arrow-line-right', 'pt', 'format:indent-set', {
-        presets: [0, 10, 20, 30, 40], step: 5, min: 0, max: 400, width: 104,
+        presets: [0, 10, 20, 30, 40], step: 5, min: 0, max: 400, width: 100,
         iconCmd: 'format:indent-increase',
         hint: '아이콘을 누르면 한 단계 들여씁니다 — 값을 직접 고치거나 ⌄ 에서 골라도 됩니다',
       }),
       V('outdent', '내어쓰기', 'arrow-line-left', 'pt', 'format:outdent-set', {
-        presets: [0, 10, 20, 30], step: 5, min: 0, max: 400, width: 104,
+        presets: [0, 10, 20, 30], step: 5, min: 0, max: 400, width: 100,
         iconCmd: 'format:indent-decrease',
         hint: '아이콘을 누르면 한 단계 내어씁니다 — 값을 직접 고치거나 ⌄ 에서 골라도 됩니다',
       }),
