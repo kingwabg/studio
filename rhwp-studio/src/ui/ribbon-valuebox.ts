@@ -7,6 +7,12 @@
  */
 
 export interface ValueBoxOpts {
+  /**
+   * 상자 앞에 붙는 아이콘 단추 — 누르면 **한 번에 적용**(들여쓰기 한 단계 등).
+   * 값 상자는 그 옆에서 정밀 조정을 맡는다: "눌러서 바로 적용 + 값도 바로 수정"
+   * (사용자 요청 2026-08-03). cmd 를 주면 data-cmd 가 붙어 활성 표시도 같이 받는다.
+   */
+  leadIcon?: { svg: string; title: string; cmd?: string; onClick?: () => void };
   /** 표시 단위 — 'pt' | '%' 등 */
   unit: string;
   /** ⌄ 를 눌렀을 때 뜨는 프리셋 값들 */
@@ -65,6 +71,24 @@ export function createValueBox(opts: ValueBoxOpts): ValueBox {
   down.textContent = '▼';
   arrows.append(up, down);
 
+  // 아이콘 단추(선택) — 값 칸 앞. 편집 포커스를 뺏지 않게 mousedown 으로 잡는다.
+  let lead: HTMLButtonElement | null = null;
+  if (opts.leadIcon) {
+    lead = document.createElement('button');
+    lead.type = 'button';
+    lead.className = 'rb-vb-lead';
+    lead.title = opts.leadIcon.title;
+    lead.innerHTML = opts.leadIcon.svg;
+    if (opts.leadIcon.cmd) lead.dataset.cmd = opts.leadIcon.cmd;
+    const fire = opts.leadIcon.onClick;
+    lead.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fire?.();
+    });
+    group.appendChild(lead);
+  }
+
   group.append(input, unit, caret, arrows);
 
   let current: number | undefined;
@@ -106,7 +130,7 @@ export function createValueBox(opts: ValueBoxOpts): ValueBox {
   // 프리셋 목록
   let menu: HTMLElement | null = null;
   const closeMenu = (): void => { menu?.remove(); menu = null; };
-  caret.addEventListener('mousedown', (e) => {
+  const toggleMenu = (e: MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     if (menu) { closeMenu(); return; }
@@ -133,7 +157,10 @@ export function createValueBox(opts: ValueBoxOpts): ValueBox {
       if (menu && !menu.contains(ev.target as Node)) { closeMenu(); document.removeEventListener('mousedown', off, true); }
     };
     setTimeout(() => document.addEventListener('mousedown', off, true), 0);
-  });
+  };
+  caret.addEventListener('mousedown', toggleMenu);
+  // 아이콘에 할 일이 없으면(크기·줄 간격) 아이콘도 프리셋을 연다 — 죽은 단추를 두지 않는다.
+  if (lead && !opts.leadIcon?.onClick) lead.addEventListener('mousedown', toggleMenu);
 
   return {
     el: group,

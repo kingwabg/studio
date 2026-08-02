@@ -172,6 +172,25 @@
 }
 .rb-slot > .sb-size-group.rb-adopted:focus-within,
 .rb-slot > .sb-size-group.rb-valuebox:focus-within { border-color: var(--rb-accent); }
+
+/* 값 상자 앞 아이콘 단추 — 누르면 한 번에 적용(들여쓰기 한 단계 등), 값은 옆에서 수정.
+   적용돼 있으면 .is-active 로 켜진다(다른 리본 단추와 같은 규칙). */
+.rb-vb-lead {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 22px; flex: 0 0 auto;
+  border: 0; border-radius: 3px; background: transparent;
+  color: var(--rb-fg); cursor: pointer; padding: 0;
+}
+.rb-vb-lead:hover { background: var(--rb-fill); }
+.rb-vb-lead.is-active { background: var(--rb-fill); color: var(--rb-accent); }
+/* 아이콘은 Phosphor 글꼴(<i>)이다 — SVG 가 아니라 font-size 로 크기를 잡는다 */
+.rb-vb-lead > i { font-size: 15px; line-height: 1; }
+/* 아이콘이 자리를 먹으면 flex 가 값 칸을 최소폭 밑으로 눌러 숫자가 잘렸다(실측
+   "10.0"→"1"). 값이 먼저다 — 최소폭을 박고 화살표·단위는 줄어들지 않게 고정한다. */
+.rb-slot > .sb-size-group.rb-valuebox > .sb-size { min-width: 30px; }
+.rb-slot > .sb-size-group.rb-valuebox > .sb-size-unit,
+.rb-slot > .sb-size-group.rb-valuebox > .rb-vb-caret,
+.rb-slot > .sb-size-group.rb-valuebox > .sb-size-arrows { flex: 0 0 auto; }
 .rb-slot .sb-size {
   width: 100%; min-width: 0; flex: 1; border: 0; background: transparent;
   color: var(--rb-fg); font: inherit; font-size: 12px; text-align: right; padding: 0;

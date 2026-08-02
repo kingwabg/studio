@@ -404,6 +404,15 @@ export class RibbonHeader {
         host.className = 'rb-slot has-label';
         host.style.width = `${item.width}px`;
         const vb = createValueBox({
+          // 아이콘 단추: cmd 가 있으면 한 번에 적용, 없으면 프리셋 목록을 연다.
+          leadIcon: {
+            svg: this.icon(item.icon, 15).outerHTML,
+            title: item.hint ?? item.label,
+            cmd: item.iconCmd,
+            onClick: item.iconCmd
+              ? () => this.onCommand?.(item.iconCmd!)
+              : undefined,
+          },
           unit: item.unit,
           presets: item.presets,
           step: item.step,
