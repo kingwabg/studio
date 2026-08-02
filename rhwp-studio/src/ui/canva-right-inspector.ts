@@ -154,13 +154,8 @@ export class CanvaRightInspector {
     }
     styleSec.appendChild(styles);
 
-    // 스타일 설정 — 이름 있는 스타일을 만들고·고치고·적용한다(한글 스타일 관리, F6).
-    // 프리셋 카드가 "빠른 적용"이면 이건 "스타일 자체를 편집"하는 진입점이다.
-    const styleManage = mkButton('canva-full-btn', {
-      html: svg('<path d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16l8 4 8-4"/>') + '<span>스타일 설정…</span>',
-    });
-    styleManage.addEventListener('mousedown', (e) => { e.preventDefault(); this.services.dispatcher.dispatch('format:style-dialog'); });
-    styleSec.appendChild(styleManage);
+    // [2026-08-03 사용자 지시] 글자 탭의 「스타일 설정…」 제거 — 같은 진입점이 스타일 탭
+    // 하단과 홈 리본에 이미 있어 세 겹이었다. 여기 프리셋 카드는 "빠른 적용"만 맡는다.
 
     this.fmtPane.appendChild(styleSec);
 
