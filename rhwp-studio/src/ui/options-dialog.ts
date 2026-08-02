@@ -6,6 +6,7 @@
 import { ModalDialog } from './dialog';
 import { userSettings } from '@/core/user-settings';
 import { createAiPanel } from './ai-settings-panel';
+import { createRulerPanel } from './ruler-settings-panel';
 import { FontSetDialog } from './font-set-dialog';
 import {
   clearStoredLocalFonts,
@@ -49,6 +50,13 @@ export class OptionsDialog extends ModalDialog {
     fileTab.dataset.tab = 'file';
     tabs.appendChild(fileTab);
 
+    // 줄자 — 모양 넷 중 고르기(본문은 ui/ruler-settings-panel.ts)
+    const rulerTab = document.createElement('button');
+    rulerTab.className = 'dialog-tab';
+    rulerTab.textContent = '줄자';
+    rulerTab.dataset.tab = 'ruler';
+    tabs.appendChild(rulerTab);
+
     // AI — 모델 고르기·API 키(본문은 ui/ai-settings-panel.ts)
     const aiTab = document.createElement('button');
     aiTab.className = 'dialog-tab';
@@ -68,6 +76,11 @@ export class OptionsDialog extends ModalDialog {
     filePanel.className = 'dialog-tab-panel opt-tab-panel';
     filePanel.dataset.tab = 'file';
     body.appendChild(filePanel);
+
+    const rulerPanel = createRulerPanel(this.eventBus);
+    rulerPanel.classList.add('dialog-tab-panel', 'opt-tab-panel');
+    rulerPanel.dataset.tab = 'ruler';
+    body.appendChild(rulerPanel);
 
     const aiPanel = createAiPanel();
     aiPanel.classList.add('dialog-tab-panel', 'opt-tab-panel');

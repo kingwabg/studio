@@ -42,12 +42,25 @@ export interface DialogSettings {
   picturePropsKeepRatio: boolean;
 }
 
+/**
+ * 줄자 모양 (디자인 "rhwp 줄자 재설계", 2026-08-03).
+ * 한글 줄자는 눈금이 빽빽한데 정작 알고 싶은 건 셋뿐이다 — 글이 어디서 시작하고,
+ * 어디서 끝나고, 커서가 어느 칸인가. 아래 셋은 그걸 먼저 말하고 눈금을 뒤로 물린다.
+ * - `classic` : 지금까지 쓰던 회색 눈금자 (mm 눈금 + 들여쓰기 마커)
+ * - `map`     : 여백 지도 — 본문 폭은 띠, 여백은 빈 종이. 숫자는 커서 자리만
+ * - `cross`   : 십자 조준 — 두 줄자에서 뻗은 선이 커서에서 만난다(인쇄 돔보)
+ * - `quiet`   : 부를 때만 — 평소엔 실 한 줄, 가까이 가면 눈금이 피어난다
+ */
+export type RulerStyle = 'classic' | 'map' | 'cross' | 'quiet';
+
 /** 보기 표시 설정 */
 export interface ViewSettings {
   /** 문단부호 표시 여부 */
   showParagraphMarks: boolean;
   /** 조판부호 표시 여부 */
   showControlCodes: boolean;
+  /** 줄자 모양 — 없으면 classic(지금까지 쓰던 것) */
+  rulerStyle?: RulerStyle;
 }
 
 /** 복구용 자동저장 설정 */
@@ -314,6 +327,16 @@ class UserSettingsService {
   /** 조판부호 표시 설정 */
   setShowControlCodes(value: boolean): void {
     this.data.view.showControlCodes = value;
+    this.save();
+  }
+
+  /** 줄자 모양 — 없으면 classic */
+  getRulerStyle(): RulerStyle {
+    return this.data.view.rulerStyle ?? 'classic';
+  }
+
+  setRulerStyle(value: RulerStyle): void {
+    this.data.view.rulerStyle = value;
     this.save();
   }
 

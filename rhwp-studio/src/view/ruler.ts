@@ -3,6 +3,8 @@ import { WasmBridge } from '@/core/wasm-bridge';
 import type { ParaProperties } from '@/core/types';
 import { VirtualScroll } from './virtual-scroll';
 import { ViewportManager } from './viewport-manager';
+import { userSettings, type RulerStyle } from '@/core/user-settings';
+import { drawRulerStyle } from './ruler-styles';
 
 /** 1mm = 96 / 25.4 px (at 96dpi, zoom=1) */
 const PX_PER_MM = 96 / 25.4;
@@ -100,7 +102,16 @@ export class Ruler {
           this.scheduleUpdate();
         }
       }),
+      // [줄자 재설계 2026-08-03] 환경 설정에서 모양을 고르면 즉시 다시 그린다 —
+      // 대화상자를 닫아야 보이면 고르면서 비교할 수가 없다.
+      eventBus.on('ruler-style-changed', () => this.scheduleUpdate()),
     );
+
+    // 「부를 때만」의 방아쇠 — 줄자에 손이 오면 깨우고, 나가면 다시 재운다.
+    for (const cv of [hCanvas, vCanvas]) {
+      cv.addEventListener('mouseenter', () => this.setAwake(true));
+      cv.addEventListener('mouseleave', () => this.setAwake(false));
+    }
 
     this.resize();
   }
@@ -141,6 +152,21 @@ export class Ruler {
       this.rafId = 0;
       this.update();
     });
+  }
+
+  /** 지금 고른 줄자 모양 (환경 설정 > 줄자) */
+  private style(): RulerStyle {
+    return userSettings.getRulerStyle();
+  }
+
+  /** 「부를 때만」 안에서 손이 줄자 가까이 왔나 — 다른 안은 안 본다 */
+  private awake = false;
+
+  /** 줄자 모양 바뀜/깨어남 알림 — main.ts 가 이벤트로 물려준다 */
+  setAwake(on: boolean): void {
+    if (this.awake === on) return;
+    this.awake = on;
+    this.scheduleUpdate();
   }
 
   /** 가로/세로 눈금자를 모두 다시 그린다 */
@@ -248,6 +274,28 @@ export class Ruler {
     // 본문 영역 배경
     const bodyLeftPx = pageScreenLeft + pageInfo.marginLeft * zoom;
     const bodyRightPx = pageScreenLeft + pageDisplayWidth - pageInfo.marginRight * zoom;
+
+    // [줄자 재설계 2026-08-03] classic 이 아니면 그리기만 새 렌더러에 넘긴다.
+    // ⚠ 좌표는 여기서 계산한 것을 그대로 넘긴다 — 같은 식을 두 번 쓰면 어긋난다.
+    const style = this.style();
+    if (style !== 'classic') {
+      const cursorX = this.hasParaInfo
+        ? bodyLeftPx + (this.paraMarginLeftPx + this.paraIndentPx) * zoom
+        : null;
+      drawRulerStyle(ctx, style, 'h', {
+        canvasW, canvasH,
+        bodyStart: bodyLeftPx, bodyEnd: bodyRightPx,
+        pageStart: pageScreenLeft,
+        mmPx: PX_PER_MM * zoom,
+        lengthMm: Math.ceil(pageInfo.width / PX_PER_MM),
+        cursor: cursorX,
+        cursorLabel: this.hasParaInfo
+          ? `${Math.round((this.paraMarginLeftPx + this.paraIndentPx) * 72 / 96)} pt`
+          : null,
+      }, this.awake);
+      ctx.restore();
+      return;
+    }
 
     if (this.inCell) {
       // 셀 모드: 셀 영역만 본문 톤, 나머지는 여백 톤
@@ -404,6 +452,22 @@ export class Ruler {
       // 본문 영역 배경
       const bodyTopPx = pageScreenTop + (pageInfo.marginHeader + pageInfo.marginTop) * zoom;
       const bodyBottomPx = pageScreenTop + pageInfo.height * zoom - (pageInfo.marginFooter + pageInfo.marginBottom) * zoom;
+
+      // [줄자 재설계 2026-08-03] 왼쪽 줄자도 위와 **같은 문법**으로 그린다 —
+      // 위만 눈금이고 왼쪽은 빈 띠인 비대칭을 없애는 게 이 디자인의 핵심이다.
+      const vStyle = this.style();
+      if (vStyle !== 'classic') {
+        drawRulerStyle(ctx, vStyle, 'v', {
+          canvasW, canvasH,
+          bodyStart: bodyTopPx, bodyEnd: bodyBottomPx,
+          pageStart: pageScreenTop,
+          mmPx,
+          lengthMm: Math.ceil(pageInfo.height / PX_PER_MM),
+          cursor: null, // 세로 커서 좌표는 캐럿 rect 가 준다(2안에서 배선)
+        }, this.awake);
+        continue;
+      }
+
       ctx.fillStyle = palette.bgBody;
       ctx.fillRect(0, bodyTopPx, canvasW, bodyBottomPx - bodyTopPx);
 
