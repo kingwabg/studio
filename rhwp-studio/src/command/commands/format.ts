@@ -8,6 +8,7 @@ import { PicturePropsDialog } from '@/ui/picture-props-dialog';
 import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
 import { openTablePanel } from '@/ui/canva-sidebars';
 import { showConfirm } from '@/ui/confirm-dialog';
+import { showToast } from '@/ui/toast';
 
 export const formatCommands: CommandDef[] = [
   {
@@ -125,6 +126,27 @@ export const formatCommands: CommandDef[] = [
       const current = props?.lineSpacing ?? 160;
       const newValue = Math.min(500, current + 10);
       ih.setLineSpacing(newValue);
+    },
+  },
+  // 한 쪽 줄이기 — 마지막 몇 줄이 넘칠 때 줄간격(부족하면 자간까지)을 줄여 페이지 수를 1 줄인다
+  {
+    id: 'format:auto-fit-page',
+    label: '한 쪽 줄이기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      const ih = services.getInputHandler();
+      if (!ih) return;
+      const r = ih.autoFitToPage();
+      if (r.status === 'already') {
+        showToast({ message: '이미 한 페이지입니다.', durationMs: 3000 });
+      } else if (r.status === 'failed') {
+        showToast({ message: '한 쪽을 줄이지 못했습니다. 글꼴 크기나 여백을 조절해 보세요.', durationMs: 4000 });
+      } else {
+        const detail = r.charSpacing
+          ? `줄 간격 ${r.lineSpacing}% · 자간 ${r.charSpacing}%`
+          : `줄 간격 ${r.lineSpacing}%`;
+        showToast({ message: `한 쪽을 줄였습니다 (${detail}).`, durationMs: 3000 });
+      }
     },
   },
   // 글꼴 크기 크게 (Alt+Shift+E)

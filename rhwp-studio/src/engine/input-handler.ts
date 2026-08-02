@@ -4426,6 +4426,95 @@ export class InputHandler {
     this.applyParaFormat({ lineSpacing: value, lineSpacingType: 'Percent' });
   }
 
+  /**
+   * 한 쪽 줄이기 — 마지막 몇 줄이 다음 쪽으로 넘칠 때, 문서 전체에 줄간격(주 레버,
+   * 한컴 정합)을 조금씩 줄이고, 부족하면 자간까지 좁혀 페이지 수를 1 줄인다.
+   * (Word 'Shrink One Page' 와 같은 목표 = 현재 쪽수 - 1.)
+   *
+   * 후보 사다리: 줄간격 155→130%(5%p 스텝) → 그래도 부족하면 줄간격 130% 고정 +
+   * 자간 -3→-12%(3%p 스텝). 가독성 하한: 줄간격 130%, 자간 -12%.
+   *
+   * 탐색은 wasm 스냅샷 위에서만 시도해 히스토리를 더럽히지 않고(applyParaFormat/
+   * applyCharFormat 은 호출마다 rebuild_section→paginate 하므로 pageCount 가 즉시
+   * 갱신된다), 성공 조합을 찾으면 스냅샷 커맨드 1회로 확정 → Ctrl+Z 한 번에 원상복귀.
+   *
+   * ponytail: 후보마다 전체 문단×paginate = O(paras·candidates) 재조판. 보통 문서엔
+   *   충분히 빠르다. 문제 되면 beginBatch/endBatch 로 조판을 후보당 1회로 묶을 것.
+   */
+  autoFitToPage(): {
+    status: 'already' | 'failed' | 'ok';
+    lineSpacing?: number;
+    charSpacing?: number;
+  } {
+    const LS_FLOOR = 130; // 줄간격 하한 (%)
+    const LS_STEP = 5;
+    const CS_FLOOR = -12; // 자간 하한 (%)
+    const CS_STEP = 3;
+    const total = this.wasm.pageCount;
+    if (total <= 1) return { status: 'already' };
+    const target = total - 1;
+
+    const secCount = this.wasm.getSectionCount();
+    const p0 = this.wasm.getParaPropertiesAt(0, 0);
+    const startLS =
+      p0.lineSpacingType === 'Percent' && p0.lineSpacing
+        ? Math.round(p0.lineSpacing)
+        : 160;
+
+    const applyLS = (v: number): void => {
+      const json = JSON.stringify({ lineSpacing: v, lineSpacingType: 'Percent' });
+      for (let s = 0; s < secCount; s++) {
+        const pc = this.wasm.getParagraphCount(s);
+        for (let p = 0; p < pc; p++) this.wasm.applyParaFormat(s, p, json);
+      }
+    };
+    const applyCS = (v: number): void => {
+      const json = JSON.stringify({ spacings: Array(7).fill(v) });
+      for (let s = 0; s < secCount; s++) {
+        const pc = this.wasm.getParagraphCount(s);
+        for (let p = 0; p < pc; p++) {
+          const len = this.wasm.getLogicalLength(s, p);
+          if (len > 0) this.wasm.applyCharFormat(s, p, 0, len, json);
+        }
+      }
+    };
+
+    // 후보 사다리: [줄간격, 자간] 조합. 줄간격 먼저(한컴 주 레버), 이후 자간 추가.
+    const ladder: Array<[number, number]> = [];
+    for (let v = startLS - LS_STEP; v >= LS_FLOOR; v -= LS_STEP) ladder.push([v, 0]);
+    const lsFinal = Math.min(startLS, LS_FLOOR);
+    for (let c = -CS_STEP; c >= CS_FLOOR; c -= CS_STEP) ladder.push([lsFinal, c]);
+    if (ladder.length === 0) return { status: 'failed' };
+
+    // 스냅샷 위에서 "어느 조합이면 되는지"만 탐색 (히스토리 무오염)
+    const snap = this.wasm.saveSnapshot();
+    let winner: [number, number] | null = null;
+    let prevCS = 0;
+    for (const [ls, cs] of ladder) {
+      applyLS(ls);
+      if (cs !== prevCS) { applyCS(cs); prevCS = cs; }
+      if (this.wasm.pageCount <= target) { winner = [ls, cs]; break; }
+    }
+    this.wasm.restoreSnapshot(snap);
+    this.wasm.discardSnapshot(snap);
+
+    if (winner === null) return { status: 'failed' };
+
+    // 확정 1회 — 스냅샷 커맨드라 Ctrl+Z 한 번에 원문 그대로 복원된다.
+    const cursorBefore = this.cursor.getPosition();
+    const [lsWin, csWin] = winner;
+    this.executeOperation({
+      kind: 'snapshot',
+      operationType: 'autoFitPage',
+      operation: (): DocumentPosition => {
+        applyLS(lsWin);
+        if (csWin !== 0) applyCS(csWin);
+        return cursorBefore;
+      },
+    });
+    return { status: 'ok', lineSpacing: lsWin, charSpacing: csWin };
+  }
+
   /** 글꼴 크기 증감 (커맨드 시스템용, delta: HWPUNIT, 1pt=100) */
   adjustFontSize(delta: number): void {
     if (!this.cursor.hasSelection()) return;
