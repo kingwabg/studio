@@ -375,6 +375,16 @@ async function initialize(): Promise<void> {
     const ribbon = new RibbonHeader(document.getElementById('ribbon-header')!);
     (window as any).__ribbon = ribbon; // e2e/디버그용
     ribbon.onCommand = (cmd: string) => dispatcher.dispatch(cmd);
+    // [활성 상태 2026-08-03] 커서 자리에 적용된 서식을 리본 버튼에 켜서 보여 준다.
+    // 신호는 이미 있던 것을 그대로 쓴다(input-handler.emitCursorFormatState) — 옛 툴바가
+    // 듣던 두 이벤트를 리본도 듣게 하는 것뿐이다. 단위는 서식의 자연 단위:
+    // 글자 서식은 선택/커서 앞 글자, 문단 서식은 커서 문단.
+    eventBus.on('cursor-format-changed', (props) => {
+      ribbon.setCharState(props as Record<string, unknown>);
+    });
+    eventBus.on('cursor-para-changed', (props) => {
+      ribbon.setParaState(props as Record<string, unknown>);
+    });
     // 저장된 테마 모드를 버튼 아이콘에 반영
     try { ribbon.setThemeMode(getThemeMode() as 'system' | 'light' | 'dark'); }
     catch { /* 조회 실패 시 기본(system) */ }

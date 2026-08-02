@@ -51,10 +51,76 @@ export class RibbonHeader {
   private adopted = new Map<string, HTMLElement>();
   /** 편집 모드 컨텍스트 리본(머리말/꼬리말·각주) — 켜지면 일반 리본을 덮는다 */
   private contextRow: HTMLDivElement | null = null;
+  /**
+   * 지금 커서 자리에 **적용돼 있는** 서식의 명령 id 들 — 해당 리본 버튼을 켜 둔다.
+   * 탭을 바꾸면 버튼이 다시 그려지므로, 상태를 여기 들고 있다가 렌더 끝에 다시 칠한다.
+   */
+  private activeCmds = new Set<string>();
 
   constructor(root: HTMLElement) {
     this.root = root;
     this.build();
+  }
+
+  /**
+   * 커서 자리의 **글자 서식**을 리본에 반영한다 (굵게·기울임·밑줄·취소선).
+   * 단위는 서식의 자연 단위 — 글자 서식은 선택 영역 또는 커서 앞 글자다
+   * (input-handler 의 cursor-format-changed 가 그 값을 밀어 준다).
+   */
+  setCharState(props: Record<string, unknown>): void {
+    const on = (cmd: string, v: unknown): void => {
+      if (v) this.activeCmds.add(cmd);
+      else this.activeCmds.delete(cmd);
+    };
+    on('format:bold', props.bold);
+    on('format:italic', props.italic);
+    on('format:underline', props.underline);
+    on('format:strikethrough', props.strikethrough);
+    this.paintActive();
+  }
+
+  /**
+   * 커서 **문단**의 서식을 리본에 반영한다 (정렬·문단 번호·글머리표·들여쓰기).
+   * 문단 서식의 자연 단위는 커서가 있는 문단 하나다.
+   */
+  setParaState(props: Record<string, unknown>): void {
+    // 정렬 — 넷 중 하나만 켜진다
+    const align = (props.alignment as string) ?? 'justify';
+    for (const [key, cmd] of Object.entries({
+      left: 'format:align-left',
+      center: 'format:align-center',
+      right: 'format:align-right',
+      justify: 'format:align-justify',
+    })) {
+      if (key === align) this.activeCmds.add(cmd);
+      else this.activeCmds.delete(cmd);
+    }
+    // 문단 번호 / 글머리표 — headType 이 정본
+    const head = (props.headType as string) ?? 'None';
+    const num = head === 'Number' || head === 'Outline';
+    if (num) this.activeCmds.add('format:toggle-numbering');
+    else this.activeCmds.delete('format:toggle-numbering');
+    if (head === 'Bullet') this.activeCmds.add('format:toggle-bullet');
+    else this.activeCmds.delete('format:toggle-bullet');
+    // 들여쓰기/내어쓰기 — 이 둘은 증감 명령이지만 "지금 들어가 있나"를 보여 준다
+    // (사용자 요청 2026-08-03). 왼쪽 여백이 있으면 들여쓰기, 첫 줄이 음수면 내어쓰기.
+    const marginLeft = Number(props.marginLeft ?? 0);
+    const indent = Number(props.indent ?? 0);
+    if (marginLeft > 0.5) this.activeCmds.add('format:indent-increase');
+    else this.activeCmds.delete('format:indent-increase');
+    if (indent < -0.5) this.activeCmds.add('format:indent-decrease');
+    else this.activeCmds.delete('format:indent-decrease');
+    this.paintActive();
+  }
+
+  /** 활성 명령 집합을 지금 그려진 버튼들에 칠한다 — 렌더 뒤에도 다시 부른다 */
+  private paintActive(): void {
+    const btns = this.root.querySelectorAll<HTMLElement>('[data-cmd]');
+    for (const b of btns) {
+      const cmd = b.dataset.cmd;
+      if (!cmd) continue;
+      b.classList.toggle('is-active', this.activeCmds.has(cmd));
+    }
   }
 
   /** 부팅 시 저장된 테마 모드를 반영한다 */
@@ -352,6 +418,9 @@ export class RibbonHeader {
     this.ribbonRow.appendChild(more);
 
     this.placeAdopted();
+    // 버튼을 새로 그렸으니 지금 커서 자리의 서식 상태를 다시 칠한다 — 안 그러면 탭을
+    // 바꿀 때마다 켜져 있던 굵게·정렬 표시가 꺼진 채로 남는다.
+    this.paintActive();
   }
 
   private closeOverflow(): void {
