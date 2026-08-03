@@ -5221,8 +5221,9 @@ export class InputHandler {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         this.moveSelectedFormObject(e.key === 'ArrowLeft' ? -1 : 1);
-      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // 글자를 치기 시작하면 개체 선택을 접고 평소 타이핑으로 — 가로채지 않는다
+      } else if ((e.key.length === 1 || e.key === 'Process') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // 글자를 치기 시작하면 개체 선택을 접고 평소 타이핑으로 — 가로채지 않는다.
+        // (한글 조합 입력은 keydown 이 'Process' 로 온다 — 안 접으면 테두리 잔상이 남는다)
         this.clearFormObjectSelection();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
