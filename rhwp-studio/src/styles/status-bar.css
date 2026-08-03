@@ -103,3 +103,22 @@
 .icon-zoom-in        { background-position: -40px -960px; }
 .icon-zoom-fit-width { background-position: -80px -960px; }
 .icon-zoom-fit       { background-position: -120px -960px; }
+
+/* 양식 모드 토글(상태바) — 켜지면 파랗게. active 클래스는 setEditMode 가 단다. */
+.stb-toggle {
+  border: 1px solid var(--color-border, #d5d5d5);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: inherit;
+  color: inherit;
+  line-height: 20px;
+}
+.stb-toggle:hover { background: var(--color-hover, #eee); }
+.stb-toggle.active {
+  background: var(--color-accent-bg, #e4f1f6);
+  border-color: var(--color-primary, #00647f);
+  color: var(--color-primary, #00647f);
+  font-weight: 600;
+}

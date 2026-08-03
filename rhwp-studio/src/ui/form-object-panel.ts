@@ -164,7 +164,7 @@ export function buildFormObjectPanel(host: HTMLElement, services: CanvaServices)
   actSec.appendChild(actRow);
 
   const hint = mkEl('div', 'canva-hint',
-    '체크·입력 등 실제 동작은 「보기 › 양식 모드」에서 클릭할 때 돕니다.');
+    '체크·입력 등 실제 동작은 아래 상태바의 「양식 모드」를 켜고 클릭할 때 돕니다.');
   host.appendChild(hint);
   return true;
 }

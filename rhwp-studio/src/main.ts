@@ -681,6 +681,11 @@ function setupZoomControls(): void {
   });
 
   // 폭 맞춤: 용지 폭에 맞게 줌 조절
+  // 양식 모드 토글 — 보기 메뉴 깊숙이 있던 걸 상태바로 꺼냈다(발견성).
+  // active 표시는 setEditMode 의 [data-cmd="view:form-mode"] 일괄 토글이 해 준다.
+  document.getElementById('sb-form-mode')?.addEventListener('click', () => {
+    dispatcher.dispatch('view:form-mode');
+  });
   document.getElementById('sb-zoom-fit-width')!.addEventListener('click', () => {
     if (wasm.pageCount === 0) return;
     const container = document.getElementById('scroll-container')!;
@@ -756,6 +761,7 @@ function setupEventListeners(): void {
   // 삽입/수정 모드 토글
   eventBus.on('insert-mode-changed', (insertMode) => {
     document.getElementById('sb-mode')!.textContent = (insertMode as boolean) ? '삽입' : '수정';
+
   });
 
   eventBus.on('document-mutated', (reason) => {
