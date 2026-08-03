@@ -467,6 +467,29 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
 
   // 모양 복사 유지 모드 해제 — 한컴: Esc 로 종료.
   // return 하지 않는다: 셀 선택 해제 등 다른 Esc 의미는 계속 진행(같은 키로 동시 해제).
+  // 양식 개체 선택 해제 — 그림 선택 해제와 같은 규약
+  if (e.key === 'Escape' && this.formObjectSelection) {
+    e.preventDefault();
+    this.clearFormObjectSelection();
+    return;
+  }
+
+  // 양식 개체 선택 중 Delete/Backspace = 개체 삭제(그림 규약)
+  if ((e.key === 'Delete' || e.key === 'Backspace') && this.formObjectSelection) {
+    e.preventDefault();
+    const { hit } = this.formObjectSelection;
+    if (hit.sec !== undefined && hit.para !== undefined && hit.ci !== undefined) {
+      try {
+        this.wasm.deleteFormObject(hit.sec, hit.para, hit.ci);
+        this.clearFormObjectSelection();
+        this.eventBus.emit('document-changed');
+      } catch (err) {
+        console.warn('[InputHandler] 양식 개체 삭제 실패:', err);
+      }
+    }
+    return;
+  }
+
   if (e.key === 'Escape' && this.hasCopiedFormat()) {
     this.clearCopiedFormat();
   }

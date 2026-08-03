@@ -1304,14 +1304,21 @@ export function onClick(this: any, e: MouseEvent): void {
       }
     }
 
-    // 양식 개체 클릭 감지
+    // 양식 개체 클릭 감지 — 편집 모드에선 **개체 선택**(그림처럼), 양식 모드에선 실제 동작
+    // (체크 토글·콤보 열기). 한컴과 같은 이분법(사용자 요청 2026-08-03).
     {
       const formHit = this.wasm.getFormObjectAt(pageIdx, pageX, pageY);
       if (formHit.found) {
-        this.handleFormObjectClick(formHit, pageIdx, zoom);
+        if (this.editMode === 'form') {
+          this.handleFormObjectClick(formHit, pageIdx, zoom);
+        } else {
+          this.selectFormObject(formHit, pageIdx);
+        }
         this.textarea.focus();
         return;
       }
+      // 양식이 아닌 곳을 눌렀다 — 개체 선택이 있었으면 접는다(그림 선택 해제와 같은 규약)
+      this.clearFormObjectSelection?.();
     }
 
     // [캔버스 한컴 포크] 캔버스 모드: 빈 지면(표/개체 아님) 클릭 = 전체 선택 해제(캔바의 빈 캔버스).
@@ -1402,6 +1409,29 @@ export function onDblClick(this: any, e: MouseEvent): void {
 
   const target = e.target as HTMLElement;
   if (target.closest('#menu-bar') || target.closest('#icon-toolbar') || target.closest('#style-bar')) return;
+
+  // 양식 개체 더블클릭 → 텍스트(입력·콤보)/캡션(단추·체크·라디오) 바로 수정
+  {
+    const zoom = this.viewportManager.getZoom();
+    const sc = this.container.querySelector('#scroll-content');
+    if (sc) {
+      const cr = sc.getBoundingClientRect();
+      const contentX = e.clientX - cr.left;
+      const contentY = e.clientY - cr.top;
+      const pageIdx = this.virtualScroll.getPageAtPoint(contentX, contentY);
+      if (pageIdx >= 0) {
+        const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
+        const pageLeft = this.virtualScroll.getPageLeftResolved(pageIdx, (sc as HTMLElement).clientWidth);
+        const formHit = this.wasm.getFormObjectAt(
+          pageIdx, (contentX - pageLeft) / zoom, (contentY - pageOffset) / zoom);
+        if (formHit.found) {
+          e.preventDefault();
+          this.openFormObjectTextEditor(formHit, pageIdx);
+          return;
+        }
+      }
+    }
+  }
 
   // 머리말/꼬리말 영역 더블클릭 → 편집 모드 진입
   if (!this.cursor.isInHeaderFooter()) {

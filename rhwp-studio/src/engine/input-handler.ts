@@ -5188,6 +5188,124 @@ export class InputHandler {
   }
 
   /** 양식 개체 bbox를 scroll-content 내 절대 좌표로 변환 */
+  // ─── 양식 개체 선택 (그림 개체 선택의 얇은 판) ─────────────────────────
+  // 편집 모드에서 양식을 클릭하면 개체로 선택되고(테두리+모서리), 오른쪽 패널이
+  // 양식 속성을 보여준다. 실제 동작(체크 토글 등)은 「양식 모드」에서만 클릭으로 돈다
+  // — 한컴과 같은 이분법. 더블클릭은 어느 모드든 텍스트/캡션 수정.
+  // ponytail: 핸들 드래그 리사이즈는 없다(크기는 패널 숫자로) — 요구가 생기면 그림 배관 재사용.
+
+  /** 지금 선택된 양식 개체 (없으면 null). 패널이 읽는다. */
+  formObjectSelection: { hit: FormObjectHitResult; pageIdx: number } | null = null;
+  private formSelectionEl: HTMLElement | null = null;
+
+  selectFormObject(formHit: FormObjectHitResult, pageIdx: number): void {
+    this.exitPictureObjectSelectionIfNeeded();
+    this.formObjectSelection = { hit: formHit, pageIdx };
+    this.caret.hide();
+    this.selectionRenderer.clear();
+    this.renderFormObjectSelection();
+    this.eventBus.emit('form-object-selection-changed', true);
+  }
+
+  clearFormObjectSelection(): void {
+    if (!this.formObjectSelection) return;
+    this.formObjectSelection = null;
+    this.formSelectionEl?.remove();
+    this.formSelectionEl = null;
+    this.eventBus.emit('form-object-selection-changed', false);
+  }
+
+  /** 선택 테두리 + 모서리 사각형 — 그림 선택과 같은 인상만 준다(드래그 없음) */
+  private renderFormObjectSelection(): void {
+    this.formSelectionEl?.remove();
+    this.formSelectionEl = null;
+    const sel = this.formObjectSelection;
+    if (!sel?.hit.bbox) return;
+    const rect = this.formBboxToOverlayRect(sel.hit.bbox, sel.pageIdx);
+    const box = document.createElement('div');
+    box.className = 'form-object-selection';
+    box.style.cssText = [
+      'position:absolute;pointer-events:none;z-index:30',
+      `left:${rect.left - 2}px;top:${rect.top - 2}px`,
+      `width:${rect.width + 4}px;height:${rect.height + 4}px`,
+      'border:1.5px solid var(--color-primary,#00647f)',
+    ].join(';');
+    for (const [hx, hy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+      const h = document.createElement('div');
+      h.style.cssText = [
+        'position:absolute;width:7px;height:7px;background:#fff',
+        'border:1.5px solid var(--color-primary,#00647f)',
+        `left:${hx === 0 ? -4 : 'calc(100% - 4px)'}`.replace('left:-4', 'left:-4px'),
+        `top:${hy === 0 ? '-4px' : 'calc(100% - 4px)'}`,
+      ].join(';');
+      if (hx === 1) h.style.left = 'calc(100% - 4px)';
+      else h.style.left = '-4px';
+      box.appendChild(h);
+    }
+    const scrollContent = this.container.querySelector('#scroll-content');
+    (scrollContent ?? this.container).appendChild(box);
+    this.formSelectionEl = box;
+  }
+
+  /**
+   * 패널에서 속성을 고친 뒤 — bbox 가 변했을 수 있어 옛 중심으로 다시 히트해 갱신한다.
+   * 못 찾으면(재조판으로 밀림) 선택을 접는다 — 엉뚱한 좌표에 테두리를 남기지 않는다.
+   */
+  refreshFormObjectSelection(): void {
+    const sel = this.formObjectSelection;
+    if (!sel?.hit.bbox) return;
+    const cx = sel.hit.bbox.x + sel.hit.bbox.w / 2;
+    const cy = sel.hit.bbox.y + sel.hit.bbox.h / 2;
+    try {
+      const hit = this.wasm.getFormObjectAt(sel.pageIdx, cx, cy);
+      if (hit.found && hit.sec === sel.hit.sec && hit.para === sel.hit.para && hit.ci === sel.hit.ci) {
+        this.formObjectSelection = { hit, pageIdx: sel.pageIdx };
+        this.renderFormObjectSelection();
+        this.eventBus.emit('form-object-selection-changed', true);
+        return;
+      }
+    } catch { /* 조회 실패 → 접기 */ }
+    this.clearFormObjectSelection();
+  }
+
+  /** 더블클릭 텍스트/캡션 수정 — Edit·콤보는 text, 나머지는 caption 을 고친다 */
+  openFormObjectTextEditor(formHit: FormObjectHitResult, pageIdx: number): void {
+    const { sec, para, ci, formType } = formHit;
+    if (sec === undefined || para === undefined || ci === undefined) return;
+    if (formType === 'Edit' || formType === 'ComboBox') {
+      this.showEditOverlay(sec, para, ci, formHit, pageIdx);
+      return;
+    }
+    // 캡션 수정 — showEditOverlay 와 같은 겉모습, 커밋만 caption 으로
+    this.removeFormOverlay();
+    if (!formHit.bbox) return;
+    const rect = this.formBboxToOverlayRect(formHit.bbox, pageIdx);
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = formHit.caption ?? '';
+    input.className = 'form-edit-input';
+    input.style.left = `${rect.left}px`;
+    input.style.top = `${rect.top}px`;
+    input.style.width = `${rect.width}px`;
+    input.style.height = `${rect.height}px`;
+    input.style.fontSize = `${Math.max(rect.height * 0.5, 10)}px`;
+    const commit = () => {
+      this.wasm.setFormObjectProps(sec, para, ci, { caption: input.value });
+      this.removeFormOverlay();
+      this.afterEdit();
+      this.refreshFormObjectSelection();
+    };
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); this.removeFormOverlay(); }
+    });
+    input.addEventListener('blur', () => commit());
+    const scrollContent = this.container.querySelector('#scroll-content');
+    (scrollContent ?? this.container).appendChild(input);
+    this.formOverlay = input;
+    requestAnimationFrame(() => { input.focus(); input.select(); });
+  }
+
   private formBboxToOverlayRect(bbox: { x: number; y: number; w: number; h: number }, pageIdx: number): { left: number; top: number; width: number; height: number } {
     const zoom = this.viewportManager.getZoom();
     const pageOffset = this.virtualScroll.getPageOffset(pageIdx);

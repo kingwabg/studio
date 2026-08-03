@@ -29,12 +29,13 @@ import { buildStylePanel } from './style-panel';
 // 글자 탭 확장 섹션 — 각 기능이 파일 하나씩(ui/char-sections/)
 import type { CharSectionDeps } from './char-sections/types';
 import { buildSameFormatSection } from './char-sections/same-format';
+import { buildFormObjectPanel } from './form-object-panel';
 import { buildEmphasisSection } from './char-sections/emphasis-dot';
 import { buildLineDecorSection } from './char-sections/line-decor';
 import { buildCharShadeSection } from './char-sections/char-shade';
 import { buildRelativeSizeSection } from './char-sections/relative-size';
 
-type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture';
+type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture' | 'form';
 export type PanelTab = 'props' | 'text' | 'table' | 'cell' | 'style';
 
 /** 각 탭의 섹션 목차 (디자인 2c 갱신 2026-07-30 — 텍스트 탭 신설) */
@@ -317,6 +318,7 @@ export class CanvaRightInspector {
     bus.on('cursor-rect-updated', () => this.refreshContext());
     bus.on('table-object-selection-changed', () => this.refreshContext());
     bus.on('picture-object-selection-changed', () => this.refreshContext());
+    bus.on('form-object-selection-changed', () => this.refreshContext());
     bus.on('document-changed', () => this.refreshContext());
     // 새 문서 생성/로드 완료는 command-state-changed로 온다 (initializeDocument)
     bus.on('command-state-changed', () => this.refreshContext());
@@ -463,12 +465,23 @@ export class CanvaRightInspector {
     const hasDoc = this.services.wasm.pageCount > 0;
     let ctx: Ctx;
     if (!ih || !hasDoc) ctx = 'none';
+    else if (ih.formObjectSelection) ctx = 'form';
     else if (ih.isInPictureObjectSelection?.()) ctx = 'picture';
     else if (ih.isInTableObjectSelection?.()) ctx = 'table';
     else if (ih.isInTable?.()) ctx = 'cell';
     else ctx = 'body';
     // [캔버스 한컴 포크] 그림 컨텍스트 안에서도 다중 선택 전환이면 다시 그린다(정렬 섹션 노출)
     const multi = ctx === 'picture' && !!ih.isMultiPictureSelection?.();
+    // 양식 선택은 어느 개체냐가 곧 내용 — 개체가 바뀌면(또는 속성 갱신 신호면) 항상 다시 그린다
+    if (ctx === 'form') {
+      this.painted = true;
+      this.ctx = ctx;
+      this.lastMulti = multi;
+      this.panelTab = 'props';
+      this.applyContext();
+      this.syncTabs();
+      return;
+    }
     if (ctx === this.ctx && this.painted && multi === this.lastMulti) {
       // 같은 컨텍스트 안의 커서 이동 — 위치 설명(쪽·문단·셀 주소)만 따라간다
       this.paintBanner();
@@ -695,6 +708,7 @@ export class CanvaRightInspector {
       cell: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M9 4v16M3 12h18"/>', label: '표 셀 편집' },
       table: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16"/>', label: '표 개체 선택됨' },
       picture: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>', label: '그림 선택됨' },
+      form: { icon: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 12l2 2 4-4"/>', label: '양식 개체 선택됨' },
     };
     const sub = this.describeSelection(c);
     // ⚠ 스타일 편집 바(.sp-editbar)가 이 헤더에 얹혀 있다 — innerHTML 로 갈아엎으면
@@ -710,6 +724,20 @@ export class CanvaRightInspector {
   private applyContext(): void {
     const c = this.ctx;
     this.paintBanner();
+
+    // 양식 개체가 선택돼 있으면 무엇보다 그 속성판 — 그림/표 선택과 같은 우선순위 규약.
+    {
+      const ih = this.services.getInputHandler() as any;
+      if (ih?.formObjectSelection) {
+        this.emptyEl.hidden = true;
+        this.fmtPane.hidden = true;
+        this.tabPane.hidden = false;
+        this.tabPane.innerHTML = '';
+        if (buildFormObjectPanel(this.tabPane, this.services)) return;
+        // 선택 정보가 낡았으면(개체 삭제 등) 평소 화면으로 계속
+        this.tabPane.hidden = true;
+      }
+    }
 
     // [디자인 2c 갱신] 속성 외 탭은 섹션 스트립 + 폼. 속성 탭만 기존 서식 화면.
     if (this.panelTab !== 'props') {
