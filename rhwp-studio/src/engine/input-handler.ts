@@ -5423,13 +5423,15 @@ export class InputHandler {
       //   두 번째 개체부터 테두리가 안 뜨고 화살표가 캐럿만 움직임).
       //   엔진은 삽입 직후 이미 최신이므로 **엔진에 직접** 개체 뒤 캐럿 좌표를 묻는다.
       const rect = this.wasm.getCursorRect(sec, para, logicalAfter);
-      if (!rect) return;
+      if (!rect) { console.warn('[form-autosel] rect 없음', { sec, para, logicalAfter }); return; }
       const pageIdx = rect.pageIndex ?? 0;
       const hit = this.wasm.getFormObjectAt(pageIdx, rect.x - 3, rect.y + rect.height / 2);
       if (hit.found && hit.sec === sec && hit.para === para && hit.ci === ci) {
         this.selectFormObject(hit, pageIdx);
+      } else {
+        console.warn('[form-autosel] 히트 불일치', { want: { sec, para, ci }, rect, hit });
       }
-    } catch { /* 선택 실패는 치명 아님 — 클릭으로 선택하면 된다 */ }
+    } catch (err) { console.warn('[form-autosel] 예외', err); }
   }
 
   /** 더블클릭 텍스트/캡션 수정 — Edit·콤보는 text, 나머지는 caption 을 고친다 */
