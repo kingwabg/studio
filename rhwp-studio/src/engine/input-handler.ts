@@ -5416,9 +5416,13 @@ export class InputHandler {
    * 삽입 직후 화살표가 개체가 아니라 캐럿을 움직여 "이동이 안 된다"로 보였다).
    * 캐럿(개체 바로 뒤) 왼쪽 지점을 히트해 개체를 찾는다.
    */
-  selectJustInsertedForm(sec: number, para: number, ci: number): void {
+  selectJustInsertedForm(sec: number, para: number, ci: number, logicalAfter: number): void {
     try {
-      const rect = this.cursor.getRect();
+      // ⚠ 화면 캐럿(this.cursor.getRect())은 재조판 뒤 rAF 에서 갱신된다 — 연속 삽입이
+      //   겹치면 낡은 좌표를 히트해 자동 선택이 조용히 실패했다(2026-08-03 실측:
+      //   두 번째 개체부터 테두리가 안 뜨고 화살표가 캐럿만 움직임).
+      //   엔진은 삽입 직후 이미 최신이므로 **엔진에 직접** 개체 뒤 캐럿 좌표를 묻는다.
+      const rect = this.wasm.getCursorRect(sec, para, logicalAfter);
       if (!rect) return;
       const pageIdx = rect.pageIndex ?? 0;
       const hit = this.wasm.getFormObjectAt(pageIdx, rect.x - 3, rect.y + rect.height / 2);

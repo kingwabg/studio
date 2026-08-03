@@ -268,9 +268,9 @@ export const insertCommands: CommandDef[] = [
           // 삽입 직후 포커스가 편집기 밖에 남아 →·타이핑이 무시된다(2026-08-03 배포본 실측)
           (ih as any).focusTextarea?.();
           // 한컴 관례: 삽입 직후 개체가 선택 상태 — 바로 ←/→ 이동·Delete 가 된다.
-          // 캐럿 갱신(updateCaret) 뒤에 히트해야 rect 가 새 개체 뒤를 가리킨다.
-          requestAnimationFrame(() =>
-            (ih as any).selectJustInsertedForm?.(pos.sectionIndex, result.paraIdx, result.controlIdx));
+          // 엔진 좌표로 동기 선택(rAF 대기 없음 — 화면 캐럿 타이밍에 기대면 연속 삽입에서 빗나간다).
+          (ih as any).selectJustInsertedForm?.(
+            pos.sectionIndex, result.paraIdx, result.controlIdx, pos.charOffset + 1);
         }
       } catch (err) {
         console.warn(`[${id}] 양식 개체 삽입 실패:`, err);
