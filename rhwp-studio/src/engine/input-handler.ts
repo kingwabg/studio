@@ -5221,6 +5221,9 @@ export class InputHandler {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         this.moveSelectedFormObject(e.key === 'ArrowLeft' ? -1 : 1);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // 글자를 치기 시작하면 개체 선택을 접고 평소 타이핑으로 — 가로채지 않는다
+        this.clearFormObjectSelection();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         const { hit } = this.formObjectSelection;
@@ -5404,6 +5407,24 @@ export class InputHandler {
     } catch (err) {
       console.warn('[InputHandler] 양식 드래그 낙하 실패:', err);
     }
+  }
+
+  /**
+   * 방금 삽입한 양식 개체를 선택 상태로 만든다 — 한컴 관례(개체 삽입 직후 = 선택).
+   * 넣자마자 ←/→ 로 자리를 옮기고 Delete 로 지울 수 있다(2026-08-03 사용자 신고:
+   * 삽입 직후 화살표가 개체가 아니라 캐럿을 움직여 "이동이 안 된다"로 보였다).
+   * 캐럿(개체 바로 뒤) 왼쪽 지점을 히트해 개체를 찾는다.
+   */
+  selectJustInsertedForm(sec: number, para: number, ci: number): void {
+    try {
+      const rect = this.cursor.getRect();
+      if (!rect) return;
+      const pageIdx = rect.pageIndex ?? 0;
+      const hit = this.wasm.getFormObjectAt(pageIdx, rect.x - 3, rect.y + rect.height / 2);
+      if (hit.found && hit.sec === sec && hit.para === para && hit.ci === ci) {
+        this.selectFormObject(hit, pageIdx);
+      }
+    } catch { /* 선택 실패는 치명 아님 — 클릭으로 선택하면 된다 */ }
   }
 
   /** 더블클릭 텍스트/캡션 수정 — Edit·콤보는 text, 나머지는 caption 을 고친다 */
