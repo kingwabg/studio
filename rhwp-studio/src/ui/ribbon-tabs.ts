@@ -106,47 +106,9 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
         step: 5, min: 50, max: 500, width: 100,
         hint: '줄 간격(%) — 값을 고치거나 ⌄ 에서 고릅니다',
       }),
-      gap(),
-      P('list-numbers', '문단 번호', 'format:toggle-numbering'),
-      P('list-bullets', '글머리표', 'format:toggle-bullet'),
-      P('text-indent', '한 수준 증가', 'format:level-increase'),
-      P('text-outdent', '한 수준 감소', 'format:level-decrease'),
-      // 일반 문단 들여쓰기/내어쓰기 — '한 수준' 은 개요/번호용이라 일반 문단엔 안 먹는다.
-      // 값 상자로 바꿨다(2026-08-03): 종전 ± 버튼은 눌러도 지금 얼마가 들어갔는지 안 보였다.
-      // 아이콘을 누르면 한 단계 바로 적용되고, 값은 옆에서 바로 고친다(사용자 요청 2026-08-03)
-      V('indent', '들여쓰기', 'arrow-line-right', 'pt', 'format:indent-set', {
-        presets: [0, 10, 20, 30, 40], step: 5, min: 0, max: 400, width: 100,
-        iconCmd: 'format:indent-increase',
-        hint: '아이콘을 누르면 한 단계 들여씁니다 — 값을 직접 고치거나 ⌄ 에서 골라도 됩니다',
-      }),
-      V('outdent', '내어쓰기', 'arrow-line-left', 'pt', 'format:outdent-set', {
-        presets: [0, 10, 20, 30], step: 5, min: 0, max: 400, width: 100,
-        iconCmd: 'format:indent-decrease',
-        hint: '아이콘을 누르면 한 단계 내어씁니다 — 값을 직접 고치거나 ⌄ 에서 골라도 됩니다',
-      }),
-      gap(),
-      // 글자 간격(자간·장평) — 문단 수준(들여쓰기)과 같은 '간격' 무리라 옆에 둔다.
-      // 명령은 이미 있었다(format:char-spacing-*/char-ratio-*, 단축키 Shift+Alt+N/W/J/K).
-      // ⚠ 자간과 장평은 "비슷해 보인다"는 지적을 받았다(2026-08-01). 둘 다 한 줄에
-      //   들어가는 글자 수를 바꿔서 그렇게 느껴지는데, 바꾸는 대상이 다르다 —
-      //   자간은 글자 **사이**, 장평은 글자 **자체의 폭**이다. 툴팁으로 못 박는다.
-      P('arrows-in-line-horizontal', '자간 줄이기', 'format:char-spacing-decrease',
-        '글자와 글자 사이를 좁힙니다 — 글자 모양은 그대로입니다 (Shift+Alt+N)'),
-      P('arrows-out-line-horizontal', '자간 늘리기', 'format:char-spacing-increase',
-        '글자와 글자 사이를 벌립니다 — 글자 모양은 그대로입니다 (Shift+Alt+W)'),
-      P('arrows-in-simple', '장평 줄이기', 'format:char-ratio-decrease',
-        '글자 자체를 홀쭉하게 만듭니다 — 사이 간격이 아니라 글자 폭입니다 (Shift+Alt+J)'),
-      P('arrows-out-simple', '장평 늘리기', 'format:char-ratio-increase',
-        '글자 자체를 넓적하게 만듭니다 — 사이 간격이 아니라 글자 폭입니다 (Shift+Alt+K)'),
-      gap(),
-      // 「⋯」에 있던 두 대화상자를 꺼내 놓는다. 옛 '자세히' 확장 버튼은 글자 모양과
-      // 같은 명령이라 중복 — 버튼으로 대체하고 홈의 오버플로는 비운다(⋯ 자동 소멸).
-      // 「스타일 설정」은 대화상자 3형제(스타일·글자 모양·문단 모양)의 맏이 자리에 둔다
-      // (사용자 요청 2026-08-01: 글자 모양 왼쪽). 앞머리 콤보는 고르기, 여기는 만들기·고치기.
-      P('cards-three', '스타일 설정', 'format:style-dialog',
-        '스타일을 만들고 고칩니다 — 목록에서 고르는 건 앞머리 칸입니다 (F6)'),
-      P('text-aa', '글자 모양', 'format:char-shape'),
-      P('paragraph', '문단 모양', 'format:para-shape'),
+      // ⚠ 목록·들여쓰기·자간/장평·대화상자 3형제는 **「서식」 탭으로 옮겼다**(사용자 지시
+      //   2026-08-03: "홈에 기능이 많아 용도별로 나누자" → A안). 홈은 손이 가장 자주 가는
+      //   글자 꾸미기 + 정렬까지만 둔다. 서식 탭 위치는 한/글 순서를 따른다(입력 다음).
     ],
   },
   {
@@ -201,6 +163,52 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       O('flip-horizontal', '좌우 대칭', '', 'insert:flip-horz'),
       O('flip-vertical', '상하 대칭', '', 'insert:flip-vert'),
       O('trash', '개체 지우기', 'Delete', 'insert:picture-delete'),
+    ],
+  },
+  {
+    id: 'format',
+    label: '서식',
+    // [홈 분가 2026-08-03] 사용자 지시 "홈에 기능이 많아 용도별로 나누자" → A안.
+    // 자리는 한/글 리본 순서를 따른다([편집][보기][입력][**서식**][쪽][검토][도구]) —
+    // 한/글 쓰던 손이 찾아가는 자리에 둔다. 홈엔 손이 가장 자주 가는 것만 남겼다.
+    items: [
+      // 목록·수준 — 개요/번호 문서의 뼈대
+      P('list-numbers', '문단 번호', 'format:toggle-numbering'),
+      P('list-bullets', '글머리표', 'format:toggle-bullet'),
+      P('text-indent', '한 수준 증가', 'format:level-increase'),
+      P('text-outdent', '한 수준 감소', 'format:level-decrease'),
+      gap(),
+      // 일반 문단 들여쓰기/내어쓰기 — '한 수준' 은 개요/번호용이라 일반 문단엔 안 먹는다.
+      // 아이콘을 누르면 한 단계 바로 적용되고, 값은 옆에서 바로 고친다.
+      V('indent', '들여쓰기', 'arrow-line-right', 'pt', 'format:indent-set', {
+        presets: [0, 10, 20, 30, 40], step: 5, min: 0, max: 400, width: 100,
+        iconCmd: 'format:indent-increase',
+        hint: '아이콘을 누르면 한 단계 들여씁니다 — 값을 직접 고치거나 ⌄ 에서 골라도 됩니다',
+      }),
+      V('outdent', '내어쓰기', 'arrow-line-left', 'pt', 'format:outdent-set', {
+        presets: [0, 10, 20, 30], step: 5, min: 0, max: 400, width: 100,
+        iconCmd: 'format:indent-decrease',
+        hint: '아이콘을 누르면 한 단계 내어씁니다 — 값을 직접 고치거나 ⌄ 에서 골라도 됩니다',
+      }),
+      gap(),
+      // 글자 간격(자간·장평).
+      // ⚠ 자간과 장평은 "비슷해 보인다"는 지적을 받았다(2026-08-01). 둘 다 한 줄에
+      //   들어가는 글자 수를 바꿔서 그렇게 느껴지는데, 바꾸는 대상이 다르다 —
+      //   자간은 글자 **사이**, 장평은 글자 **자체의 폭**이다. 툴팁으로 못 박는다.
+      P('arrows-in-line-horizontal', '자간 줄이기', 'format:char-spacing-decrease',
+        '글자와 글자 사이를 좁힙니다 — 글자 모양은 그대로입니다 (Shift+Alt+N)'),
+      P('arrows-out-line-horizontal', '자간 늘리기', 'format:char-spacing-increase',
+        '글자와 글자 사이를 벌립니다 — 글자 모양은 그대로입니다 (Shift+Alt+W)'),
+      P('arrows-in-simple', '장평 줄이기', 'format:char-ratio-decrease',
+        '글자 자체를 홀쭉하게 만듭니다 — 사이 간격이 아니라 글자 폭입니다 (Shift+Alt+J)'),
+      P('arrows-out-simple', '장평 늘리기', 'format:char-ratio-increase',
+        '글자 자체를 넓적하게 만듭니다 — 사이 간격이 아니라 글자 폭입니다 (Shift+Alt+K)'),
+      gap(),
+      // 대화상자 3형제 — 앞머리 콤보는 고르기, 여기는 만들기·고치기.
+      P('cards-three', '스타일 설정', 'format:style-dialog',
+        '스타일을 만들고 고칩니다 — 목록에서 고르는 건 홈 앞머리 칸입니다 (F6)'),
+      P('text-aa', '글자 모양', 'format:char-shape'),
+      P('paragraph', '문단 모양', 'format:para-shape'),
     ],
   },
   {
@@ -312,9 +320,11 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
  * 나머지는 접는다. 사용자가 켜면 그 선택이 이긴다(아래 hidden 저장).
  */
 export const DEFAULT_OFF: Record<string, string[]> = {
-  // 한 수준 증가·감소는 사용자 요청으로 기본 노출(2026-08-01). 자간·장평 4종 중
-  // 자주 쓰는 '자간'만 남기고 '장평'은 접는다 — 홈 한 줄에 다 들어가지 않는다.
-  home: ['취소선', '장평 줄이기', '장평 늘리기'],
+  // 홈은 「서식」 탭 분가(2026-08-03) 뒤 16개로 줄어 접을 게 없다 — 취소선도 되살렸다.
+  home: [],
+  // 장평은 자간과 헷갈린다는 지적(2026-08-01)이 있어 서식 탭에서도 기본 접힘.
+  // 필요한 사람은 「⋯ 편집」에서 켠다.
+  format: ['장평 줄이기', '장평 늘리기'],
   edit: ['모양 붙여넣기', '찾아가기'],
   insert: ['필드 입력', '미주', '이모지'],
   layout: ['격자 설정', '새 번호로 시작', '구역 나누기', '쪽 테두리/배경', '바탕쪽'],
@@ -324,11 +334,20 @@ export const DEFAULT_OFF: Record<string, string[]> = {
 
 const HIDDEN_KEY = 'rhwpRibbonHidden';
 
-/** 탭별 숨김 라벨 — 저장된 게 있으면 그것, 없으면 DEFAULT_OFF. */
+/**
+ * 탭별 숨김 라벨 — 저장된 게 있으면 그것을 쓰되, **저장본에 없는 탭은 기본값으로 채운다**.
+ *
+ * ⚠ 종전엔 저장본이 있으면 통째로 그것만 썼다. 그래서 탭이 새로 생기면(2026-08-03 「서식」)
+ *   이미 써 온 사용자에게는 그 탭의 기본 접힘이 영영 반영되지 않는다 — 탭 키가 저장본에
+ *   없어서다. 탭 단위로 채워 넣는다(사용자가 직접 끈 탭은 그대로 존중).
+ */
 export function loadHidden(): Record<string, string[]> {
   try {
     const raw = localStorage.getItem(HIDDEN_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, string[]>;
+    if (raw) {
+      const saved = JSON.parse(raw) as Record<string, string[]>;
+      return { ...DEFAULT_OFF, ...saved };
+    }
   } catch { /* 시크릿 모드 등 */ }
   return { ...DEFAULT_OFF };
 }
