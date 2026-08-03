@@ -1372,6 +1372,17 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).insertEquation(sec, para, charOffset, script, fontSizeHwpunit, color));
   }
 
+  /** 양식 개체 삽입 — formType 만 필수(PushButton|CheckBox|ComboBox|RadioButton|Edit) */
+  insertFormObject(sec: number, para: number, charOffset: number, props: { formType: string; name?: string; caption?: string; text?: string; groupName?: string }): { ok: boolean; paraIdx: number; controlIdx: number } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).insertFormObject(sec, para, charOffset, JSON.stringify(props)));
+  }
+
+  deleteFormObject(sec: number, para: number, controlIdx: number): { ok: boolean } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).deleteFormObject(sec, para, controlIdx));
+  }
+
   insertFootnote(sec: number, para: number, charOffset: number): { ok: boolean; paraIdx: number; controlIdx: number; footnoteNumber: number } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse((this.doc as any).insertFootnote(sec, para, charOffset));

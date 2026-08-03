@@ -1,4 +1,4 @@
-import type { CommandDef } from '../types';
+import type { CommandDef, EditorContext, CommandServices } from '../types';
 import { PicturePropsDialog } from '@/ui/picture-props-dialog';
 import { EquationEditorDialog } from '@/ui/equation-editor-dialog';
 import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
@@ -227,6 +227,39 @@ export const insertCommands: CommandDef[] = [
       ih.enterTextboxPlacementMode();
     },
   },
+  // ── 양식 개체 5종 — 엔진 insertFormObject 한 경로. 기본값(크기·캡션·색)은 엔진이
+  //    한컴 정답지(samples/form-01.hwp) 값으로 채우므로 여기선 종류만 넘긴다.
+  //    라디오는 GroupName 이 있어야 클릭 상호배타가 돌아 기본 그룹을 준다.
+  ...([
+    ['insert:form-button', '명령 단추', 'PushButton', {}],
+    ['insert:form-checkbox', '선택 상자', 'CheckBox', {}],
+    ['insert:form-combobox', '콤보 상자', 'ComboBox', {}],
+    ['insert:form-radio', '라디오 단추', 'RadioButton', { groupName: '그룹1' }],
+    ['insert:form-edit', '입력 상자', 'Edit', {}],
+  ] as const).map(([id, label, formType, extra]) => ({
+    id,
+    label,
+    canExecute: (ctx: EditorContext) => ctx.hasDocument && !ctx.inTable && !ctx.isFormMode,
+    execute(services: CommandServices) {
+      const ih = services.getInputHandler();
+      if (!ih) return;
+      const pos = ih.getPosition();
+      // 본문 전용(수식과 같은 제약) — 셀 안 삽입 배관은 아직 없다
+      if ((pos as any).cellIndex !== undefined && (pos as any).cellIndex >= 0) return;
+      try {
+        const result = services.wasm.insertFormObject(
+          pos.sectionIndex, pos.paragraphIndex, pos.charOffset,
+          { formType, ...extra },
+        );
+        if (result.ok) {
+          services.eventBus.emit('document-mutated', 'insert-form');
+          services.eventBus.emit('document-changed');
+        }
+      } catch (err) {
+        console.warn(`[${id}] 양식 개체 삽입 실패:`, err);
+      }
+    },
+  })),
   {
     id: 'insert:equation',
     label: '수식',

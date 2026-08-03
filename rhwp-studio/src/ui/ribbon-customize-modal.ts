@@ -27,6 +27,9 @@ class RibbonCustomizeDialog extends ModalDialog {
   private tabId: string;
   private listEl!: HTMLElement;
   private paletteEl!: HTMLElement;
+  private searchEl!: HTMLInputElement;
+  /** 팔레트 이름 필터(검색창 값) */
+  private filter = '';
 
   constructor(startTab: string, private onApply: () => void) {
     super('리본 배치', 860);
@@ -48,7 +51,9 @@ class RibbonCustomizeDialog extends ModalDialog {
 
   private setLabels(next: string[]): void {
     this.layout[this.tabId] = next;
+    const hadFocus = document.activeElement === this.searchEl;
     this.paint();
+    if (hadFocus) this.searchEl.focus();
   }
 
   protected createBody(): HTMLElement {
@@ -77,12 +82,22 @@ class RibbonCustomizeDialog extends ModalDialog {
     body.appendChild(tabRow);
 
     const cols = mkEl('div', 'rc-cols');
-    cols.style.cssText = 'display:flex;gap:12px;align-items:stretch;min-height:340px';
+    // 115개 팔레트가 세로로 자라면 모달이 화면을 넘어 제목·검색창이 잘린다 — 뷰포트에 묶는다.
+    cols.style.cssText = 'display:flex;gap:12px;align-items:stretch;height:min(52vh, 460px)';
 
     // 왼쪽: 전체 아이콘(탭별)
     const left = mkEl('div', 'rc-col');
     left.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:6px;min-width:0';
-    left.appendChild(mkEl('div', 'rc-coltitle', '전체 아이콘 — 끌어서 오른쪽에 놓으세요'));
+    left.appendChild(mkEl('div', 'rc-coltitle', '전체 아이콘 — 누르면 이 탭에 넣고, 다시 누르면 뺍니다 (끌어도 됩니다)'));
+    // 115개를 눈으로 훑는 건 무리다 — 이름 검색이 1차 진입로.
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.placeholder = '아이콘 검색…';
+    search.className = 'rc-search';
+    search.style.cssText = 'padding:6px 10px;border:1px solid var(--color-border,#ddd);border-radius:6px;font-size:12.5px;outline:none';
+    search.addEventListener('input', () => { this.filter = search.value.trim(); this.paint(); });
+    left.appendChild(search);
+    this.searchEl = search;
     this.paletteEl = mkEl('div', 'rc-palette');
     this.paletteEl.style.cssText = 'flex:1;overflow:auto;border:1px solid var(--color-border,#ddd);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:10px';
     left.appendChild(this.paletteEl);
@@ -127,29 +142,42 @@ class RibbonCustomizeDialog extends ModalDialog {
       byTab.set(e.fromTab, arr);
     }
     for (const [tabLabel, entries] of byTab) {
+      // 검색 중이면 이름이 걸리는 것만 — 묶음이 통째로 비면 묶음도 숨긴다.
+      const visible = this.filter
+        ? entries.filter((e) => e.label.includes(this.filter))
+        : entries;
+      if (visible.length === 0) continue;
       const group = mkEl('div', 'rc-group');
       const h = mkEl('div', 'rc-grouphead', tabLabel);
       h.style.cssText = 'font-size:11px;font-weight:600;color:var(--color-primary,#00647f);margin-bottom:4px';
       group.appendChild(h);
       const wrap = mkEl('div', 'rc-chips');
       wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px';
-      for (const e of entries) {
-        const chip = mkButton('rc-chip', { title: `${e.label} (${e.fromTab})` });
-        chip.innerHTML = `<i class="ph-duotone ph-${e.icon}"></i><span>${e.label}</span>`;
+      for (const e of visible) {
+        const on = placed.has(e.label);
+        const chip = mkButton('rc-chip', {
+          title: on ? `${e.label} — 누르면 이 탭에서 뺍니다` : `${e.label} — 누르면 이 탭에 넣습니다`,
+        });
+        chip.innerHTML = `<i class="ph-duotone ph-${e.icon}"></i><span>${e.label}</span>${on ? '<span style="font-weight:700">✓</span>' : ''}`;
         chip.draggable = true;
         chip.style.cssText = [
           'display:inline-flex;align-items:center;gap:4px',
-          'padding:3px 7px;border-radius:5px;font-size:11.5px;cursor:grab',
-          `border:1px solid ${placed.has(e.label) ? 'var(--color-primary,#00647f)' : 'var(--color-border,#ddd)'}`,
-          `background:${placed.has(e.label) ? 'var(--color-accent-bg,#e4f1f6)' : 'var(--color-bg,#fff)'}`,
+          'padding:3px 7px;border-radius:5px;font-size:11.5px;cursor:pointer',
+          `border:1px solid ${on ? 'var(--color-primary,#00647f)' : 'var(--color-border,#ddd)'}`,
+          `background:${on ? 'var(--color-accent-bg,#e4f1f6)' : 'var(--color-bg,#fff)'}`,
         ].join(';');
         chip.addEventListener('dragstart', (ev) => {
           ev.dataTransfer?.setData('text/plain', e.label);
           ev.dataTransfer!.effectAllowed = 'copy';
         });
-        // 끌기 말고 눌러서도 넣을 수 있게(끌기가 어려운 환경 대비)
-        chip.addEventListener('dblclick', () => {
-          if (!placed.has(e.label)) this.setLabels([...labels, e.label]);
+        // 한 번 클릭 = 넣기/빼기 토글 — 115개 팔레트에서 드래그는 느리다(사용자 신고 2026-08-03).
+        // 순서를 다듬고 싶을 때만 오른쪽 목록에서 끌면 된다.
+        chip.addEventListener('click', () => {
+          if (placed.has(e.label)) {
+            this.setLabels(labels.filter((l) => l !== e.label));
+          } else {
+            this.setLabels([...labels, e.label]);
+          }
         });
         wrap.appendChild(chip);
       }
