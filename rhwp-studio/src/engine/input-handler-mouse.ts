@@ -1312,12 +1312,26 @@ export function onClick(this: any, e: MouseEvent): void {
         if (this.editMode === 'form') {
           this.handleFormObjectClick(formHit, pageIdx, zoom);
         } else {
-          const already = this.formObjectSelection?.hit;
-          this.selectFormObject(formHit, pageIdx);
-          // 이미 선택된 개체를 다시 눌렀다 → 드래그 이동 시작(그림 이동 규약)
-          if (already && already.para === formHit.para && already.ci === formHit.ci) {
-            this.formMoveDrag = { startX: e.clientX, startY: e.clientY, moved: false };
-            document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
+          // 체크 네모/라디오 동그라미를 **직접** 눌렀으면 편집 모드에서도 토글한다
+          // (사용자 요청 2026-08-03: "체크박스 상태에 마우스 클릭하면 선택·해제").
+          // 글리프는 개체 왼쪽 끝의 정사각형 영역 — 캡션 쪽 클릭은 여전히 개체 선택.
+          const glyphClick =
+            (formHit.formType === 'CheckBox' || formHit.formType === 'RadioButton') &&
+            formHit.bbox &&
+            pageX <= formHit.bbox.x + Math.min(formHit.bbox.h, formHit.bbox.w / 2);
+          if (glyphClick) {
+            this.handleFormObjectClick(formHit, pageIdx, zoom);
+            // 값이 바뀌었으니 새로 히트해 선택·패널을 최신 값으로
+            const fresh = this.wasm.getFormObjectAt(pageIdx, pageX, pageY);
+            this.selectFormObject(fresh.found ? fresh : formHit, pageIdx);
+          } else {
+            const already = this.formObjectSelection?.hit;
+            this.selectFormObject(formHit, pageIdx);
+            // 이미 선택된 개체를 다시 눌렀다 → 드래그 이동 시작(그림 이동 규약)
+            if (already && already.para === formHit.para && already.ci === formHit.ci) {
+              this.formMoveDrag = { startX: e.clientX, startY: e.clientY, moved: false };
+              document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
+            }
           }
         }
         this.textarea.focus();
