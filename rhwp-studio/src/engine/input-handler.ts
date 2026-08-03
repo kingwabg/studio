@@ -5200,8 +5200,48 @@ export class InputHandler {
   /** 지금 선택된 양식 개체 (없으면 null). 패널이 읽는다. */
   formObjectSelection: { hit: FormObjectHitResult; pageIdx: number } | null = null;
   private formSelectionEl: HTMLElement | null = null;
+  private formKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /**
+   * 개체 조작 키를 **문서 수준**에서 받는다 — 편집기(textarea)에만 걸면 오른쪽 패널을
+   * 만졌거나 포커스가 본문 밖으로 나간 뒤 화살표가 먹지 않는다(사용자 신고 2026-08-03).
+   * 패널 입력칸에서 타이핑 중일 때는 가로채지 않는다(글자·화살표는 그 칸의 것이다).
+   */
+  private installFormKeyHandler(): void {
+    if (this.formKeyHandler) return;
+    this.formKeyHandler = (e: KeyboardEvent): void => {
+      if (!this.formObjectSelection) return;
+      if (this.formOverlay) return; // 캡션/내용 입력 중 — 그 입력창이 주인
+      const t = e.target as HTMLElement | null;
+      if (t && t !== this.textarea) {
+        const tag = t.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable) return;
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.moveSelectedFormObject(e.key === 'ArrowLeft' ? -1 : 1);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        const { hit } = this.formObjectSelection;
+        if (hit.sec !== undefined && hit.para !== undefined && hit.ci !== undefined) {
+          try {
+            this.wasm.deleteFormObject(hit.sec, hit.para, hit.ci);
+            this.clearFormObjectSelection();
+            this.eventBus.emit('document-changed');
+          } catch (err) {
+            console.warn('[InputHandler] 양식 개체 삭제 실패:', err);
+          }
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.clearFormObjectSelection();
+      }
+    };
+    document.addEventListener('keydown', this.formKeyHandler, true);
+  }
 
   selectFormObject(formHit: FormObjectHitResult, pageIdx: number): void {
+    this.installFormKeyHandler();
     this.exitPictureObjectSelectionIfNeeded();
     this.formObjectSelection = { hit: formHit, pageIdx };
     this.caret.hide();
