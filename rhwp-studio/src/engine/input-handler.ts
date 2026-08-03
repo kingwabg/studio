@@ -2738,7 +2738,8 @@ export class InputHandler {
   }
 
   /** textarea에 포커스를 설정한다 (iOS 호환) */
-  private focusTextarea(): void {
+  /** 편집기 포커스 복원 — 커맨드(삽입 등)가 끝난 뒤 키 입력이 살아나게 */
+  focusTextarea(): void {
     // 양식 오버레이(캡션·내용 입력)가 떠 있으면 편집기가 포커스를 뺏으면 안 된다 —
     // 뺏기면 사용자가 친 글이 개체가 아니라 **본문에 들어간다**(2026-08-03 배포본 실측).
     if (this.formOverlay) return;

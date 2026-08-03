@@ -254,6 +254,8 @@ export const insertCommands: CommandDef[] = [
         if (result.ok) {
           services.eventBus.emit('document-mutated', 'insert-form');
           services.eventBus.emit('document-changed');
+          // 삽입 직후 포커스가 편집기 밖에 남아 →·타이핑이 무시된다(2026-08-03 배포본 실측)
+          (ih as any).focusTextarea?.();
         }
       } catch (err) {
         console.warn(`[${id}] 양식 개체 삽입 실패:`, err);
