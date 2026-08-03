@@ -247,13 +247,24 @@ export const insertCommands: CommandDef[] = [
       // 본문 전용(수식과 같은 제약) — 셀 안 삽입 배관은 아직 없다
       if ((pos as any).cellIndex !== undefined && (pos as any).cellIndex >= 0) return;
       try {
+        // 커서는 논리 좌표(개체=1칸), 엔진 삽입은 텍스트 좌표 — 변환해서 넘긴다.
+        // 안 하면 개체 뒤에서 두 번째 개체를 넣을 때 자리가 어긋난다.
+        const textOffset = services.wasm.logicalToTextOffset(
+          pos.sectionIndex, pos.paragraphIndex, pos.charOffset);
         const result = services.wasm.insertFormObject(
-          pos.sectionIndex, pos.paragraphIndex, pos.charOffset,
+          pos.sectionIndex, pos.paragraphIndex, textOffset,
           { formType, ...extra },
         );
         if (result.ok) {
           services.eventBus.emit('document-mutated', 'insert-form');
           services.eventBus.emit('document-changed');
+          // 커서를 새 개체 **뒤**로 — 안 옮기면 이어서 치는 글자·다음 개체가 전부
+          // 개체 앞에 쌓인다(2026-08-03 사용자 신고 "연속으로 만들기 잘 안돼").
+          ih.moveCursorTo({
+            sectionIndex: pos.sectionIndex,
+            paragraphIndex: result.paraIdx,
+            charOffset: pos.charOffset + 1,
+          });
           // 삽입 직후 포커스가 편집기 밖에 남아 →·타이핑이 무시된다(2026-08-03 배포본 실측)
           (ih as any).focusTextarea?.();
         }
