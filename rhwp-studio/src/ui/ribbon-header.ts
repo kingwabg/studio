@@ -353,7 +353,11 @@ export class RibbonHeader {
     this.ribbonRow.innerHTML = '';
     this.closeOverflow();
 
-    const off = new Set(this.hidden[tab.id] ?? []);
+    // [자유 배치] 사용자 배치가 있는 탭에서는 배치가 전부다 — 접힘 목록을 겹쳐 적용하면
+    // 기본 접힘(DEFAULT_OFF) 항목은 배치에 넣어도 걸러져 "적용이 안 되는" 결함이 된다
+    // (2026-08-04 실측: 검토 탭 배치에 조판 부호·문단 부호만 넣자 리본이 통째로 비었다).
+    const usingLayout = !!loadLayout()[tab.id];
+    const off = usingLayout ? new Set<string>() : new Set(this.hidden[tab.id] ?? []);
     // 접어 둔 버튼은 「⋯ 편집」 목록으로 내려간다 — 사라지는 게 아니라 옮겨 간다.
     const overItems: Array<Extract<RibbonItem, { kind: 'over' }>> = [
       ...tab.items.filter((i): i is Extract<RibbonItem, { kind: 'over' }> => i.kind === 'over'),

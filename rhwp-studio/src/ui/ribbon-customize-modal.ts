@@ -173,10 +173,13 @@ class RibbonCustomizeDialog extends ModalDialog {
         // 한 번 클릭 = 넣기/빼기 토글 — 115개 팔레트에서 드래그는 느리다(사용자 신고 2026-08-03).
         // 순서를 다듬고 싶을 때만 오른쪽 목록에서 끌면 된다.
         chip.addEventListener('click', () => {
-          if (placed.has(e.label)) {
-            this.setLabels(labels.filter((l) => l !== e.label));
+          // ⚠ paint 시점의 labels 클로저를 쓰면 빠른 연속 클릭에서 직전 추가가 유실된다
+          //   — 누를 때마다 현재 배치를 다시 읽는다(강조점 칩과 같은 stale 패턴).
+          const now = this.currentLabels();
+          if (now.includes(e.label)) {
+            this.setLabels(now.filter((l) => l !== e.label));
           } else {
-            this.setLabels([...labels, e.label]);
+            this.setLabels([...now, e.label]);
           }
         });
         wrap.appendChild(chip);
