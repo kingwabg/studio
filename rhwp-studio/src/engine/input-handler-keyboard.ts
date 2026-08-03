@@ -474,6 +474,13 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
     return;
   }
 
+  // 양식 개체 선택 중 ←/→ = 텍스트 사이 한 글자 이동(개체 규약 — 사용자 요청 2026-08-03)
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && this.formObjectSelection) {
+    e.preventDefault();
+    this.moveSelectedFormObject(e.key === 'ArrowLeft' ? -1 : 1);
+    return;
+  }
+
   // 양식 개체 선택 중 Delete/Backspace = 개체 삭제(그림 규약)
   if ((e.key === 'Delete' || e.key === 'Backspace') && this.formObjectSelection) {
     e.preventDefault();

@@ -1384,6 +1384,12 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).setFormObjectProps(sec, para, controlIdx, JSON.stringify(props)));
   }
 
+  /** 양식 개체 이동 — {delta:±1}(화살표) 또는 {toPara,offset}(드래그, 텍스트 좌표) */
+  moveFormObject(sec: number, para: number, controlIdx: number, props: Record<string, number>): { ok: boolean; paraIdx: number; controlIdx: number } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).moveFormObject(sec, para, controlIdx, JSON.stringify(props)));
+  }
+
   deleteFormObject(sec: number, para: number, controlIdx: number): { ok: boolean } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse((this.doc as any).deleteFormObject(sec, para, controlIdx));

@@ -5268,10 +5268,106 @@ export class InputHandler {
     this.clearFormObjectSelection();
   }
 
+  /** 선택된 양식 개체를 텍스트 사이에서 옮긴다(delta=±1 화살표, 또는 절대 낙하점) */
+  moveSelectedFormObject(deltaOrProps: number | { toPara: number; offset: number }): void {
+    const sel = this.formObjectSelection;
+    if (!sel?.hit || sel.hit.sec === undefined || sel.hit.para === undefined || sel.hit.ci === undefined) return;
+    try {
+      const props = typeof deltaOrProps === 'number' ? { delta: deltaOrProps } : deltaOrProps;
+      const r = this.wasm.moveFormObject(sel.hit.sec, sel.hit.para, sel.hit.ci, props as any);
+      if (!r.ok) return;
+      this.eventBus.emit('document-changed');
+      // 새 위치로 재히트해 선택 테두리를 따라 옮긴다 — 낙하점을 모르니 개체 정보로 재조회
+      const hit2 = { ...sel.hit, para: r.paraIdx, ci: r.controlIdx };
+      this.formObjectSelection = { hit: hit2 as FormObjectHitResult, pageIdx: sel.pageIdx };
+      // bbox 는 재조판 후 바뀐다 — 화면 전체에서 이 개체를 다시 찾는 대신, 문서 변경 후
+      // 한 프레임 뒤 옛 중심 근처를 다시 히트한다(가로 이동은 근처에 남는다).
+      requestAnimationFrame(() => this.rehitFormSelectionNear(sel.hit.bbox, sel.pageIdx, r.paraIdx, r.controlIdx));
+    } catch (err) {
+      console.warn('[InputHandler] 양식 개체 이동 실패:', err);
+    }
+  }
+
+  /** 옛 bbox 주변을 넓혀가며 재히트 — 같은 (para, ci) 를 찾으면 선택 갱신 */
+  private rehitFormSelectionNear(
+    bbox: { x: number; y: number; w: number; h: number } | undefined,
+    pageIdx: number, para: number, ci: number,
+  ): void {
+    if (!bbox) return;
+    const cy = bbox.y + bbox.h / 2;
+    const step = Math.max(bbox.w / 2, 8);
+    for (let i = -8; i <= 8; i++) {
+      const cx = bbox.x + bbox.w / 2 + i * step;
+      try {
+        const hit = this.wasm.getFormObjectAt(pageIdx, cx, cy);
+        if (hit.found && hit.para === para && hit.ci === ci) {
+          this.formObjectSelection = { hit, pageIdx };
+          this.renderFormObjectSelection();
+          this.eventBus.emit('form-object-selection-changed', true);
+          return;
+        }
+      } catch { /* 계속 탐색 */ }
+    }
+    // 못 찾으면(줄바꿈으로 멀리 감) 선택 유지하되 테두리만 숨긴다 — 다음 클릭이 정리한다
+    this.formSelectionEl?.remove();
+    this.formSelectionEl = null;
+  }
+
+  // ─── 양식 개체 드래그 이동 ─────────────────────────
+  formMoveDrag: { startX: number; startY: number; moved: boolean } | null = null;
+
+  updateFormMoveDrag(e: MouseEvent): void {
+    const drag = this.formMoveDrag;
+    if (!drag || !this.formSelectionEl) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 4) return; // 클릭 떨림 무시
+    drag.moved = true;
+    this.formSelectionEl.style.transform = `translate(${dx}px, ${dy}px)`;
+    this.formSelectionEl.style.opacity = '0.6';
+  }
+
+  finishFormMoveDrag(e: MouseEvent): void {
+    const drag = this.formMoveDrag;
+    this.formMoveDrag = null;
+    if (!drag) return;
+    if (this.formSelectionEl) {
+      this.formSelectionEl.style.transform = '';
+      this.formSelectionEl.style.opacity = '';
+    }
+    if (!drag.moved) return; // 제자리 클릭 — 선택 유지만
+
+    const sel = this.formObjectSelection;
+    if (!sel?.hit || sel.hit.sec === undefined) return;
+    const sc = this.container.querySelector('#scroll-content');
+    if (!sc) return;
+    const cr = sc.getBoundingClientRect();
+    const zoom = this.viewportManager.getZoom();
+    const contentX = e.clientX - cr.left;
+    const contentY = e.clientY - cr.top;
+    const pageIdx = this.virtualScroll.getPageAtPoint(contentX, contentY);
+    if (pageIdx < 0) return;
+    const pageOffset = this.virtualScroll.getPageOffset(pageIdx);
+    const pageLeft = this.virtualScroll.getPageLeftResolved(pageIdx, (sc as HTMLElement).clientWidth);
+    const pageX = (contentX - pageLeft) / zoom;
+    const pageY = (contentY - pageOffset) / zoom;
+    try {
+      const hit = this.wasm.hitTest(pageIdx, pageX, pageY);
+      if (hit.paragraphIndex === undefined || (hit as any).parentParaIndex !== undefined) return; // 셀 안 낙하는 v1 밖
+      if (hit.sectionIndex !== sel.hit.sec) return;
+      const textOffset = this.wasm.logicalToTextOffset(hit.sectionIndex, hit.paragraphIndex, hit.charOffset);
+      this.moveSelectedFormObject({ toPara: hit.paragraphIndex, offset: textOffset });
+    } catch (err) {
+      console.warn('[InputHandler] 양식 드래그 낙하 실패:', err);
+    }
+  }
+
   /** 더블클릭 텍스트/캡션 수정 — Edit·콤보는 text, 나머지는 caption 을 고친다 */
   openFormObjectTextEditor(formHit: FormObjectHitResult, pageIdx: number): void {
     const { sec, para, ci, formType } = formHit;
     if (sec === undefined || para === undefined || ci === undefined) return;
+    // 더블클릭도 개체를 선택 상태로 — "선택 + 바로 수정"(사용자 요청 2026-08-03)
+    this.selectFormObject(formHit, pageIdx);
     if (formType === 'Edit' || formType === 'ComboBox') {
       this.showEditOverlay(sec, para, ci, formHit, pageIdx);
       return;

@@ -1312,7 +1312,13 @@ export function onClick(this: any, e: MouseEvent): void {
         if (this.editMode === 'form') {
           this.handleFormObjectClick(formHit, pageIdx, zoom);
         } else {
+          const already = this.formObjectSelection?.hit;
           this.selectFormObject(formHit, pageIdx);
+          // 이미 선택된 개체를 다시 눌렀다 → 드래그 이동 시작(그림 이동 규약)
+          if (already && already.para === formHit.para && already.ci === formHit.ci) {
+            this.formMoveDrag = { startX: e.clientX, startY: e.clientY, moved: false };
+            document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
+          }
         }
         this.textarea.focus();
         return;
@@ -1748,6 +1754,12 @@ export function onMouseMove(this: any, e: MouseEvent): void {
     return;
   }
 
+  // 양식 개체 이동 드래그 중
+  if (this.formMoveDrag) {
+    this.updateFormMoveDrag(e);
+    return;
+  }
+
   // 그림 이동 드래그 중
   if (this.isPictureMoveDragging && this.pictureMoveState) {
     if (this.dragRafId) return;
@@ -2112,6 +2124,12 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
 }
 
 export function onMouseUp(this: any, _e: MouseEvent): void {
+  // 양식 개체 드래그 낙하
+  if (this.formMoveDrag) {
+    this.finishFormMoveDrag(_e);
+    return;
+  }
+
   // 그림 배치 모드 마우스업 → 삽입 실행
   if (this.imagePlacementMode && this.imagePlacementDrag && this.imagePlacementData) {
     this.finishImagePlacement(_e);
