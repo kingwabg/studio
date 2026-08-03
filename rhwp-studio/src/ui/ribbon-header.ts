@@ -17,8 +17,10 @@
  */
 
 import {
-  RIBBON_TABS, DEFAULT_OFF, loadHidden, saveHidden, type RibbonItem,
+  RIBBON_TABS, DEFAULT_OFF, loadHidden, saveHidden, loadLayout, resolveTabItems,
+  type RibbonItem,
 } from './ribbon-tabs';
+import { showRibbonCustomize } from './ribbon-customize-modal';
 import { createValueBox, type ValueBox } from './ribbon-valuebox';
 
 export { RIBBON_TABS, type RibbonItem };
@@ -362,7 +364,14 @@ export class RibbonHeader {
         : [])),
     ];
 
-    for (const item of tab.items) {
+    // [자유 배치 2026-08-03] 사용자가 짠 배치가 있으면 그 순서·구성으로 그린다.
+    // 없으면 기본 배치(접힘만 반영) — 손대지 않은 탭은 앞으로 기본이 바뀌면 따라간다.
+    const layout = loadLayout();
+    const drawItems = layout[tab.id]
+      ? resolveTabItems(tab, layout, this.hidden)
+      : tab.items;
+
+    for (const item of drawItems) {
       if (item.kind === 'over') continue;
       if (item.kind === 'btn' && off.has(item.label)) continue;
       // 칸(스타일·글꼴·크기·색)도 접을 수 있다 — 버튼만 되던 것을 넓혔다(2026-08-01)
@@ -469,7 +478,10 @@ export class RibbonHeader {
     more.appendChild(ml);
     more.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.toggleEditPanel(more, tab, overItems);
+      // [자유 배치 2026-08-03] 종전엔 그 탭 항목을 켜고 끄기만 하는 작은 패널이었다 —
+      // 다른 탭 아이콘을 홈으로 가져올 수 없었다(사용자 요청으로 모달 고르개로 바꿈).
+      this.closeOverflow();
+      showRibbonCustomize(this.activeTab, () => this.renderRibbon());
     });
     this.ribbonRow.appendChild(more);
 

@@ -355,3 +355,92 @@ export function saveHidden(v: Record<string, string[]>): void {
   try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(v)); } catch { /* 무시 */ }
 }
 
+// ─── 사용자 배치(2026-08-03) ──────────────────────────────────────────
+// 「⋯ 편집」이 켜고 끄기만 되던 것을 **자유 배치**로 넓힌다(사용자 요청):
+// 전체 탭의 아이콘을 다 보여주고 끌어다 홈에 원하는 것만 남긴다.
+//
+// 저장 모델: 탭마다 "이 탭에 이 순서로 이것들을 놓는다"는 라벨 목록.
+// 없는 탭은 기본 배치(RIBBON_TABS) 그대로 — 손대지 않은 탭은 앞으로 기본이 바뀌면 따라간다.
+// (켜고 끄기(hidden)와 달리 **다른 탭 것도 가져올 수 있다**는 게 핵심 차이다.)
+
+const CUSTOM_KEY = 'rhwpRibbonCustom';
+
+export type RibbonLayout = Record<string, string[]>;
+
+export function loadLayout(): RibbonLayout {
+  try {
+    const raw = localStorage.getItem(CUSTOM_KEY);
+    if (raw) return JSON.parse(raw) as RibbonLayout;
+  } catch { /* 시크릿 모드 등 */ }
+  return {};
+}
+
+export function saveLayout(v: RibbonLayout): void {
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(v)); } catch { /* 무시 */ }
+}
+
+/** 라벨을 가진 모든 항목 — 어느 탭에서 왔는지와 함께. 배치 고르개의 재료다. */
+export interface CatalogEntry {
+  label: string;
+  icon: string;
+  fromTab: string;
+  item: RibbonItem;
+}
+
+export function buildCatalog(): CatalogEntry[] {
+  const seen = new Set<string>();
+  const out: CatalogEntry[] = [];
+  for (const tab of RIBBON_TABS) {
+    for (const item of tab.items) {
+      const label =
+        item.kind === 'btn' || item.kind === 'over' || item.kind === 'value' ? item.label
+        : item.kind === 'slot' ? item.label
+        : undefined;
+      if (!label || seen.has(label)) continue; // 같은 라벨은 한 번만(되돌리기는 홈·편집 양쪽에 있다)
+      seen.add(label);
+      const icon =
+        item.kind === 'btn' || item.kind === 'over' || item.kind === 'value' ? item.icon
+        : item.kind === 'slot' ? (item.icon ?? 'square')
+        : 'square';
+      out.push({ label, icon, fromTab: tab.label, item });
+    }
+  }
+  return out;
+}
+
+/** 라벨 → 항목 정의 (배치 목록을 실제 리본 항목으로 되돌릴 때) */
+export function catalogMap(): Map<string, RibbonItem> {
+  const m = new Map<string, RibbonItem>();
+  for (const e of buildCatalog()) m.set(e.label, e.item);
+  return m;
+}
+
+/**
+ * 이 탭에 실제로 놓을 항목들.
+ * 사용자 배치가 있으면 그것(구분선은 원래 자리 대신 무리 사이에 자동으로 하나씩),
+ * 없으면 기본 배치에서 접힌 것만 뺀다.
+ */
+export function resolveTabItems(
+  tab: { id: string; items: RibbonItem[] },
+  layout: RibbonLayout,
+  hidden: Record<string, string[]>,
+): RibbonItem[] {
+  const custom = layout[tab.id];
+  if (!custom) {
+    const off = new Set(hidden[tab.id] ?? []);
+    return tab.items.filter((i) => {
+      if (i.kind === 'btn') return !off.has(i.label);
+      if (i.kind === 'slot' && i.label) return !off.has(i.label);
+      if (i.kind === 'value') return !off.has(i.label);
+      return true;
+    });
+  }
+  const map = catalogMap();
+  const items: RibbonItem[] = [];
+  for (const label of custom) {
+    const it = map.get(label);
+    if (it) items.push(it);
+  }
+  return items;
+}
+
