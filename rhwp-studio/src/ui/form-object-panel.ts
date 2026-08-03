@@ -115,6 +115,23 @@ export function buildFormObjectPanel(host: HTMLElement, services: CanvaServices)
     groupSec.appendChild(row);
   }
 
+  // ── 항목(콤보) — 줄 하나가 항목 하나 ──
+  if (formType === 'ComboBox') {
+    const itemSec = section('항목');
+    const ta = document.createElement('textarea');
+    ta.rows = 5;
+    ta.placeholder = '항목을 한 줄에 하나씩 적으세요\n예)\n봄\n여름\n가을';
+    ta.value = (info.items ?? []).join('\n');
+    ta.style.cssText = 'width:100%;padding:6px 8px;border:1px solid var(--color-border,#ddd);border-radius:5px;font-size:12px;resize:vertical;box-sizing:border-box';
+    ta.addEventListener('change', () => {
+      const items = ta.value.split('\n').map((l) => l.trim()).filter(Boolean);
+      apply({ items });
+    });
+    itemSec.appendChild(ta);
+    itemSec.appendChild(mkEl('div', 'canva-hint',
+      '양식 모드에서 개체를 클릭하면 이 목록이 펼쳐집니다.'));
+  }
+
   // ── 크기 (mm) ──
   const sizeSec = section('크기');
   const sizeRow = mkEl('div', 'canva-chip-row');
