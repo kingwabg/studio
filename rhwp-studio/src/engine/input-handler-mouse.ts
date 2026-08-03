@@ -1309,6 +1309,8 @@ export function onClick(this: any, e: MouseEvent): void {
     {
       const formHit = this.wasm.getFormObjectAt(pageIdx, pageX, pageY);
       if (formHit.found) {
+        // 더블클릭으로 오버레이가 떠 있으면 그 입력창이 주인 — 아래 focus 로 뺏지 않는다
+        if (this.formOverlay) return;
         if (this.editMode === 'form') {
           this.handleFormObjectClick(formHit, pageIdx, zoom);
         } else {

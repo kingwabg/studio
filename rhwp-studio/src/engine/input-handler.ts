@@ -2739,6 +2739,9 @@ export class InputHandler {
 
   /** textarea에 포커스를 설정한다 (iOS 호환) */
   private focusTextarea(): void {
+    // 양식 오버레이(캡션·내용 입력)가 떠 있으면 편집기가 포커스를 뺏으면 안 된다 —
+    // 뺏기면 사용자가 친 글이 개체가 아니라 **본문에 들어간다**(2026-08-03 배포본 실측).
+    if (this.formOverlay) return;
     this.textarea.focus();
   }
 
@@ -5399,7 +5402,9 @@ export class InputHandler {
     const scrollContent = this.container.querySelector('#scroll-content');
     (scrollContent ?? this.container).appendChild(input);
     this.formOverlay = input;
-    requestAnimationFrame(() => { input.focus(); input.select(); });
+    const grab = () => { if (this.formOverlay === input) { input.focus(); input.select(); } };
+    requestAnimationFrame(grab);
+    setTimeout(grab, 0);
   }
 
   private formBboxToOverlayRect(bbox: { x: number; y: number; w: number; h: number }, pageIdx: number): { left: number; top: number; width: number; height: number } {
@@ -5526,9 +5531,9 @@ export class InputHandler {
     (scrollContent ?? this.container).appendChild(input);
     this.formOverlay = input;
 
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
+    // rAF 한 번으로는 편집기(textarea)에 포커스를 뺏길 수 있다 — 다음 틱까지 붙잡는다.
+    const grab = () => { if (this.formOverlay === input) { input.focus(); input.select(); } };
+    requestAnimationFrame(grab);
+    setTimeout(grab, 0);
   }
 }
