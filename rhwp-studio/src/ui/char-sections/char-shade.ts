@@ -53,11 +53,13 @@ export function buildCharShadeSection(host: HTMLElement, deps: CharSectionDeps):
 
   const row = mkEl('div', 'canva-swatches');
 
-  // 클릭으로도 바뀌는 값이라 지역 변수로 든다(재클릭 해제 판정 + 즉시 표시 갱신 둘 다 필요)
-  let cur = norm(deps.charProps?.shadeColor);
+  // ⚠ 지금 값을 지역 변수에 담아 두면 안 된다 — 섹션은 한 번만 그려지고 커서를 따라오지 않는다.
+  //   낡은 값으로 토글을 판정하면 엉뚱하게 "해제"만 보낸다(강조점에서 실제로 터진 결함).
+  const curValue = (): string => norm(deps.getCharProps()?.shadeColor);
   const swatches = new Map<string, HTMLButtonElement>();
 
   const repaint = (): void => {
+    const cur = curValue();
     for (const [c, el] of swatches) {
       const on = c === cur;
       el.classList.toggle('is-active', on);
@@ -78,11 +80,9 @@ export function buildCharShadeSection(host: HTMLElement, deps: CharSectionDeps):
     b.addEventListener('mousedown', (e) => {
       e.preventDefault();
       // 같은 색을 다시 누르면 해제 — 없음으로 되돌린다(끄려고 대화상자를 여는 일이 없게)
-      const next = color === cur ? NONE : color;
+      const next = color === curValue() ? NONE : color;
       deps.applyChar({ shadeColor: next });
-      cur = next;
       repaint();
-      deps.redraw();
     });
     swatches.set(color, b);
     row.appendChild(b);
@@ -94,4 +94,5 @@ export function buildCharShadeSection(host: HTMLElement, deps: CharSectionDeps):
   repaint();
   sec.appendChild(row);
   host.appendChild(sec);
+  deps.onCharChange(() => repaint());
 }

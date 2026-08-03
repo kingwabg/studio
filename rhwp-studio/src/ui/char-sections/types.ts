@@ -20,8 +20,17 @@ export interface CharSectionDeps {
    * 호출자가 반환된 요소에 내용을 채워 넣고, host 에는 이미 붙어 있다.
    */
   section: (label: string, link?: { text: string; onClick: () => void }) => HTMLElement;
-  /** 지금 커서/선택의 글자 속성 — 없으면 null */
+  /**
+   * 섹션을 **그릴 때**의 글자 속성 — 없으면 null.
+   * ⚠ 이건 스냅숏이다. 섹션은 탭을 열 때 한 번만 그려지고 커서가 움직여도 다시 안 그려지므로,
+   *   **누를 때 판단하는 값(토글 on/off 같은 것)은 반드시 `getCharProps()` 로 다시 읽어라.**
+   *   (2026-08-03 실결함: 강조점이 낡은 값으로 토글돼 두 번째 문단부터는 "해제"만 보냈다.)
+   */
   charProps: CharProperties | null;
+  /** 지금 이 순간의 글자 속성 — 커서를 옮긴 뒤에도 맞는 값 */
+  getCharProps: () => CharProperties | null;
+  /** 커서 서식이 바뀔 때마다 부른다(섹션의 켜짐 표시 갱신용). 패널을 다시 그리면 자동 해제된다. */
+  onCharChange: (fn: (p: CharProperties) => void) => void;
   /**
    * 글자 서식 적용 — 내부에서 `eventBus.emit('format-char', patch)` 를 부른다.
    * 선택이 있으면 그 범위에, 없으면 대기 서식(다음 입력)에 걸린다.

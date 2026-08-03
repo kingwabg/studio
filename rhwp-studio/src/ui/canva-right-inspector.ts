@@ -230,6 +230,8 @@ export class CanvaRightInspector {
     // "고른 것을 자세히 손보는 자리"다(리본과 겹치면 오늘 「스타일 설정」처럼 지우게 된다).
     // 각 기능은 ui/char-sections/ 안에 파일 하나씩 산다. 적용은 전부 아래 applyChar 한 경로.
     {
+      // 이 묶음을 다시 그리면 옛 섹션의 구독은 버린다(안 버리면 죽은 DOM 을 계속 칠한다).
+      this.charSectionWatchers = [];
       const charDeps: CharSectionDeps = {
         services: this.services,
         section: (label, link) => {
@@ -238,6 +240,8 @@ export class CanvaRightInspector {
           return sec;
         },
         charProps: this.lastCharProps ?? null,
+        getCharProps: () => this.lastCharProps ?? null,
+        onCharChange: (fn) => { this.charSectionWatchers.push(fn); },
         applyChar: (patch) => this.services.eventBus.emit('format-char', patch),
         redraw: () => this.applyContext(),
       };
@@ -321,8 +325,14 @@ export class CanvaRightInspector {
   /** 마지막으로 받은 커서 글자 속성 — char-sections 가 "지금 값"을 보여줄 때 쓴다 */
   private lastCharProps: CharProperties | null = null;
 
+  /** char-sections 가 걸어 둔 "커서 서식 바뀜" 구독 — 패널을 다시 그릴 때 통째로 버린다 */
+  private charSectionWatchers: Array<(p: CharProperties) => void> = [];
+
   private reflectChar(p: CharProperties): void {
     this.lastCharProps = p;
+    for (const fn of this.charSectionWatchers) {
+      try { fn(p); } catch { /* 표시용 — 한 섹션이 죽어도 나머지는 칠한다 */ }
+    }
     this.specimen.reflectChar(p);
     const ih = this.services.getInputHandler() as any;
     const ihc = ih?.cursor;

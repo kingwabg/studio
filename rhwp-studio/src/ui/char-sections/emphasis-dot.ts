@@ -34,9 +34,16 @@ export function buildEmphasisSection(host: HTMLElement, deps: CharSectionDeps): 
   const sec = deps.section('강조점');
   const row = mkEl('div', 'canva-chip-row');
 
-  // 지금 값은 클릭으로도 바뀐다 — 재클릭 해제(토글) 판정과 즉시 표시 갱신에 둘 다 필요해 지역 변수로 든다
-  let cur = deps.charProps?.emphasisDot ?? 0;
+  // ⚠ 지금 값을 **지역 변수에 담아 두면 안 된다**: 이 섹션은 탭을 열 때 한 번만 그려지고
+  //   커서가 움직여도 다시 안 그려진다. 낡은 값으로 토글을 판정하면 이미 점이 없는 문단에서도
+  //   "해제(0)"를 보내 아무 일도 일어나지 않는다 — 사용자에겐 "기능이 전혀 안 되는" 걸로 보인다
+  //   (2026-08-03 실측: 첫 문단에 한 번 찍은 뒤 다른 문단에서는 영영 안 찍혔다).
+  const curValue = (): number => deps.getCharProps()?.emphasisDot ?? 0;
   const chips = new Map<number, HTMLButtonElement>();
+  const paintAll = (): void => {
+    const cur = curValue();
+    for (const [v, el] of chips) paintChip(el, v === cur);
+  };
 
   const add = (value: number, body: (b: HTMLButtonElement) => void, title: string): void => {
     const b = mkButton('canva-chip', { title });
@@ -46,14 +53,11 @@ export function buildEmphasisSection(host: HTMLElement, deps: CharSectionDeps): 
     //    서식이 선택 범위가 아니라 엉뚱한 대기 서식으로 걸린다(패널의 다른 버튼들과 같은 규약).
     b.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      const next = value === cur ? 0 : value; // 같은 걸 다시 누르면 해제
+      const next = value === curValue() ? 0 : value; // 같은 걸 다시 누르면 해제
       deps.applyChar({ emphasisDot: next });
-      cur = next;
-      for (const [v, el] of chips) paintChip(el, v === cur);
-      deps.redraw();
+      paintAll();
     });
     chips.set(value, b);
-    paintChip(b, value === cur);
     row.appendChild(b);
   };
 
@@ -75,4 +79,8 @@ export function buildEmphasisSection(host: HTMLElement, deps: CharSectionDeps): 
 
   sec.appendChild(row);
   host.appendChild(sec);
+
+  paintAll();
+  // 커서가 움직이면 켜짐 표시도 따라간다(리본의 굵게 단추와 같은 규약).
+  deps.onCharChange(() => paintAll());
 }
