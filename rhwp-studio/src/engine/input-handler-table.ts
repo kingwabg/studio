@@ -433,15 +433,29 @@ export function startResizeDrag(this: any,
     borderOriginalPos,
   );
   if (!resizeTarget) return;
-  const shouldResizeSingleCell = shiftResize ||
-    isKnownLocalResizeSegment(this, this.cachedTableRef, edge, resizeTarget, this.cachedCellBboxes);
+  // 한 셀만 움직이는 건 **Shift 를 누른 그 드래그**뿐이다. 예전엔 한 번 로컬 리사이즈한
+  // 경계(segment 기억)를 이후 일반 드래그에서도 자동으로 로컬 처리해, 표가 한 번 어긋나면
+  // 드래그마다 더 찢어졌다(사용자 신고 2026-08-04). 한컴 정본: 일반 드래그 = 줄 전체.
+  const shouldResizeSingleCell = shiftResize;
   const singleCellTarget = shouldResizeSingleCell ? resizeTarget : null;
   const logicalAffectedCellIndices = !shouldResizeSingleCell
     ? findAlignedLogicalResizeAffectedCells(edge, resizeTarget, this.cachedCellBboxes)
     : [];
-  const affectedCellIndices = logicalAffectedCellIndices.length > 0
+  let affectedCellIndices = logicalAffectedCellIndices.length > 0
     ? logicalAffectedCellIndices
     : coordinateAffectedCellIndices;
+  // 맨 왼쪽 바깥 테두리: 경계에서 '끝나는' 셀이 없어 집합이 비고 드래그가 무동작이었다.
+  // 첫 열 전체를 대상(부호 반전·보상 없음)으로 잡으면 엔진이 표 폭까지 따라 줄인다.
+  let outerStartEdge = false;
+  if (!singleCellTarget && affectedCellIndices.length === 0 && edge.type === 'col') {
+    const targetBox = this.cachedCellBboxes.find((b: CellBbox) => b.cellIdx === resizeTarget.cellIdx);
+    if (resizeTarget.side === 'start' && targetBox?.col === 0) {
+      affectedCellIndices = [...new Set(
+        (this.cachedCellBboxes as CellBbox[]).filter(b => b.col === 0).map(b => b.cellIdx),
+      )];
+      outerStartEdge = affectedCellIndices.length > 0;
+    }
+  }
   if (affectedCellIndices.length === 0 && !singleCellTarget) return;
   const affectedBounds = !singleCellTarget && hasLocalResizeHistory(this, this.cachedTableRef)
     ? computeAffectedResizePositionBounds(edge, affectedCellIndices, this.cachedCellBboxes)
@@ -467,6 +481,7 @@ export function startResizeDrag(this: any,
     resizeTarget,
     singleCellTarget,
     shiftResize: shouldResizeSingleCell,
+    outerStartEdge,
     snapTargets, // [캔버스 한컴 포크]
   };
 
@@ -735,6 +750,28 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       this.cleanupResizeDrag();
       return;
     }
+  } else if (state.outerStartEdge) {
+    // 맨 왼쪽 바깥 테두리: 첫 열 전체 폭 조절 — 오른쪽으로 끌면(+) 첫 열이 줄어든다.
+    // 보상 이웃 없음(비보상 delta) → 엔진이 표 전체 폭을 함께 갱신한다.
+    let effDelta = -deltaHwpUnit;
+    if (effDelta < 0) {
+      let minWidth = Infinity;
+      for (const cellIdx of state.affectedCellIndices) {
+        try {
+          const props = this.wasm.getCellProperties(
+            state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci, cellIdx);
+          if (Number.isFinite(props.width)) minWidth = Math.min(minWidth, props.width);
+        } catch { /* 조회 실패 셀은 클램프 제외 */ }
+      }
+      if (Number.isFinite(minWidth)) {
+        effDelta = -Math.min(-effDelta, Math.max(0, minWidth - minCellSizeHwp('col')));
+      }
+    }
+    if (effDelta === 0) {
+      this.cleanupResizeDrag();
+      return;
+    }
+    updates = state.affectedCellIndices.map((cellIdx: number) => ({ cellIdx, widthDelta: effDelta }));
   } else {
     // 일반 모드: 균일한 내부 경계 전체를 움직이되, 반대편 이웃 셀을 보상해 표 외곽을 유지
     if (state.affectedCellIndices.length === 0) {

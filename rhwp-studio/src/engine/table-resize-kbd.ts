@@ -31,7 +31,9 @@ export interface CellPropsProvider {
 
 // ── 정렬 그룹 / 이웃 ──────────────────────────────────────────────
 
-// 경계 좌표가 같은(정렬된) 셀들만 — 열/행 인덱스가 아니라 실제 경계 좌표(±1px)로 묶는다.
+// 같은 논리 경계선에 접한 셀 전부 — 열/행 인덱스 기준. 예전엔 실제 경계 좌표(±1px)로
+// 한 번 더 걸렀는데, 그 필터가 이미 어긋난 표에서 집합을 한 셀로 무너뜨려 드래그마다
+// 격자가 더 찢어졌다(사용자 신고 2026-08-04). 한컴 정본: 경계선은 줄 전체가 움직인다.
 export function findAlignedLogicalResizeAffectedCells(
   edge: BorderEdge,
   target: { cellIdx: number; side: 'start' | 'end' },
@@ -39,33 +41,21 @@ export function findAlignedLogicalResizeAffectedCells(
 ): number[] {
   const targetBox = bboxes.find(b => b.cellIdx === target.cellIdx);
   if (!targetBox) return [];
-  const tolerance = 1.0;
-  const rounded = (v: number) => Math.round(v / tolerance) * tolerance;
 
   if (edge.type === 'col') {
     const boundaryCol = target.side === 'end'
       ? targetBox.col + targetBox.colSpan
       : targetBox.col;
-    const targetCoord = rounded(target.side === 'end' ? targetBox.x + targetBox.w : targetBox.x);
     return [...new Set(
-      bboxes
-        .filter(b =>
-          b.col + b.colSpan === boundaryCol &&
-          Math.abs(rounded(b.x + b.w) - targetCoord) <= tolerance)
-        .map(b => b.cellIdx),
+      bboxes.filter(b => b.col + b.colSpan === boundaryCol).map(b => b.cellIdx),
     )];
   }
 
   const boundaryRow = target.side === 'end'
     ? targetBox.row + targetBox.rowSpan
     : targetBox.row;
-  const targetCoord = rounded(target.side === 'end' ? targetBox.y + targetBox.h : targetBox.y);
   return [...new Set(
-    bboxes
-      .filter(b =>
-        b.row + b.rowSpan === boundaryRow &&
-        Math.abs(rounded(b.y + b.h) - targetCoord) <= tolerance)
-      .map(b => b.cellIdx),
+    bboxes.filter(b => b.row + b.rowSpan === boundaryRow).map(b => b.cellIdx),
   )];
 }
 
