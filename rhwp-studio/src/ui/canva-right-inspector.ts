@@ -38,7 +38,7 @@ import { buildCharShadeSection } from './char-sections/char-shade';
 import { buildRelativeSizeSection } from './char-sections/relative-size';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture' | 'form';
-export type PanelTab = 'props' | 'text' | 'table' | 'cell' | 'style';
+export type PanelTab = 'props' | 'text' | 'table' | 'cell';
 
 /** 각 탭의 섹션 목차 (디자인 2c 갱신 2026-07-30 — 텍스트 탭 신설) */
 const SECTIONS: Record<'text' | 'table' | 'cell', Array<[string, string]>> = {
@@ -163,31 +163,13 @@ export class CanvaRightInspector {
     //   — 스타일 설정으로 대체. 남는 것: 지금 서식 견본 · 텍스트 스타일(+스타일 설정) · 도구.
     //   상태 반영(reflectChar)은 이 요소들이 없어도 되게 옵셔널로 두었다.
 
-    // [글자 탭 확장 2026-08-03] 리본에 **없는** 글자 서식들을 여기 모은다 — 패널은
-    // "고른 것을 자세히 손보는 자리"다(리본과 겹치면 오늘 「스타일 설정」처럼 지우게 된다).
-    // 각 기능은 ui/char-sections/ 안에 파일 하나씩 산다. 적용은 전부 아래 applyChar 한 경로.
-    {
-      // 이 묶음을 다시 그리면 옛 섹션의 구독은 버린다(안 버리면 죽은 DOM 을 계속 칠한다).
-      this.charSectionWatchers = [];
-      const charDeps: CharSectionDeps = {
-        services: this.services,
-        section: (label, link) => {
-          const sec = this.section(label, link);
-          this.fmtPane.appendChild(sec);
-          return sec;
-        },
-        charProps: this.lastCharProps ?? null,
-        getCharProps: () => this.lastCharProps ?? null,
-        onCharChange: (fn) => { this.charSectionWatchers.push(fn); },
-        applyChar: (patch) => this.services.eventBus.emit('format-char', patch),
-        redraw: () => this.applyContext(),
-      };
-      buildSameFormatSection(this.fmtPane, charDeps);
-      buildEmphasisSection(this.fmtPane, charDeps);
-      buildLineDecorSection(this.fmtPane, charDeps);
-      buildCharShadeSection(this.fmtPane, charDeps);
-      buildRelativeSizeSection(this.fmtPane, charDeps);
-    }
+    // [글자 탭 확장 2026-08-03] 리본에 **없는** 글자 서식들을 여기 모은다.
+    // ⚠ render() 는 생성자에서 **한 번만** 돈다 — 하위 탭을 바꿔도 여기가 다시 안 그려진다.
+    //   그래서 실제 조립은 buildCharSections() 로 빼서 필요할 때마다 다시 부른다(2026-08-05).
+    this.charStrip = mkEl('div', 'canva-sub-strip');
+    this.charBody = mkEl('div', 'canva-char-body');
+    this.fmtPane.append(this.charStrip, this.charBody);
+    this.buildCharSections();
 
     // [디자인 2c] AI·녹음은 탭에서 빠졌다 → 속성 탭 하단이 그 진입점이다.
     // (탭만 없애고 진입점을 안 만들어 AI 패널이 열리지 않던 상태를 여기서 메운다.)
@@ -264,6 +246,10 @@ export class CanvaRightInspector {
   private lastCharProps: CharProperties | null = null;
 
   /** char-sections 가 걸어 둔 "커서 서식 바뀜" 구독 — 패널을 다시 그릴 때 통째로 버린다 */
+  /** 글자 탭 하위 탭 — 기본(프리셋·견본) / 속성(밑줄·글자 음영) */
+  private charSub: 'basic' | 'attr' = 'basic';
+  private charStrip!: HTMLElement;
+  private charBody!: HTMLElement;
   private charSectionWatchers: Array<(p: CharProperties) => void> = [];
 
   private reflectChar(p: CharProperties): void {
@@ -451,8 +437,10 @@ export class CanvaRightInspector {
 
   private visibleTabs(): PanelTab[] {
     if (this.ctx === 'none') return ['props'];
-    if (this.ctx === 'cell' || this.ctx === 'table') return ['props', 'text', 'table', 'cell', 'style'];
-    return ['props', 'text', 'style'];
+    // [2026-08-05 사용자 지시] 탭은 **글자·문단** 둘로. 스타일은 문단 탭 안으로 들어갔다 —
+    // 이름 있는 스타일은 문단 단위로 고르는 것이라 그쪽이 제자리다.
+    if (this.ctx === 'cell' || this.ctx === 'table') return ['props', 'text', 'table', 'cell'];
+    return ['props', 'text'];
   }
 
   private syncTabs(): void {
@@ -702,6 +690,53 @@ export class CanvaRightInspector {
     host.appendChild(tplSec);
   }
 
+  /**
+   * 글자 탭 본문 — 하위 탭(기본/속성)과 그 내용.
+   *
+   * [2026-08-05 사용자 지시] 한 화면에 서식을 다 쌓으면 스크롤이 길어져 아래 것들을
+   * 아무도 못 찾는다. 속성 = 사용자가 짚은 범위(밑줄·취소선 ~ 글자 음영) + 성격이 같은 상대 크기.
+   */
+  private buildCharSections(): void {
+    this.charStrip.innerHTML = '';
+    this.charBody.innerHTML = '';
+    ([['basic', '기본'], ['attr', '속성']] as Array<['basic' | 'attr', string]>).forEach(([key, label]) => {
+      const b = mkButton('canva-sub-btn', { title: label });
+      b.textContent = label;
+      b.classList.toggle('is-on', this.charSub === key);
+      b.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (this.charSub === key) return;
+        this.charSub = key;
+        this.buildCharSections();
+      });
+      this.charStrip.appendChild(b);
+    });
+
+    // 이 묶음을 다시 그리면 옛 섹션의 구독은 버린다(안 버리면 죽은 DOM 을 계속 칠한다).
+    this.charSectionWatchers = [];
+    const charDeps: CharSectionDeps = {
+      services: this.services,
+      section: (label, link) => {
+        const sec = this.section(label, link);
+        this.charBody.appendChild(sec);
+        return sec;
+      },
+      charProps: this.lastCharProps ?? null,
+      getCharProps: () => this.lastCharProps ?? null,
+      onCharChange: (fn) => { this.charSectionWatchers.push(fn); },
+      applyChar: (patch) => this.services.eventBus.emit('format-char', patch),
+      redraw: () => this.buildCharSections(),
+    };
+    if (this.charSub === 'basic') {
+      buildSameFormatSection(this.charBody, charDeps);
+      buildEmphasisSection(this.charBody, charDeps);
+    } else {
+      buildLineDecorSection(this.charBody, charDeps);
+      buildCharShadeSection(this.charBody, charDeps);
+      buildRelativeSizeSection(this.charBody, charDeps);
+    }
+  }
+
   private buildStyleTab(host: HTMLElement): void {
     this.buildQuickStyleSections(host);
     const sec = this.section('스타일');
@@ -938,15 +973,15 @@ export class CanvaRightInspector {
       if (this.panelTab === 'text') {
         buildTextTab(this.tabPane, {
           strip: this.buildSectionStrip('text'),
-          mount: (host) => this.textSections.mount(host, this.services, this.curSection.text),
+          mount: (host) => {
+            const r = this.textSections.mount(host, this.services, this.curSection.text);
+            // [2026-08-05] 스타일 탭을 없애고 여기로 옮겼다 — 이름 있는 스타일은
+            //   문단 단위로 고르는 것이라 문단 탭이 제자리다.
+            this.buildStyleTab(host);
+            return r;
+          },
           redraw: () => this.applyContext(),
         });
-        return;
-      }
-
-      // 스타일 탭 = 문서 스타일 목록(이름 있는 스타일) — 카드 클릭으로 적용
-      if (this.panelTab === 'style') {
-        this.buildStyleTab(this.tabPane);
         return;
       }
 

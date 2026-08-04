@@ -58,11 +58,11 @@ export function mountCanvaSidebars(services: CanvaServices): void {
   // [디자인 2c 갱신] 탭 = 속성 · 표 · 셀 (AI·녹음은 명세에서 빠짐 → 속성 탭 하단으로 접근)
   // [컨텍스트 탭 2026-07-30] 탭 4종이 있고 **보이는 집합이 선택을 따라간다**:
   // 본문 = 속성·텍스트 / 표 안 = 속성·텍스트·표·셀 / 선택 없음 = 속성.
-  const ALL_TABS: PanelTab[] = ['props', 'text', 'table', 'cell', 'style'];
+  const ALL_TABS: PanelTab[] = ['props', 'text', 'table', 'cell'];
   // [디자인 3a·3b 2026-07-30] 라벨을 「글자 · 문단」으로. 코드 키(props/text)는 그대로다.
   // 「속성」은 무엇이든 가리키는 빈 이름이고 「텍스트」는 옆 탭의 글자 서식과 구별되지
   // 않았다 — 담긴 것이 글자 서식과 문단 모양이므로 이름에서 경계가 읽히게 한다.
-  const LABELS: Record<PanelTab, string> = { props: '글자', text: '문단', table: '표', cell: '셀', style: '스타일' };
+  const LABELS: Record<PanelTab, string> = { props: '글자', text: '문단', table: '표', cell: '셀' };
   const showTab = (idx: number) => {
     inspectorPane.hidden = false;
     aiPane.hidden = true;
