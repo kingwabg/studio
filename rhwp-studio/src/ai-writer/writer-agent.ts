@@ -63,7 +63,7 @@ export class WriterSession {
     const steps: WriterStep[] = [];
     let realized = false;
     let transcript = `사용자 요청: ${userText}`;
-    let nudged = false;
+    let nudgeCount = 0;
 
     const doRealize = (): string => {
       this.map = realize(services, this.doc);
@@ -78,24 +78,51 @@ export class WriterSession {
       const call = parseCall(reply);
 
       if (!call) {
-        // JSON 이 아니면 한 번은 형식을 못박아 되묻는다(문서 작업 에이전트의 실사고 이관).
-        if (!nudged) {
-          nudged = true;
-          transcript += '\n\n[형식 오류] 방금 응답에 JSON 이 없었다. 설명을 쓰지 말고 도구 JSON 한 개만 출력하라.';
+        // JSON 이 아니면 두 번까지 형식을 못박아 되묻는다(문서 작업 에이전트의 실사고 이관).
+        if (nudgeCount < 2) {
+          nudgeCount += 1;
+          transcript += '\n\n[형식 오류] 방금 응답에 도구 JSON 이 없었다. 설명·본문을 직접 쓰지 말고 '
+            + '반드시 {"tool":"add_section",…} 같은 도구 JSON 한 개만 출력하라.';
           continue;
         }
-        const step: WriterStep = { kind: 'final', summary: reply.trim() };
+        /**
+         * 그래도 본문을 뱉으면 **지면으로 구조한다**(사용자 신고 2026-08-05: "채팅창에
+         * 만들었어"). 작은 모델은 형식을 끝내 안 지키기도 하는데, 그때 내용을 채팅에
+         * 버리면 사용자는 지면이 비어 있는 것만 본다 — 문서 도우미의 실패 중 최악이다.
+         */
+        const body = reply.trim();
+        if (body.length > 120) {
+          const paras = body.split(/\n{2,}|\n/).map((t) => t.trim()).filter(Boolean).slice(0, 40);
+          runWriterTool(this.doc, 'add_section', {
+            heading: '작성 내용', level: 1,
+            blocks: paras.map((t) => ({ type: 'para', text: t })),
+          });
+          doRealize();
+          const note = '모델이 도구 형식을 지키지 않아, 출력한 내용을 문서 본문으로 직접 옮겼습니다. '
+            + '구성이 어색하면 같은 요청을 한 번 더 보내 주세요.';
+          steps.push({ kind: 'final', summary: note });
+          return { finalText: note, steps, realized };
+        }
+        const step: WriterStep = { kind: 'final', summary: body };
         steps.push(step);
-        return { finalText: reply.trim(), steps, realized };
+        return { finalText: body, steps, realized };
       }
 
       const outcome = runWriterTool(this.doc, call.tool, call.args);
-      if (outcome.dirty) this.dirty = true;
 
       let result = outcome.result;
+      if (outcome.dirty) {
+        /**
+         * 도구가 문서를 바꿀 때마다 **즉시** 지면에 그린다(사용자 지시 2026-08-05:
+         * "만들어지는 과정까지 보이면 좋겠다"). 섹션이 하나 붙을 때마다 지면이 자라는
+         * 모습이 보이고, 한 번에 완성본이 뚝 떨어지지 않는다.
+         * 비용은 매번 전체 재구축이지만 섹션 수십 개 수준에선 체감이 없다.
+         */
+        const err = doRealize();
+        if (err) result += `\n${err}`;
+      }
       if (outcome.wantsReview) {
-        // review_pages: 낡았으면 다시 실체화한 뒤 **진짜 조판**을 읽는다.
-        if (this.dirty || !this.map) {
+        if (!this.map) {
           const err = doRealize();
           if (err) result = err;
         }
@@ -103,8 +130,7 @@ export class WriterSession {
       }
 
       if (outcome.finished) {
-        // 마지막 실체화 — 모델이 고친 것이 지면에 남게.
-        if (this.dirty || !this.map) doRealize();
+        if (!this.map) doRealize(); // 도구 없이 done 만 온 극단 경로 방어
         const step: WriterStep = { kind: 'final', summary: outcome.report ?? result };
         steps.push(step);
         return { finalText: outcome.report ?? result, steps, realized };
@@ -117,8 +143,7 @@ export class WriterSession {
       transcript += `\n\n[${call.tool} 결과]\n${result}`;
     }
 
-    // 상한에 닿아도 지금까지 만든 것은 지면에 남긴다 — 절반이라도 사용자 손에.
-    if (this.dirty) doRealize();
+    // 상한에 닿아도 매 도구마다 실체화했으므로 지면에는 이미 남아 있다.
     const timeout: WriterStep = {
       kind: 'final',
       summary: '작성 횟수 상한에 닿아 멈췄습니다. 지금까지 만든 부분은 문서에 있습니다 — 이어서 요청해 주세요.',
