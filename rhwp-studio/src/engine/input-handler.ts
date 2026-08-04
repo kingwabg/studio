@@ -5383,7 +5383,12 @@ export class InputHandler {
       this.formSelectionEl.style.transform = '';
       this.formSelectionEl.style.opacity = '';
     }
-    if (!drag.moved) return; // 제자리 클릭 — 선택 유지만
+    if (!drag.moved) {
+      // 제자리 클릭 = 선택 토글 해제 — "선택→해제→선택"이 클릭만으로 오간다
+      // (사용자 요청 2026-08-04). 끌면(moved) 여전히 드래그 이동이다.
+      this.clearFormObjectSelection();
+      return;
+    }
 
     const sel = this.formObjectSelection;
     if (!sel?.hit || sel.hit.sec === undefined) return;
