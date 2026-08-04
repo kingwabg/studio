@@ -8,6 +8,9 @@
  * (구 MiniMax 직결 경로는 2026-08-04 제거 — 공급자가 NVIDIA NIM 으로 대체됨)
  */
 import { NVIDIA_MODELS } from './ai-models';
+// 실패 해석은 의존성 0 모듈로 분리했다(테스트 가능하게) — 재export 로 기존 사용처를 유지한다.
+import { isBusy } from './ai-error';
+export { aiErrorHint } from './ai-error';
 
 /** 모델 미선택 시 기본값 — 한국어 교정 실측 1위(ai-models.ts 의 순서가 곧 근거). */
 export const AI_MODEL = NVIDIA_MODELS[0].id;
@@ -34,7 +37,30 @@ let hostProxyKnown = false;
 export function markHostProxy(): void { hostProxyKnown = true; }
 export function isHostProxy(): boolean { return hostProxyKnown; }
 
+/**
+ * ⚠ 공급자 혼잡은 **재시도로 넘긴다**(2026-08-05 실사고).
+ *   NVIDIA NIM 무료 티어는 큰 모델일수록 대기열이 붐벼
+ *   "ResourceExhausted: Worker local total request limit reached (77/32)" 가 뜬다.
+ *   에이전트는 한 턴에 도구를 여러 번 부르므로, 중간 한 번이 막히면 작업 전체가 죽는다.
+ *   짧게 두 번만 더 시도한다 — 더 늘리면 붐비는 큐를 우리가 더 밀어 넣는 꼴이 된다.
+ */
+const BUSY_RETRY_DELAYS = [1200, 3000];
+
 export async function callAi(systemPrompt: string, userText: string, maxTokens = 2048): Promise<string> {
+  let lastErr = '';
+  for (let attempt = 0; attempt <= BUSY_RETRY_DELAYS.length; attempt++) {
+    try {
+      return await callOnce(systemPrompt, userText, maxTokens);
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      if (!isBusy(lastErr) || attempt === BUSY_RETRY_DELAYS.length) throw e;
+      await new Promise((r) => setTimeout(r, BUSY_RETRY_DELAYS[attempt]));
+    }
+  }
+  throw new Error(lastErr || 'AI 호출 실패');
+}
+
+async function callOnce(systemPrompt: string, userText: string, maxTokens: number): Promise<string> {
   const chosen = getSelectedModel();
   const res = await fetch('/api/ai/v1/chat/completions', {
     method: 'POST',
@@ -73,15 +99,4 @@ export async function callAi(systemPrompt: string, userText: string, maxTokens =
   const raw: string = data.choices[0]?.message?.content ?? '';
   // 추론 모델이 흘리는 사고 태그 제거 — 본문만 남긴다
   return raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-}
-
-/** 실패 사유를 사용자 안내 문구로 변환 (키/크레딧 등) */
-export function aiErrorHint(detail: string): string {
-  if (/credit|balance|too low|billing|quota|insufficient/i.test(detail)) {
-    return '\n\nAI 공급자의 크레딧이 부족한 것 같습니다. 환경 설정의 AI 공급자에서 상태를 확인하세요.';
-  }
-  if (/auth|api[_ -]?key|token|401|403|invalid|unauthor/i.test(detail)) {
-    return '\n\nAPI 키를 확인하세요. 호스트 환경 설정의 AI 공급자 키, 단독 실행이면 rhwp-studio/.env.local 의 NVIDIA_API_KEY 를 확인하세요.';
-  }
-  return '';
 }
