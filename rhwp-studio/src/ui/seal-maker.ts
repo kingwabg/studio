@@ -62,6 +62,8 @@ function loadSealFace(f: SealFace, after: () => void): void {
 }
 
 type SealStyle = {
+  /** 3자 이름 뒤에 '印' 을 붙일지 — 한자를 안 쓰고 싶은 경우를 위해 끌 수 있다 */
+  sealMark: boolean;
   /** 글꼴 키 — SEAL_FACES 참조 */
   face: string;
   /** 글자 놓는 순서 — 전통은 우→좌·위→아래(seal-layout.ts 근거 주석 참조) */
@@ -81,7 +83,7 @@ type SealStyle = {
  *   것이 이 작업의 출발점이었으므로 기본값을 켜 둔다(0.35 = 은은한 정도).
  *   이미 문서에 박힌 도장 그림에는 영향이 없다 — 만들 때마다 새로 그린다.
  */
-const DEFAULT_STYLE: SealStyle = { face: 'batang', order: 'modern', texture: 0.35, color: '#c0392b', border: 10, scale: 1 };
+const DEFAULT_STYLE: SealStyle = { sealMark: true, face: 'batang', order: 'modern', texture: 0.35, color: '#c0392b', border: 10, scale: 1 };
 
 /** 이름이 같으면 얼룩도 같아야 한다 — 타이핑할 때마다 무늬가 튀면 미리보기를 못 믿는다. */
 function seedOf(text: string): number {
@@ -116,7 +118,7 @@ function drawSeal(canvas: HTMLCanvasElement, name: string, shape: Shape, style: 
   // 전통(우→좌) 배치의 근거 URL 도 그쪽 주석에 있다. 여기서는 그 좌표에 글자를 찍기만 한다.
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (const g of layoutSealChars(name, shape, style.order)) {
+  for (const g of layoutSealChars(name, shape, style.order, style.sealMark)) {
     const face = SEAL_FACES.find((f) => f.key === style.face) ?? SEAL_FACES[0];
     ctx.font = `bold ${Math.round(SIZE * g.size * style.scale * face.scale)}px "${face.family}", serif`;
     ctx.fillText(g.char, SIZE * g.x, SIZE * g.y);
@@ -156,6 +158,18 @@ function createSealTab(onChange: () => void): SignTab {
   const tune = document.createElement('div');
   tune.className = 'sgn-row sgn-tune';
 
+  // 「印」 켜기/끄기 — 3자 이름에만 영향을 준다(1·2·4자는 애초에 안 붙는다).
+  const markToggle = document.createElement('label');
+  markToggle.className = 'sgn-check';
+  markToggle.title = '3자 이름 뒤에 印 을 붙입니다 (한자)';
+  const markBox = document.createElement('input');
+  markBox.type = 'checkbox';
+  markBox.checked = DEFAULT_STYLE.sealMark;
+  const markText = document.createElement('span');
+  markText.textContent = '印';
+  markToggle.append(markBox, markText);
+  markBox.addEventListener('change', () => { style.sealMark = markBox.checked; repaint(); });
+
   const color = document.createElement('input');
   color.type = 'color';
   color.className = 'sgn-color';
@@ -184,6 +198,7 @@ function createSealTab(onChange: () => void): SignTab {
     slider('테두리', 0, 20, 1, style.border, (v) => { style.border = v; repaint(); }),
     slider('글자', 0.7, 1.3, 0.05, style.scale, (v) => { style.scale = v; repaint(); }),
     slider('질감', 0, 1, 0.05, style.texture, (v) => { style.texture = v; repaint(); }),
+    markToggle,
   );
   color.addEventListener('input', () => { style.color = color.value; repaint(); });
 
@@ -221,7 +236,7 @@ function createSealTab(onChange: () => void): SignTab {
     canvas,
     label: '도장',
     sub: '개인·법인 도장을 만듭니다',
-    foot: '2자는 세로, 3자는 이름 뒤에 印, 4자는 2×2 로 놓입니다.',
+    foot: '2자는 세로, 4자는 2×2 로 놓입니다. 3자는 印 을 켜면 2×2, 끄면 3자 그대로입니다.',
     resetLabel: '지우기',
     isEmpty: () => !input.value.trim(),
     clear: () => { input.value = ''; repaint(); input.focus(); },

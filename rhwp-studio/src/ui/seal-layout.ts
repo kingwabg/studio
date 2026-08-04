@@ -63,9 +63,19 @@ const TRAD: Record<SealShape, { one: number; two: { d: number; s: number }; quad
  * - order='modern' 은 drawSeal 의 좌표 계산을 **식 그대로** 옮긴 것이다. 기존 사용자의
  *   도장 모양이 바뀌면 안 되므로 여기 수식은 손대지 말 것(회귀).
  */
-export function layoutSealChars(name: string, shape: SealShape, order: SealOrder): SealGlyph[] {
+export function layoutSealChars(
+  name: string,
+  shape: SealShape,
+  order: SealOrder,
+  /**
+   * 3자 이름 뒤에 '印' 을 보충할지 (기본 켬 = 종전 동작).
+   * ⚠ 끌 수 있어야 하는 이유: '印' 은 한자다. 한자를 안 쓰겠다는 사용자가 있고
+   *   (2026-08-04 지시), 3자를 그대로 두면 2단으로 앉는 배치가 된다.
+   */
+  withSealMark = true,
+): SealGlyph[] {
   const chars = [...name.trim()].slice(0, 4);
-  if (chars.length === 3) chars.push('印');
+  if (chars.length === 3 && withSealMark) chars.push('印');
   if (chars.length === 0) return [];
 
   if (order === 'modern') {

@@ -983,6 +983,11 @@
 .sgn-slider { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .sgn-slider-name { font-size: 11px; opacity: 0.75; flex: none; }
 .sgn-slider input[type="range"] { flex: 1; min-width: 0; accent-color: var(--color-primary, #2c5aa0); }
+.sgn-check {
+  display: flex; align-items: center; gap: 4px; flex: none; cursor: pointer;
+  font-size: 12px; user-select: none;
+}
+.sgn-check input { accent-color: var(--color-primary, #2c5aa0); margin: 0; }
 
 /* 견본판 — 점선 테두리 안이 곧 만들어질 PNG 의 범위다 */
 .sgn-stage {
