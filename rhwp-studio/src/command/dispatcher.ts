@@ -63,6 +63,15 @@ export class CommandDispatcher {
   }
 
   /**
+   * 등록된 커맨드 목록(id·라벨).
+   * [캔버스 한컴 포크] AI 에이전트가 "무엇을 부를 수 있는지" 알려면 필요하다 —
+   * 무엇을 **열지**는 ui/agent-commands.ts 가 거르고, 실행 가부는 여전히 dispatch 가 판정한다.
+   */
+  list(): Array<{ id: string; label: string }> {
+    return this.registry.getAllIds().map((id) => ({ id, label: this.registry.get(id)?.label ?? id }));
+  }
+
+  /**
    * 커맨드가 현재 활성(실행 가능)인지 확인.
    * 메뉴/툴바의 enabled/disabled 상태 갱신에 사용.
    */

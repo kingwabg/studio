@@ -15,6 +15,7 @@
  */
 import type { CanvaServices } from './canva-services';
 import { readTable } from './table-grid.ts';
+import { describeCommands, isAllowed } from './agent-commands.ts';
 
 /**
  * 한 턴에서 도구를 부를 수 있는 최대 횟수 — 폭주 방지.
@@ -47,6 +48,9 @@ export const AGENT_PROMPT =
   '· {"tool":"replace_cell","table":0,"cell":5,"text":"값"} — 칸 내용을 **지우고 다시** 쓴다. ' +
   '사용자가 고치라고 명시했을 때만.\n' +
   '· {"tool":"insert_text","paragraph":2,"text":"내용"} — 본문 문단 끝에 텍스트를 넣는다.\n' +
+  '· {"tool":"list_commands","keyword":"정렬"} — 편집기 명령을 찾는다(굵게·정렬·표·쪽 등 190개).\n' +
+  '· {"tool":"run_command","id":"format:bold"} — 찾은 명령을 실행한다. **커서/선택 위치에 적용**되므로\n' +
+  '  글자·문단 서식은 먼저 대상 위치가 정해져 있어야 한다.\n' +
   '규칙:\n' +
   '① 반드시 JSON 하나만 출력. 설명을 붙이지 마세요.\n' +
   '② 수치·금액·날짜는 문서나 사용자가 준 것만 쓰고, 모르면 [칸이름] 형태로 남기세요. 지어내지 마세요.\n' +
@@ -172,6 +176,24 @@ function runTool(services: CanvaServices, name: string, args: Record<string, unk
       if (err) return `ERROR: ${err}`;
       state.wrote = true;
       return `문단 ${p} 끝에 ${text.length}자 삽입`;
+    }
+    case 'list_commands': {
+      const all = services.dispatcher.list();
+      return describeCommands(all, typeof args.keyword === 'string' ? args.keyword : '');
+    }
+    case 'run_command': {
+      const id = typeof args.id === 'string' ? args.id : '';
+      const all = services.dispatcher.list();
+      if (!id) return 'ERROR: id 없음';
+      // 여는 목록에 없으면 실행하지 않는다 — 저장·인쇄·대화상자·클립보드는 사람 몫이다.
+      if (!isAllowed(all, id)) return `ERROR: "${id}" 는 에이전트가 실행할 수 없는 명령 (list_commands 로 확인)`;
+      const ih = services.getInputHandler() as any;
+      if (!ih) return 'ERROR: 편집기 없음';
+      // dispatcher 가 canExecute 로 상황(선택 유무·표 안인지)을 판정한다 — 우리가 흉내내지 않는다.
+      const ok = services.dispatcher.dispatch(id);
+      if (ok) state.wrote = true;
+      return ok ? `실행 완료: ${id}`
+        : `ERROR: ${id} 를 지금 실행할 수 없다(선택 영역이 없거나 표 밖일 수 있다)`;
     }
     default:
       return `ERROR: 없는 도구 "${name}"`;
