@@ -87,7 +87,8 @@ const CENTER_PRESETS = ['代表理事', '代表', '理事長', '院長', '센터
 type SealStyle = {
   target: 'personal' | 'corporate';
   preset: string;
-  sealMark: boolean;
+  /** 3자 이름 뒤에 붙일 글자 — 한자 印 / 한글 인 / 안 붙임 */
+  sealMark: 'hanja' | 'hangul' | 'none';
   face: string;
   order: SealOrder;
   texture: number;
@@ -115,7 +116,7 @@ type SealStyle = {
  *   테두리 10px · ratio 1.0. texture 만 0.35 로 켠다(매끈함이 이 작업의 출발점이었다).
  */
 const DEFAULT_STYLE: SealStyle = {
-  target: 'personal', preset: 'circle', sealMark: true, face: 'batang', order: 'modern',
+  target: 'personal', preset: 'circle', sealMark: 'hanja', face: 'batang', order: 'modern',
   texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4, portrait: true, carve: true,
   centerText: '代表理事', centerFace: 'batang', centerSize: 50, marker: 'dot',
 };
@@ -211,7 +212,8 @@ export function drawSeal(canvas: HTMLCanvasElement, name: string, style: SealSty
     ctx.textBaseline = 'middle';
     const fam = familyOf(style.face);
     const fs = faceScale(style.face);
-    let glyphs = layoutSealChars(name, layoutShapeOf(p.kind), style.order, style.sealMark);
+    let glyphs = layoutSealChars(name, layoutShapeOf(p.kind), style.order,
+      style.sealMark !== 'none', style.sealMark === 'hangul' ? '인' : '印');
     /**
      * 타원은 한 줄로 세운다(가로 타원이면 눕힌다) — 참고 화면의 타원형이 그 모양이고,
      * 좁고 긴 칸에 2×2 를 넣으면 글자가 서로 먹는다. 印 붙임 여부는 배치가 이미 정했다.
@@ -363,19 +365,56 @@ export function createSealTab(onChange: () => void): SignTab {
   opts.append(faceSel, orderSel);
 
   // ── 조절 ────────────────────────────────────────────────
-  const slider = (label: string, min: number, max: number, step: number, value: number,
-                  onInput: (v: number) => void) => {
+  /**
+   * 수치 조절 한 칸 — [−] [ 42 ] [+] 와 단위.
+   *
+   * ⚠ 슬라이더에서 바꿨다(2026-08-04 사용자 요청). 슬라이더는 **지금 값이 얼마인지
+   *   안 보이고** 같은 값을 다시 맞추기도 어렵다. 도장은 "저번과 같은 크기"가 자주
+   *   필요하므로 눈에 보이는 수치와 한 칸씩 밟는 버튼이 맞다.
+   *
+   * 내부 값은 0.6 같은 배율인데 화면에는 60% 처럼 보여야 읽기 쉽다 — scale 로 환산한다.
+   */
+  const numField = (
+    label: string,
+    opt: { min: number; max: number; step: number; unit?: string; scale?: number },
+    value: number,
+    onChange: (v: number) => void,
+  ) => {
+    const k = opt.scale ?? 1;
     const wrap = document.createElement('label');
-    wrap.className = 'sgn-slider';
+    wrap.className = 'sgn-num';
     const nm = document.createElement('span');
-    nm.className = 'sgn-slider-name';
+    nm.className = 'sgn-num-name';
     nm.textContent = label;
-    const range = document.createElement('input');
-    range.type = 'range';
-    range.min = String(min); range.max = String(max); range.step = String(step);
-    range.value = String(value);
-    range.addEventListener('input', () => onInput(Number(range.value)));
-    wrap.append(nm, range);
+    const dec = document.createElement('button');
+    dec.type = 'button'; dec.className = 'sgn-num-btn'; dec.textContent = '−';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'sgn-num-input';
+    input.min = String(Math.round(opt.min * k));
+    input.max = String(Math.round(opt.max * k));
+    input.step = String(Math.max(1, Math.round(opt.step * k)));
+    input.value = String(Math.round(value * k));
+    const inc = document.createElement('button');
+    inc.type = 'button'; inc.className = 'sgn-num-btn'; inc.textContent = '+';
+    const unit = document.createElement('span');
+    unit.className = 'sgn-num-unit';
+    unit.textContent = opt.unit ?? '';
+
+    const commit = (shown: number) => {
+      const lo = opt.min * k, hi = opt.max * k;
+      const v = Math.min(hi, Math.max(lo, shown));
+      input.value = String(Math.round(v));
+      onChange(v / k);
+    };
+    const bump = (dir: number) => commit(Number(input.value) + dir * Math.max(1, Math.round(opt.step * k)));
+    dec.addEventListener('click', () => bump(-1));
+    inc.addEventListener('click', () => bump(1));
+    input.addEventListener('input', () => { if (input.value !== '') commit(Number(input.value)); });
+    // 빈 칸으로 뒀다가 포커스를 잃으면 마지막 값으로 되돌린다 — 빈 값이 남으면 NaN 이 된다.
+    input.addEventListener('blur', () => { if (input.value === '') commit(value * k); });
+
+    wrap.append(nm, dec, input, inc, unit);
     return wrap;
   };
 
@@ -386,25 +425,34 @@ export function createSealTab(onChange: () => void): SignTab {
   color.title = '인주 색';
   color.addEventListener('input', () => { style.color = color.value; repaint(); });
 
-  const markToggle = document.createElement('label');
-  markToggle.className = 'sgn-check';
-  markToggle.title = '3자 이름 뒤에 印 을 붙입니다 (한자)';
-  const markBox = document.createElement('input');
-  markBox.type = 'checkbox';
-  markBox.checked = style.sealMark;
-  markBox.addEventListener('change', () => { style.sealMark = markBox.checked; repaint(); });
-  const markText = document.createElement('span');
-  markText.textContent = '印';
-  markToggle.append(markBox, markText);
+  // 3자 이름 뒤에 붙일 글자 — 한자를 안 쓰는 사람도 있어 한글 「인」과 「없음」을 함께 둔다.
+  const markToggle = document.createElement('div');
+  markToggle.className = 'sgn-seg';
+  markToggle.title = '3자 이름 뒤에 붙일 글자';
+  const markBtns = (['hanja', 'hangul', 'none'] as const).map((k) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = { hanja: '印', hangul: '인', none: '없음' }[k];
+    b.addEventListener('click', () => { style.sealMark = k; syncMark(); repaint(); });
+    markToggle.appendChild(b);
+    return b;
+  });
+  const syncMark = () => {
+    const keys = ['hanja', 'hangul', 'none'];
+    markBtns.forEach((b, i) => b.classList.toggle('is-on', keys[i] === style.sealMark));
+  };
 
   const tune1 = document.createElement('div');
   tune1.className = 'sgn-row sgn-tune';
   tune1.append(
     color,
-    slider('글씨', 0.6, 1.4, 0.05, style.scale, (v) => { style.scale = v; repaint(); }),
-    slider('테두리', 0, 20, 1, style.border, (v) => { style.border = v; repaint(); }),
+    numField('글씨', { min: 0.6, max: 1.4, step: 0.05, unit: '%', scale: 100 }, style.scale,
+      (v) => { style.scale = v; repaint(); }),
+    numField('테두리', { min: 0, max: 20, step: 1, unit: 'px' }, style.border,
+      (v) => { style.border = v; repaint(); }),
   );
-  const wobbleSlider = slider('수제', 0, 1, 0.05, style.wobble, (v) => { style.wobble = v; repaint(); });
+  const wobbleSlider = numField('수제', { min: 0, max: 1, step: 0.05, unit: '%', scale: 100 }, style.wobble,
+    (v) => { style.wobble = v; repaint(); });
   wobbleSlider.title = '손으로 판 윤곽이 얼마나 울퉁불퉁한지';
 
   // 타원 방향 — 타원 프리셋일 때만 뜻이 있다.
@@ -434,8 +482,10 @@ export function createSealTab(onChange: () => void): SignTab {
   const tune2 = document.createElement('div');
   tune2.className = 'sgn-row sgn-tune';
   tune2.append(
-    slider('크기', 0.5, 1, 0.01, style.ratio, (v) => { style.ratio = v; repaint(); }),
-    slider('질감', 0, 1, 0.05, style.texture, (v) => { style.texture = v; repaint(); }),
+    numField('크기', { min: 0.5, max: 1, step: 0.01, unit: '%', scale: 100 }, style.ratio,
+      (v) => { style.ratio = v; repaint(); }),
+    numField('질감', { min: 0, max: 1, step: 0.05, unit: '%', scale: 100 }, style.texture,
+      (v) => { style.texture = v; repaint(); }),
     markToggle,
   );
   const tune3 = document.createElement('div');
@@ -473,7 +523,8 @@ export function createSealTab(onChange: () => void): SignTab {
   corpRow.append(centerSel, centerFaceSel, markerSeg);
   const corpTune = document.createElement('div');
   corpTune.className = 'sgn-row sgn-tune';
-  corpTune.append(slider('중앙 크기', 20, 90, 1, style.centerSize, (v) => { style.centerSize = v; repaint(); }));
+  corpTune.append(numField('중앙 크기', { min: 20, max: 90, step: 1 }, style.centerSize,
+    (v) => { style.centerSize = v; repaint(); }));
   corp.append(corpRow, corpTune);
 
   // ── 견본판 ──────────────────────────────────────────────
@@ -528,7 +579,7 @@ export function createSealTab(onChange: () => void): SignTab {
   }
   input.addEventListener('input', repaint);
 
-  syncTarget(); syncShape(); syncMarker(); syncTune3();
+  syncTarget(); syncShape(); syncMarker(); syncMark(); syncTune3();
 
   return {
     el,

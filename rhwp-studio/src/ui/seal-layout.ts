@@ -73,9 +73,11 @@ export function layoutSealChars(
    *   (2026-08-04 지시), 3자를 그대로 두면 2단으로 앉는 배치가 된다.
    */
   withSealMark = true,
+  /** 붙일 글자 — 한자 '印' 이 기본이지만 한글 '인' 도 쓴다(2026-08-04 사용자 요청). */
+  markChar = '印',
 ): SealGlyph[] {
   const chars = [...name.trim()].slice(0, 4);
-  if (chars.length === 3 && withSealMark) chars.push('印');
+  if (chars.length === 3 && withSealMark) chars.push(markChar);
   if (chars.length === 0) return [];
 
   if (order === 'modern') {
