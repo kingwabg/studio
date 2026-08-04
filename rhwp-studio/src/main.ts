@@ -94,6 +94,9 @@ const autosaveManager = new AutosaveManager({
   onStatus: handleAutosaveStatus,
 });
 autosaveManager.connect(eventBus);
+// [독스 모델 2026-08-04] 나가기 직전 마지막 타이핑까지 초안에 밀어 넣는다 —
+// idle 10초를 기다리다 새로고침에 잘리는 유실 창을 닫는다.
+window.addEventListener('pagehide', () => { void autosaveManager.flushNow('pagehide'); });
 initThemeSync((effective, mode) => {
   eventBus.emit('theme-changed', { mode, effective });
   eventBus.emit('command-state-changed');
@@ -208,6 +211,9 @@ function autosaveScheduleFromUserSettings(): AutosaveScheduleSettings {
 }
 
 function handleAutosaveStatus(status: AutosaveStatus): void {
+  // 저장 성공 = 초안이 문서를 지킨다 → 이탈 확인창 생략(독스 모델). 실패면 재무장.
+  if (status.state === 'saved') documentState.setAutosaveSafe(true);
+  else if (status.state === 'error') documentState.setAutosaveSafe(false);
   const message = document.getElementById('sb-message');
   if (!message) return;
   if (autosaveStatusRestoreTimer) {
@@ -1059,8 +1065,22 @@ async function offerAutosaveRecoveryIfIdle(): Promise<void> {
     // [복구 나침반 2026-08-03] 한/글처럼 **사고로 꺼졌을 때만** 묻는다.
     // 종전엔 초안이 남아 있으면 무조건 물어, 새로고침마다 창이 떴다(사용자 지적).
     // 정상 종료(새로고침·탭 닫기)였다면 남은 초안은 사용자가 버리기로 한 것이니 조용히 치운다.
+    // [독스 모델 2026-08-04] 정상 종료(새로고침·탭 닫기)여도 **조용히 복원**한다 —
+    // 구글독스·한컴독스처럼 "새로고침해도 에디터는 그대로". 종전에는 초안을 버려
+    // 강제새로고침마다 화면이 사라졌다(사용자 신고). crash 는 기존 대화상자 유지
+    // (여러 후보 중 고르기).
     if (lastExit !== 'crash') {
-      await clearAutosaveDrafts();
+      const latest = [...drafts].sort((a, b) => b.savedAt - a.savedAt)[0];
+      try {
+        await loadBytes(new Uint8Array(latest.data), latest.fileName, null);
+        documentState.markDirty('autosave-restored');
+        // 복원 로드가 이전 초안을 지우므로 곧바로 다시 심는다 — 연속 새로고침 안전
+        void autosaveManager.flushNow('restore-reseed');
+        const msg = document.getElementById('sb-message');
+        if (msg) msg.textContent = `이어서 편집 — ${latest.fileName} (자동 저장됨)`;
+      } catch (error) {
+        console.warn('[autosave] 조용한 복원 실패:', error);
+      }
       return;
     }
 

@@ -4,7 +4,7 @@
  * 수정 전/후 비교 → [적용](한 번의 snapshot = Ctrl+Z 취소 가능) / [다시 요청] / [취소].
  * inline-ai의 "골라서 수정하고 한눈에 비교"를 캔버스 개체 단위로 옮긴 것.
  */
-import { callMiniMax, aiErrorHint } from './canva-ai-client';
+import { callAi, aiErrorHint } from './canva-ai-client';
 import { buildDialogShell, mkDialogBtn } from './canva-dom';
 import { readShapeText, replaceShapeText, type ShapeRef } from './canva-ai-doc';
 
@@ -85,7 +85,7 @@ export function showAiEditDialog(ih: any, ref: ShapeRef): void {
     requestBtn.disabled = true;
     status.textContent = 'AI가 수정안을 작성 중…';
     try {
-      const out = await callMiniMax(EDIT_PROMPT, `현재 내용:\n${original}\n\n수정 요청: ${instruction}`);
+      const out = await callAi(EDIT_PROMPT, `현재 내용:\n${original}\n\n수정 요청: ${instruction}`);
       revised = out;
       revisedLabel.hidden = false;
       revisedBox.hidden = false;

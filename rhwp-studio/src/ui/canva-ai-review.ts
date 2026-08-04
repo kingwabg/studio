@@ -14,7 +14,7 @@ import {
   type ReviewFinding,
   type DocReviewResult,
 } from './canva-ai-doc';
-import { callMiniMax } from './canva-ai-client';
+import { callAi } from './canva-ai-client';
 
 const REVIEW_PROMPT =
   '당신은 한국어 문서 교정 도우미입니다. 문서에서 뽑은 글상자들을 "표현"(어색한 표현을 자연스럽게) ' +
@@ -94,7 +94,7 @@ export async function runDocReview(services: CanvaServices): Promise<DocReviewRe
   let raw: string;
   try {
     // 개체별로 "수정된 전체 텍스트"를 되돌려받아야 해서 기본값(2048)보다 넉넉히 잡는다.
-    raw = await callMiniMax(REVIEW_PROMPT, JSON.stringify(payload), 4096);
+    raw = await callAi(REVIEW_PROMPT, JSON.stringify(payload), 4096);
   } catch (e) {
     console.warn('[ai-review] 검토 요청 실패:', e);
     return { elements, findings: [], sentSummary };

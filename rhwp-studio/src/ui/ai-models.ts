@@ -54,11 +54,6 @@ export const NVIDIA_MODELS: AiModelChoice[] = [
     hint: '긴 문맥(최대 100만 토큰)',
   },
   {
-    id: 'minimaxai/minimax-m3',
-    label: 'MiniMax M3',
-    hint: '멀티모달 추론',
-  },
-  {
     id: 'stepfun-ai/step-3.7-flash',
     label: 'Step 3.7 Flash',
     hint: '빠른 응답 우선',

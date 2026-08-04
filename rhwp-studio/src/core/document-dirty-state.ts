@@ -13,14 +13,21 @@ export interface DirtyStateChange {
  */
 export class DocumentDirtyState {
   private dirty = false;
+  /** [독스 모델 2026-08-04] 자동저장이 최근에 성공했으면 새로고침·닫기를 막지 않는다 —
+   * 초안이 문서를 지키므로 확인창은 소음이다. 저장 실패/메모리 폴백이면 다시 막는다. */
+  private autosaveSafe = false;
   private beforeUnloadWindow: Window | null = null;
   private readonly eventBus: EventBus;
   private readonly beforeUnloadHandler = (event: BeforeUnloadEvent): string | void => {
-    if (!this.dirty) return;
+    if (!this.dirty || this.autosaveSafe) return;
     event.preventDefault();
     event.returnValue = '';
     return '';
   };
+
+  setAutosaveSafe(safe: boolean): void {
+    this.autosaveSafe = safe;
+  }
 
   constructor(eventBus: EventBus) {
     this.eventBus = eventBus;

@@ -1,17 +1,18 @@
 /**
  * [캔버스 한컴 포크] 우측 AI 문서 도우미 (캔바식).
- * dev 서버 프록시(/api/ai → api.minimax.io, vite.config)로 MiniMax M3 호출 — OpenAI 호환 형식.
+ * 같은 출처 /api/ai 로 호출 — 호스트(sc-) 프록시 또는 vite 직결이 NVIDIA NIM 으로 태운다.
  * 키는 서버측 Bearer 주입(브라우저 노출 없음). 응답은 "본문에 삽입"으로 커서 위치에 넣는다.
  * ⚠ 백엔드(키/크레딧)는 실행 환경 의존 — 실패 시 채팅에 정직하게 오류를 표시한다.
  */
 import type { CanvaServices } from './canva-services';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
-import { callMiniMax, aiErrorHint, getSelectedModel, setSelectedModel } from './canva-ai-client';
+import { callAi, aiErrorHint, getSelectedModel, setSelectedModel } from './canva-ai-client';
 import { mkEl, mkButton } from './canva-dom';
 import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
 import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
 import { insertFormatted } from './ai-doc-insert';
 import { openTableFill } from './table-fill';
+import { runAgentTurn } from './canva-ai-agent';
 /**
  * 문서 모드의 작성법 — **본문에 바로 넣을 글**을 쓴다.
  *
@@ -68,9 +69,14 @@ export class CanvaAiPanel {
    *   문서 탭에서 지면 배치 JSON 이 나오면 아무 쓸모가 없다.
    */
   private genMode = readCanvasMode();
-  // 상단 기능 버튼 줄: 문서 생성 ↔ 일반 글쓰기(모드 토글) + 문서 검토(실행)
+  /** 문서 작업(에이전트) 모드 — 켜지면 genMode 보다 우선한다. */
+  private agentMode = false;
+  /** 문서 내용이 외부 모델로 나가는 경로라 첫 사용 때 1회 동의를 받는다(세션 한정). */
+  private agentConsent = false;
+  // 상단 기능 버튼 줄: 문서 생성 ↔ 일반 글쓰기 ↔ 문서 작업(모드 토글) + 문서 검토(실행)
   private genBtn!: HTMLButtonElement;
   private plainBtn!: HTMLButtonElement;
+  private agentBtn!: HTMLButtonElement;
 
   constructor(private root: HTMLElement, private services: CanvaServices) {
     this.render();
@@ -88,7 +94,7 @@ export class CanvaAiPanel {
     const head = mkEl('div', 'canva-ai-head');
     const back = mkButton('canva-ai-back', { title: '속성으로 돌아가기', html: '<i class="ph ph-arrow-left"></i>' });
     back.addEventListener('click', () => this.services.eventBus.emit('ai-panel-close'));
-    this.modelBadge = mkEl('span', 'canva-ai-model', 'MiniMax M3');
+    this.modelBadge = mkEl('span', 'canva-ai-model', 'AI');
     head.append(
       back,
       mkEl('i', 'ph-duotone ph-sparkle canva-ai-spark'),
@@ -106,19 +112,22 @@ export class CanvaAiPanel {
     };
     this.genBtn = card('문서 생성', 'article', '캔버스식 문서 생성: 지면에 제목·본문·표를 배치합니다');
     this.plainBtn = card('일반 글쓰기', 'pencil-simple', '일반 글쓰기: 텍스트 답변을 커서 위치에 삽입합니다');
-    this.genBtn.addEventListener('click', () => { this.genMode = true; this.syncMode(); });
-    this.plainBtn.addEventListener('click', () => { this.genMode = false; this.syncMode(); });
+    // 문서 작업(에이전트) — AI가 문서를 직접 읽고 고친다(canva-ai-agent). claw-hwp식 대화 조작.
+    this.agentBtn = card('문서 작업', 'robot', '문서 작업: AI가 열린 문서를 읽고 표·본문을 직접 고칩니다');
+    this.genBtn.addEventListener('click', () => { this.genMode = true; this.agentMode = false; this.syncMode(); });
+    this.plainBtn.addEventListener('click', () => { this.genMode = false; this.agentMode = false; this.syncMode(); });
+    this.agentBtn.addEventListener('click', () => { this.agentMode = true; this.syncMode(); });
     // 문서 검토 — 프롬프트가 아니라 버튼 동작(수집→동의→검토→findings)이라 모드가 아닌 실행 버튼.
     const reviewBtn = card('문서 검토', 'check-circle', '문서 전체 검토 (표현·오탈자)');
     reviewBtn.classList.add('canva-ai-modebtn-action');
     reviewBtn.addEventListener('click', () => void this.reviewFlow());
-    modes.append(this.genBtn, this.plainBtn, reviewBtn);
+    modes.append(this.genBtn, this.plainBtn, this.agentBtn, reviewBtn);
     pane.appendChild(modes);
 
     this.log = mkEl('div', 'canva-ai-log');
     pane.appendChild(this.log);
 
-    this.pushMsg({ role: 'ai', text: '안녕하세요! 위 버튼으로 기능을 고르세요.\n· 문서 생성 — 지면에 제목·본문·표를 배치\n· 일반 글쓰기 — 텍스트를 커서 위치에 삽입\n· 문서 검토 — 문서 전체의 표현·오탈자를 점검' });
+    this.pushMsg({ role: 'ai', text: '안녕하세요! 위 버튼으로 기능을 고르세요.\n· 문서 생성 — 지면에 제목·본문·표를 배치\n· 일반 글쓰기 — 텍스트를 커서 위치에 삽입\n· 문서 작업 — AI가 문서를 읽고 표·본문을 직접 고침\n· 문서 검토 — 문서 전체의 표현·오탈자를 점검' });
 
     const bar = mkEl('div', 'canva-ai-input-bar');
     this.input = document.createElement('textarea');
@@ -159,14 +168,66 @@ export class CanvaAiPanel {
   }
 
   private syncMode(): void {
-    this.genBtn.classList.toggle('is-active', this.genMode);
-    this.plainBtn.classList.toggle('is-active', !this.genMode);
-    this.input.placeholder = this.genMode ? '어떤 문서를 만들까요?' : '무엇을 써 드릴까요?';
+    this.genBtn.classList.toggle('is-active', !this.agentMode && this.genMode);
+    this.plainBtn.classList.toggle('is-active', !this.agentMode && !this.genMode);
+    this.agentBtn.classList.toggle('is-active', this.agentMode);
+    this.input.placeholder = this.agentMode
+      ? '문서에 무엇을 할까요? (예: 표1 빈칸 채워줘)'
+      : this.genMode ? '어떤 문서를 만들까요?' : '무엇을 써 드릴까요?';
+  }
+
+  /**
+   * 문서 작업(에이전트) 턴 — AI가 도구 호출로 문서를 읽고 고친다.
+   * ⚠ 문서 내용이 외부 모델로 나가는 경로: 첫 사용에서 1회 동의를 받는다(문서 검토와 같은 규약).
+   */
+  private async sendAgent(text: string): Promise<void> {
+    if (!this.agentConsent) {
+      const msgEl = this.pushMsg({
+        role: 'ai',
+        text: '문서 작업은 표·본문 내용을 AI로 전송해 진행합니다. 계속할까요?',
+      });
+      const actions = mkEl('div', 'canva-ai-actions');
+      const ok = mkButton('canva-ai-act', { text: '동의하고 진행' });
+      const no = mkButton('canva-ai-act', { text: '취소' });
+      ok.addEventListener('click', () => { this.agentConsent = true; actions.remove(); void this.sendAgent(text); });
+      no.addEventListener('click', () => { actions.remove(); this.pushMsg({ role: 'ai', text: '취소했습니다. 아무것도 전송하지 않았습니다.' }); });
+      actions.append(ok, no);
+      msgEl.appendChild(actions);
+      return;
+    }
+
+    this.setBusy(true);
+    const thinking = this.pushMsg({ role: 'ai', text: '문서를 살펴보는 중…' });
+    try {
+      const result = await runAgentTurn(
+        this.services, text,
+        (sys, user) => this.callModel(user, sys),
+        (step) => { thinking.querySelector('.bubble')!.textContent = `작업 중 — ${step.name}: ${step.summary}`; },
+      );
+      thinking.remove();
+      this.pushMsg({
+        role: 'ai',
+        text: result.finalText + (result.wrote ? '\n\n(방금 수정은 Ctrl+Z 로 한 번에 되돌릴 수 있습니다)' : ''),
+      });
+    } catch (e) {
+      thinking.remove();
+      const detail = e instanceof Error ? e.message : String(e);
+      this.pushMsg({ role: 'ai', err: true, text: `문서 작업에 실패했습니다.\n${detail}${aiErrorHint(detail)}` });
+    } finally {
+      this.setBusy(false);
+    }
   }
 
   private async send(): Promise<void> {
     const text = this.input.value.trim();
     if (!text || this.busy) return;
+    if (this.agentMode) {
+      this.input.value = '';
+      this.autosize();
+      this.pushMsg({ role: 'user', text });
+      void this.sendAgent(text);
+      return;
+    }
     this.input.value = '';
     this.autosize();
     this.pushMsg({ role: 'user', text });
@@ -315,8 +376,8 @@ export class CanvaAiPanel {
 
   private async callModel(userText: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {
     // 공용 클라이언트(canva-ai-client) — AI 수정 대화상자와 공유.
-    // 배지는 모델 버튼이 그린다(하드코딩 'MiniMax M3' 는 호스트 배포에서 거짓말이었다).
-    return callMiniMax(systemPrompt, userText);
+    // 배지는 모델 버튼이 그린다(하드코딩 모델명은 호스트 배포에서 거짓말이었다).
+    return callAi(systemPrompt, userText);
   }
 
   /**
@@ -360,7 +421,7 @@ export class CanvaAiPanel {
         }
         chip.addEventListener('click', () => { menu.hidden = !menu.hidden; });
       } catch {
-        // 단독 실행(호스트 없음) — 종전 MiniMax 고정이므로 버튼을 숨긴다
+        // 단독 실행(호스트 없음) — 모델은 NVIDIA 기본값 고정이므로 버튼을 숨긴다
         wrap.hidden = true;
       }
     })();

@@ -1,6 +1,6 @@
 /**
  * [캔버스 한컴 포크] "문서 전체 검토 AI" — 검토 UI 렌더링(순수 렌더링, 코어 로직 없음).
- * 코어(wasm 접근·MiniMax 호출·검토 실행)는 별도 에이전트(A)가 병렬 개발 — 이 파일은
+ * 코어(wasm 접근·AI 호출·검토 실행)는 별도 에이전트(A)가 병렬 개발 — 이 파일은
  * canva-ai-doc.ts의 계약 타입만 소비해 DOM을 그리고 handlers를 호출한다.
  * 흐름: renderSendPreview(전송 동의) → [검토 시작] → 코어가 검토 실행 →
  *       renderReviewFindings(결과 리스트) → 행별 [적용]/[무시]/클릭(onJumpTo).

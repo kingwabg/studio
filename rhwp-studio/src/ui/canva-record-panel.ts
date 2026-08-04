@@ -8,7 +8,7 @@
 import type { CanvaServices } from './canva-services';
 import { SttSession, type SttState } from './canva-record-stt';
 import { mkEl, mkButton } from './canva-dom';
-import { callMiniMax, aiErrorHint } from './canva-ai-client';
+import { callAi, aiErrorHint } from './canva-ai-client';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
 import { LAYOUT_PROMPT } from './canva-ai-panel';
 
@@ -117,7 +117,7 @@ export class CanvaRecordPanel {
     this.resultActions = mkEl('div', 'canva-record-result-actions');
     const genBtn = mkButton('canva-ai-act', { text: '회의록 생성' });
     const insertBtn = mkButton('canva-ai-act', { text: '본문 삽입' });
-    const genHint = mkEl('div', 'canva-hint', '생성 시 전사록이 AI(MiniMax)로 전송됩니다.');
+    const genHint = mkEl('div', 'canva-hint', '생성 시 전사록이 AI로 전송됩니다.');
     genBtn.addEventListener('click', () => void this.generateMinutes());
     insertBtn.addEventListener('click', () => this.insertTranscript());
     const btnRow = mkEl('div', 'canva-btn-row');
@@ -232,7 +232,7 @@ export class CanvaRecordPanel {
       const userMsg =
         '다음 회의 전사록을 바탕으로 회의록 문서를 만들어줘. 제목·일시·참석자·안건별 논의·결정사항·할 일 구조로:\n\n' +
         transcript;
-      const reply = await callMiniMax(LAYOUT_PROMPT, userMsg);
+      const reply = await callAi(LAYOUT_PROMPT, userMsg);
       const layout = parseAiLayout(reply);
       thinking.remove();
       if (!layout) {
