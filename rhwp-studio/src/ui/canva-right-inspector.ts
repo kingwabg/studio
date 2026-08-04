@@ -595,7 +595,11 @@ export class CanvaRightInspector {
       const input = mkEl('input', 'canva-mystyle-input') as HTMLInputElement;
       input.type = 'text';
       input.placeholder = '스타일 이름';
+      // Enter 의 save 가 재렌더로 input 을 제거하면 blur 가 또 발화한다 — 1회 가드
+      let committed = false;
       const save = () => {
+        if (committed) return;
+        committed = true;
         const name = input.value.trim();
         const p = this.lastCharProps;
         if (!name || !p) { this.renderMyStyles(); return; }
@@ -611,7 +615,7 @@ export class CanvaRightInspector {
       };
       input.addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter') { ev.preventDefault(); save(); }
-        if (ev.key === 'Escape') this.renderMyStyles();
+        if (ev.key === 'Escape') { committed = true; this.renderMyStyles(); }
       });
       input.addEventListener('blur', () => save());
       row.appendChild(input);
