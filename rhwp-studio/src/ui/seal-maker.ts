@@ -52,6 +52,8 @@ export class SealMakerDialog extends ModalDialog {
   private resetBtn!: HTMLButtonElement;
   private saveBtn!: HTMLButtonElement;
 
+  private inlineBox: HTMLInputElement | null = null;
+
   constructor(private services: CommandServices) {
     super('도장 만들기', 660);
     this.titleIcon = 'signature';
@@ -110,7 +112,17 @@ export class SealMakerDialog extends ModalDialog {
     this.footNote = document.createElement('p');
     this.footNote.className = 'sgn-foot';
 
-    body.append(lead, this.tabBar, this.panels, actions, this.footNote);
+    // 배치 방식 — 기본은 떠 있는 그림(옮길 수 있다). 서명란 칸에 글자처럼 앉히려면 켠다.
+    const inline = document.createElement('label');
+    inline.className = 'sgn-check';
+    inline.title = '켜면 글자처럼 본문에 앉지만 드래그로 옮길 수 없습니다';
+    this.inlineBox = document.createElement('input');
+    this.inlineBox.type = 'checkbox';
+    const inlineText = document.createElement('span');
+    inlineText.textContent = '글자처럼 배치 (끄면 자유롭게 이동)';
+    inline.append(this.inlineBox, inlineText);
+
+    body.append(lead, this.tabBar, this.panels, actions, inline, this.footNote);
     return body;
   }
 
@@ -165,6 +177,7 @@ export class SealMakerDialog extends ModalDialog {
     const label = this.tabs[this.active].label;
     const ok = insertPictureAtCursor(this.services, {
       data, drawW, drawH, naturalW: w, naturalH: h, description: `${label}: 서명`,
+      inline: this.inlineBox?.checked ?? false,
     });
     // ⚠ 실패했으면 **닫지 않는다**. 예전엔 무조건 닫아 버려 "그냥 안 됨"으로 보였다.
     if (!ok) {

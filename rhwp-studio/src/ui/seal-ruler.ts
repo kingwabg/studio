@@ -22,9 +22,23 @@ const PX_PER_MM_96 = 96 / 25.4;
 /** 그릴 때는 4배로 그려 인쇄 해상도(≈384dpi)를 확보한다 — 얇은 선이 뭉개지지 않게. */
 const SS = 4;
 
-/** 인쇄 가능 영역(A4 210×297 에서 여백 20mm 를 뺀 값) */
-const SHEET_W_MM = 170;
-const SHEET_H_MM = 257;
+/**
+ * 실측지는 **전용 새 문서**에 전면으로 앉힌다(사용자 선택 2026-08-04 "C").
+ *
+ * 왜 새 문서인가: 결재 문서에 끼워 넣으면 그 문서의 여백(보통 20mm)에 갇혀 작아지고,
+ * 여백을 줄이면 남의 문서 설정을 건드리게 된다. 실측지는 결재 내용과 섞일 이유가
+ * 없으므로 제 문서를 만들어 바로 뽑는 편이 맞다.
+ *
+ * 여백 5mm 는 **프린터가 물리적으로 못 찍는 가장자리**를 피하는 최소값이다. 0 으로 두면
+ * 대부분의 프린터가 자동 축소해 버려 실측 자체가 틀어진다 — 이 도구는 그러면 무용지물이다.
+ */
+const PAGE_MARGIN_MM = 5;
+const A4_W_MM = 210;
+const A4_H_MM = 297;
+const SHEET_W_MM = A4_W_MM - PAGE_MARGIN_MM * 2;
+const SHEET_H_MM = A4_H_MM - PAGE_MARGIN_MM * 2;
+/** 1mm = 7200/25.4 HWPUNIT — 용지·여백 설정이 쓰는 단위 */
+const MM_TO_HWPUNIT = 7200 / 25.4;
 
 /** 원형 도장 지름(mm) — 막도장 12, 개인 인감 15, 법인 21~30 언저리를 모두 덮는다 */
 const CIRCLE_MM = [9, 12, 15, 18, 21, 24, 27, 30];
@@ -152,7 +166,7 @@ export class SealRulerDialog extends ModalDialog {
   constructor(private services: CommandServices) {
     super('도장 실측 템플릿', 640);
     this.titleIcon = 'stamp';
-    this.confirmLabel = '문서에 넣기';
+    this.confirmLabel = '새 문서로 만들기';
   }
 
   protected createBody(): HTMLElement {
@@ -163,6 +177,7 @@ export class SealRulerDialog extends ModalDialog {
     intro.className = 'sgn-intro';
     intro.textContent =
       '인쇄해서 실제 도장을 찍어 보세요. 자국이 꼭 맞는 칸의 mm 가 도장 크기입니다. ' +
+      '「새 문서로 만들기」를 누르면 A4 한 장에 꽉 차게 담은 문서가 새로 열립니다 — 바로 인쇄하세요. ' +
       '인쇄할 때 「페이지에 맞춤」을 끄고 100% 배율로 뽑아야 정확합니다.';
 
     const stage = document.createElement('div');
@@ -205,8 +220,30 @@ export class SealRulerDialog extends ModalDialog {
   private async insert(): Promise<void> {
     const blob: Blob = await new Promise((r) => this.canvas.toBlob((x) => r(x!), 'image/png'));
     const data = new Uint8Array(await blob.arrayBuffer());
-    // ⚠ 삽입 크기는 **mm 를 96dpi px 로 환산한 값**이어야 인쇄물이 실제 크기로 나온다.
-    //   캔버스는 4배로 그렸지만(인쇄 선명도), 문서에 앉히는 크기는 원래 mm 그대로다.
+
+    // ① 전용 새 문서를 연다. 남의 문서 여백을 건드리지 않기 위해서다.
+    this.services.eventBus.emit('create-new-document');
+    const ready = await this.waitForBlankDocument();
+    if (!ready) {
+      showToast({ message: '새 문서를 열지 못했습니다 — 잠시 후 다시 시도해 주세요.', durationMs: 4000 });
+      return;
+    }
+
+    // ② 용지를 A4 로, 여백은 프린터 최소치로. 이래야 실측지가 한 장에 꽉 찬다.
+    try {
+      const mm = (v: number) => Math.round(v * MM_TO_HWPUNIT);
+      this.services.wasm.setPageDef(0, {
+        width: mm(A4_W_MM), height: mm(A4_H_MM),
+        marginLeft: mm(PAGE_MARGIN_MM), marginRight: mm(PAGE_MARGIN_MM),
+        marginTop: mm(PAGE_MARGIN_MM), marginBottom: mm(PAGE_MARGIN_MM),
+        marginHeader: 0, marginFooter: 0, marginGutter: 0,
+        landscape: false, binding: 0,
+      });
+    } catch (e) {
+      console.warn('[도장 실측] 용지 설정 실패 — 기본 여백으로 넣는다', e);
+    }
+
+    // ③ 여백을 뺀 자리에 전면으로 앉힌다.
     const ok = insertPictureAtCursor(this.services, {
       data,
       drawW: Math.round(SHEET_W_MM * PX_PER_MM_96),
@@ -216,9 +253,23 @@ export class SealRulerDialog extends ModalDialog {
       description: '도장 실측 템플릿',
     });
     if (!ok) {
-      showToast({ message: '문서에 넣지 못했습니다 — 편집기에 문서가 열려 있는지 확인해 주세요.', durationMs: 4000 });
+      showToast({ message: '문서에 넣지 못했습니다 — 잠시 후 다시 시도해 주세요.', durationMs: 4000 });
       return;
     }
     this.hide();
+  }
+
+  /** 새 문서가 실제로 열릴 때까지 기다린다. 이벤트만 쏘고 바로 넣으면 옛 문서에 들어간다. */
+  private waitForBlankDocument(timeoutMs = 4000): Promise<boolean> {
+    const started = Date.now();
+    return new Promise((resolve) => {
+      const tick = () => {
+        // 새 문서는 쪽이 1이고 본문이 비어 있다 — pageCount 만으로도 교체 여부를 알 수 있다.
+        if (this.services.wasm.pageCount > 0) { resolve(true); return; }
+        if (Date.now() - started > timeoutMs) { resolve(false); return; }
+        setTimeout(tick, 80);
+      };
+      setTimeout(tick, 120);
+    });
   }
 }

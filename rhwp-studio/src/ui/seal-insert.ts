@@ -40,6 +40,15 @@ export type InsertPictureArgs = {
   naturalW: number;
   naturalH: number;
   description: string;
+  /**
+   * 글자처럼 배치(inline)할지. 기본은 **false = 떠 있는 그림**.
+   *
+   * ⚠ treatAsChar 를 켜면 **드래그로 못 옮긴다** — 본문 흐름에 실려 글자처럼 앉기 때문이다
+   *   (input-handler-picture.ts:601 \"본문 배치 개체는 offset 이동 불가\").
+   *   도장은 원하는 자리에 얹는 물건이라 옮길 수 있어야 한다(2026-08-04 사용자 신고
+   *   \"왜 이동이 안되지\"). 서명란 칸 안에 글자처럼 앉히고 싶을 때만 켠다.
+   */
+  inline?: boolean;
 };
 
 /**
@@ -67,8 +76,11 @@ export function insertPictureAtCursor(services: CommandServices, a: InsertPictur
         //   글자처럼 앉는다(드롭 경로도 같은 후처리를 한다. 이걸 빼먹어 논리 길이 0으로
         //   "안 들어갔다"고 오판했다, 2026-08-01 실측).
         if (r.ok) {
-          wasm.setPictureProperties(pos.sectionIndex, r.paraIdx ?? pos.paragraphIndex,
-            r.controlIdx, { treatAsChar: true });
+          // insertPicture 는 **떠 있는 그림**으로 넣는다 — 글자취급은 요청할 때만 켠다.
+          if (a.inline) {
+            wasm.setPictureProperties(pos.sectionIndex, r.paraIdx ?? pos.paragraphIndex,
+              r.controlIdx, { treatAsChar: true });
+          }
           ok = true;
         }
         return null;
