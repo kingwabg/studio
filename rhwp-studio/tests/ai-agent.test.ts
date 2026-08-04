@@ -27,6 +27,12 @@ function mockServices(overrides: Record<string, unknown> = {}) {
   const calls: string[] = [];
   const wasm = {
     getTables: () => [{ para: 0, controlIdx: 0, rowCount: 2, colCount: 2 }],
+    // 병합 표 흉내: 실제 셀은 3개뿐(cellIdx 3 은 존재하지 않는다) — 외부 서식 실사고 재현.
+    getTableCellBboxes: () => [
+      { cellIdx: 0, row: 0, col: 0 }, { cellIdx: 1, row: 0, col: 1 }, { cellIdx: 2, row: 1, col: 0 },
+    ],
+    getCellParagraphCount: () => 1,
+    getCellParagraphLength: (_s: number, _p: number, _c: number, cell: number) => (cell === 0 ? 4 : 0),
     getParagraphCount: () => 3,
     getParagraphLength: () => 10,
     getTextRange: () => '본문',
@@ -115,4 +121,25 @@ test('두 번 연속 JSON 이 아니면 그 산문을 최종 답변으로 돌려
   const r = await runAgentTurn(services, '요청', async () => '설명만 하는 답');
   assert.equal(r.finalText, '설명만 하는 답');
   assert.equal(r.wrote, false);
+});
+
+test('병합 표: 존재하지 않는 셀 번호는 쓰지 않고, 실제 셀만 센다', async () => {
+  // 외부 서식 실사고(2026-08-05): 행×열 산술로 없는 셀을 찔러 "셀 문단 접근 실패"가 나고
+  // 있는 텍스트를 빈칸으로 오인했다. 이제 getTableCellBboxes 의 실제 목록만 쓴다.
+  const { services, calls } = mockServices();
+  const replies = [
+    '{"tool":"fill_cells","table":0,"fills":[{"cell":3,"text":"없는칸"},{"cell":1,"text":"새값"}]}',
+    '{"tool":"done","report":"완료"}',
+  ];
+  const r = await runAgentTurn(services, '채워줘', async () => replies.shift()!);
+  assert.equal(r.wrote, true);
+  assert.deepEqual(calls, ['insert:1']);        // cell 3(비존재)은 시도조차 안 했다
+});
+
+test('병합 표: replace 도 실제 셀 목록으로 범위를 판정한다', async () => {
+  const { services } = mockServices();
+  const replies = ['{"tool":"replace_cell","table":0,"cell":3,"text":"x"}', '{"tool":"done","report":"끝"}'];
+  let fed = '';
+  await runAgentTurn(services, '고쳐줘', async (_s, u) => { fed = u; return replies.shift()!; });
+  assert.match(fed, /그 번호의 셀이 없음/);
 });

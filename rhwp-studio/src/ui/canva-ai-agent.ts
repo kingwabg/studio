@@ -14,6 +14,7 @@
  * ④ 이미 값이 있는 셀을 덮으려면 모델이 replace 를 명시해야 한다 — 기본은 빈 칸만.
  */
 import type { CanvaServices } from './canva-services';
+import { readTable } from './table-grid.ts';
 
 /** 한 턴에서 도구를 부를 수 있는 최대 횟수 — 폭주 방지. 6이면 읽기 2~3 + 쓰기 1~2 로 충분하다. */
 const MAX_ROUNDS = 6;
@@ -53,12 +54,6 @@ function listTables(services: CanvaServices): TableRef[] {
   try { return services.wasm.getTables(0) ?? []; } catch { return []; }
 }
 
-function readCell(services: CanvaServices, t: TableRef, cellIdx: number): string {
-  try {
-    return (services.wasm.getTextInCell(0, t.para, t.controlIdx, cellIdx, 0, 0, READ_LIMIT) ?? '').trim();
-  } catch { return ''; }
-}
-
 /** 도구 실행. 결과는 모델에게 그대로 돌아간다 — 사람이 아니라 모델이 읽는 문자열이다. */
 function runTool(services: CanvaServices, name: string, args: Record<string, unknown>,
   state: { wrote: boolean }): string {
@@ -92,13 +87,13 @@ function runTool(services: CanvaServices, name: string, args: Record<string, unk
     case 'read_table': {
       const t = pickTable();
       if (typeof t === 'string') return t;
-      const rows: string[] = [];
-      const total = t.rowCount * t.colCount;
-      for (let i = 0; i < total; i++) {
-        const v = readCell(services, t, i);
-        rows.push(`${i}\t${Math.floor(i / t.colCount) + 1}행${(i % t.colCount) + 1}열\t${v || '(빈칸)'}`);
-      }
-      return rows.join('\n');
+      // ⚠ 0..행×열 순회 금지(2026-08-05 실사고): 외부 서식은 병합이 많아 그 번호대로 셀이
+      //   없고, 접근 예외를 '빈칸'으로 오인해 **있는 텍스트를 못 읽는 것처럼** 보였다.
+      //   table-fill.readTable 이 getTableCellBboxes 로 실제 셀만 열거한다(같은 원칙: :38).
+      const grid = readTable(wasm as never, 0, t);
+      return grid.cells
+        .map((c) => `${c.cellIdx}\t${c.row + 1}행${c.col + 1}열\t${c.text || '(빈칸)'}`)
+        .join('\n');
     }
     case 'fill_cells': {
       const t = pickTable();
@@ -107,14 +102,18 @@ function runTool(services: CanvaServices, name: string, args: Record<string, unk
       let ok = 0; const skipped: number[] = [];
       const ih = services.getInputHandler() as any;
       if (!ih) return 'ERROR: 편집기 없음';
+      // 실제 셀 목록 기준으로 판정한다 — 행×열 산술은 병합 표에서 어긋난다(read_table 주석).
+      const grid = readTable(wasm as never, 0, t);
+      const byIdx = new Map(grid.cells.map((c) => [c.cellIdx, c] as const));
       ih.executeOperation({
         kind: 'snapshot', operationType: 'aiAgentFill',
         operation: () => {
           for (const f of fills as Array<{ cell?: unknown; text?: unknown }>) {
             const cell = Number(f?.cell);
             const text = typeof f?.text === 'string' ? f.text.trim() : '';
-            if (!Number.isInteger(cell) || cell < 0 || cell >= t.rowCount * t.colCount || !text) continue;
-            if (readCell(services, t, cell)) { skipped.push(cell); continue; } // 기본은 빈 칸만
+            const known = byIdx.get(cell);
+            if (!known || !text) continue;
+            if (known.text) { skipped.push(cell); continue; } // 기본은 빈 칸만
             try { wasm.insertTextInCell(0, t.para, t.controlIdx, cell, 0, 0, text); ok++; } catch { /* 결과 수치로 보고 */ }
           }
         },
@@ -127,7 +126,9 @@ function runTool(services: CanvaServices, name: string, args: Record<string, unk
       if (typeof t === 'string') return t;
       const cell = Number(args.cell);
       const text = typeof args.text === 'string' ? args.text.trim() : '';
-      if (!Number.isInteger(cell) || cell < 0 || cell >= t.rowCount * t.colCount) return 'ERROR: cell 범위 밖';
+      const gridR = readTable(wasm as never, 0, t);
+      const knownR = gridR.cells.find((c) => c.cellIdx === cell);
+      if (!knownR) return 'ERROR: cell 범위 밖(그 번호의 셀이 없음 — read_table 로 실제 번호를 확인)';
       if (!text) return 'ERROR: text 비어 있음';
       const ih = services.getInputHandler() as any;
       if (!ih) return 'ERROR: 편집기 없음';
@@ -136,7 +137,7 @@ function runTool(services: CanvaServices, name: string, args: Record<string, unk
         kind: 'snapshot', operationType: 'aiAgentReplace',
         operation: () => {
           try {
-            const old = readCell(services, t, cell);
+            const old = knownR.text;
             if (old) wasm.deleteTextInCell(0, t.para, t.controlIdx, cell, 0, 0, old.length + 8);
             wasm.insertTextInCell(0, t.para, t.controlIdx, cell, 0, 0, text);
           } catch (e) { err = String(e).slice(0, 80); }
