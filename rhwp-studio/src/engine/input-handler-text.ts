@@ -237,6 +237,21 @@ export function handleBackspace(this: any, pos: DocumentPosition, inCell: boolea
 
   const { charOffset } = pos;
 
+  // 캐럿 바로 앞 칸이 양식 개체면 글자 대신 **개체를** 지운다(한컴 동작 — 2026-08-04 요청).
+  // 셀 안 양식은 배관이 달라 본문만(pos 에 셀 좌표가 없을 때).
+  if (!inCell && (pos as any).parentParaIndex === undefined && charOffset > 0) {
+    try {
+      const ci = this.wasm.formControlAtLogical(pos.sectionIndex, pos.paragraphIndex, charOffset - 1);
+      if (ci >= 0) {
+        this.wasm.deleteFormObject(pos.sectionIndex, pos.paragraphIndex, ci);
+        this.clearFormObjectSelection?.();
+        this.cursor.moveTo({ ...pos, charOffset: charOffset - 1 });
+        this.afterEdit();
+        return;
+      }
+    } catch { /* 조회 실패 시 평소 삭제로 */ }
+  }
+
   // 필드 경계 보호: 필드 시작 위치에서는 Backspace 차단
   try {
     const fi = this.wasm.getFieldInfoAt(pos);
@@ -310,6 +325,19 @@ export function handleDelete(this: any, pos: DocumentPosition, inCell: boolean):
   }
 
   const { charOffset } = pos;
+
+  // 캐럿 바로 뒤 칸이 양식 개체면 글자 대신 **개체를** 지운다(Backspace 와 대칭).
+  if (!inCell && (pos as any).parentParaIndex === undefined) {
+    try {
+      const ci = this.wasm.formControlAtLogical(pos.sectionIndex, pos.paragraphIndex, charOffset);
+      if (ci >= 0) {
+        this.wasm.deleteFormObject(pos.sectionIndex, pos.paragraphIndex, ci);
+        this.clearFormObjectSelection?.();
+        this.afterEdit();
+        return;
+      }
+    } catch { /* 조회 실패 시 평소 삭제로 */ }
+  }
 
   // 필드 경계 보호: 필드 끝 위치에서는 Delete 차단
   try {

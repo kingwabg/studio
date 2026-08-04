@@ -1390,6 +1390,12 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).moveFormObject(sec, para, controlIdx, JSON.stringify(props)));
   }
 
+  /** 논리 칸을 차지한 양식 개체의 컨트롤 인덱스(-1 = 없음) — Backspace/Delete 분기 */
+  formControlAtLogical(sec: number, para: number, logical: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).formControlAtLogical(sec, para, logical);
+  }
+
   deleteFormObject(sec: number, para: number, controlIdx: number): { ok: boolean } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse((this.doc as any).deleteFormObject(sec, para, controlIdx));
