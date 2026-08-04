@@ -627,13 +627,21 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       cellIdx = prev.cellIdx;
     }
     const edgeName: 'bottom' | 'right' = state.edge.type === 'col' ? 'right' : 'bottom';
-    // [치유 2026-08-04] 어긋난 경계를 끌다 스냅이 다른 경계선(원위치)에 캐치되면
-    // offset 대신 복원 — 격자가 원래의 단순한 모양으로 돌아온다(사용자 요청 "캐치").
+    // [치유 2026-08-04·v2] 놓은 위치가 다른 경계선에 캐치 반경 안이고 이 경계 주변이
+    // 어긋나 있으면 offset 대신 복원 — **양방향**: 어긋난 세그를 원위치로 끌어도,
+    // 정렬된 세그를 어긋난 선에 맞춰도 격자가 단순한 모양으로 돌아온다(신고 수리).
+    const CATCH_PX = 6;
+    const nearLine = (state.snapTargets ?? [])
+      .some((p2: number) => Math.abs(clamped - p2) <= CATCH_PX);
     const finalBox = state.bboxes.find((b: CellBbox) => b.cellIdx === cellIdx);
-    const isOffsetCell = state.edge.type === 'col'
-      ? (finalBox?.colSpan ?? 1) > 1
-      : (finalBox?.rowSpan ?? 1) > 1;
-    const healing = snapped.hit && isOffsetCell && deltaHwpUnit < 0;
+    const spanOf = (b: CellBbox | undefined) =>
+      b ? (state.edge.type === 'col' ? b.colSpan : b.rowSpan) : 1;
+    const neighborBox = finalBox
+      ? (state.edge.type === 'col'
+        ? state.bboxes.find((b: CellBbox) => b.row === finalBox.row && b.col === finalBox.col + finalBox.colSpan)
+        : state.bboxes.find((b: CellBbox) => b.col === finalBox.col && b.row === finalBox.row + finalBox.rowSpan))
+      : undefined;
+    const healing = nearLine && (spanOf(finalBox) > 1 || spanOf(neighborBox) > 1);
     try {
       this.executeOperation({
         kind: 'snapshot',

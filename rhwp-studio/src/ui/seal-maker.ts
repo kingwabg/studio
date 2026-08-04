@@ -12,6 +12,8 @@ import type { SignTab } from './sign-tab';
 import { createDrawTab } from './sign-draw';
 import { createFontTab } from './sign-fonts';
 import { createSealTab } from './seal-tab';
+import { insertPictureAtCursor } from './seal-insert';
+import { showToast } from './toast';
 
 const SIZE = 300; // 도장 렌더 해상도(px)
 const INSERT_H = 57; // 문서 안 높이 ≈ 15mm (96dpi) — 폭은 그림 비율대로 따라간다
@@ -156,31 +158,19 @@ export class SealMakerDialog extends ModalDialog {
   }
 
   private async insert(): Promise<void> {
-    const ih = this.services.getInputHandler() as any;
-    if (!ih || this.services.wasm.pageCount === 0) return;
     const { data, w, h } = await this.blob();
     // 높이를 기준으로 맞추고 폭은 비율대로 — 가로로 긴 서명이 눌리지 않게.
     const drawH = INSERT_H;
     const drawW = Math.max(8, Math.round((w / h) * INSERT_H));
-    const pos = ih.getCursorPosition();
     const label = this.tabs[this.active].label;
-    ih.executeOperation({
-      kind: 'snapshot',
-      operationType: 'insertSeal',
-      operation: (wasm: typeof this.services.wasm) => {
-        const r = wasm.insertPicture(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, '',
-          data, drawW, drawH, w, h, 'png', `${label}: 서명`);
-        // ⚠ insertPicture 는 **떠 있는 그림**으로 넣는다 — 글자취급으로 바꿔야 서명란에
-        //   글자처럼 앉는다(드롭 경로도 같은 후처리를 한다. 이걸 빼먹어 논리 길이 0으로
-        //   "안 들어갔다"고 오판했다, 2026-08-01 실측).
-        if (r.ok) {
-          wasm.setPictureProperties(pos.sectionIndex, r.paraIdx ?? pos.paragraphIndex,
-            r.controlIdx, { treatAsChar: true });
-        }
-        return null;
-      },
+    const ok = insertPictureAtCursor(this.services, {
+      data, drawW, drawH, naturalW: w, naturalH: h, description: `${label}: 서명`,
     });
-    this.services.eventBus.emit('document-changed');
+    // ⚠ 실패했으면 **닫지 않는다**. 예전엔 무조건 닫아 버려 "그냥 안 됨"으로 보였다.
+    if (!ok) {
+      showToast({ message: '문서에 넣지 못했습니다 — 편집기에 문서가 열려 있는지 확인해 주세요.', durationMs: 4000 });
+      return;
+    }
     this.hide();
   }
 }

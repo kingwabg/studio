@@ -14,6 +14,8 @@
  */
 import { ModalDialog } from './dialog';
 import type { CommandServices } from '@/command/types';
+import { insertPictureAtCursor } from './seal-insert';
+import { showToast } from './toast';
 
 /** 화면·인쇄 공통 기준. 96dpi 에서 1mm = 3.7795px 이고, 문서 삽입 크기도 이 단위다. */
 const PX_PER_MM_96 = 96 / 25.4;
@@ -201,30 +203,22 @@ export class SealRulerDialog extends ModalDialog {
   }
 
   private async insert(): Promise<void> {
-    const ih = this.services.getInputHandler() as any;
-    if (!ih || this.services.wasm.pageCount === 0) return;
     const blob: Blob = await new Promise((r) => this.canvas.toBlob((x) => r(x!), 'image/png'));
     const data = new Uint8Array(await blob.arrayBuffer());
-
     // ⚠ 삽입 크기는 **mm 를 96dpi px 로 환산한 값**이어야 인쇄물이 실제 크기로 나온다.
     //   캔버스는 4배로 그렸지만(인쇄 선명도), 문서에 앉히는 크기는 원래 mm 그대로다.
-    const drawW = Math.round(SHEET_W_MM * PX_PER_MM_96);
-    const drawH = Math.round(SHEET_H_MM * PX_PER_MM_96);
-    const pos = ih.getCursorPosition();
-    ih.executeOperation({
-      kind: 'snapshot',
-      operationType: 'insertSealRuler',
-      operation: (wasm: typeof this.services.wasm) => {
-        const r = wasm.insertPicture(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, '',
-          data, drawW, drawH, this.canvas.width, this.canvas.height, 'png', '도장 실측 템플릿');
-        if (r.ok) {
-          wasm.setPictureProperties(pos.sectionIndex, r.paraIdx ?? pos.paragraphIndex,
-            r.controlIdx, { treatAsChar: true });
-        }
-        return null;
-      },
+    const ok = insertPictureAtCursor(this.services, {
+      data,
+      drawW: Math.round(SHEET_W_MM * PX_PER_MM_96),
+      drawH: Math.round(SHEET_H_MM * PX_PER_MM_96),
+      naturalW: this.canvas.width,
+      naturalH: this.canvas.height,
+      description: '도장 실측 템플릿',
     });
-    this.services.eventBus.emit('document-changed');
+    if (!ok) {
+      showToast({ message: '문서에 넣지 못했습니다 — 편집기에 문서가 열려 있는지 확인해 주세요.', durationMs: 4000 });
+      return;
+    }
     this.hide();
   }
 }
