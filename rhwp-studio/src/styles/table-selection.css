@@ -28,8 +28,7 @@
   cursor: not-allowed;
 }
 .tbl-noresize-zone .tbl-noresize-mark {
-  opacity: 0;
-  transition: opacity 0.1s;
+  opacity: 0.85; /* 색구분 결정(2026-08-04): ⃠ 상시 표시 — 파란 핸들과 한눈에 구분 */
 }
 .tbl-noresize-zone:hover .tbl-noresize-mark {
   opacity: 1;

@@ -30,6 +30,18 @@ function createObjectHandle(cx: number, cy: number, size: number, locked: boolea
   return el;
 }
 
+/** 표 크기 조절 핸들 — 파란 사각형, 오른쪽아래 모서리는 파란 원 (사용자 색구분 결정) */
+function createTableResizeHandle(cx: number, cy: number, size: number, corner: boolean): HTMLDivElement {
+  const half = size / 2;
+  const el = document.createElement('div');
+  el.style.cssText =
+    `position:absolute;left:${cx - half}px;top:${cy - half}px;` +
+    `width:${size}px;height:${size}px;box-sizing:border-box;pointer-events:none;` +
+    `background:var(--color-primary,#4472c4);border:1px solid #fff;` +
+    (corner ? 'border-radius:50%;' : '');
+  return el;
+}
+
 /** 크기 조절 불가 자리: 평소엔 투명, 호버하면 ⃠ 표시 + 금지 커서 (CSS .tbl-noresize-zone) */
 function createNoResizeHoverZone(cx: number, cy: number, size: number): HTMLDivElement {
   const half = size / 2;
@@ -285,13 +297,18 @@ export class TableObjectRenderer {
       ];
 
       for (const pos of positions) {
-        // [경계선 재설계 2026-08-04] 표 크기 조절은 오른쪽·아래·오른쪽아래만 —
-        // 기준점(왼쪽 위) 쪽 5자리는 핸들을 그리지 않고, 호버하면 ⃠ 만 나타난다
-        // (셀 보호 호버와 같은 반응형 규약). 그림 쪽은 render() 경로라 영향 없다.
+        // [경계선 재설계 2026-08-04] 표 크기 조절은 오른쪽·아래·오른쪽아래만.
+        // 색 구분(사용자 결정): 조절 가능 = 파란 핸들(모서리는 원), 불가 = 회색 ⃠ 상시 표시.
+        // 그림 쪽은 render() 경로라 영향 없다.
         const resizable = pos.dir === 'e' || pos.dir === 's' || pos.dir === 'se';
-        const el = (resizable || locked)
-          ? createObjectHandle(pos.cx, pos.cy, hs, locked)
-          : createNoResizeHoverZone(pos.cx, pos.cy, hs + 4);
+        let el: HTMLDivElement;
+        if (locked) {
+          el = createObjectHandle(pos.cx, pos.cy, hs, true);
+        } else if (resizable) {
+          el = createTableResizeHandle(pos.cx, pos.cy, hs + 2, pos.dir === 'se');
+        } else {
+          el = createNoResizeHoverZone(pos.cx, pos.cy, hs + 4);
+        }
         this.layer.appendChild(el);
         this.handles.push({ dir: pos.dir, el, cx: pos.cx, cy: pos.cy });
       }
