@@ -573,7 +573,8 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
     max: state.maxResizePos,
   });
   // [캔버스 한컴 포크] 커밋도 스냅된 위치 기준(update와 동일 규칙) — 스냅선 정리
-  const newPos = applyBoundarySnap(state, clamped, e.altKey).pos;
+  const snapped = applyBoundarySnap(state, clamped, e.altKey);
+  const newPos = snapped.pos;
   _snapLayerFor(this.container).clear();
   const deltaPagePx = newPos - state.borderOriginalPos;
   // 1 page px (96 DPI) = 75 HWPUNIT (7200/96)
@@ -626,15 +627,29 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       cellIdx = prev.cellIdx;
     }
     const edgeName: 'bottom' | 'right' = state.edge.type === 'col' ? 'right' : 'bottom';
+    // [치유 2026-08-04] 어긋난 경계를 끌다 스냅이 다른 경계선(원위치)에 캐치되면
+    // offset 대신 복원 — 격자가 원래의 단순한 모양으로 돌아온다(사용자 요청 "캐치").
+    const finalBox = state.bboxes.find((b: CellBbox) => b.cellIdx === cellIdx);
+    const isOffsetCell = state.edge.type === 'col'
+      ? (finalBox?.colSpan ?? 1) > 1
+      : (finalBox?.rowSpan ?? 1) > 1;
+    const healing = snapped.hit && isOffsetCell && deltaHwpUnit < 0;
     try {
       this.executeOperation({
         kind: 'snapshot',
-        operationType: 'offsetCellBoundary',
+        operationType: healing ? 'restoreCellBoundary' : 'offsetCellBoundary',
         operation: (wasm: any) => {
-          wasm.offsetCellBoundary(
-            state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
-            cellIdx, edgeName, deltaHwpUnit,
-          );
+          if (healing) {
+            wasm.restoreCellBoundary(
+              state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
+              cellIdx, edgeName,
+            );
+          } else {
+            wasm.offsetCellBoundary(
+              state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
+              cellIdx, edgeName, deltaHwpUnit,
+            );
+          }
           return this.cursor.getPosition();
         },
       });
@@ -1017,8 +1032,11 @@ export function moveSelectedTable(this: any, key: 'ArrowUp' | 'ArrowDown' | 'Arr
   try {
     const result = this.wasm.moveTableOffset(ref.sec, ref.ppi, ref.ci, deltaH, deltaV);
     // Undo 기록
+    // [어울림 #6] 표 이동은 옆 문단을 재줄바꿈한다 — 캐럿 rect 를 같이 갱신하지 않으면
+    // 본문 캐럿이 옛 줄 위치에 남는다(hancom-format-parity #6).
     this.executeOperation({ kind: 'record', command:
       new MoveTableCommand(ref.sec, ref.ppi, ref.ci, deltaH, deltaV, result.ppi, result.ci),
+      meta: { refresh: 'selectionOnly' },
     });
     // [2026-07-30 사용자 결정] TAC 표 문단 교환(+커서 보정)은 한컴에 없는 기능이라 제거 —
     // 엔진 moveTableOffset 이 TAC 무동작으로 바뀌어 ppi 는 이제 항상 불변이다.
@@ -1203,12 +1221,14 @@ export function finishMoveDrag(this: any): void {
   if (state) {
     const { totalDeltaH, totalDeltaV, startPpi, tableRef } = state;
     if (totalDeltaH !== 0 || totalDeltaV !== 0) {
+      // [어울림 #6] 드래그 이동도 동일 — 재줄바꿈 후 캐럿 rect 갱신
       this.executeOperation({ kind: 'record', command:
         new MoveTableCommand(
           tableRef.sec, startPpi, tableRef.ci,
           totalDeltaH, totalDeltaV,
           tableRef.ppi, tableRef.ci,
         ),
+        meta: { refresh: 'selectionOnly' },
       });
     }
   }

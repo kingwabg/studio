@@ -947,6 +947,15 @@ export class WasmBridge {
     return JSON.parse(this.doc.offsetCellBoundary(sec, parentPara, controlIdx, cellIdx, edge, deltaHwp));
   }
 
+  /** [경계선 재설계] 어긋난 경계 복원(치유) — 스냅으로 정렬선에 캐치되면 호출 */
+  restoreCellBoundary(
+    sec: number, parentPara: number, controlIdx: number,
+    cellIdx: number, edge: 'bottom' | 'right',
+  ): { ok: boolean } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse(this.doc.restoreCellBoundary(sec, parentPara, controlIdx, cellIdx, edge));
+  }
+
   moveTableOffset(sec: number, parentPara: number, controlIdx: number, deltaH: number, deltaV: number): { ok: boolean; ppi: number; ci: number } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.moveTableOffset(sec, parentPara, controlIdx, deltaH, deltaV));
