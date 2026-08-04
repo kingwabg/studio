@@ -10,7 +10,7 @@ import { SttSession, type SttState } from './canva-record-stt';
 import { mkEl, mkButton } from './canva-dom';
 import { callAi, aiErrorHint } from './canva-ai-client';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
-import { LAYOUT_PROMPT } from './canva-ai-panel';
+import { LAYOUT_PROMPT } from './canva-ai-layout';
 
 const ICON_MIC =
   '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +

@@ -7,6 +7,16 @@
  */
 import type { CanvaServices } from './canva-services';
 
+// [2026-08-05] AI 패널의 「문서 생성」 모드는 폐지됐지만(새 「문서 작성」이 대체)
+// 이 배치 파이프라인은 **녹음→회의록**(canva-record-panel.ts)이 계속 쓴다 — 그래서 파일과
+// 프롬프트가 남아 있다. 프롬프트를 패널에서 이리로 옮겨 왔다(주인이 바뀐 것).
+export const LAYOUT_PROMPT =
+  '당신은 한국어 문서 레이아웃 설계자입니다. 사용자의 요청을 A4(210×297mm) 지면 위 요소 배치로 설계해 JSON만 출력하세요.\n' +
+  '형식: {"elements":[{"type":"text","x":20,"y":20,"w":170,"text":"내용 (줄바꿈은 \\n)"},{"type":"table","x":20,"y":60,"rows":[["헤더1","헤더2"],["값1","값2"]]}]}\n' +
+  '규칙: 좌표/폭은 mm 숫자. 여백 20mm 안쪽(x 20~190, y 20~277)에 배치. 문서 제목은 맨 위 text 요소.\n' +
+  '표는 rows 2차원 배열(첫 행=헤더, 빈 값은 ""), 셀 텍스트는 짧게. 요소는 2~8개.\n' +
+  '설명·코드펜스 없이 JSON 하나만 출력합니다.';
+
 export interface AiTextEl { type: 'text'; x: number; y: number; w: number; text: string; }
 export interface AiTableEl { type: 'table'; x: number; y: number; rows: string[][]; }
 export type AiLayoutEl = AiTextEl | AiTableEl;

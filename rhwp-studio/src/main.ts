@@ -580,6 +580,8 @@ async function initialize(): Promise<void> {
       (window as any).__canvaskitRenderMode = canvaskitMode;
       (window as any).__canvaskitSurfaceRequest = canvaskitSurfaceRequest;
       (window as any).__renderProfile = renderProfile;
+      // AI 문서 작성 e2e 판정용 — 모델 없이 도구→실체화→검토를 스크립트로 돌린다
+      void import('@/ai-writer/writer-agent').then((m) => { (window as any).__WriterSession = m.WriterSession; });
     }
 
     // [캔버스 한컴 포크] 캔바식 좌/우 사이드바 (삽입 팔레트 · 속성 인스펙터 · AI)
