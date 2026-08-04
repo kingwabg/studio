@@ -5222,6 +5222,7 @@ export class InputHandler {
       }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
+        e.stopPropagation();
         this.moveSelectedFormObject(e.key === 'ArrowLeft' ? -1 : 1);
       } else if ((e.key.length === 1 || e.key === 'Process') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // 글자를 치기 시작하면 개체 선택을 접고 평소 타이핑으로 — 가로채지 않는다.
@@ -5229,6 +5230,8 @@ export class InputHandler {
         this.clearFormObjectSelection();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
+        // 전파를 막지 않으면 같은 키가 textarea 핸들러로 흘러가 본문 글자까지 지운다
+        e.stopPropagation();
         const { hit } = this.formObjectSelection;
         if (hit.sec !== undefined && hit.para !== undefined && hit.ci !== undefined) {
           try {
@@ -5242,6 +5245,7 @@ export class InputHandler {
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         this.clearFormObjectSelection();
       }
     };
