@@ -212,19 +212,40 @@ export class CanvaAiPanel {
    * 파일 형식 칩은 두지 않았다 — 여기는 HWP 편집기 안이라 선택지가 하나뿐이다.
    */
   private renderWriterSetup(text: string): void {
-    const infer = (): string => {
-      if (/계획/.test(text)) return '사업계획서';
-      if (/제안|기획/.test(text)) return '제안서';
+    /**
+     * 추천은 **요청 문장을 읽고** 네 항목 모두 정한다 — 유형만 읽고 나머지를 고정하면
+     * "내부 검토용으로 간단하게"라고 말해도 「대외 제출용·표준」이 추천으로 떠서
+     * 읽는 척만 하는 카드가 된다(사용자 지적 2026-08-05).
+     * 규칙(키워드) 기반이라 흔한 표현은 잡지만, 미묘한 표현은 칩으로 바로잡으면 된다 —
+     * 추천이 틀려도 클릭 한 번이라 모델 호출(느리고 유료)을 쓰지 않았다.
+     */
+    const inferType = (): string => {
       if (/회의/.test(text)) return '회의록';
-      if (/공문|협조|안내문/.test(text)) return '공문';
+      if (/공문|협조문|안내문|시행문/.test(text)) return '공문';
+      if (/제안|기획/.test(text)) return '제안서';
+      if (/계획/.test(text)) return '사업계획서';
       if (/보고/.test(text)) return '보고서';
       return '보고서';
     };
+    const inferPurpose = (): string => {
+      if (/내부|검토용|초안|리뷰/.test(text)) return '내부 검토용';
+      if (/개인|연습|참고용/.test(text)) return '개인·기타';
+      return '대외 제출용'; // 제출·공모·기관 언급이 없어도 공문서의 기본은 격식이다
+    };
+    const inferLength = (): string => {
+      if (/간단|간략|짧게|한\s*장|1\s*장|요약/.test(text)) return '간략(1~2장)';
+      if (/상세|자세|길게|풍부|꼼꼼/.test(text)) return '상세(6장 이상)';
+      return '표준(3~5장)';
+    };
+    const inferTone = (): string => {
+      if (/서술체|부드럽|자연스럽|편하게|말하듯/.test(text)) return '일반 서술체';
+      return '공식 공문체';
+    };
     const groups: Array<{ label: string; options: string[]; pick: string }> = [
-      { label: '어떤 문서를 만들까요?', options: ['사업계획서', '보고서', '제안서', '회의록', '공문', '기타'], pick: infer() },
-      { label: '주요 목적은?', options: ['대외 제출용', '내부 검토용', '개인·기타'], pick: '대외 제출용' },
-      { label: '분량은?', options: ['표준(3~5장)', '간략(1~2장)', '상세(6장 이상)'], pick: '표준(3~5장)' },
-      { label: '문체는?', options: ['공식 공문체', '일반 서술체'], pick: '공식 공문체' },
+      { label: '어떤 문서를 만들까요?', options: ['사업계획서', '보고서', '제안서', '회의록', '공문', '기타'], pick: inferType() },
+      { label: '주요 목적은?', options: ['대외 제출용', '내부 검토용', '개인·기타'], pick: inferPurpose() },
+      { label: '분량은?', options: ['표준(3~5장)', '간략(1~2장)', '상세(6장 이상)'], pick: inferLength() },
+      { label: '문체는?', options: ['공식 공문체', '일반 서술체'], pick: inferTone() },
     ];
     const picks = groups.map((g) => g.pick);
 
