@@ -5268,7 +5268,6 @@ export class InputHandler {
   // 엔진 비트(HWP5 리스트헤더/HWPX protect)는 예전부터 왕복됐지만 편집 차단이 없었다.
   // 방향 결정(2026-08-04): 항상 잠김 / 패널 토글로 해제 / 캐럿 진입 시에만 자물쇠 표시.
 
-  private cellLockBadgeEl: HTMLElement | null = null;
   private lastCellLockToastAt = 0;
 
   /** 커서가 잠긴 셀 안이면 그 셀 좌표를 준다(아니면 null). 중첩 표는 바깥 표 기준(v1). */
@@ -5298,31 +5297,14 @@ export class InputHandler {
     });
   }
 
-  /** 캐럿이 움직일 때마다: 잠긴 셀이면 입력을 뿌리(readOnly)에서 막고 자물쇠 배지를 단다 */
+  /**
+   * 캐럿이 움직일 때마다: 잠긴 셀이면 입력을 뿌리(readOnly)에서 막는다.
+   * **표시는 그리지 않는다** — 잠김 신호는 호버 시 빨간 ✕ 하나로 통일한다
+   * (input-handler-mouse 의 protected-cell-hover-guard, 2026-08-04 사용자 요청:
+   *  "자물쇠는 별로, 호버했을 때 하나만").
+   */
   private updateCellLockState(): void {
-    const locked = this.cursorLockedCell();
-    this.textarea.readOnly = !!locked; // 타이핑·IME 조합 원천 차단 (키 이동·클릭은 그대로)
-    if (!locked) {
-      this.cellLockBadgeEl?.remove();
-      this.cellLockBadgeEl = null;
-      return;
-    }
-    try {
-      const bb = this.wasm.getTableCellBboxes(locked.sec, locked.ppi, locked.ci)
-        .find((b) => b.cellIdx === locked.cellIdx);
-      if (!bb) return;
-      const rect = this.formBboxToOverlayRect({ x: bb.x, y: bb.y, w: bb.w, h: bb.h }, bb.pageIndex);
-      if (!this.cellLockBadgeEl) {
-        const el = document.createElement('div');
-        el.className = 'cell-lock-badge';
-        el.textContent = '\u{1F512}';
-        el.style.cssText = 'position:absolute;pointer-events:none;z-index:30;font-size:11px;line-height:1;opacity:.75';
-        (this.container.querySelector('#scroll-content') ?? this.container).appendChild(el);
-        this.cellLockBadgeEl = el;
-      }
-      this.cellLockBadgeEl.style.left = `${rect.left + rect.width - 15}px`;
-      this.cellLockBadgeEl.style.top = `${rect.top + 2}px`;
-    } catch { /* bbox 조회 실패 시 배지만 생략 — 차단은 이미 걸려 있다 */ }
+    this.textarea.readOnly = !!this.cursorLockedCell();
   }
 
   /** 양식 개체 조작을 스냅숏 undo 로 태운다 — 그림 개체와 같은 전략(2026-08-04 요청) */
