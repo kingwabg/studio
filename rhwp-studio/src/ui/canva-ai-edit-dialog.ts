@@ -103,7 +103,12 @@ export function showAiEditDialog(ih: any, ref: ShapeRef): void {
   };
   requestBtn.addEventListener('click', () => void doRequest());
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void doRequest(); }
+    // ⚠ 한글 조합 중 Enter 는 조합 확정이다 — 방어가 없으면 한 번에 두 번 요청된다
+    //   (AI 패널에서 실제로 그랬다, 2026-08-05). stopPropagation 은 조합 중에도 필요하다.
+    if (!e.isComposing && e.keyCode !== 229 && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void doRequest();
+    }
     e.stopPropagation(); // 편집기 단축키로 새지 않게
   });
 

@@ -135,6 +135,12 @@ export class CanvaAiPanel {
     this.input.placeholder = '무엇을 써 드릴까요?';
     this.input.addEventListener('input', () => this.autosize());
     this.input.addEventListener('keydown', (e) => {
+      // ⚠ 한글 조합 중 Enter 는 **조합 확정**이지 전송이 아니다(2026-08-05 실사고).
+      //   방어가 없으면 "표 빈칸 채우자" 를 치고 Enter 한 번에 두 번 보내진다 —
+      //   앞부분이 먼저 나가고, 조합이 끝난 마지막 글자("자")가 또 나간다.
+      //   같은 저장소의 goto-dialog.ts:193 · find-dialog.ts:218 이 쓰는 방어와 같다.
+      //   keyCode 229 는 isComposing 을 안 주는 구형 IME 폴백.
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void this.send(); }
     });
     this.sendBtn = mkButton('canva-ai-send', {
