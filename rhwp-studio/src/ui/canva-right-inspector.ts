@@ -154,92 +154,8 @@ export class CanvaRightInspector {
     // 그대로 적용된 예문을 맨 위에 둔다 — 아래 컨트롤을 만지면 즉시 따라온다.
     this.specimen.mount(this.fmtPane);
 
-    // [텍스트 스타일 프리셋 2026-07-30] 캔바식 '제목 추가' 카드 — 누르면 현재 문단
-    // 전체에 크기·굵기(·번호)를 한 번에 입힌다. 카드 자체가 그 스타일로 그려져
-    // 결과를 미리 보여준다.
-    const styleSec = this.section('텍스트 스타일');
-    const styles = mkEl('div', 'canva-styles');
-    for (const t of TEXT_STYLES) {
-      const b = mkButton(`canva-style-card canva-style--${t.id}`, { title: t.hint });
-      b.textContent = t.label;
-      // [내 스타일 2026-08-04] 카드 우하단에 크기 뱃지 — 고르기 전 가늠(사용자 제안)
-      b.appendChild(mkEl('span', 'canva-style-badge', `${t.pt}pt`));
-      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.applyTextStyle(t); });
-      styles.appendChild(b);
-    }
-    styleSec.appendChild(styles);
-
-    // [내 스타일 2026-08-04] 자주 쓰는 서식을 이름으로 저장해 카드로 재사용한다 —
-    // 카드가 그 서식 그대로 그려져(미리보기) 고르기 쉽고, 클릭 한 번으로 문단에 입힌다.
-    this.myStylesHost = mkEl('div', 'canva-mystyles');
-    styleSec.appendChild(this.myStylesHost);
-    this.renderMyStyles();
-
-    // [2026-08-03 사용자 지시] 글자 탭의 「스타일 설정…」 제거 — 같은 진입점이 스타일 탭
-    // 하단과 홈 리본에 이미 있어 세 겹이었다. 여기 프리셋 카드는 "빠른 적용"만 맡는다.
-
-    this.fmtPane.appendChild(styleSec);
-
-    // [문단 템플릿 2026-08-02] 캔바식 '시작 골격' — 누르면 모달 그리드가 열리고, 고른 카드가
-    // 커서 자리에 제목+번호목록 등 서식된 문단을 통째로 넣는다. 삽입은 기존
-    // insertFormatted(ai-doc-insert) 재사용: 분류·좌표 변환·단일 undo 가 이미 처리돼 있다.
-    const tplSec = this.section('문단 템플릿');
-    const tplBtn = mkButton('canva-full-btn', {
-      html: svg('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 9h8M8 13h8M8 17h5"/>') + '<span>문단 템플릿…</span>',
-    });
-    // [문단 템플릿 2026-08-04] 독스식 — 버튼을 누르면 작은 미리보기 플라이아웃이 바로
-    // 뜨고(문서 안 가림), 저장·수정·삭제 관리는 「템플릿 관리…」로 기존 모달을 연다.
-    const openTemplateManager = () => {
-      const modal = new TemplatePickerModal({
-        onPick: (t) => this.applyTemplate(t.body),
-        // 수정: 새 문서에 body 를 채우고 「템플릿 편집 모드」 바를 띄운다 — 이름·저장
-        //   (같은 id 덮어쓰기)·삭제·닫기를 문서 위에서 바로. 저장이 딴 데로 새던 문제 해결.
-        onEdit: (t) => {
-          // 새 문서 준비가 끝난 뒤 내용을 채우고 편집 바를 띄운다(경합 방지 — create-new
-          //   는 async·저장가드 포함). 가드를 취소하면 onReady 가 안 불려 아무 일도 없다.
-          this.services.eventBus.emit('create-new-document', {
-            onReady: () => {
-              this.applyTemplate(t.body);
-              openTemplateEditBar({
-                label: t.label,
-                onSave: (name) => {
-                  const body = extractDocBody(this.services.wasm);
-                  if (!body.trim()) { showToast({ message: '저장할 본문이 없습니다.', durationMs: 2200 }); return; }
-                  void saveTemplate({ id: t.id, label: name || t.label, body, addedAt: Date.now() });
-                  showToast({ message: `템플릿 '${name || t.label}' 저장됨`, durationMs: 2200 });
-                },
-                onDelete: () => {
-                  void deleteTemplate(t.id);
-                  closeTemplateEditBar();
-                  showToast({ message: '템플릿을 삭제했습니다.', durationMs: 2200 });
-                },
-              });
-            },
-          });
-        },
-        onSaveCurrent: async (name) => {
-          const body = extractDocBody(this.services.wasm);
-          if (!body.trim()) {
-            showToast({ message: '저장할 본문이 없습니다.', durationMs: 2200 });
-            return;
-          }
-          await saveTemplate({ id: createTemplateId(), label: name || '내 템플릿', body, addedAt: Date.now() });
-          showToast({ message: '현재 문서를 템플릿으로 저장했습니다.', durationMs: 2200 });
-          modal.refresh();
-        },
-        onDelete: (id) => deleteTemplate(id),
-      });
-      modal.show();
-    };
-    tplBtn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      showTemplateFlyout(tplBtn, {
-        onPick: (t) => this.applyTemplate(t.body),
-        onManage: openTemplateManager,
-      });
-    });
-    tplSec.appendChild(tplBtn);
-    this.fmtPane.appendChild(tplSec);
+    // [2026-08-04 사용자 지시] 텍스트 스타일(프리셋+내 스타일)·문단 템플릿 묶음은
+    // 글자 탭이 아니라 **스타일 탭**에 산다 — buildQuickStyleSections 참조.
 
     // ⚠ 「글자」(B·I·U·취소선·글꼴·크기)·「글자색」·「형광펜」 섹션은 **뺐다**
     //   (사용자 요청 2026-08-01 "없어도 될 거 같아"). 리본 홈 탭에 같은 것이 전부 있다.
@@ -695,7 +611,99 @@ export class CanvaRightInspector {
    * 스타일 탭 — 대화상자와 같은 구조(목록 + 정보 카드 3장)를 패널에서, 그리고 ✎ 로
    * **여기서 바로 고친다**(사용자 지시 2026-08-03). 본체는 ui/style-panel.ts.
    */
+  /** [2026-08-04 사용자 지시] 텍스트 스타일 프리셋 + 내 스타일 + 문단 템플릿 —
+   *  스타일 탭 상단 묶음(글자 탭에서 이사). */
+  private buildQuickStyleSections(host: HTMLElement): void {
+    // [텍스트 스타일 프리셋 2026-07-30] 캔바식 '제목 추가' 카드 — 누르면 현재 문단
+    // 전체에 크기·굵기(·번호)를 한 번에 입힌다. 카드 자체가 그 스타일로 그려져
+    // 결과를 미리 보여준다.
+    const styleSec = this.section('텍스트 스타일');
+    const styles = mkEl('div', 'canva-styles');
+    for (const t of TEXT_STYLES) {
+      const b = mkButton(`canva-style-card canva-style--${t.id}`, { title: t.hint });
+      b.textContent = t.label;
+      // [내 스타일 2026-08-04] 카드 우하단에 크기 뱃지 — 고르기 전 가늠(사용자 제안)
+      b.appendChild(mkEl('span', 'canva-style-badge', `${t.pt}pt`));
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); this.applyTextStyle(t); });
+      styles.appendChild(b);
+    }
+    styleSec.appendChild(styles);
+
+    // [내 스타일 2026-08-04] 자주 쓰는 서식을 이름으로 저장해 카드로 재사용한다 —
+    // 카드가 그 서식 그대로 그려져(미리보기) 고르기 쉽고, 클릭 한 번으로 문단에 입힌다.
+    this.myStylesHost = mkEl('div', 'canva-mystyles');
+    styleSec.appendChild(this.myStylesHost);
+    this.renderMyStyles();
+
+    // [2026-08-03 사용자 지시] 글자 탭의 「스타일 설정…」 제거 — 같은 진입점이 스타일 탭
+    // 하단과 홈 리본에 이미 있어 세 겹이었다. 여기 프리셋 카드는 "빠른 적용"만 맡는다.
+
+    host.appendChild(styleSec);
+
+    // [문단 템플릿 2026-08-02] 캔바식 '시작 골격' — 누르면 모달 그리드가 열리고, 고른 카드가
+    // 커서 자리에 제목+번호목록 등 서식된 문단을 통째로 넣는다. 삽입은 기존
+    // insertFormatted(ai-doc-insert) 재사용: 분류·좌표 변환·단일 undo 가 이미 처리돼 있다.
+    const tplSec = this.section('문단 템플릿');
+    const tplBtn = mkButton('canva-full-btn', {
+      html: svg('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 9h8M8 13h8M8 17h5"/>') + '<span>문단 템플릿…</span>',
+    });
+    // [문단 템플릿 2026-08-04] 독스식 — 버튼을 누르면 작은 미리보기 플라이아웃이 바로
+    // 뜨고(문서 안 가림), 저장·수정·삭제 관리는 「템플릿 관리…」로 기존 모달을 연다.
+    const openTemplateManager = () => {
+      const modal = new TemplatePickerModal({
+        onPick: (t) => this.applyTemplate(t.body),
+        // 수정: 새 문서에 body 를 채우고 「템플릿 편집 모드」 바를 띄운다 — 이름·저장
+        //   (같은 id 덮어쓰기)·삭제·닫기를 문서 위에서 바로. 저장이 딴 데로 새던 문제 해결.
+        onEdit: (t) => {
+          // 새 문서 준비가 끝난 뒤 내용을 채우고 편집 바를 띄운다(경합 방지 — create-new
+          //   는 async·저장가드 포함). 가드를 취소하면 onReady 가 안 불려 아무 일도 없다.
+          this.services.eventBus.emit('create-new-document', {
+            onReady: () => {
+              this.applyTemplate(t.body);
+              openTemplateEditBar({
+                label: t.label,
+                onSave: (name) => {
+                  const body = extractDocBody(this.services.wasm);
+                  if (!body.trim()) { showToast({ message: '저장할 본문이 없습니다.', durationMs: 2200 }); return; }
+                  void saveTemplate({ id: t.id, label: name || t.label, body, addedAt: Date.now() });
+                  showToast({ message: `템플릿 '${name || t.label}' 저장됨`, durationMs: 2200 });
+                },
+                onDelete: () => {
+                  void deleteTemplate(t.id);
+                  closeTemplateEditBar();
+                  showToast({ message: '템플릿을 삭제했습니다.', durationMs: 2200 });
+                },
+              });
+            },
+          });
+        },
+        onSaveCurrent: async (name) => {
+          const body = extractDocBody(this.services.wasm);
+          if (!body.trim()) {
+            showToast({ message: '저장할 본문이 없습니다.', durationMs: 2200 });
+            return;
+          }
+          await saveTemplate({ id: createTemplateId(), label: name || '내 템플릿', body, addedAt: Date.now() });
+          showToast({ message: '현재 문서를 템플릿으로 저장했습니다.', durationMs: 2200 });
+          modal.refresh();
+        },
+        onDelete: (id) => deleteTemplate(id),
+      });
+      modal.show();
+    };
+    tplBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      showTemplateFlyout(tplBtn, {
+        onPick: (t) => this.applyTemplate(t.body),
+        onManage: openTemplateManager,
+      });
+    });
+    tplSec.appendChild(tplBtn);
+    host.appendChild(tplSec);
+  }
+
   private buildStyleTab(host: HTMLElement): void {
+    this.buildQuickStyleSections(host);
     const sec = this.section('스타일');
     host.appendChild(sec);
     buildStylePanel(sec, {
