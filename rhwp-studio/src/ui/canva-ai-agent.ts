@@ -198,12 +198,28 @@ export async function runAgentTurn(
   // 대화 맥락 — 모델에 보내는 것은 요청 + 도구 결과 이력뿐(문서 전문을 통째로 보내지 않는다).
   let transcript = `사용자 요청: ${userText}`;
 
+  let nudged = false;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const reply = await callModel(AGENT_PROMPT, transcript);
     const call = parseToolCall(reply);
 
-    if (!call || call.tool === 'done') {
-      const report = typeof call?.args?.report === 'string' ? String(call.args.report) : reply.trim();
+    if (!call) {
+      // ⚠ JSON 이 아니면 **한 번은 되묻는다**(2026-08-05 실사고). 추론 모델이 생각을 본문으로
+      //   흘려 잘린 영어 사고문이 오는 일이 있었는데, 그걸 그대로 "최종 답변"으로 띄우니
+      //   사용자는 영문 독백을 보고 표는 그대로였다. 한 번 더 형식을 못박아 요구한다.
+      if (!nudged) {
+        nudged = true;
+        transcript += '\n\n[형식 오류] 방금 응답에 JSON 이 없었다. 설명·생각을 쓰지 말고 '
+          + '도구 JSON 한 개만 출력하라. 더 할 일이 없으면 {"tool":"done","report":"..."} 로 마쳐라.';
+        continue;
+      }
+      const step: AgentStep = { kind: 'final', summary: reply.trim() };
+      steps.push(step);
+      return { finalText: reply.trim(), steps, wrote: state.wrote };
+    }
+
+    if (call.tool === 'done') {
+      const report = typeof call.args?.report === 'string' ? String(call.args.report) : reply.trim();
       const step: AgentStep = { kind: 'final', summary: report };
       steps.push(step);
       return { finalText: report, steps, wrote: state.wrote };

@@ -46,8 +46,14 @@ export async function callAi(systemPrompt: string, userText: string, maxTokens =
       //   비워 보내면 호스트가 **자기 기본 공급자**(설정 화면에서 키를 넣은 것)를 쓴다.
       //   단독 실행(vite 직결)은 model 이 필수라 그때만 카탈로그 기본값을 채운다.
       ...(chosen ? { model: chosen } : isHostProxy() ? {} : { model: AI_MODEL }),
-      // 표준 OpenAI 파라미터만 보낸다 — 공급자 전용 키는 호스트 프록시가 공급자별로 처리한다
-      // (실사고: MiniMax 전용 thinking 을 NVIDIA 에 보내 "Unsupported parameter" 400).
+      // ⚠ 추론(reasoning) 모델의 생각을 끈다(2026-08-05 실사고 수리).
+      //   Nemotron 계열은 생각을 reasoning_content 로 따로 내지만, 생각이 길어 토큰 예산을
+      //   다 쓰면 **생각이 본문(content)으로 흘러넘치고 잘린다**. 그러면 도구 호출 JSON 이
+      //   없어 「문서 작업」이 표를 못 고치고, 채팅에는 영어 사고문이 그대로 찍혔다.
+      //   실측: thinking:false → reasoning_content 빈 문자열, content 는 순수 JSON.
+      //   ⚠ 이 키는 NVIDIA 전용이다 — 호스트 프록시가 공급자별 허용 목록으로 거르므로
+      //   다른 공급자에는 실려 나가지 않는다(sc- route.ts PROVIDER_EXTRA).
+      chat_template_kwargs: { thinking: false },
       max_tokens: maxTokens,
       messages: [
         { role: 'system', content: systemPrompt },

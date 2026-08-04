@@ -201,7 +201,8 @@ export class CanvaAiPanel {
     try {
       const result = await runAgentTurn(
         this.services, text,
-        (sys, user) => this.callModel(user, sys),
+        // 표를 다 읽으면 입력이 길다 — 토큰을 넉넉히 준다(부족하면 답이 잘려 JSON 이 깨진다).
+        (sys, user) => this.callModel(user, sys, 4096),
         (step) => { thinking.querySelector('.bubble')!.textContent = `작업 중 — ${step.name}: ${step.summary}`; },
       );
       thinking.remove();
@@ -374,10 +375,10 @@ export class CanvaAiPanel {
     }
   }
 
-  private async callModel(userText: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {
+  private async callModel(userText: string, systemPrompt: string = SYSTEM_PROMPT, maxTokens?: number): Promise<string> {
     // 공용 클라이언트(canva-ai-client) — AI 수정 대화상자와 공유.
     // 배지는 모델 버튼이 그린다(하드코딩 모델명은 호스트 배포에서 거짓말이었다).
-    return callAi(systemPrompt, userText);
+    return callAi(systemPrompt, userText, maxTokens);
   }
 
   /**

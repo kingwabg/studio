@@ -99,3 +99,20 @@ test('프롬프트가 수치 지어내기 금지와 done 규약을 담는다(계
   assert.match(AGENT_PROMPT, /"tool":"done"/);
   assert.match(AGENT_PROMPT, /빈 칸/);
 });
+
+test('JSON 이 아니면 한 번 되묻고, 그래도 아니면 그때 최종 답변으로 넘긴다', async () => {
+  // 추론 모델이 생각을 본문으로 흘려 잘린 산문이 오는 실사고(2026-08-05) 회귀 가드.
+  const { services } = mockServices();
+  const replies = ['The user wants me to analyze the table...', '{"tool":"done","report":"끝"}'];
+  const sent: string[] = [];
+  const r = await runAgentTurn(services, '표 채워줘', async (_s, u) => { sent.push(u); return replies.shift()!; });
+  assert.equal(r.finalText, '끝');                       // 되물어 정상 종료로 회복
+  assert.match(sent[1], /형식 오류/);                     // 되묻는 지시가 실제로 갔다
+});
+
+test('두 번 연속 JSON 이 아니면 그 산문을 최종 답변으로 돌려준다', async () => {
+  const { services } = mockServices();
+  const r = await runAgentTurn(services, '요청', async () => '설명만 하는 답');
+  assert.equal(r.finalText, '설명만 하는 답');
+  assert.equal(r.wrote, false);
+});
