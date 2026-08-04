@@ -808,23 +808,61 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
     // 축소 등이 정상 동작(display 크기로 클램프·renderHeight override). 열은 model==display이고
     // 순수 model이라야 Alt(모델 통째)와 합성되므로(2026-07-14 fix) 이력 없으면 현행 model 유지.
     const useDisplayPath = hasLocalHistory || state.edge.type === 'row';
-    const delta = useDisplayPath
-      ? clampCompensatedDisplayDelta(state.edge, pairBoxes, deltaHwpUnit)
-      : clampCompensatedResizeDelta(
+    if (!useDisplayPath) {
+      const delta = clampCompensatedResizeDelta(
         this.wasm,
         state.tableRef,
         state.edge,
         pairs,
         deltaHwpUnit,
       );
-    if (delta === 0) {
-      this.cleanupResizeDrag();
-      return;
-    }
-    updates = [];
-    if (useDisplayPath) {
+      if (delta === 0) {
+        this.cleanupResizeDrag();
+        return;
+      }
+      updates = [];
+      const addedNeighbors = new Set<number>();
+      for (const pair of pairs) {
+        if (state.edge.type === 'col') {
+          updates.push({ cellIdx: pair.targetCellIdx, widthDelta: delta });
+          if (pair.neighborCellIdx !== null && !addedNeighbors.has(pair.neighborCellIdx)) {
+            updates.push({ cellIdx: pair.neighborCellIdx, widthDelta: -delta });
+            addedNeighbors.add(pair.neighborCellIdx);
+          }
+        } else {
+          updates.push({ cellIdx: pair.targetCellIdx, heightDelta: delta });
+          if (pair.neighborCellIdx !== null && !addedNeighbors.has(pair.neighborCellIdx)) {
+            updates.push({ cellIdx: pair.neighborCellIdx, heightDelta: -delta });
+            addedNeighbors.add(pair.neighborCellIdx);
+          }
+        }
+      }
+    } else {
+      // display 경로: 세그별 delta — 각 세그의 경계를 **같은 목표 위치(newPos)로 정렬**한다.
+      // 예전엔 전역 delta 하나를 모든 세그에 더해, ① 이미 어긋난 표에서 어긋남이 영구 보존되고
+      // ② 한 세그의 이웃이 최소높이면 전역 클램프가 0이 되어 전체가 무동작이었다
+      // (2026-08-04 신고 "안 움직여지고 오른쪽이 길어져"). 세그별로 계산하면 어긋난 줄을
+      // 드래그 한 번으로 다시 붙일 수 있고, 클램프도 세그별로만 걸린다.
+      const segs = pairBoxes.map((pair) => {
+        const segBoundaryPx = state.edge.type === 'col'
+          ? pair.targetBox.x + pair.targetBox.w
+          : pair.targetBox.y + pair.targetBox.h;
+        const requested = Math.round((newPos - segBoundaryPx) * 75);
+        const clamped = clampSingleCellDisplayDelta(
+          state.edge,
+          getCellDisplaySize(pair.targetBox, state.edge),
+          pair.neighborBox ? getCellDisplaySize(pair.neighborBox, state.edge) : null,
+          requested,
+        );
+        return { ...pair, segDelta: clamped };
+      });
+      if (segs.every((s2) => s2.segDelta === 0)) {
+        this.cleanupResizeDrag();
+        return;
+      }
+      updates = [];
       const updatedCells = new Set<number>();
-      for (const pair of pairBoxes) {
+      for (const pair of segs) {
         const targetProps = this.wasm.getCellProperties(
           state.tableRef.sec,
           state.tableRef.ppi,
@@ -833,7 +871,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
         );
         const targetDesiredSize = Math.max(
           minCellSizeHwp(state.edge.type),
-          getCellDisplaySize(pair.targetBox, state.edge) + delta,
+          getCellDisplaySize(pair.targetBox, state.edge) + pair.segDelta,
         );
         pushLocalResizeDisplayHint(
           updates,
@@ -853,7 +891,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
           );
           const neighborDesiredSize = Math.max(
             minCellSizeHwp(state.edge.type),
-            getCellDisplaySize(pair.neighborBox, state.edge) - delta,
+            getCellDisplaySize(pair.neighborBox, state.edge) - pair.segDelta,
           );
           pushLocalResizeDisplayHint(
             updates,
@@ -878,23 +916,6 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
         const d = state.edge.type === 'col' ? update.widthDelta : update.heightDelta;
         return d !== 0 || update.localResize === true;
       });
-    } else {
-      const addedNeighbors = new Set<number>();
-      for (const pair of pairs) {
-        if (state.edge.type === 'col') {
-          updates.push({ cellIdx: pair.targetCellIdx, widthDelta: delta });
-          if (pair.neighborCellIdx !== null && !addedNeighbors.has(pair.neighborCellIdx)) {
-            updates.push({ cellIdx: pair.neighborCellIdx, widthDelta: -delta });
-            addedNeighbors.add(pair.neighborCellIdx);
-          }
-        } else {
-          updates.push({ cellIdx: pair.targetCellIdx, heightDelta: delta });
-          if (pair.neighborCellIdx !== null && !addedNeighbors.has(pair.neighborCellIdx)) {
-            updates.push({ cellIdx: pair.neighborCellIdx, heightDelta: -delta });
-            addedNeighbors.add(pair.neighborCellIdx);
-          }
-        }
-      }
     }
   }
 
