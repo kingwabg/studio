@@ -155,6 +155,9 @@ function computeAffectedResizePositionBounds(
 
 function promoteResizeDragToSingleCell(self: any, state: any, shiftKey: boolean): { cellIdx: number; side: 'start' | 'end' } | null {
   if (state.singleCellTarget) return state.singleCellTarget;
+  // [경계선 재설계 2026-08-04] Shift 승격 봉쇄 — 한 칸 리사이즈 샛길 제거
+  return null;
+  // eslint-disable-next-line no-unreachable
   if (!shiftKey || !state.resizeTarget) return null;
 
   state.singleCellTarget = state.resizeTarget;
@@ -433,10 +436,11 @@ export function startResizeDrag(this: any,
     borderOriginalPos,
   );
   if (!resizeTarget) return;
-  // 한 셀만 움직이는 건 **Shift 를 누른 그 드래그**뿐이다. 예전엔 한 번 로컬 리사이즈한
-  // 경계(segment 기억)를 이후 일반 드래그에서도 자동으로 로컬 처리해, 표가 한 번 어긋나면
-  // 드래그마다 더 찢어졌다(사용자 신고 2026-08-04). 한컴 정본: 일반 드래그 = 줄 전체.
-  const shouldResizeSingleCell = shiftResize;
+  // [경계선 재설계 2026-08-04] 규칙은 하나다: **경계선 드래그 = 항상 줄 전체, 표 크기 불변**
+  // (바깥 테두리만 표 크기 조절). 한 칸만 어긋내는 샛길(Shift·셀블록·segment 기억)은 전부
+  // 봉쇄 — 같은 행 셀 높이 차이는 렌더 흉내라서 늘 사고(찢어짐·늘어남)로 돌아왔다.
+  // 한 칸 조절은 추후 그리드 재구성(행/열 분할+스팬)으로 정본 구현한다.
+  const shouldResizeSingleCell = false;
   const singleCellTarget = shouldResizeSingleCell ? resizeTarget : null;
   const logicalAffectedCellIndices = !shouldResizeSingleCell
     ? findAlignedLogicalResizeAffectedCells(edge, resizeTarget, this.cachedCellBboxes)
@@ -707,45 +711,6 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       const d = state.edge.type === 'col' ? update.widthDelta : update.heightDelta;
       return d !== 0 || update.localResize === true;
     });
-    if (updates.length === 0) {
-      this.cleanupResizeDrag();
-      return;
-    }
-  } else if (state.edge.type === 'col' && inCellSel && range) {
-    // 선택 셀만 추출
-    const selectedBboxes = state.affectedCellIndices
-      .map((cellIdx: any) => state.bboxes.find((b: any) => b.cellIdx === cellIdx))
-      .filter((b: any): b is CellBbox =>
-        b !== undefined &&
-        b.row >= range.startRow && b.row <= range.endRow &&
-        b.col >= range.startCol && b.col <= range.endCol);
-    if (selectedBboxes.length === 0) {
-      this.cleanupResizeDrag();
-      return;
-    }
-    updates = [];
-    const addedNeighbors = new Set<number>();
-    for (const bbox of selectedBboxes) {
-      if (state.edge.type === 'col') {
-        updates.push({ cellIdx: bbox.cellIdx, widthDelta: deltaHwpUnit });
-        // 같은 행의 오른쪽 이웃 셀에 반대 delta
-        const neighbor = state.bboxes.find((b: any) =>
-          b.row === bbox.row && b.col === bbox.col + bbox.colSpan);
-        if (neighbor && !addedNeighbors.has(neighbor.cellIdx)) {
-          updates.push({ cellIdx: neighbor.cellIdx, widthDelta: -deltaHwpUnit });
-          addedNeighbors.add(neighbor.cellIdx);
-        }
-      } else {
-        updates.push({ cellIdx: bbox.cellIdx, heightDelta: deltaHwpUnit });
-        // 같은 열의 아래쪽 이웃 셀에 반대 delta
-        const neighbor = state.bboxes.find((b: any) =>
-          b.col === bbox.col && b.row === bbox.row + bbox.rowSpan);
-        if (neighbor && !addedNeighbors.has(neighbor.cellIdx)) {
-          updates.push({ cellIdx: neighbor.cellIdx, heightDelta: -deltaHwpUnit });
-          addedNeighbors.add(neighbor.cellIdx);
-        }
-      }
-    }
     if (updates.length === 0) {
       this.cleanupResizeDrag();
       return;

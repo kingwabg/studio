@@ -17,20 +17,39 @@ const INSERT_H = 57; // 문서 안 높이 ≈ 15mm (96dpi) — 폭은 그림 비
 
 type Shape = 'circle' | 'square';
 
-function drawSeal(canvas: HTMLCanvasElement, name: string, shape: Shape): void {
+/**
+ * 도장 겉모습 조절값 (사용자 요청 2026-08-04).
+ * ⚠ 기본값은 **종전 동작과 정확히 같다** — 이미 만들어 쓰던 도장의 모양이 바뀌면 안 된다.
+ *   인주색 #c0392b · 테두리 10px · 글자 배율 1.0 이 그대로 옛 drawSeal 이다.
+ */
+type SealStyle = {
+  /** 인주 색 */
+  color: string;
+  /** 테두리 굵기(px). 0 이면 테두리를 그리지 않는다 — 글자만 찍는 도장도 실재한다 */
+  border: number;
+  /** 글자 배율 — 이름이 길면 줄이고, 한 글자면 키우고 싶을 때 */
+  scale: number;
+};
+
+const DEFAULT_STYLE: SealStyle = { color: '#c0392b', border: 10, scale: 1 };
+
+function drawSeal(canvas: HTMLCanvasElement, name: string, shape: Shape, style: SealStyle = DEFAULT_STYLE): void {
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, SIZE, SIZE);
-  const red = '#c0392b';
-  ctx.strokeStyle = red;
-  ctx.fillStyle = red;
-  ctx.lineWidth = 10;
+  ctx.strokeStyle = style.color;
+  ctx.fillStyle = style.color;
+  ctx.lineWidth = style.border;
 
-  if (shape === 'circle') {
-    ctx.beginPath();
-    ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 8, 0, Math.PI * 2);
-    ctx.stroke();
-  } else {
-    ctx.strokeRect(8, 8, SIZE - 16, SIZE - 16);
+  // 테두리 0 = 안 그린다. 획 굵기의 절반만큼 안으로 들여야 선이 캔버스 밖으로 새지 않는다.
+  if (style.border > 0) {
+    const inset = style.border / 2 + 3;
+    if (shape === 'circle') {
+      ctx.beginPath();
+      ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - inset, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(inset, inset, SIZE - inset * 2, SIZE - inset * 2);
+    }
   }
 
   // 글자 배치 — 도장은 오른쪽→왼쪽·위→아래가 전통이지만 가독성을 위해 좌→우로 둔다.
@@ -42,7 +61,7 @@ function drawSeal(canvas: HTMLCanvasElement, name: string, shape: Shape): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (const g of grid) {
-    ctx.font = `bold ${Math.round(SIZE * g.s)}px "HCR Batang", "함초롬바탕", serif`;
+    ctx.font = `bold ${Math.round(SIZE * g.s * style.scale)}px "HCR Batang", "함초롬바탕", serif`;
     ctx.fillText(g.c, SIZE * g.x, SIZE * g.y);
   }
 }
@@ -62,6 +81,43 @@ function createSealTab(onChange: () => void): SignTab {
   shapeSel.innerHTML = '<option value="circle">원형</option><option value="square">사각</option>';
   row.append(input, shapeSel);
 
+  // 겉모습 조절 — 인주색·테두리 굵기·글자 크기. 기관마다 쓰는 인주색이 다르고
+  // (붉은 인주가 표준이지만 검정 계약인도 쓴다), 이름 길이에 따라 글자가 답답해진다.
+  const style: SealStyle = { ...DEFAULT_STYLE };
+
+  const tune = document.createElement('div');
+  tune.className = 'sgn-row sgn-tune';
+
+  const color = document.createElement('input');
+  color.type = 'color';
+  color.className = 'sgn-color';
+  color.value = style.color;
+  color.title = '인주 색';
+
+  /** 슬라이더 하나 만들기 — 라벨·값 표시가 늘 붙어 다녀서 묶어 둔다 */
+  const slider = (label: string, min: number, max: number, step: number, value: number,
+                  onInput: (v: number) => void) => {
+    const wrap = document.createElement('label');
+    wrap.className = 'sgn-slider';
+    const name = document.createElement('span');
+    name.className = 'sgn-slider-name';
+    name.textContent = label;
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.min = String(min); range.max = String(max); range.step = String(step);
+    range.value = String(value);
+    range.addEventListener('input', () => onInput(Number(range.value)));
+    wrap.append(name, range);
+    return wrap;
+  };
+
+  tune.append(
+    color,
+    slider('테두리', 0, 20, 1, style.border, (v) => { style.border = v; repaint(); }),
+    slider('글자', 0.7, 1.3, 0.05, style.scale, (v) => { style.scale = v; repaint(); }),
+  );
+  color.addEventListener('input', () => { style.color = color.value; repaint(); });
+
   const stage = document.createElement('div');
   stage.className = 'sgn-stage sgn-stage-sm';
   const canvas = document.createElement('canvas');
@@ -73,10 +129,10 @@ function createSealTab(onChange: () => void): SignTab {
   hint.textContent = '이름을 넣으면 도장이 만들어집니다';
   stage.append(canvas, hint);
 
-  el.append(row, stage);
+  el.append(row, tune, stage);
 
   const repaint = () => {
-    drawSeal(canvas, input.value, shapeSel.value as Shape);
+    drawSeal(canvas, input.value, shapeSel.value as Shape, style);
     hint.hidden = !!input.value.trim();
     onChange();
   };
