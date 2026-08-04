@@ -71,25 +71,13 @@ function isProtectedCellHit(self: any, hit: any): boolean {
   return protectedCell;
 }
 
-function showProtectedCellHover(self: any, e: MouseEvent): void {
-  if (!self.protectedCellHoverEl) {
-    const el = document.createElement('div');
-    el.className = 'protected-cell-hover-guard';
-    el.setAttribute('aria-hidden', 'true');
-    el.textContent = '×';
-    document.body.appendChild(el);
-    self.protectedCellHoverEl = el;
-  }
-  self.protectedCellHoverEl.style.left = `${e.clientX + 12}px`;
-  self.protectedCellHoverEl.style.top = `${e.clientY + 12}px`;
-  self.protectedCellHoverEl.style.display = 'flex';
+// 잠긴 셀 호버 신호는 **커서 모양 하나**다 — 빨간 ✕ 배지를 같이 띄우면 마우스를
+// 따라다니는 표시가 둘이 된다(사용자 신고 2026-08-04 "두개가 나와").
+function showProtectedCellHover(self: any, _e: MouseEvent): void {
   self.container.style.cursor = 'not-allowed';
 }
 
 function hideProtectedCellHover(self: any): void {
-  if (self.protectedCellHoverEl) {
-    self.protectedCellHoverEl.style.display = 'none';
-  }
   if (self.container.style.cursor === 'not-allowed') {
     self.container.style.cursor = '';
   }

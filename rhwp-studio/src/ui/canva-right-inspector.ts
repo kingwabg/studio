@@ -94,6 +94,8 @@ export class CanvaRightInspector {
   private painted = false;
   /** [캔버스 한컴 포크] 그림 컨텍스트 내 다중 선택 여부 — 단일↔다중 전환 시 정렬 섹션 재렌더 */
   private lastMulti = false;
+  /** 표/셀 컨텍스트에서 지금 보고 있는 셀 — 이게 바뀌면 패널을 다시 그린다 */
+  private lastCellKey = '';
 
   private banner!: HTMLElement;
   /** lint 오버레이가 밀어 주는 검사 결과 — 「수정본」 줄의 재료 */
@@ -482,14 +484,19 @@ export class CanvaRightInspector {
       this.syncTabs();
       return;
     }
-    if (ctx === this.ctx && this.painted && multi === this.lastMulti) {
-      // 같은 컨텍스트 안의 커서 이동 — 위치 설명(쪽·문단·셀 주소)만 따라간다
+    // 셀에서 셀로 옮겨도 ctx 는 'cell' 그대로다 — 그러면 패널이 처음 물었던 셀 번호를
+    // 계속 쓰게 되어, 셀 보호·제목 셀이 **엉뚱한 칸**에 걸린다(사용자 신고 2026-08-04).
+    const cellKey = (ctx === 'cell' || ctx === 'table') ? cellIdentity(ih) : '';
+    const cellMoved = cellKey !== this.lastCellKey;
+    if (ctx === this.ctx && this.painted && multi === this.lastMulti && !cellMoved) {
+      // 같은 컨텍스트·같은 셀 안의 커서 이동 — 위치 설명(쪽·문단·셀 주소)만 따라간다
       this.paintBanner();
       return;
     }
     this.painted = true;
     this.ctx = ctx;
     this.lastMulti = multi;
+    this.lastCellKey = cellKey;
     // [컨텍스트 탭] 선택이 곧 탭이다 — 셀 클릭=셀, 표 개체=표, 그 외=서식 패널.
     // ctx 가 바뀔 때만 건드리므로, 표 안에서 사용자가 손으로 고른 탭은 유지된다.
     this.panelTab = ctx === 'table' ? 'table' : ctx === 'cell' ? 'cell' : 'props';
@@ -909,4 +916,12 @@ function rgbToHex(v: string): string {
   if (!m) return v.toLowerCase();
   const h = (n: string) => Number(n).toString(16).padStart(2, '0');
   return `#${h(m[1])}${h(m[2])}${h(m[3])}`;
+}
+
+/** 커서가 지금 어느 표·어느 셀에 있는지의 신원 문자열(없으면 빈 문자열) */
+function cellIdentity(ih: any): string {
+  const ref = ih?.cursor?.getCellTableContext?.() ?? ih?.getSelectedTableRef?.();
+  if (!ref) return '';
+  const cellIdx = ih?.cursor?.getPosition?.()?.cellIndex ?? -1;
+  return `${ref.sec}/${ref.ppi}/${ref.ci}/${cellIdx}`;
 }
