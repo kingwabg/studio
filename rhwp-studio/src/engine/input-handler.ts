@@ -1,4 +1,5 @@
 import { WasmBridge } from '@/core/wasm-bridge';
+import { showToast } from '@/ui/toast';
 import { EventBus } from '@/core/event-bus';
 import { CursorState } from './cursor';
 import { CaretRenderer } from './caret-renderer';
@@ -2647,6 +2648,9 @@ export class InputHandler {
    */
   executeOperation(desc: OperationDescriptor): void {
     if (!this.isOperationAllowedInEditMode(desc)) return;
+    // 잠긴 셀(셀 보호): 내용 편집을 라우터에서 차단한다 — 해제는 패널 스위치가 wasm 직행이라 안 막힌다.
+    // ponytail: 커서 위치 기준 판정 — 셀 블록 다중 선택·표 구조 명령(직접 wasm 경로)은 v1 미차단.
+    if (this.cursorLockedCell()) { this.notifyCellLockBlocked(); return; }
     // [변경 추적] ON 이면 텍스트 명령을 스냅샷으로 승격한다 — 구현·이유는 track-review.ts
     const promoted = _track.promoteWhileTracking?.call(this, desc);
     if (promoted) desc = promoted;
@@ -2903,6 +2907,7 @@ export class InputHandler {
    *                   결함 차단 영역. (Task #779)
    */
   private updateCaret(skipScroll: boolean = false): void {
+    this.updateCellLockState();
     const rect = this.cursor.getRect();
     if (rect) {
       const zoom = this.viewportManager.getZoom();
@@ -5250,6 +5255,67 @@ export class InputHandler {
       }
     };
     document.addEventListener('keydown', this.formKeyHandler, true);
+  }
+
+  // ─── 셀 잠금 (셀 보호 cellProtect 강제) ────────────────────────────────
+  // 엔진 비트(HWP5 리스트헤더/HWPX protect)는 예전부터 왕복됐지만 편집 차단이 없었다.
+  // 방향 결정(2026-08-04): 항상 잠김 / 패널 토글로 해제 / 캐럿 진입 시에만 자물쇠 표시.
+
+  private cellLockBadgeEl: HTMLElement | null = null;
+  private lastCellLockToastAt = 0;
+
+  /** 커서가 잠긴 셀 안이면 그 셀 좌표를 준다(아니면 null). 중첩 표는 바깥 표 기준(v1). */
+  private cursorLockedCell(): { sec: number; ppi: number; ci: number; cellIdx: number } | null {
+    if (this.cursor.isInHeaderFooter() || this.cursor.isInFootnote()) return null;
+    const pos = this.cursor.getPosition();
+    if (pos.parentParaIndex === undefined || pos.controlIndex === undefined || pos.cellIndex === undefined) {
+      return null;
+    }
+    try {
+      const cp = this.wasm.getCellProperties(
+        pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex);
+      if (!cp?.cellProtect) return null;
+      return { sec: pos.sectionIndex, ppi: pos.parentParaIndex, ci: pos.controlIndex, cellIdx: pos.cellIndex };
+    } catch {
+      return null;
+    }
+  }
+
+  private notifyCellLockBlocked(): void {
+    const now = Date.now();
+    if (now - this.lastCellLockToastAt < 1500) return; // 키 반복 스팸 방지
+    this.lastCellLockToastAt = now;
+    showToast({
+      message: '잠긴 셀이라 고칠 수 없어요.\n오른쪽 패널 「속성 → 셀 보호」를 끄면 풀립니다.',
+      durationMs: 4000,
+    });
+  }
+
+  /** 캐럿이 움직일 때마다: 잠긴 셀이면 입력을 뿌리(readOnly)에서 막고 자물쇠 배지를 단다 */
+  private updateCellLockState(): void {
+    const locked = this.cursorLockedCell();
+    this.textarea.readOnly = !!locked; // 타이핑·IME 조합 원천 차단 (키 이동·클릭은 그대로)
+    if (!locked) {
+      this.cellLockBadgeEl?.remove();
+      this.cellLockBadgeEl = null;
+      return;
+    }
+    try {
+      const bb = this.wasm.getTableCellBboxes(locked.sec, locked.ppi, locked.ci)
+        .find((b) => b.cellIdx === locked.cellIdx);
+      if (!bb) return;
+      const rect = this.formBboxToOverlayRect({ x: bb.x, y: bb.y, w: bb.w, h: bb.h }, bb.pageIndex);
+      if (!this.cellLockBadgeEl) {
+        const el = document.createElement('div');
+        el.className = 'cell-lock-badge';
+        el.textContent = '\u{1F512}';
+        el.style.cssText = 'position:absolute;pointer-events:none;z-index:30;font-size:11px;line-height:1;opacity:.75';
+        (this.container.querySelector('#scroll-content') ?? this.container).appendChild(el);
+        this.cellLockBadgeEl = el;
+      }
+      this.cellLockBadgeEl.style.left = `${rect.left + rect.width - 15}px`;
+      this.cellLockBadgeEl.style.top = `${rect.top + 2}px`;
+    } catch { /* bbox 조회 실패 시 배지만 생략 — 차단은 이미 걸려 있다 */ }
   }
 
   /** 양식 개체 조작을 스냅숏 undo 로 태운다 — 그림 개체와 같은 전략(2026-08-04 요청) */
