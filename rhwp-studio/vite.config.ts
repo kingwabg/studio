@@ -10,12 +10,11 @@ export default defineConfig(({ mode }) => {
   // 이 값은 dev 서버(Node)에서만 읽혀 프록시 요청 헤더로 주입되고, 브라우저 번들엔 절대 나가지 않는다.
   // .env.local의 AI 키는 서버 시작 시 1회 로드된다 (키 추가/변경 후 dev 서버 재시작 필요).
   // ⚠ dev 서버 cwd는 부모(studio)일 수 있으므로 반드시 __dirname(=rhwp-studio) 기준으로 읽는다.
-  // MINIMAX_API_KEY 우선, 기존 ANTHROPIC_API_KEY에 넣어둔 값도 그대로 인정(하위호환).
+  // (2026-08-04) 공급자를 NVIDIA NIM 으로 교체 — 구 MINIMAX_API_KEY 직결 폴백 제거.
   const env = loadEnv(mode, __dirname, '');
   const hostProxy = process.env.RHWP_AI_PROXY_TARGET ?? '';
-  const aiKey = process.env.MINIMAX_API_KEY || env.MINIMAX_API_KEY
-    || process.env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY || '';
-  console.log(`[ai-proxy] MiniMax API key ${aiKey ? '로드됨' : '없음 — rhwp-studio/.env.local 에 MINIMAX_API_KEY 설정'}`);
+  const aiKey = process.env.NVIDIA_API_KEY || env.NVIDIA_API_KEY || '';
+  console.log(`[ai-proxy] NVIDIA API key ${aiKey ? '로드됨' : '없음 — rhwp-studio/.env.local 에 NVIDIA_API_KEY 설정'}`);
 
   return {
   define: {
@@ -56,13 +55,13 @@ export default defineConfig(({ mode }) => {
     },
     proxy: {
       // [캔버스 한컴 포크] AI 패널 프록시 — 브라우저는 같은 출처 /api/ai/* 로 부르고,
-      // dev 서버가 api.minimax.io 로 전달하며 Authorization: Bearer 를 서버측에서 주입.
-      // 키가 번들에 노출되지 않고, 브라우저 CORS/CSP 우회도 자연 해결. MiniMax는 OpenAI 호환.
+      // dev 서버가 NVIDIA NIM 으로 전달하며 Authorization: Bearer 를 서버측에서 주입.
+      // 키가 번들에 노출되지 않고, 브라우저 CORS/CSP 우회도 자연 해결. NIM 은 OpenAI 호환.
       // ⚠ 배포 경로는 **호스트(sc-)의 /api/ai** 다 — 거기서 공급자·키가 정해진다.
       //   dev 에서도 같은 경로로 검증하려면 RHWP_AI_PROXY_TARGET=http://127.0.0.1:3000 을
-      //   주면 된다(경로 그대로 전달). 안 주면 옛 MiniMax 직결 경로를 쓴다.
+      //   주면 된다(경로 그대로 전달). 안 주면 NVIDIA NIM 직결.
       '/api/ai': {
-        target: hostProxy || 'https://api.minimax.io',
+        target: hostProxy || 'https://integrate.api.nvidia.com',
         changeOrigin: true,
         rewrite: (p: string) => (hostProxy ? p : p.replace(/^\/api\/ai/, '')),
         configure: (proxy: { on: (ev: string, cb: (req: { setHeader: (k: string, v: string) => void; removeHeader: (k: string) => void }) => void) => void }) => {

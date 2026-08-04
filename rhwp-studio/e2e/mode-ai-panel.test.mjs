@@ -56,7 +56,7 @@ runTest('모드 세그먼트 · AI 패널 진입/복귀', async ({ page }) => {
   });
   assert.ok(ai.shown, 'AI 패널이 열린다 (진입점 회귀 방지)');
   assert.ok(ai.back, '뒤로가기 버튼');
-  assert.strictEqual(ai.model, 'MiniMax M3', '모델 칩');
+  assert.strictEqual(ai.model, 'AI', '모델 칩(선택 전 기본 표시)');
   assert.deepStrictEqual(ai.cards, ['문서 생성', '일반 글쓰기', '문서 검토'], '모드 카드 3종');
 
   // ④ 뒤로가기 → 글자
