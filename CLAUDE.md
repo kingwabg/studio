@@ -27,6 +27,7 @@
   제품 방향·로드맵 정본 = `docs/product-spec.md`, 기술 선택(라이브러리) 정본 = `docs/tech-choices.md`
   — 완료 보고 시 다음 기능 제안, 새 기능 전 라이브러리 검토가 의무(agent-protocol §4, 2026-07-12).
   슬래시 명령: `/boot`(세션 부팅) · `/done`(완료 게이트) — `.claude/commands/`.
+  폴더 지도(어디에 무엇이 있는지) = `docs/project-structure.md` — 낯선 영역을 찾을 때 먼저.
 
 ## 편집 표면 구조 (2026-07-13 레거시 제거 후 — Strangler Fig 종료)
 **제품 에디터 = rhwp-studio(7700, 독립 앱).** 레거시 DocumentStudio(`/`)와 `/studio` 모듈형
