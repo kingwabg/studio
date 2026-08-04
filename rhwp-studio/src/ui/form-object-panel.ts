@@ -3,7 +3,7 @@
  * (사용자 요청 2026-08-03: "개체 선택되면 오른쪽 패널을 개체에 대한 기능을 넣자")
  *
  * 적용은 전부 wasm.setFormObjectProps / setFormValue / deleteFormObject 세 경로.
- * undo 미연동은 값편집(setFormValue)과 같은 기존 천장이다.
+ * 속성 변경·삭제는 스냅숏 undo 로 태운다(2026-08-04). 값편집(setFormValue)만 미연동 천장.
  */
 import type { CanvaServices } from './canva-services';
 import { mkEl, mkButton } from './canva-dom';
@@ -47,7 +47,9 @@ export function buildFormObjectPanel(host: HTMLElement, services: CanvaServices)
 
   const apply = (props: Record<string, unknown>) => {
     try {
-      (services.wasm as any).setFormObjectProps(sec, para, ci, props);
+      ih.runFormObjectOp('setFormObjectProps', () => {
+        (services.wasm as any).setFormObjectProps(sec, para, ci, props);
+      });
       services.eventBus.emit('document-changed');
       ih?.refreshFormObjectSelection?.();
     } catch (err) {
@@ -170,7 +172,9 @@ export function buildFormObjectPanel(host: HTMLElement, services: CanvaServices)
   delBtn.addEventListener('mousedown', (e) => {
     e.preventDefault();
     try {
-      (services.wasm as any).deleteFormObject(sec, para, ci);
+      ih.runFormObjectOp('deleteFormObject', () => {
+        (services.wasm as any).deleteFormObject(sec, para, ci);
+      });
       ih?.clearFormObjectSelection?.();
       services.eventBus.emit('document-changed');
     } catch (err) {

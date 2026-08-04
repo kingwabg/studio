@@ -243,10 +243,15 @@ export function handleBackspace(this: any, pos: DocumentPosition, inCell: boolea
     try {
       const ci = this.wasm.formControlAtLogical(pos.sectionIndex, pos.paragraphIndex, charOffset - 1);
       if (ci >= 0) {
-        this.wasm.deleteFormObject(pos.sectionIndex, pos.paragraphIndex, ci);
+        this.executeOperation({
+          kind: 'snapshot',
+          operationType: 'deleteFormObject',
+          operation: () => {
+            this.wasm.deleteFormObject(pos.sectionIndex, pos.paragraphIndex, ci);
+            return { ...pos, charOffset: charOffset - 1 };
+          },
+        });
         this.clearFormObjectSelection?.();
-        this.cursor.moveTo({ ...pos, charOffset: charOffset - 1 });
-        this.afterEdit();
         return;
       }
     } catch { /* 조회 실패 시 평소 삭제로 */ }
@@ -331,9 +336,15 @@ export function handleDelete(this: any, pos: DocumentPosition, inCell: boolean):
     try {
       const ci = this.wasm.formControlAtLogical(pos.sectionIndex, pos.paragraphIndex, charOffset);
       if (ci >= 0) {
-        this.wasm.deleteFormObject(pos.sectionIndex, pos.paragraphIndex, ci);
+        this.executeOperation({
+          kind: 'snapshot',
+          operationType: 'deleteFormObject',
+          operation: () => {
+            this.wasm.deleteFormObject(pos.sectionIndex, pos.paragraphIndex, ci);
+            return pos;
+          },
+        });
         this.clearFormObjectSelection?.();
-        this.afterEdit();
         return;
       }
     } catch { /* 조회 실패 시 평소 삭제로 */ }

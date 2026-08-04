@@ -2622,6 +2622,7 @@ export class InputHandler {
   private handleUndo(): void {
     const newPos = this.history.undo(this.wasm);
     if (newPos) {
+      this.clearFormObjectSelection(); // 스냅숏 복원 뒤 개체 인덱스가 낡는다
       this.clearTableResizeRuntimeCache();
       this.cursor.moveTo(newPos);
       this.afterEdit();
@@ -2632,6 +2633,7 @@ export class InputHandler {
   private handleRedo(): void {
     const newPos = this.history.redo(this.wasm);
     if (newPos) {
+      this.clearFormObjectSelection();
       this.clearTableResizeRuntimeCache();
       this.cursor.moveTo(newPos);
       this.afterEdit();
@@ -5230,7 +5232,8 @@ export class InputHandler {
         const { hit } = this.formObjectSelection;
         if (hit.sec !== undefined && hit.para !== undefined && hit.ci !== undefined) {
           try {
-            this.wasm.deleteFormObject(hit.sec, hit.para, hit.ci);
+            const { sec, para, ci } = hit as { sec: number; para: number; ci: number };
+            this.runFormObjectOp('deleteFormObject', () => { this.wasm.deleteFormObject(sec, para, ci); });
             this.clearFormObjectSelection();
             this.eventBus.emit('document-changed');
           } catch (err) {
@@ -5243,6 +5246,15 @@ export class InputHandler {
       }
     };
     document.addEventListener('keydown', this.formKeyHandler, true);
+  }
+
+  /** 양식 개체 조작을 스냅숏 undo 로 태운다 — 그림 개체와 같은 전략(2026-08-04 요청) */
+  runFormObjectOp(operationType: string, op: () => DocumentPosition | void): void {
+    this.executeOperation({
+      kind: 'snapshot',
+      operationType,
+      operation: () => op() ?? this.cursor.getPosition(),
+    });
   }
 
   selectFormObject(formHit: FormObjectHitResult, pageIdx: number): void {
@@ -5322,15 +5334,19 @@ export class InputHandler {
     if (!sel?.hit || sel.hit.sec === undefined || sel.hit.para === undefined || sel.hit.ci === undefined) return;
     try {
       const props = typeof deltaOrProps === 'number' ? { delta: deltaOrProps } : deltaOrProps;
-      const r = this.wasm.moveFormObject(sel.hit.sec, sel.hit.para, sel.hit.ci, props as any);
-      if (!r.ok) return;
+      const { sec, para, ci } = sel.hit as { sec: number; para: number; ci: number };
+      // ponytail: 경계에서 실패한 이동도 no-op 스냅숏 한 장이 스택에 남는다 — 신고되면 pre-check
+      let r: { ok: boolean; paraIdx: number; controlIdx: number } | undefined;
+      this.runFormObjectOp('moveFormObject', () => { r = this.wasm.moveFormObject(sec, para, ci, props as any); });
+      const moved = r as { ok: boolean; paraIdx: number; controlIdx: number } | undefined;
+      if (!moved?.ok) return;
       this.eventBus.emit('document-changed');
       // 새 위치로 재히트해 선택 테두리를 따라 옮긴다 — 낙하점을 모르니 개체 정보로 재조회
-      const hit2 = { ...sel.hit, para: r.paraIdx, ci: r.controlIdx };
+      const hit2 = { ...sel.hit, para: moved.paraIdx, ci: moved.controlIdx };
       this.formObjectSelection = { hit: hit2 as FormObjectHitResult, pageIdx: sel.pageIdx };
       // bbox 는 재조판 후 바뀐다 — 화면 전체에서 이 개체를 다시 찾는 대신, 문서 변경 후
       // 한 프레임 뒤 옛 중심 근처를 다시 히트한다(가로 이동은 근처에 남는다).
-      requestAnimationFrame(() => this.rehitFormSelectionNear(sel.hit.bbox, sel.pageIdx, r.paraIdx, r.controlIdx));
+      requestAnimationFrame(() => this.rehitFormSelectionNear(sel.hit.bbox, sel.pageIdx, moved.paraIdx, moved.controlIdx));
     } catch (err) {
       console.warn('[InputHandler] 양식 개체 이동 실패:', err);
     }
@@ -5463,7 +5479,11 @@ export class InputHandler {
     input.style.height = `${rect.height}px`;
     input.style.fontSize = `${Math.max(rect.height * 0.5, 10)}px`;
     const commit = () => {
-      this.wasm.setFormObjectProps(sec, para, ci, { caption: input.value });
+      if (input.value !== (formHit.caption ?? '')) {
+        this.runFormObjectOp('setFormObjectProps', () => {
+          this.wasm.setFormObjectProps(sec, para, ci, { caption: input.value });
+        });
+      }
       this.removeFormOverlay();
       this.afterEdit();
       this.refreshFormObjectSelection();

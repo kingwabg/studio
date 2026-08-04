@@ -251,20 +251,26 @@ export const insertCommands: CommandDef[] = [
         // 안 하면 개체 뒤에서 두 번째 개체를 넣을 때 자리가 어긋난다.
         const textOffset = services.wasm.logicalToTextOffset(
           pos.sectionIndex, pos.paragraphIndex, pos.charOffset);
-        const result = services.wasm.insertFormObject(
-          pos.sectionIndex, pos.paragraphIndex, textOffset,
-          { formType, ...extra },
-        );
-        if (result.ok) {
+        // 스냅숏 undo 로 태운다 — ⌘Z 로 삽입이 되돌아간다(2026-08-04 요청).
+        // 라우터가 커서를 새 개체 **뒤**로 옮긴다 — 안 옮기면 이어서 치는 글자·다음
+        // 개체가 전부 개체 앞에 쌓인다(2026-08-03 사용자 신고 "연속으로 만들기 잘 안돼").
+        let result: { ok: boolean; paraIdx: number; controlIdx: number } | undefined;
+        ih.executeOperation({
+          kind: 'snapshot',
+          operationType: 'insertFormObject',
+          operation: () => {
+            result = services.wasm.insertFormObject(
+              pos.sectionIndex, pos.paragraphIndex, textOffset,
+              { formType, ...extra },
+            );
+            return result.ok
+              ? { sectionIndex: pos.sectionIndex, paragraphIndex: result.paraIdx, charOffset: pos.charOffset + 1 }
+              : pos;
+          },
+        });
+        if (result?.ok) {
           services.eventBus.emit('document-mutated', 'insert-form');
           services.eventBus.emit('document-changed');
-          // 커서를 새 개체 **뒤**로 — 안 옮기면 이어서 치는 글자·다음 개체가 전부
-          // 개체 앞에 쌓인다(2026-08-03 사용자 신고 "연속으로 만들기 잘 안돼").
-          ih.moveCursorTo({
-            sectionIndex: pos.sectionIndex,
-            paragraphIndex: result.paraIdx,
-            charOffset: pos.charOffset + 1,
-          });
           // 삽입 직후 포커스가 편집기 밖에 남아 →·타이핑이 무시된다(2026-08-03 배포본 실측)
           (ih as any).focusTextarea?.();
           // 한컴 관례: 삽입 직후 개체가 선택 상태 — 바로 ←/→ 이동·Delete 가 된다.
