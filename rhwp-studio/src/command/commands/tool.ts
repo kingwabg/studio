@@ -3,10 +3,12 @@ import { OptionsDialog } from '../../ui/options-dialog';
 import { showToast } from '@/ui/toast';
 
 import { SealMakerDialog } from '@/ui/seal-maker';
+import { SealRulerDialog } from '@/ui/seal-ruler';
 import { EsignChecklistDialog, ConsentSimDialog, NdaGeneratorDialog } from '@/ui/esign-tools';
 import { openTableFill } from '@/ui/table-fill';
 
 let sealDialog: SealMakerDialog | null = null;
+let rulerDialog: SealRulerDialog | null = null;
 let checklistDialog: EsignChecklistDialog | null = null;
 let consentDialog: ConsentSimDialog | null = null;
 let ndaDialog: NdaGeneratorDialog | null = null;
@@ -38,6 +40,16 @@ export const toolCommands: CommandDef[] = [
     execute(services) {
       if (!sealDialog) sealDialog = new SealMakerDialog(services);
       sealDialog.show();
+    },
+  },
+  {
+    // 인쇄해서 실제 도장을 찍어 크기를 재는 종이(2026-08-04 사용자 요청)
+    id: 'tool:seal-ruler',
+    label: '도장 실측 템플릿',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) {
+      if (!rulerDialog) rulerDialog = new SealRulerDialog(services);
+      rulerDialog.show();
     },
   },
   {

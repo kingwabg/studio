@@ -32,6 +32,11 @@ export type SealShapeOptions = {
    *   손으로 판 느낌은 사람마다 원하는 정도가 다르므로 판단을 사용자에게 넘긴다.
    */
   wobble?: number;
+  /**
+   * 타원 방향 — true(기본)면 세로로 긴 타원, false 면 가로로 긴 타원.
+   * 다른 모양에는 영향이 없다. (2026-08-04 사용자 요청: 세로 토글)
+   */
+  portrait?: boolean;
   /** 테두리 굵기(px). 0 이면 그리지 않는다 */
   width: number;
   /** 캔버스 대비 테두리 크기 비율 0.5~1.0 (사용자 UI 의 "테두리 크기 %") */
@@ -123,13 +128,17 @@ function boundaryRadius(kind: SealShapeKind, theta: number, hx: number, hy: numb
  * ratio 는 캔버스 대비 크기지만, 획이 캔버스 밖으로 새면 안 되므로 상한을 둔다
  * (ratio=1.0 일 때 정확히 seal-maker 의 종전 inset = width/2 + 3 이 되도록 맞췄다).
  */
-function metrics(size: number, o: Pick<SealShapeOptions, 'kind' | 'width' | 'ratio'>) {
+function metrics(size: number, o: Pick<SealShapeOptions, 'kind' | 'width' | 'ratio' | 'portrait'>) {
   const ratio = Math.min(1, Math.max(0.5, o.ratio));
   const width = Math.max(0, o.width);
   const limit = size / 2 - width / 2 - PAD;
   const h = Math.max(1, Math.min((size * ratio) / 2, limit));
-  const hx = o.kind === 'ellipse' ? h * ELLIPSE_RX : h;
-  return { hx, hy: h, corner: o.kind === 'roundSquare' ? h * CORNER_RATIO : 0, width };
+  // 타원은 한 축만 줄인다. 세로 타원이면 가로를, 가로 타원이면 세로를 줄인다.
+  const flat = o.kind === 'ellipse';
+  const portrait = o.portrait !== false;
+  const hx = flat && portrait ? h * ELLIPSE_RX : h;
+  const hy = flat && !portrait ? h * ELLIPSE_RX : h;
+  return { hx, hy, corner: o.kind === 'roundSquare' ? h * CORNER_RATIO : 0, width };
 }
 
 /**
@@ -202,7 +211,7 @@ export function drawSealBorder(ctx: CanvasRenderingContext2D, size: number, o: S
 }
 
 /** 글자가 들어갈 수 있는 안쪽 영역 — 배치 모듈이 쓴다. 0~1 정규화 */
-export function sealInnerBox(o: Pick<SealShapeOptions, 'kind' | 'width' | 'ratio'>, size: number):
+export function sealInnerBox(o: Pick<SealShapeOptions, 'kind' | 'width' | 'ratio' | 'portrait'>, size: number):
 { x: number; y: number; w: number; h: number } {
   const { hx, hy, corner, width } = metrics(size, o);
   // 획의 안쪽 가장자리까지가 실제로 비어 있는 공간이다.

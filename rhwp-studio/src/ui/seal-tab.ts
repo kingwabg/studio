@@ -100,6 +100,8 @@ type SealStyle = {
   scale: number;
   /** 수제 윤곽이 흔들리는 세기 0~1 */
   wobble: number;
+  /** 타원 방향 — 세로(기본) / 가로 */
+  portrait: boolean;
   centerText: string;
   centerFace: string;
   centerSize: number;
@@ -112,7 +114,7 @@ type SealStyle = {
  */
 const DEFAULT_STYLE: SealStyle = {
   target: 'personal', preset: 'circle', sealMark: true, face: 'batang', order: 'modern',
-  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4,
+  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4, portrait: true,
   centerText: '代表理事', centerFace: 'batang', centerSize: 50, marker: 'dot',
 };
 
@@ -156,13 +158,13 @@ export function drawSeal(canvas: HTMLCanvasElement, name: string, style: SealSty
   } else {
     const p = presetOf(style.preset);
     drawSealBorder(ctx, SIZE, {
-      kind: p.kind, handmade: p.handmade, wobble: style.wobble, width: style.border,
-      ratio: style.ratio, color: style.color, seed,
+      kind: p.kind, handmade: p.handmade, wobble: style.wobble, portrait: style.portrait,
+      width: style.border, ratio: style.ratio, color: style.color, seed,
     });
 
     // 글자는 테두리가 만든 안쪽 영역에 앉힌다 — 테두리를 줄이면 글자도 따라 줄어야
     // 도장 비율이 유지된다. 배치 좌표(0~1)를 그 박스로 옮기는 것이 여기서 하는 일 전부다.
-    const box = sealInnerBox({ kind: p.kind, width: style.border, ratio: style.ratio }, SIZE);
+    const box = sealInnerBox({ kind: p.kind, width: style.border, ratio: style.ratio, portrait: style.portrait }, SIZE);
     ctx.fillStyle = style.color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -288,6 +290,18 @@ export function createSealTab(onChange: () => void): SignTab {
   );
   const wobbleSlider = slider('수제', 0, 1, 0.05, style.wobble, (v) => { style.wobble = v; repaint(); });
   wobbleSlider.title = '손으로 판 윤곽이 얼마나 울퉁불퉁한지';
+
+  // 타원 방향 — 타원 프리셋일 때만 뜻이 있다.
+  const portToggle = document.createElement('label');
+  portToggle.className = 'sgn-check';
+  portToggle.title = '끄면 가로로 긴 타원이 됩니다';
+  const portBox = document.createElement('input');
+  portBox.type = 'checkbox';
+  portBox.checked = style.portrait;
+  portBox.addEventListener('change', () => { style.portrait = portBox.checked; repaint(); });
+  const portText = document.createElement('span');
+  portText.textContent = '세로';
+  portToggle.append(portBox, portText);
   const tune2 = document.createElement('div');
   tune2.className = 'sgn-row sgn-tune';
   tune2.append(
@@ -297,7 +311,7 @@ export function createSealTab(onChange: () => void): SignTab {
   );
   const tune3 = document.createElement('div');
   tune3.className = 'sgn-row sgn-tune';
-  tune3.append(wobbleSlider);
+  tune3.append(wobbleSlider, portToggle);
 
   // ── 법인 전용 ───────────────────────────────────────────
   const corp = document.createElement('div');
@@ -357,12 +371,20 @@ export function createSealTab(onChange: () => void): SignTab {
     markToggle.hidden = isCorp;
     corp.hidden = !isCorp;
     // 수제 세기는 수제 프리셋일 때만 뜻이 있다 — 매끈한 모양에서 보이면 눌러도 안 변한다.
-    tune3.hidden = isCorp || !presetOf(style.preset).handmade;
+    syncTune3();
     input.placeholder = isCorp ? '회사·기관명' : '이름 (1~4자)';
   }
   function syncShape() {
     shapeCards.forEach((c, i) => c.classList.toggle('is-on', PRESETS[i].key === style.preset));
-    tune3.hidden = style.target === 'corporate' || !presetOf(style.preset).handmade;
+    syncTune3();
+  }
+  /** 세 번째 조절 줄은 해당 모양에서만 뜻이 있는 것들만 담는다 — 안 먹는 조절이 보이면 헷갈린다. */
+  function syncTune3() {
+    const p = presetOf(style.preset);
+    const corp = style.target === 'corporate';
+    wobbleSlider.hidden = corp || !p.handmade;
+    portToggle.hidden = corp || p.kind !== 'ellipse';
+    tune3.hidden = wobbleSlider.hidden && portToggle.hidden;
   }
   function syncMarker() {
     const keys = ['dot', 'star', 'diamond', 'none'];
@@ -376,7 +398,7 @@ export function createSealTab(onChange: () => void): SignTab {
   }
   input.addEventListener('input', repaint);
 
-  syncTarget(); syncShape(); syncMarker();
+  syncTarget(); syncShape(); syncMarker(); syncTune3();
 
   return {
     el,
