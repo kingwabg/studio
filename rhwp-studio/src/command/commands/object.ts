@@ -17,7 +17,30 @@ function alignCmd(id: string, label: string, mode: AlignMode, shortcutLabel?: st
   };
 }
 
+/**
+ * 선택한 개체의 **배치 방식**을 뒤집는다 — 글자취급(본문에 실림) ↔ 떠 있는 그림.
+ *
+ * ⚠ 왜 명령으로 두나: 「본문 배치(글자취급)」 개체는 **드래그로 못 옮긴다**
+ *   (input-handler-picture.ts:601 \"본문 배치 개체는 offset 이동 불가\").
+ *   도장을 넣고 \"왜 이동이 안 되지\"로 막힌 실제 신고가 있었다(2026-08-04).
+ *   패널에서 한 번에 뒤집을 수 있어야 그 벽을 사용자가 스스로 넘는다.
+ */
+function toggleInline(services: Parameters<CommandDef['execute']>[0]): void {
+  const ih = services.getInputHandler() as any;
+  const ref = ih?.cursor?.getSelectedPictureRef?.();
+  if (!ref) return;
+  const cur = ih.getObjectProperties?.(ref);
+  if (!cur) return;
+  ih.setObjectProperties?.(ref, { treatAsChar: !cur.treatAsChar });
+}
+
 export const objectCommands: CommandDef[] = [
+  {
+    id: 'object:toggle-inline',
+    label: '글자처럼 배치 켜기/끄기',
+    canExecute: (ctx) => ctx.hasDocument,
+    execute(services) { toggleInline(services); },
+  },
   alignCmd('object:align-left', '개체 왼쪽 정렬', 'left'),
   alignCmd('object:align-hcenter', '개체 가로 가운데 정렬', 'hcenter'),
   alignCmd('object:align-right', '개체 오른쪽 정렬', 'right'),

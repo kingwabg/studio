@@ -1486,3 +1486,23 @@
 
 .sp-foot { font-size: 11.5px; color: var(--color-text-dim, #666); padding-top: 2px; }
 .sp-foot b { color: var(--color-primary, #00647f); }
+
+
+/* 그림 빠른 설정 — 배치 방식·크기 (2026-08-04)
+   대화상자(2,825줄)를 열지 않고 자주 쓰는 둘만 패널에서 끝낸다. */
+.canva-pic-quick { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.canva-pic-row { display: flex; align-items: center; gap: 6px; }
+.canva-pic-label { font-size: 11px; opacity: 0.7; min-width: 26px; flex: none; }
+.canva-pic-seg { display: inline-flex; flex: 1; border: 1px solid var(--ui-border, #d9d6d2); border-radius: 6px; overflow: hidden; }
+.canva-pic-seg-btn {
+  flex: 1; height: 26px; font: inherit; font-size: 11px; cursor: pointer;
+  border: 0; background: var(--ui-surface, #fff); color: inherit;
+}
+.canva-pic-seg-btn + .canva-pic-seg-btn { border-left: 1px solid var(--ui-border, #d9d6d2); }
+.canva-pic-seg-btn.is-on { background: var(--color-primary-weak, #eef3fb); color: var(--color-primary, #2c5aa0); font-weight: 600; }
+.canva-pic-num {
+  width: 52px; height: 26px; padding: 0 5px; font: inherit; font-size: 11.5px; text-align: center;
+  border: 1px solid var(--ui-border, #d9d6d2); border-radius: 6px;
+  background: var(--ui-surface, #fff); color: inherit;
+}
+.canva-pic-unit { font-size: 10.5px; opacity: 0.55; }
