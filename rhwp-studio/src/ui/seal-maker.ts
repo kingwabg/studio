@@ -13,6 +13,7 @@ import { createDrawTab } from './sign-draw';
 import { createFontTab } from './sign-fonts';
 import { layoutSealChars, type SealOrder } from './seal-layout';
 import { applySealTexture } from './seal-texture';
+import { keepCanvasFontFamily } from '@/core/canvas-font-substitution';
 
 const SIZE = 300; // 도장 렌더 해상도(px)
 const INSERT_H = 57; // 문서 안 높이 ≈ 15mm (96dpi) — 폭은 그림 비율대로 따라간다
@@ -24,7 +25,45 @@ type Shape = 'circle' | 'square';
  * ⚠ 기본값은 **종전 동작과 정확히 같다** — 이미 만들어 쓰던 도장의 모양이 바뀌면 안 된다.
  *   인주색 #c0392b · 테두리 10px · 글자 배율 1.0 이 그대로 옛 drawSeal 이다.
  */
+/**
+ * 도장 글꼴 — **이미 번들에 있는 것만** 쓴다(public/fonts, 라이선스는 LICENSES/ 에 정리됨).
+ *
+ * ⚠ 전서체(篆書)는 넣지 않았다(2026-08-04 조사). 한글 전서체는 라이선스가 깨끗한 것이
+ *   없고(유통되는 HJ한전서 계열은 저작권자 실체 미확인), 애초에 2011년 행정안전부가
+ *   관인 서체를 전서체 → 한글로 바꿔 현행 기준과도 어긋난다. 한자 전용 전서 폰트
+ *   (全字庫 등)는 OFL 로 깨끗하지만 한글 이름을 못 찍어 쓸모가 없다.
+ *   도장 인상은 폰트보다 **프레임·인주색·꽉 찬 배치**에서 나온다 — 그쪽에 힘을 줬다.
+ */
+type SealFace = { key: string; label: string; family: string; file?: string; scale: number };
+
+const SEAL_FACES: SealFace[] = [
+  // 굵은 명조가 도장에 가장 가깝다. 번들 폰트라 새로 받을 것이 없다.
+  { key: 'batang', label: '굵은 명조', family: 'seal 명조', file: 'fonts/KoPubWorld-Batang-Bold.woff2', scale: 1 },
+  // 각진 고딕 = 획 굵기가 균일해 전각(篆刻) 인상에 가깝다.
+  { key: 'square', label: '각진 고딕', family: 'seal 각진', file: 'fonts/NanumSquareEB.woff2', scale: 0.96 },
+  { key: 'round', label: '둥근 고딕', family: 'seal 둥근', file: 'fonts/NanumSquareRoundEB.woff2', scale: 0.96 },
+  // 종전 기본값 — 모양이 바뀌는 게 싫은 사람을 위해 남긴다(엔진이 주는 글꼴).
+  { key: 'hcr', label: '함초롬바탕', family: 'HCR Batang", "함초롬바탕', scale: 1 },
+];
+
+// ⚠ 없으면 캔버스 글꼴 치환이 이 글꼴들을 시스템 글꼴로 바꿔 전부 똑같이 그린다
+//   (sign-fonts.ts 의 같은 주석 참조).
+for (const f of SEAL_FACES) keepCanvasFontFamily(f.family);
+
+const sealFontLoaded = new Map<string, Promise<void>>();
+/** 한 번만 내려받는다. 실패해도 던지지 않는다 — 대체 글꼴로 그려도 도장은 나온다. */
+function loadSealFace(f: SealFace, after: () => void): void {
+  if (!f.file || sealFontLoaded.has(f.key)) return;
+  const p = new FontFace(f.family, `url(${f.file}) format('woff2')`)
+    .load()
+    .then((face) => { document.fonts.add(face); after(); })
+    .catch((e) => { console.warn(`[도장] 글꼴 ${f.label} 로드 실패`, e); });
+  sealFontLoaded.set(f.key, p);
+}
+
 type SealStyle = {
+  /** 글꼴 키 — SEAL_FACES 참조 */
+  face: string;
   /** 글자 놓는 순서 — 전통은 우→좌·위→아래(seal-layout.ts 근거 주석 참조) */
   order: SealOrder;
   /** 인주 자국 질감 0~1. 0 이면 옛날처럼 매끈하다 */
@@ -42,7 +81,7 @@ type SealStyle = {
  *   것이 이 작업의 출발점이었으므로 기본값을 켜 둔다(0.35 = 은은한 정도).
  *   이미 문서에 박힌 도장 그림에는 영향이 없다 — 만들 때마다 새로 그린다.
  */
-const DEFAULT_STYLE: SealStyle = { order: 'modern', texture: 0.35, color: '#c0392b', border: 10, scale: 1 };
+const DEFAULT_STYLE: SealStyle = { face: 'batang', order: 'modern', texture: 0.35, color: '#c0392b', border: 10, scale: 1 };
 
 /** 이름이 같으면 얼룩도 같아야 한다 — 타이핑할 때마다 무늬가 튀면 미리보기를 못 믿는다. */
 function seedOf(text: string): number {
@@ -78,7 +117,8 @@ function drawSeal(canvas: HTMLCanvasElement, name: string, shape: Shape, style: 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (const g of layoutSealChars(name, shape, style.order)) {
-    ctx.font = `bold ${Math.round(SIZE * g.size * style.scale)}px "HCR Batang", "함초롬바탕", serif`;
+    const face = SEAL_FACES.find((f) => f.key === style.face) ?? SEAL_FACES[0];
+    ctx.font = `bold ${Math.round(SIZE * g.size * style.scale * face.scale)}px "${face.family}", serif`;
     ctx.fillText(g.char, SIZE * g.x, SIZE * g.y);
   }
 
@@ -103,7 +143,11 @@ function createSealTab(onChange: () => void): SignTab {
   orderSel.className = 'sgn-select';
   orderSel.innerHTML = '<option value="modern">현대 배치</option><option value="traditional">전통 배치</option>';
   orderSel.title = '전통은 오른쪽→왼쪽, 위→아래로 읽습니다';
-  row.append(input, shapeSel, orderSel);
+  const faceSel = document.createElement('select');
+  faceSel.className = 'sgn-select';
+  faceSel.innerHTML = SEAL_FACES.map((f) => `<option value="${f.key}">${f.label}</option>`).join('');
+  faceSel.title = '도장 글꼴';
+  row.append(input, shapeSel, orderSel, faceSel);
 
   // 겉모습 조절 — 인주색·테두리 굵기·글자 크기. 기관마다 쓰는 인주색이 다르고
   // (붉은 인주가 표준이지만 검정 계약인도 쓴다), 이름 길이에 따라 글자가 답답해진다.
@@ -164,6 +208,13 @@ function createSealTab(onChange: () => void): SignTab {
   input.addEventListener('input', repaint);
   shapeSel.addEventListener('change', repaint);
   orderSel.addEventListener('change', () => { style.order = orderSel.value as SealOrder; repaint(); });
+  faceSel.addEventListener('change', () => {
+    style.face = faceSel.value;
+    // 아직 안 받은 글꼴이면 도착한 뒤 다시 그린다 — 그전엔 대체 글꼴로 먼저 보여 준다.
+    const f = SEAL_FACES.find((x) => x.key === style.face);
+    if (f) loadSealFace(f, repaint);
+    repaint();
+  });
 
   return {
     el,
@@ -174,7 +225,7 @@ function createSealTab(onChange: () => void): SignTab {
     resetLabel: '지우기',
     isEmpty: () => !input.value.trim(),
     clear: () => { input.value = ''; repaint(); input.focus(); },
-    onShow: () => { repaint(); input.focus(); },
+    onShow: () => { loadSealFace(SEAL_FACES[0], repaint); repaint(); input.focus(); },
   };
 }
 

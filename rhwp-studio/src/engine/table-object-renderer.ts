@@ -30,6 +30,27 @@ function createObjectHandle(cx: number, cy: number, size: number, locked: boolea
   return el;
 }
 
+/** 크기 조절 불가 자리: 평소엔 투명, 호버하면 ⃠ 표시 + 금지 커서 (CSS .tbl-noresize-zone) */
+function createNoResizeHoverZone(cx: number, cy: number, size: number): HTMLDivElement {
+  const half = size / 2;
+  const el = document.createElement('div');
+  el.className = 'tbl-noresize-zone';
+  el.style.cssText =
+    `position:absolute;left:${cx - half}px;top:${cy - half}px;` +
+    `width:${size}px;height:${size}px;box-sizing:border-box;`;
+  const mark = document.createElement('div');
+  mark.className = 'tbl-noresize-mark';
+  mark.style.cssText = 'width:100%;height:100%;border:1px solid #777;border-radius:50%;' +
+    'background:rgba(255,255,255,0.9);position:relative;';
+  const slash = document.createElement('div');
+  slash.style.cssText =
+    `position:absolute;left:50%;top:50%;width:${Math.max(size - 3, 1)}px;height:1px;` +
+    'background:#777;transform:translate(-50%,-50%) rotate(45deg);transform-origin:center;';
+  mark.appendChild(slash);
+  el.appendChild(mark);
+  return el;
+}
+
 function createSvgRoot(width: string, height: string): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.style.width = width;
@@ -264,7 +285,13 @@ export class TableObjectRenderer {
       ];
 
       for (const pos of positions) {
-        const el = createObjectHandle(pos.cx, pos.cy, hs, locked);
+        // [경계선 재설계 2026-08-04] 표 크기 조절은 오른쪽·아래·오른쪽아래만 —
+        // 기준점(왼쪽 위) 쪽 5자리는 핸들을 그리지 않고, 호버하면 ⃠ 만 나타난다
+        // (셀 보호 호버와 같은 반응형 규약). 그림 쪽은 render() 경로라 영향 없다.
+        const resizable = pos.dir === 'e' || pos.dir === 's' || pos.dir === 'se';
+        const el = (resizable || locked)
+          ? createObjectHandle(pos.cx, pos.cy, hs, locked)
+          : createNoResizeHoverZone(pos.cx, pos.cy, hs + 4);
         this.layer.appendChild(el);
         this.handles.push({ dir: pos.dir, el, cx: pos.cx, cy: pos.cy });
       }

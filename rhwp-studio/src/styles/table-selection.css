@@ -20,3 +20,17 @@
   box-sizing: border-box;
   pointer-events: none;
 }
+
+/* [경계선 재설계 2026-08-04] 표 개체 선택 — 크기 조절 불가 자리(왼쪽·위)는
+   평소 투명, 호버 시에만 ⃠ 표시 + 금지 커서 (셀 보호 호버와 같은 규약) */
+.tbl-noresize-zone {
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+.tbl-noresize-zone .tbl-noresize-mark {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.tbl-noresize-zone:hover .tbl-noresize-mark {
+  opacity: 1;
+}
