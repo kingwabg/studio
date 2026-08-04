@@ -1560,6 +1560,15 @@ export function handleCellSelectionDelete(this: any): void {
   };
 
   void (async () => {
+    // 잠긴 셀(셀 보호)이 선택에 끼어 있으면 블록 삭제류 전체를 막는다 — executeOperation 의
+    // 캐럿 기준 가드는 셀 블록 경로를 못 본다(2026-08-04 배포 실측 구멍).
+    try {
+      const hasLocked = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci).some((c: CellBbox) =>
+        c.row >= range.startRow && c.row <= range.endRow &&
+        c.col >= range.startCol && c.col <= range.endCol &&
+        this.wasm.getCellProperties(ctx.sec, ctx.ppi, ctx.ci, c.cellIdx)?.cellProtect);
+      if (hasLocked) { this.notifyCellLockBlocked?.(); return; }
+    } catch { /* 조회 실패 시 기존 흐름 */ }
     // 행 전체 선택(표 전체 제외) → 줄 삭제
     if (wholeRows && !wholeTable) {
       const n = range.endRow - range.startRow + 1;

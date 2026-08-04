@@ -2216,6 +2216,11 @@ export class InputHandler {
 
   /** 특수 키 처리 (Backspace, Enter, 화살표, Ctrl+Z/Y) */
   private onKeyDown(e: KeyboardEvent): void {
+    // 잠긴 셀: 타이핑은 readOnly 로 조용히 죽는다 — 왜 안 되는지는 알려준다(이동·복사는 그대로)
+    if ((e.key.length === 1 || e.key === 'Process') && !e.ctrlKey && !e.metaKey && !e.altKey
+        && this.textarea.readOnly && this.cursorLockedCell()) {
+      this.notifyCellLockBlocked();
+    }
     _keyboard.onKeyDown.call(this, e);
   }
 
