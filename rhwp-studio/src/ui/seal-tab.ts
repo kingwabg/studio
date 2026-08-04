@@ -19,6 +19,7 @@ import { layoutSealChars, type SealOrder, type SealShape } from './seal-layout';
 import { applySealTexture } from './seal-texture';
 import { drawSealBorder, sealInnerBox, type SealShapeKind } from './seal-shapes';
 import { drawCorporateSeal, type CenterMarker } from './seal-corporate';
+import { carveGlyph, clearGlyphCache } from './seal-script';
 
 const SIZE = 300; // 도장 렌더 해상도(px)
 
@@ -55,7 +56,7 @@ function loadFace(key: string, after: () => void): void {
     f.key,
     new FontFace(f.family, `url(${f.file}) format('woff2')`)
       .load()
-      .then((face) => { document.fonts.add(face); after(); })
+      .then((face) => { document.fonts.add(face); clearGlyphCache(); after(); })
       .catch((e) => { console.warn(`[도장] 글꼴 ${f.label} 로드 실패`, e); }),
   );
 }
@@ -104,6 +105,8 @@ type SealStyle = {
   portrait: boolean;
   /** 전각(篆刻) 채움 — 글자를 제 칸에 꽉 채워 늘린다 */
   carve: boolean;
+  /** 전서(篆書)화 세기 0~1. 0 이면 원래 자형 그대로, 올릴수록 직각 격자로 다시 짠다 */
+  script: number;
   centerText: string;
   centerFace: string;
   centerSize: number;
@@ -116,7 +119,7 @@ type SealStyle = {
  */
 const DEFAULT_STYLE: SealStyle = {
   target: 'personal', preset: 'circle', sealMark: true, face: 'batang', order: 'modern',
-  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4, portrait: true, carve: true,
+  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4, portrait: true, carve: true, script: 0,
   centerText: '代表理事', centerFace: 'batang', centerSize: 50, marker: 'dot',
 };
 
@@ -194,7 +197,22 @@ export function drawSeal(canvas: HTMLCanvasElement, name: string, style: SealSty
     for (const g of glyphs) {
       const px = (box.x + g.x * box.w) * SIZE;
       const py = (box.y + g.y * box.h) * SIZE;
-      if (style.carve) {
+      if (style.script > 0) {
+        // 전서화 — 격자로 다시 짠 실루엣을 칸에 맞춰 늘려 찍는다.
+        // 마스크는 검은 실루엣이라 색을 입히려면 합성 모드를 쓴다(도장 색이 조절값이다).
+        const g2 = carveGlyph(g.char, fam, { strength: style.script });
+        const w = cellW * style.scale;
+        const h = cellH * style.scale;
+        const tint = document.createElement('canvas');
+        tint.width = Math.max(1, Math.round(w));
+        tint.height = Math.max(1, Math.round(h));
+        const tc = tint.getContext('2d')!;
+        tc.drawImage(g2, 0, 0, tint.width, tint.height);
+        tc.globalCompositeOperation = 'source-in';
+        tc.fillStyle = style.color;
+        tc.fillRect(0, 0, tint.width, tint.height);
+        ctx.drawImage(tint, px - w / 2, py - h / 2, w, h);
+      } else if (style.carve) {
         // 잉크 상자를 재려면 일단 아무 크기로나 그려 봐야 한다(측정용 기준 크기).
         const probe = 100;
         ctx.font = `bold ${probe}px ${fam}`;
@@ -357,6 +375,9 @@ export function createSealTab(onChange: () => void): SignTab {
   const carveText = document.createElement('span');
   carveText.textContent = '전각';
   carveToggle.append(carveBox, carveText);
+
+  const scriptSlider = slider('전서', 0, 1, 0.05, style.script, (v) => { style.script = v; repaint(); });
+  scriptSlider.title = '올릴수록 획을 직각 격자로 다시 짭니다 — 도장 서체 흉내입니다';
   const tune2 = document.createElement('div');
   tune2.className = 'sgn-row sgn-tune';
   tune2.append(
@@ -367,6 +388,9 @@ export function createSealTab(onChange: () => void): SignTab {
   const tune3 = document.createElement('div');
   tune3.className = 'sgn-row sgn-tune';
   tune3.append(wobbleSlider, portToggle, carveToggle);
+  const tune4 = document.createElement('div');
+  tune4.className = 'sgn-row sgn-tune';
+  tune4.append(scriptSlider);
 
   // ── 법인 전용 ───────────────────────────────────────────
   const corp = document.createElement('div');
@@ -414,7 +438,7 @@ export function createSealTab(onChange: () => void): SignTab {
   hint.textContent = '이름을 넣으면 도장이 만들어집니다';
   stage.append(canvas, hint);
 
-  el.append(head, shapes, opts, tune1, tune2, tune3, corp, stage);
+  el.append(head, shapes, opts, tune1, tune2, tune3, tune4, corp, stage);
 
   function syncTarget() {
     segBtns[0].classList.toggle('is-on', style.target === 'personal');
@@ -441,6 +465,7 @@ export function createSealTab(onChange: () => void): SignTab {
     portToggle.hidden = corp || p.kind !== 'ellipse';
     carveToggle.hidden = corp;
     tune3.hidden = wobbleSlider.hidden && portToggle.hidden && carveToggle.hidden;
+    tune4.hidden = corp; // 법인은 호 텍스트라 격자화가 안 맞는다
   }
   function syncMarker() {
     const keys = ['dot', 'star', 'diamond', 'none'];

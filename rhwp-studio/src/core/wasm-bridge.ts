@@ -938,6 +938,15 @@ export class WasmBridge {
     return JSON.parse(this.doc.resizeTableCells(sec, parentPara, controlIdx, JSON.stringify(updates)));
   }
 
+  /** [경계선 재설계] Shift+드래그 한 칸 어긋내기 — 엔진 격자 재구성. edge: 'bottom'|'right' */
+  offsetCellBoundary(
+    sec: number, parentPara: number, controlIdx: number,
+    cellIdx: number, edge: 'bottom' | 'right', deltaHwp: number,
+  ): { ok: boolean } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse(this.doc.offsetCellBoundary(sec, parentPara, controlIdx, cellIdx, edge, deltaHwp));
+  }
+
   moveTableOffset(sec: number, parentPara: number, controlIdx: number, deltaH: number, deltaV: number): { ok: boolean; ppi: number; ci: number } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.moveTableOffset(sec, parentPara, controlIdx, deltaH, deltaV));

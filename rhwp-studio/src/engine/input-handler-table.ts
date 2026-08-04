@@ -155,9 +155,6 @@ function computeAffectedResizePositionBounds(
 
 function promoteResizeDragToSingleCell(self: any, state: any, shiftKey: boolean): { cellIdx: number; side: 'start' | 'end' } | null {
   if (state.singleCellTarget) return state.singleCellTarget;
-  // [경계선 재설계 2026-08-04] Shift 승격 봉쇄 — 한 칸 리사이즈 샛길 제거
-  return null;
-  // eslint-disable-next-line no-unreachable
   if (!shiftKey || !state.resizeTarget) return null;
 
   state.singleCellTarget = state.resizeTarget;
@@ -446,11 +443,10 @@ export function startResizeDrag(this: any,
     borderOriginalPos,
   );
   if (!resizeTarget) return;
-  // [경계선 재설계 2026-08-04] 규칙은 하나다: **경계선 드래그 = 항상 줄 전체, 표 크기 불변**
-  // (바깥 테두리만 표 크기 조절). 한 칸만 어긋내는 샛길(Shift·셀블록·segment 기억)은 전부
-  // 봉쇄 — 같은 행 셀 높이 차이는 렌더 흉내라서 늘 사고(찢어짐·늘어남)로 돌아왔다.
-  // 한 칸 조절은 추후 그리드 재구성(행/열 분할+스팬)으로 정본 구현한다.
-  const shouldResizeSingleCell = false;
+  // [경계선 재설계 2026-08-04] 일반 드래그 = 항상 줄 전체·표 크기 불변.
+  // Shift+드래그 = 한 칸 어긋내기 — 엔진 격자 재구성(offsetCellBoundary) 정본.
+  // 렌더 흉내(segment 기억·renderHint 로컬)는 봉쇄 유지.
+  const shouldResizeSingleCell = shiftResize;
   const singleCellTarget = shouldResizeSingleCell ? resizeTarget : null;
   const logicalAffectedCellIndices = !shouldResizeSingleCell
     ? findAlignedLogicalResizeAffectedCells(edge, resizeTarget, this.cachedCellBboxes)
@@ -608,110 +604,48 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
   const range = inCellSel ? this.cursor.getSelectedCellRange() : null;
 
   if (state.singleCellTarget) {
-    const neighborIdx = findSingleCellResizeNeighbor(
-      state.edge,
-      state.singleCellTarget,
-      state.bboxes,
-    );
-    const requestedDelta = state.singleCellTarget.side === 'end' ? deltaHwpUnit : -deltaHwpUnit;
-    const targetBox = state.bboxes.find((b: CellBbox) => b.cellIdx === state.singleCellTarget?.cellIdx);
-    const neighborBox = neighborIdx === null
-      ? null
-      : state.bboxes.find((b: CellBbox) => b.cellIdx === neighborIdx) ?? null;
-    if (!targetBox) {
+    // [경계선 재설계 2026-08-04] Shift+드래그 = 한 칸 어긋내기 — 렌더 흉내가 아니라
+    // 엔진 격자 재구성(offsetCellBoundary: 분할+병합)이라 파일에 그대로 저장되고
+    // 한컴에서도 동일하다. side 'start'(위/왼쪽 경계를 잡음)는 그 경계를 아래/오른쪽
+    // 경계로 갖는 앞 칸으로 정규화한다.
+    const tgt = state.singleCellTarget;
+    const box = state.bboxes.find((b: CellBbox) => b.cellIdx === tgt.cellIdx);
+    if (!box) {
       this.cleanupResizeDrag();
       return;
     }
-    const targetDisplaySize = getCellDisplaySize(targetBox, state.edge);
-    const neighborDisplaySize = neighborBox ? getCellDisplaySize(neighborBox, state.edge) : null;
-    const delta = neighborBox
-      ? clampSingleCellDisplayDelta(state.edge, targetDisplaySize, neighborDisplaySize, requestedDelta)
-      : clampSingleCellResizeDelta(
-        this.wasm,
-        state.tableRef,
-        state.edge,
-        state.singleCellTarget.cellIdx,
-        neighborIdx,
-        requestedDelta,
-      );
-    if (delta === 0) {
-      this.cleanupResizeDrag();
-      return;
-    }
-    const targetProps = this.wasm.getCellProperties(
-      state.tableRef.sec,
-      state.tableRef.ppi,
-      state.tableRef.ci,
-      state.singleCellTarget.cellIdx,
-    );
-    const targetDesiredSize = Math.max(minCellSizeHwp(state.edge.type), targetDisplaySize + delta);
-    const targetModelDelta = state.edge.type === 'col'
-      ? targetDesiredSize - getCellModelSize(targetProps, state.edge)
-      : 0;
-    updates = state.edge.type === 'col'
-      ? [{
-        cellIdx: state.singleCellTarget.cellIdx,
-        widthDelta: targetModelDelta,
-        localResize: true,
-        renderWidth: targetDesiredSize,
-      }]
-      : [{
-        cellIdx: state.singleCellTarget.cellIdx,
-        heightDelta: 0,
-        localResize: true,
-        renderHeight: targetDesiredSize,
-      }];
-    if (neighborIdx !== null && neighborBox) {
-      const neighborProps = this.wasm.getCellProperties(
-        state.tableRef.sec,
-        state.tableRef.ppi,
-      state.tableRef.ci,
-      neighborIdx,
-    );
-    const neighborDesiredSize = Math.max(
-      minCellSizeHwp(state.edge.type),
-      getCellDisplaySize(neighborBox, state.edge) - delta,
-      );
-      const neighborModelDelta = state.edge.type === 'col'
-        ? neighborDesiredSize - getCellModelSize(neighborProps, state.edge)
-        : 0;
-      updates.push(state.edge.type === 'col'
-        ? {
-          cellIdx: neighborIdx,
-          widthDelta: neighborModelDelta,
-          localResize: true,
-          renderWidth: neighborDesiredSize,
-        }
-        : {
-          cellIdx: neighborIdx,
-          heightDelta: 0,
-          localResize: true,
-          renderHeight: neighborDesiredSize,
-        });
-    }
-    if (state.edge.type === 'col') {
-      for (const box of state.bboxes) {
-        if (box.row !== targetBox.row) continue;
-        if (box.cellIdx === state.singleCellTarget.cellIdx) continue;
-        if (neighborIdx !== null && box.cellIdx === neighborIdx) continue;
-        pushLocalResizeWidthHint(updates, box.cellIdx, getCellDisplaySize(box, state.edge));
+    let cellIdx = tgt.cellIdx;
+    if (tgt.side === 'start') {
+      const prev = state.edge.type === 'col'
+        ? state.bboxes.find((b: CellBbox) => b.row === box.row && b.col + b.colSpan === box.col)
+        : state.bboxes.find((b: CellBbox) => b.col === box.col && b.row + b.rowSpan === box.row);
+      if (!prev) {
+        this.cleanupResizeDrag();
+        return;
       }
-    } else {
-      for (const box of state.bboxes) {
-        if (box.col !== targetBox.col) continue;
-        if (box.cellIdx === state.singleCellTarget.cellIdx) continue;
-        if (neighborIdx !== null && box.cellIdx === neighborIdx) continue;
-        pushLocalResizeHeightHint(updates, box.cellIdx, getCellDisplaySize(box, state.edge));
-      }
+      cellIdx = prev.cellIdx;
     }
-    updates = updates.filter(update => {
-      const d = state.edge.type === 'col' ? update.widthDelta : update.heightDelta;
-      return d !== 0 || update.localResize === true;
-    });
-    if (updates.length === 0) {
-      this.cleanupResizeDrag();
-      return;
+    const edgeName: 'bottom' | 'right' = state.edge.type === 'col' ? 'right' : 'bottom';
+    try {
+      this.executeOperation({
+        kind: 'snapshot',
+        operationType: 'offsetCellBoundary',
+        operation: (wasm: any) => {
+          wasm.offsetCellBoundary(
+            state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
+            cellIdx, edgeName, deltaHwpUnit,
+          );
+          return this.cursor.getPosition();
+        },
+      });
+    } catch (err) {
+      // 엔진 가드 메시지(바깥 테두리·스팬 불일치·이미 어긋난 방향)를 그대로 안내한다
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast({ message: `한 칸 어긋내기: ${msg.replace(/^.*RenderError[:( ]*/, '')}`, durationMs: 4000 });
     }
+    if (inCellSel) this.updateCellSelection();
+    this.cleanupResizeDrag();
+    return;
   } else {
     // 일반 모드: 균일한 내부 경계 전체를 움직이되, 반대편 이웃 셀을 보상해 표 외곽을 유지
     if (state.affectedCellIndices.length === 0) {
