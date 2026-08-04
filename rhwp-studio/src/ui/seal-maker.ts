@@ -11,6 +11,8 @@ import type { CommandServices } from '@/command/types';
 import type { SignTab } from './sign-tab';
 import { createDrawTab } from './sign-draw';
 import { createFontTab } from './sign-fonts';
+import { layoutSealChars, type SealOrder } from './seal-layout';
+import { applySealTexture } from './seal-texture';
 
 const SIZE = 300; // 도장 렌더 해상도(px)
 const INSERT_H = 57; // 문서 안 높이 ≈ 15mm (96dpi) — 폭은 그림 비율대로 따라간다
@@ -23,6 +25,10 @@ type Shape = 'circle' | 'square';
  *   인주색 #c0392b · 테두리 10px · 글자 배율 1.0 이 그대로 옛 drawSeal 이다.
  */
 type SealStyle = {
+  /** 글자 놓는 순서 — 전통은 우→좌·위→아래(seal-layout.ts 근거 주석 참조) */
+  order: SealOrder;
+  /** 인주 자국 질감 0~1. 0 이면 옛날처럼 매끈하다 */
+  texture: number;
   /** 인주 색 */
   color: string;
   /** 테두리 굵기(px). 0 이면 테두리를 그리지 않는다 — 글자만 찍는 도장도 실재한다 */
@@ -31,7 +37,22 @@ type SealStyle = {
   scale: number;
 };
 
-const DEFAULT_STYLE: SealStyle = { color: '#c0392b', border: 10, scale: 1 };
+/**
+ * ⚠ texture 만 0 이 아니다. 매끈한 도장은 "동그라미 안의 글자"로 보여 가짜 티가 난다는
+ *   것이 이 작업의 출발점이었으므로 기본값을 켜 둔다(0.35 = 은은한 정도).
+ *   이미 문서에 박힌 도장 그림에는 영향이 없다 — 만들 때마다 새로 그린다.
+ */
+const DEFAULT_STYLE: SealStyle = { order: 'modern', texture: 0.35, color: '#c0392b', border: 10, scale: 1 };
+
+/** 이름이 같으면 얼룩도 같아야 한다 — 타이핑할 때마다 무늬가 튀면 미리보기를 못 믿는다. */
+function seedOf(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
 
 function drawSeal(canvas: HTMLCanvasElement, name: string, shape: Shape, style: SealStyle = DEFAULT_STYLE): void {
   const ctx = canvas.getContext('2d')!;
@@ -52,18 +73,17 @@ function drawSeal(canvas: HTMLCanvasElement, name: string, shape: Shape, style: 
     }
   }
 
-  // 글자 배치 — 도장은 오른쪽→왼쪽·위→아래가 전통이지만 가독성을 위해 좌→우로 둔다.
-  const chars = [...name.trim()].slice(0, 4);
-  if (chars.length === 3) chars.push('印');
-  const grid = chars.length <= 2
-    ? chars.map((c, i) => ({ c, x: 0.5, y: chars.length === 1 ? 0.5 : 0.30 + i * 0.40, s: 0.34 }))
-    : chars.map((c, i) => ({ c, x: 0.30 + (i % 2) * 0.40, y: 0.30 + Math.floor(i / 2) * 0.40, s: 0.30 }));
+  // 글자 배치 계산은 seal-layout.ts 가 맡는다 — 순수 함수라 좌표를 시험으로 못 박을 수 있고,
+  // 전통(우→좌) 배치의 근거 URL 도 그쪽 주석에 있다. 여기서는 그 좌표에 글자를 찍기만 한다.
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (const g of grid) {
-    ctx.font = `bold ${Math.round(SIZE * g.s * style.scale)}px "HCR Batang", "함초롬바탕", serif`;
-    ctx.fillText(g.c, SIZE * g.x, SIZE * g.y);
+  for (const g of layoutSealChars(name, shape, style.order)) {
+    ctx.font = `bold ${Math.round(SIZE * g.size * style.scale)}px "HCR Batang", "함초롬바탕", serif`;
+    ctx.fillText(g.char, SIZE * g.x, SIZE * g.y);
   }
+
+  // 인주 자국 — 벡터로 그린 뒤 후처리한다. 시드를 이름에서 뽑아 같은 입력이면 같은 얼룩.
+  applySealTexture(canvas, { intensity: style.texture, seed: seedOf(`${name}|${shape}|${style.order}`) });
 }
 
 function createSealTab(onChange: () => void): SignTab {
@@ -79,7 +99,11 @@ function createSealTab(onChange: () => void): SignTab {
   const shapeSel = document.createElement('select');
   shapeSel.className = 'sgn-select';
   shapeSel.innerHTML = '<option value="circle">원형</option><option value="square">사각</option>';
-  row.append(input, shapeSel);
+  const orderSel = document.createElement('select');
+  orderSel.className = 'sgn-select';
+  orderSel.innerHTML = '<option value="modern">현대 배치</option><option value="traditional">전통 배치</option>';
+  orderSel.title = '전통은 오른쪽→왼쪽, 위→아래로 읽습니다';
+  row.append(input, shapeSel, orderSel);
 
   // 겉모습 조절 — 인주색·테두리 굵기·글자 크기. 기관마다 쓰는 인주색이 다르고
   // (붉은 인주가 표준이지만 검정 계약인도 쓴다), 이름 길이에 따라 글자가 답답해진다.
@@ -115,6 +139,7 @@ function createSealTab(onChange: () => void): SignTab {
     color,
     slider('테두리', 0, 20, 1, style.border, (v) => { style.border = v; repaint(); }),
     slider('글자', 0.7, 1.3, 0.05, style.scale, (v) => { style.scale = v; repaint(); }),
+    slider('질감', 0, 1, 0.05, style.texture, (v) => { style.texture = v; repaint(); }),
   );
   color.addEventListener('input', () => { style.color = color.value; repaint(); });
 
@@ -138,6 +163,7 @@ function createSealTab(onChange: () => void): SignTab {
   };
   input.addEventListener('input', repaint);
   shapeSel.addEventListener('change', repaint);
+  orderSel.addEventListener('change', () => { style.order = orderSel.value as SealOrder; repaint(); });
 
   return {
     el,
