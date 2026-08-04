@@ -26,6 +26,12 @@ export type SealShapeOptions = {
   kind: SealShapeKind;
   /** 손으로 판 느낌 — 윤곽선이 불규칙해진다 */
   handmade: boolean;
+  /**
+   * 수제 흔들림 세기 0~1 (기본 0.5). 1 이 옛 고정값이다.
+   * ⚠ 조절값으로 연 이유(2026-08-04): 고정 진폭이 "너무 뒤틀린다"는 지적을 받았다.
+   *   손으로 판 느낌은 사람마다 원하는 정도가 다르므로 판단을 사용자에게 넘긴다.
+   */
+  wobble?: number;
   /** 테두리 굵기(px). 0 이면 그리지 않는다 */
   width: number;
   /** 캔버스 대비 테두리 크기 비율 0.5~1.0 (사용자 UI 의 "테두리 크기 %") */
@@ -130,8 +136,9 @@ function metrics(size: number, o: Pick<SealShapeOptions, 'kind' | 'width' | 'rat
  * 수제 윤곽이 반지름 방향으로 흔들리는 폭(px).
  * 도장이 커지면 같이 커지되(비율), 획이 굵을수록 칼자국도 굵게 남는다.
  */
-function wobbleAmp(hy: number, width: number): number {
-  return hy * 0.014 + width * 0.16;
+function wobbleAmp(hy: number, width: number, wobble = 0.5): number {
+  const k = Math.max(0, Math.min(1, wobble));
+  return (hy * 0.014 + width * 0.16) * k;
 }
 
 /** 테두리를 그린다 */
@@ -166,7 +173,7 @@ export function drawSealBorder(ctx: CanvasRenderingContext2D, size: number, o: S
   const slow = makeRing(rng, WOBBLE_NODES);
   const fast = makeRing(rng, WOBBLE_NODES * 3);
   const inkRing = makeRing(rng, WOBBLE_NODES); // 획 굵기용 — 윤곽과 다른 수열이어야 상관이 안 생긴다
-  const amp = wobbleAmp(hy, width);
+  const amp = wobbleAmp(hy, width, o.wobble);
 
   const px = new Float64Array(SEGMENTS);
   const py = new Float64Array(SEGMENTS);
@@ -204,7 +211,9 @@ export function sealInnerBox(o: Pick<SealShapeOptions, 'kind' | 'width' | 'ratio
   //   여백이 몇 px 더 생기는 손해보다, 수제에서 글자가 테두리에 닿는 쪽이 훨씬 나쁘다.
   //   1.5 = 저·고주파 2겹의 최대 진폭(1 + 1/3)에 여유 한 줌, 0.15·width = 수제에서 획이
   //   최대 1.28배까지 굵어질 때 안쪽으로 더 번지는 절반(0.64-0.5=0.14)의 몫.
-  const bite = wobbleAmp(hy, width) * 1.5 + width * 0.15;
+  //   wobble 세기는 여기서 알 수 없으므로 **최대(1)** 를 기준으로 뺀다 — 약하게 준
+  //   도장에서 여백이 조금 넉넉해질 뿐이고, 반대로 모자라면 글자가 테두리에 닿는다.
+  const bite = wobbleAmp(hy, width, 1) * 1.5 + width * 0.15;
   const ix = Math.max(0, hx - width / 2 - bite);
   const iy = Math.max(0, hy - width / 2 - bite);
   let bw: number;

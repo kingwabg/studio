@@ -98,6 +98,8 @@ type SealStyle = {
   ratio: number;
   /** 글씨 크기 배율 */
   scale: number;
+  /** 수제 윤곽이 흔들리는 세기 0~1 */
+  wobble: number;
   centerText: string;
   centerFace: string;
   centerSize: number;
@@ -110,7 +112,7 @@ type SealStyle = {
  */
 const DEFAULT_STYLE: SealStyle = {
   target: 'personal', preset: 'circle', sealMark: true, face: 'batang', order: 'modern',
-  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1,
+  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4,
   centerText: '代表理事', centerFace: 'batang', centerSize: 50, marker: 'dot',
 };
 
@@ -154,7 +156,7 @@ export function drawSeal(canvas: HTMLCanvasElement, name: string, style: SealSty
   } else {
     const p = presetOf(style.preset);
     drawSealBorder(ctx, SIZE, {
-      kind: p.kind, handmade: p.handmade, width: style.border,
+      kind: p.kind, handmade: p.handmade, wobble: style.wobble, width: style.border,
       ratio: style.ratio, color: style.color, seed,
     });
 
@@ -215,7 +217,8 @@ export function createSealTab(onChange: () => void): SignTab {
     thumb.width = 84; thumb.height = 84;
     // 카드 그림은 실제 그리는 함수로 만든다 — 그림과 결과가 어긋날 수 없다.
     drawSealBorder(thumb.getContext('2d')!, 84, {
-      kind: p.kind, handmade: p.handmade, width: 4, ratio: 0.88, color: '#c0392b', seed: 7,
+      kind: p.kind, handmade: p.handmade, wobble: DEFAULT_STYLE.wobble,
+      width: 4, ratio: 0.88, color: '#c0392b', seed: 7,
     });
     const nm = document.createElement('span');
     nm.className = 'sgn-shape-name';
@@ -283,6 +286,8 @@ export function createSealTab(onChange: () => void): SignTab {
     slider('글씨', 0.6, 1.4, 0.05, style.scale, (v) => { style.scale = v; repaint(); }),
     slider('테두리', 0, 20, 1, style.border, (v) => { style.border = v; repaint(); }),
   );
+  const wobbleSlider = slider('수제', 0, 1, 0.05, style.wobble, (v) => { style.wobble = v; repaint(); });
+  wobbleSlider.title = '손으로 판 윤곽이 얼마나 울퉁불퉁한지';
   const tune2 = document.createElement('div');
   tune2.className = 'sgn-row sgn-tune';
   tune2.append(
@@ -290,6 +295,9 @@ export function createSealTab(onChange: () => void): SignTab {
     slider('질감', 0, 1, 0.05, style.texture, (v) => { style.texture = v; repaint(); }),
     markToggle,
   );
+  const tune3 = document.createElement('div');
+  tune3.className = 'sgn-row sgn-tune';
+  tune3.append(wobbleSlider);
 
   // ── 법인 전용 ───────────────────────────────────────────
   const corp = document.createElement('div');
@@ -337,7 +345,7 @@ export function createSealTab(onChange: () => void): SignTab {
   hint.textContent = '이름을 넣으면 도장이 만들어집니다';
   stage.append(canvas, hint);
 
-  el.append(head, shapes, opts, tune1, tune2, corp, stage);
+  el.append(head, shapes, opts, tune1, tune2, tune3, corp, stage);
 
   function syncTarget() {
     segBtns[0].classList.toggle('is-on', style.target === 'personal');
@@ -348,10 +356,13 @@ export function createSealTab(onChange: () => void): SignTab {
     orderSel.hidden = isCorp;
     markToggle.hidden = isCorp;
     corp.hidden = !isCorp;
+    // 수제 세기는 수제 프리셋일 때만 뜻이 있다 — 매끈한 모양에서 보이면 눌러도 안 변한다.
+    tune3.hidden = isCorp || !presetOf(style.preset).handmade;
     input.placeholder = isCorp ? '회사·기관명' : '이름 (1~4자)';
   }
   function syncShape() {
     shapeCards.forEach((c, i) => c.classList.toggle('is-on', PRESETS[i].key === style.preset));
+    tune3.hidden = style.target === 'corporate' || !presetOf(style.preset).handmade;
   }
   function syncMarker() {
     const keys = ['dot', 'star', 'diamond', 'none'];
