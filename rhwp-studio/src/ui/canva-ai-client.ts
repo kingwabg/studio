@@ -25,12 +25,27 @@ export function setSelectedModel(model: string): void {
   try { localStorage.setItem(MODEL_KEY, model); } catch { /* 시크릿 모드 등 */ }
 }
 
+/**
+ * 호스트(sc-) 프록시 뒤에서 도는가 — 모델 선택 줄이 공급자 목록을 받아오면 true.
+ * 호스트가 있으면 model 을 비워 보내 **호스트 기본 공급자**(키가 저장된 것)를 쓰게 한다.
+ * 단독 실행(vite 직결)은 NVIDIA 가 model 을 필수로 요구해 카탈로그 기본값을 채워야 한다.
+ */
+let hostProxyKnown = false;
+export function markHostProxy(): void { hostProxyKnown = true; }
+export function isHostProxy(): boolean { return hostProxyKnown; }
+
 export async function callAi(systemPrompt: string, userText: string, maxTokens = 2048): Promise<string> {
+  const chosen = getSelectedModel();
   const res = await fetch('/api/ai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: getSelectedModel() || AI_MODEL,
+      // ⚠ 고른 모델이 없으면 model 을 **아예 안 보낸다**(2026-08-05 실사고 수리).
+      //   종전엔 카탈로그 1순위(Gemma)를 박아 보냈는데, 호스트에 키가 저장된 공급자는
+      //   다른 것(Nemotron)이라 매 호출이 503 "API 키가 없습니다" 로 죽었다.
+      //   비워 보내면 호스트가 **자기 기본 공급자**(설정 화면에서 키를 넣은 것)를 쓴다.
+      //   단독 실행(vite 직결)은 model 이 필수라 그때만 카탈로그 기본값을 채운다.
+      ...(chosen ? { model: chosen } : isHostProxy() ? {} : { model: AI_MODEL }),
       // 표준 OpenAI 파라미터만 보낸다 — 공급자 전용 키는 호스트 프록시가 공급자별로 처리한다
       // (실사고: MiniMax 전용 thinking 을 NVIDIA 에 보내 "Unsupported parameter" 400).
       max_tokens: maxTokens,
@@ -41,9 +56,13 @@ export async function callAi(systemPrompt: string, userText: string, maxTokens =
     }),
   });
   // 프록시 404/502 는 HTML 을 돌려줘 json() 이 SyntaxError 를 던진다 → 상태코드 문구로 대체
-  const data = await res.json().catch(() => ({ error: { message: `HTTP ${res.status} ${res.statusText}` } }));
+  const data = await res.json().catch(() => ({ error: `HTTP ${res.status} ${res.statusText}` }));
   if (data.error || !data.choices?.length) {
-    throw new Error(data.error?.message || 'AI 호출 실패');
+    // ⚠ error 는 문자열일 수도, {message} 일 수도 있다. 호스트 프록시는 **문자열**로 주는데
+    //   종전엔 .message 만 봐서 그 안내("API 키가 없습니다 — 설정 → AI 공급자에서…")를
+    //   통째로 삼키고 "AI 호출 실패"만 띄웠다 — 사용자가 원인을 알 수 없었다(2026-08-05).
+    const detail = typeof data.error === 'string' ? data.error : data.error?.message;
+    throw new Error(detail || 'AI 호출 실패');
   }
   const raw: string = data.choices[0]?.message?.content ?? '';
   // 추론 모델이 흘리는 사고 태그 제거 — 본문만 남긴다

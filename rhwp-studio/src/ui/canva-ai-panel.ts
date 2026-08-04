@@ -6,7 +6,7 @@
  */
 import type { CanvaServices } from './canva-services';
 import { parseAiLayout, applyAiLayout, type AiLayout } from './canva-ai-layout';
-import { callAi, aiErrorHint, getSelectedModel, setSelectedModel } from './canva-ai-client';
+import { callAi, aiErrorHint, getSelectedModel, setSelectedModel, markHostProxy } from './canva-ai-client';
 import { mkEl, mkButton } from './canva-dom';
 import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
 import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
@@ -403,6 +403,8 @@ export class CanvaAiPanel {
           providers?: Array<{ name: string; model: string; enabled: boolean; isDefault: boolean }>;
         }).providers?.filter((x) => x.enabled) ?? [];
         if (!list.length) { wrap.hidden = true; return; }
+        // 호스트가 있다 — 이제 model 을 비워 보내면 호스트 기본 공급자(키 저장된 것)를 쓴다.
+        markHostProxy();
         const chosen = getSelectedModel();
         const cur = list.find((x) => x.model === chosen) ?? list.find((x) => x.isDefault) ?? list[0];
         paint(cur.name);
