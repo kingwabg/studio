@@ -22,6 +22,7 @@ import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
 import { insertFormatted } from './ai-doc-insert';
 import { TemplatePickerModal } from './template-picker-modal';
+import { showTemplateFlyout } from './template-flyout';
 import { openTemplateEditBar, closeTemplateEditBar } from './template-edit-bar';
 import { extractDocBody, saveTemplate, deleteTemplate, createTemplateId } from '@/media/template-store';
 import { showToast } from './toast';
@@ -177,8 +178,9 @@ export class CanvaRightInspector {
     const tplBtn = mkButton('canva-full-btn', {
       html: svg('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 9h8M8 13h8M8 17h5"/>') + '<span>문단 템플릿…</span>',
     });
-    tplBtn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
+    // [문단 템플릿 2026-08-04] 독스식 — 버튼을 누르면 작은 미리보기 플라이아웃이 바로
+    // 뜨고(문서 안 가림), 저장·수정·삭제 관리는 「템플릿 관리…」로 기존 모달을 연다.
+    const openTemplateManager = () => {
       const modal = new TemplatePickerModal({
         onPick: (t) => this.applyTemplate(t.body),
         // 수정: 새 문서에 body 를 채우고 「템플릿 편집 모드」 바를 띄운다 — 이름·저장
@@ -219,6 +221,13 @@ export class CanvaRightInspector {
         onDelete: (id) => deleteTemplate(id),
       });
       modal.show();
+    };
+    tplBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      showTemplateFlyout(tplBtn, {
+        onPick: (t) => this.applyTemplate(t.body),
+        onManage: openTemplateManager,
+      });
     });
     tplSec.appendChild(tplBtn);
     this.fmtPane.appendChild(tplSec);

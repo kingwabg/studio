@@ -1506,3 +1506,50 @@
   background: var(--ui-surface, #fff); color: inherit;
 }
 .canva-pic-unit { font-size: 10.5px; opacity: 0.55; }
+
+/* [문단 템플릿 2026-08-04] 독스식 플라이아웃 — 작은 미리보기 카드 */
+.tpl-flyout {
+  z-index: 10050;
+  background: #fff;
+  border: 1px solid var(--ui-border, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 460px;
+}
+.tpl-fly-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.tpl-fly-card {
+  width: 96px;
+  background: none;
+  border: 1px solid var(--ui-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 6px 6px 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: stretch;
+}
+.tpl-fly-card:hover { border-color: #4472c4; box-shadow: 0 0 0 2px rgba(68, 114, 196, 0.15); }
+.tpl-fly-card .canva-tpl-preview { margin-bottom: 0; }
+.tpl-fly-name {
+  font-size: 10.5px;
+  color: #334155;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tpl-fly-manage {
+  border: none;
+  background: none;
+  color: #4472c4;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 2px 0;
+  text-align: left;
+}
+.tpl-fly-manage:hover { text-decoration: underline; }
