@@ -2653,9 +2653,11 @@ export class InputHandler {
    */
   executeOperation(desc: OperationDescriptor): void {
     if (!this.isOperationAllowedInEditMode(desc)) return;
-    // 잠긴 셀(셀 보호): 내용 편집을 라우터에서 차단한다 — 해제는 패널 스위치가 wasm 직행이라 안 막힌다.
-    // ponytail: 커서 위치 기준 판정 — 셀 블록 다중 선택·표 구조 명령(직접 wasm 경로)은 v1 미차단.
-    if (this.cursorLockedCell()) { this.notifyCellLockBlocked(); return; }
+    // 잠긴 셀(셀 보호): **내용** 편집만 라우터에서 차단한다. 속성 적용(objectProps — 셀 패널의
+    // patchCell 경로)은 면제 — 안 그러면 「셀 보호」 해제 스위치까지 스스로 막는다(2026-08-04 실측).
+    // ponytail: 커서 위치 기준 판정 — 표 구조 명령(직접 wasm 경로)은 v1 미차단.
+    const isPropsOp = desc.kind === 'snapshot' && desc.operationType === 'objectProps';
+    if (!isPropsOp && this.cursorLockedCell()) { this.notifyCellLockBlocked(); return; }
     // [변경 추적] ON 이면 텍스트 명령을 스냅샷으로 승격한다 — 구현·이유는 track-review.ts
     const promoted = _track.promoteWhileTracking?.call(this, desc);
     if (promoted) desc = promoted;
