@@ -14,8 +14,14 @@
   overflow: hidden;
 }
 
+/* ⚠ 네 칸 모두 grid-area 를 **명시**한다(2026-08-04 실측 수리).
+   종전엔 자동 배치(DOM 순서)에 기댔는데, embed 모드(embed.css)가 눈금자 3개를
+   display:none 으로 빼면 자동 흐름이 무너져 #scroll-container 가 첫 셀(0px 트랙)에
+   앉았다 — 문서 6페이지가 로드되고도 본문이 0×0 이라 아무것도 안 보였다(공모 서식 실사고). */
+
 /* 눈금자 교차 코너 (좌상단) */
 #ruler-corner {
+  grid-area: 1 / 1;
   background: var(--ruler-bg);
   border-right: 1px solid var(--ui-border-strong);
   border-bottom: 1px solid var(--ui-border-strong);
@@ -23,6 +29,7 @@
 
 /* 가로 눈금자 */
 #h-ruler {
+  grid-area: 1 / 2;
   display: block;
   border-bottom: 1px solid var(--ui-border-strong);
   background: var(--ruler-bg);
@@ -31,6 +38,7 @@
 
 /* 세로 눈금자 */
 #v-ruler {
+  grid-area: 2 / 1;
   display: block;
   border-right: 1px solid var(--ui-border-strong);
   background: var(--ruler-bg);
@@ -38,6 +46,7 @@
 }
 
 #scroll-container {
+  grid-area: 2 / 2;
   position: relative;
   overflow-y: auto;
   overflow-x: auto;

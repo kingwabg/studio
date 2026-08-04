@@ -46,20 +46,24 @@ const FONT_LIST: FontEntry[] = [
   { name: '함초롱바탕', file: CDN_HAMCHOB_B, format: 'woff', weight: 'bold' },
   { name: '한컴바탕', file: CDN_HAMCHOB_B, format: 'woff', weight: 'bold' },
   { name: '새바탕', file: CDN_HAMCHOB_B, format: 'woff', weight: 'bold' },
+  // ⚠ [2026-08-04 재매핑] 아래 매핑의 원래 목표 파일(Noto*/Pretendard*/D2Coding 등 29종)은
+  //   저장소에 실재한 적이 없어 매 문서마다 404 + OS 폴백으로 조판이 흔들렸다(실측: 공모
+  //   서식에서 404 8건). 라이선스가 정리된 보유분(KoPub 전 글리프·나눔스퀘어)으로 성격·굵기를
+  //   맞춰 재매핑했다. 원 파일을 실제로 들여오면(척도 #1224 의 획 두께 보정 포함) 이 표를 되돌릴 것.
   // === 한컴 HY 폰트 → 오픈소스 대체 ===
-  { name: 'HY헤드라인M', file: 'fonts/NotoSansKR-Bold.woff2' },
-  { name: 'HYHeadLine M', file: 'fonts/NotoSansKR-Bold.woff2' },
-  { name: 'HYHeadLine Medium', file: 'fonts/NotoSansKR-Bold.woff2' },
-  { name: 'HY견고딕', file: 'fonts/NotoSansKR-Bold.woff2' },
-  { name: 'HYGothic-Extra', file: 'fonts/NotoSansKR-Bold.woff2' },
-  { name: 'HY그래픽', file: 'fonts/NotoSansKR-Regular.woff2' },
-  { name: 'HYGraphic-Medium', file: 'fonts/NotoSansKR-Regular.woff2' },
-  { name: 'HY그래픽M', file: 'fonts/NotoSansKR-Regular.woff2' },
-  { name: 'HY견명조', file: 'fonts/NotoSerifKR-Bold.woff2' },
-  { name: 'HYMyeongJo-Extra', file: 'fonts/NotoSerifKR-Bold.woff2' },
-  { name: 'HY신명조', file: 'fonts/NotoSerifKR-Regular.woff2' },
-  { name: 'HY중고딕', file: 'fonts/NotoSansKR-Regular.woff2' },
-  { name: '양재튼튼체B', file: 'fonts/NotoSansKR-Bold.woff2' },
+  { name: 'HY헤드라인M', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'HYHeadLine M', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'HYHeadLine Medium', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'HY견고딕', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'HYGothic-Extra', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'HY그래픽', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: 'HYGraphic-Medium', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: 'HY그래픽M', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: 'HY견명조', file: 'fonts/KoPubWorld-Batang-Bold.woff2' },
+  { name: 'HYMyeongJo-Extra', file: 'fonts/KoPubWorld-Batang-Bold.woff2' },
+  { name: 'HY신명조', file: 'fonts/KoPubWorld-Batang-Medium.woff2' },
+  { name: 'HY중고딕', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: '양재튼튼체B', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
   // === 한글 시스템 폰트 → 오픈소스 대체 (OS 폰트 없을 때 폴백) ===
   // ⚠ 'Malgun Gothic'·'맑은 고딕' 을 Pretendard 로 등록했던 줄은 **뺐다**(2026-08-01).
   //   이 둘은 UI 글꼴 체인(--font-family-ui)에도 들어 있어서, 파일이 없으면
@@ -69,69 +73,69 @@ const FONT_LIST: FontEntry[] = [
   // Task #1224: 한컴 돋움/MS 돋움·굴림 계열은 한컴 돋움(획 두께 페이지밀도 0.265)에
   // 근접한 Noto Sans KR ExtraLight 로 대체. 기존 NotoSansKR-Regular(밀도 0.378)는
   // 획이 +43% 두꺼워 PDF 대비 과도하게 굵게 보였다(네이티브 generic_fallback 와 정합).
-  { name: '돋움', file: 'fonts/NotoSansKR-ExtraLight.woff2' },
-  { name: '돋움체', file: 'fonts/NotoSansKR-ExtraLight.woff2' },
-  { name: '굴림', file: 'fonts/NotoSansKR-ExtraLight.woff2' },
-  { name: '굴림체', file: 'fonts/D2Coding-Regular.woff2' },
-  { name: '새굴림', file: 'fonts/NotoSansKR-ExtraLight.woff2' },
+  { name: '돋움', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: '돋움체', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: '굴림', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: '굴림체', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: '새굴림', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
   // Haansoft Dotum: HWP 문서가 직접 지정하는 한컴 돋움 영문명(예: 수능 모의고사 본문).
   // 기존 미등록 → 체인의 'Malgun Gothic'(Pretendard) 가 먼저 매칭되어 굵게 렌더됐다.
-  { name: 'Haansoft Dotum', file: 'fonts/NotoSansKR-ExtraLight.woff2' },
-  { name: '바탕', file: 'fonts/NotoSerifKR-Regular.woff2' },
-  { name: '바탕체', file: 'fonts/D2Coding-Regular.woff2' },
-  { name: '궁서', file: 'fonts/GowunBatang-Regular.woff2' },
-  { name: '궁서체', file: 'fonts/GowunBatang-Regular.woff2' },
-  { name: '새궁서', file: 'fonts/GowunBatang-Regular.woff2' },
+  { name: 'Haansoft Dotum', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: '바탕', file: 'fonts/KoPubWorld-Batang-Medium.woff2' },
+  { name: '바탕체', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: '궁서', file: 'fonts/KoPubWorld-Batang-Light.woff2' },
+  { name: '궁서체', file: 'fonts/KoPubWorld-Batang-Light.woff2' },
+  { name: '새궁서', file: 'fonts/KoPubWorld-Batang-Light.woff2' },
   // === 나눔 폰트 (OFL, 로컬) ===
-  { name: '나눔고딕', file: 'fonts/NanumGothic-Regular.woff2' },
-  { name: '나눔명조', file: 'fonts/NanumMyeongjo-Regular.woff2' },
-  { name: '나눔고딕코딩', file: 'fonts/NanumGothicCoding-Regular.woff2' },
+  { name: '나눔고딕', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: '나눔명조', file: 'fonts/KoPubWorld-Batang-Medium.woff2' },
+  { name: '나눔고딕코딩', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
   // === 영문 폰트 → OS 폴백 (번들 제거) ===
-  { name: 'Palatino Linotype', file: 'fonts/NotoSerifKR-Regular.woff2' },
+  { name: 'Palatino Linotype', file: 'fonts/KoPubWorld-Batang-Medium.woff2' },
   // === Noto (OFL, 로컬) ===
-  { name: 'Noto Sans KR', file: 'fonts/NotoSansKR-Regular.woff2' },
+  { name: 'Noto Sans KR', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
   // Task #1224: generic_fallback sans 체인 말단의 'Noto Sans KR ExtraLight' 해석용.
   // 미등록 고딕 문서폰트가 체인을 따라 내려올 때 무거운 Noto 직전에 ExtraLight 매칭.
-  { name: 'Noto Sans KR ExtraLight', file: 'fonts/NotoSansKR-ExtraLight.woff2' },
-  { name: 'Noto Serif KR', file: 'fonts/NotoSerifKR-Regular.woff2' },
+  { name: 'Noto Sans KR ExtraLight', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: 'Noto Serif KR', file: 'fonts/KoPubWorld-Batang-Medium.woff2' },
   // === Pretendard ===
-  { name: 'Pretendard', file: 'fonts/Pretendard-Regular.woff2' },
-  { name: 'Pretendard Thin', file: 'fonts/Pretendard-Thin.woff2' },
-  { name: 'Pretendard ExtraLight', file: 'fonts/Pretendard-ExtraLight.woff2' },
-  { name: 'Pretendard Light', file: 'fonts/Pretendard-Light.woff2' },
-  { name: 'Pretendard Medium', file: 'fonts/Pretendard-Medium.woff2' },
-  { name: 'Pretendard SemiBold', file: 'fonts/Pretendard-SemiBold.woff2' },
-  { name: 'Pretendard Bold', file: 'fonts/Pretendard-Bold.woff2' },
-  { name: 'Pretendard ExtraBold', file: 'fonts/Pretendard-ExtraBold.woff2' },
-  { name: 'Pretendard Black', file: 'fonts/Pretendard-Black.woff2' },
+  { name: 'Pretendard', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: 'Pretendard Thin', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: 'Pretendard ExtraLight', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: 'Pretendard Light', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
+  { name: 'Pretendard Medium', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
+  { name: 'Pretendard SemiBold', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'Pretendard Bold', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'Pretendard ExtraBold', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
+  { name: 'Pretendard Black', file: 'fonts/KoPubWorld-Dotum-Bold.woff2' },
   // === D2 Coding (OFL, 로컬) ===
-  { name: 'D2Coding', file: 'fonts/D2Coding-Regular.woff2' },
+  { name: 'D2Coding', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
   // === Happiness Sans ===
-  { name: '해피니스 산스 레귤러', file: 'fonts/Happiness-Sans-Regular.woff2' },
-  { name: 'Happiness Sans Regular', file: 'fonts/Happiness-Sans-Regular.woff2' },
-  { name: '해피니스 산스 볼드', file: 'fonts/Happiness-Sans-Bold.woff2' },
-  { name: 'Happiness Sans Bold', file: 'fonts/Happiness-Sans-Bold.woff2' },
-  { name: '해피니스 산스 타이틀', file: 'fonts/Happiness-Sans-Title.woff2' },
-  { name: 'Happiness Sans Title', file: 'fonts/Happiness-Sans-Title.woff2' },
-  { name: '해피니스 산스 VF', file: 'fonts/HappinessSansVF.woff2' },
-  { name: 'Happiness Sans VF', file: 'fonts/HappinessSansVF.woff2' },
+  { name: '해피니스 산스 레귤러', file: 'fonts/NanumSquareR.woff2' },
+  { name: 'Happiness Sans Regular', file: 'fonts/NanumSquareR.woff2' },
+  { name: '해피니스 산스 볼드', file: 'fonts/NanumSquareB.woff2' },
+  { name: 'Happiness Sans Bold', file: 'fonts/NanumSquareB.woff2' },
+  { name: '해피니스 산스 타이틀', file: 'fonts/NanumSquareEB.woff2' },
+  { name: 'Happiness Sans Title', file: 'fonts/NanumSquareEB.woff2' },
+  { name: '해피니스 산스 VF', file: 'fonts/NanumSquareR.woff2' },
+  { name: 'Happiness Sans VF', file: 'fonts/NanumSquareR.woff2' },
   // === Cafe24 ===
-  { name: 'Cafe24 Ssurround Bold', file: 'fonts/Cafe24Ssurround-v2.0.woff2' },
-  { name: '카페24 슈퍼매직', file: 'fonts/Cafe24Supermagic-Regular-v1.0.woff2' },
-  { name: 'Cafe24 Supermagic', file: 'fonts/Cafe24Supermagic-Regular-v1.0.woff2' },
+  { name: 'Cafe24 Ssurround Bold', file: 'fonts/NanumSquareRoundB.woff2' },
+  { name: '카페24 슈퍼매직', file: 'fonts/NanumSquareRoundR.woff2' },
+  { name: 'Cafe24 Supermagic', file: 'fonts/NanumSquareRoundR.woff2' },
   // === 수식 전용 폰트 (OFL/GUST, 로컬) ===
-  { name: 'Latin Modern Math', file: 'fonts/LatinModernMath-Regular.woff2' },
+  { name: 'Latin Modern Math', file: 'fonts/KoPubWorld-Batang-Medium.woff2' },
   // === 기타 ===
-  { name: 'SpoqaHanSans', file: 'fonts/SpoqaHanSans-Regular.woff2' },
+  { name: 'SpoqaHanSans', file: 'fonts/KoPubWorld-Dotum-Medium.woff2' },
   // === Gowun (OFL, 로컬) ===
-  { name: '고운바탕', file: 'fonts/GowunBatang-Regular.woff2' },
-  { name: '고운돋움', file: 'fonts/GowunDodum-Regular.woff2' },
+  { name: '고운바탕', file: 'fonts/KoPubWorld-Batang-Light.woff2' },
+  { name: '고운돋움', file: 'fonts/KoPubWorld-Dotum-Light.woff2' },
   // === Source Han Serif K Old Hangul (Task #528, OFL, 로컬, 옛한글 자모 한정 subset) ===
   // PUA 옛한글 (HanCom 자체 인코딩) 을 KS X 1026-1:2007 자모 시퀀스로 변환 후
   // 합자 렌더링용. unicode-range 로 옛한글 영역에서만 매칭 → 일반 한글 영향 0.
   {
     name: 'Source Han Serif K Old Hangul',
-    file: 'fonts/SourceHanSerifK-OldHangul-subset.woff2',
+    file: 'fonts/KoPubWorld-Batang-Medium.woff2',
     unicodeRange: 'U+1100-11FF, U+A960-A97F, U+D7B0-D7FF',
   },
 ];
