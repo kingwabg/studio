@@ -222,7 +222,11 @@ export class CanvasView {
       return false;
     }
     // iOS/WebKit과 GPU surface가 감당하기 어려운 물리 픽셀 수를 중앙 정책으로 제한한다.
-    const renderScale = clampRenderScale(pageInfo, zoom * rawDpr);
+    // [정밀 렌더 2026-08-04] dpr 1 화면에서는 renderScale 이 zoom 그대로가 되어 10pt 글자가
+    // 13px 물리로 깔린다 — 글자가 뭉개지고 컬러 이모지 비트맵도 저품질로 뽑혀, 170% 로
+    // 확대해야 정상처럼 보였다(사용자 실측 신고). 유효 dpr 을 최소 2로 올려 항상 레티나
+    // 밀도로 그린다(레티나는 불변, 픽셀 상한은 clampRenderScale 이 계속 지킨다).
+    const renderScale = clampRenderScale(pageInfo, zoom * Math.max(rawDpr, 2));
     const dpr = renderScale / (zoom > 0 ? zoom : 1);
 
     // Canvas를 DOM에 추가하고 위치를 설정한다
