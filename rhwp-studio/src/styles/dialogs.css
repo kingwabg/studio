@@ -989,6 +989,38 @@
 }
 .sgn-check input { accent-color: var(--color-primary, #2c5aa0); margin: 0; }
 
+/* 도장 모양 프리셋 카드 (2026-08-04) — 이름만으로는 '수제'가 뭔지 모른다.
+   미리보기 그림이 곧 설명이라 카드 안에 작은 캔버스를 둔다. */
+.sgn-shapes {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+}
+.sgn-shape {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 7px 4px 6px; cursor: pointer; border-radius: 8px;
+  border: 1px solid var(--ui-border, #d9d6d2); background: var(--ui-surface, #fff);
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.sgn-shape:hover { background: var(--ui-hover, #f4f5f6); }
+.sgn-shape.is-on {
+  border-color: var(--color-primary, #2c5aa0);
+  background: var(--color-primary-weak, #eef3fb);
+}
+.sgn-shape canvas { width: 42px; height: 42px; display: block; }
+.sgn-shape-name { font-size: 10.5px; line-height: 1.2; text-align: center; opacity: 0.85; }
+
+/* 개인/법인 — 두 갈래뿐이라 드롭다운보다 세그먼트가 빠르다 */
+.sgn-seg { display: inline-flex; border: 1px solid var(--ui-border, #d9d6d2); border-radius: 6px; overflow: hidden; flex: none; }
+.sgn-seg button {
+  height: 32px; padding: 0 12px; font: inherit; font-size: 12px; cursor: pointer;
+  border: 0; background: var(--ui-surface, #fff); color: inherit;
+}
+.sgn-seg button + button { border-left: 1px solid var(--ui-border, #d9d6d2); }
+.sgn-seg button.is-on { background: var(--color-primary-weak, #eef3fb); color: var(--color-primary, #2c5aa0); font-weight: 600; }
+
+/* 법인 전용 칸 — 개인일 때는 통째로 숨는다 */
+.sgn-corp[hidden] { display: none; }
+.sgn-corp { display: flex; flex-direction: column; gap: 8px; }
+
 /* 견본판 — 점선 테두리 안이 곧 만들어질 PNG 의 범위다 */
 .sgn-stage {
   position: relative; display: flex; align-items: center; justify-content: center;
