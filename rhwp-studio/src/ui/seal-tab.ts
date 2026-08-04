@@ -55,7 +55,7 @@ function loadFace(key: string, after: () => void): void {
     f.key,
     new FontFace(f.family, `url(${f.file}) format('woff2')`)
       .load()
-      .then((face) => { document.fonts.add(face); after(); })
+      .then((face) => { document.fonts.add(face); inkCache.clear(); after(); })
       .catch((e) => { console.warn(`[도장] 글꼴 ${f.label} 로드 실패`, e); }),
   );
 }
@@ -135,6 +135,45 @@ function layoutShapeOf(kind: SealShapeKind): SealShape {
   return kind === 'ellipse' || kind === 'circle' ? 'circle' : 'square';
 }
 
+/**
+ * 글자 하나를 그려 **실제 잉크가 차지한 사각형을 픽셀로 잰다.**
+ *
+ * ⚠ measureText 의 actualBoundingBox* 로 기준선을 계산해 맞추던 것을 버렸다
+ *   (2026-08-04). 수식은 맞는데 결과가 세로로 31px 씩 떴다 — 부호를 뒤집어 가며
+ *   맞추는 것은 확신에 찬 오답이 되기 쉽다. 픽셀을 세면 글꼴·글자와 무관하게 정확하다.
+ *
+ * 결과는 캐시한다(글자·글꼴당 한 번). 글꼴이 늦게 오면 모양이 바뀌므로 그때 비운다.
+ */
+const inkCache = new Map<string, { cv: HTMLCanvasElement; x: number; y: number; w: number; h: number } | null>();
+
+function glyphInk(char: string, font: string) {
+  const key = `${char}|${font}`;
+  if (inkCache.has(key)) return inkCache.get(key);
+  const S = 160;
+  const cv = document.createElement('canvas');
+  cv.width = S; cv.height = S;
+  const c = cv.getContext('2d', { willReadFrequently: true })!;
+  c.font = `bold ${Math.round(S * 0.62)}px ${font}`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillStyle = '#000';
+  c.fillText(char, S / 2, S / 2);
+  const d = c.getImageData(0, 0, S, S).data;
+  let x0 = S, x1 = -1, y0 = S, y1 = -1;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      if (d[(y * S + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+  }
+  const box = x1 < 0 ? null : { cv, x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  if (inkCache.size > 400) inkCache.clear();
+  inkCache.set(key, box);
+  return box;
+}
+
 function presetOf(key: string): Preset {
   return PRESETS.find((p) => p.key === key) ?? PRESETS[1];
 }
@@ -177,6 +216,13 @@ export function drawSeal(canvas: HTMLCanvasElement, name: string, style: SealSty
      * 타원은 한 줄로 세운다(가로 타원이면 눕힌다) — 참고 화면의 타원형이 그 모양이고,
      * 좁고 긴 칸에 2×2 를 넣으면 글자가 서로 먹는다. 印 붙임 여부는 배치가 이미 정했다.
      */
+    /**
+     * 3자인데 印 을 껐다 — 2×2 의 오른쪽 아래가 비어 무게중심이 왼쪽 위로 쏠린다
+     * (사용자 지적 2026-08-04). 마지막 글자를 아랫줄 **가운데**로 내려 두 칸을 걸치게 한다.
+     */
+    if (glyphs.length === 3 && p.kind !== 'ellipse') {
+      glyphs = glyphs.map((g, i) => (i === 2 ? { ...g, x: 0.5 } : g));
+    }
     if (p.kind === 'ellipse' && glyphs.length > 1) {
       const n = glyphs.length;
       const step = 1 / n;
@@ -202,36 +248,51 @@ export function drawSeal(canvas: HTMLCanvasElement, name: string, style: SealSty
     const GAP = 0.9; // 칸끼리 딱 붙으면 글자가 서로 먹는다 — 한 줌만 띄운다
     const cellW = (box.w / cols) * GAP * SIZE;
     const cellH = (box.h / rows) * GAP * SIZE;
+    /** 아랫줄 가운데로 내려온 3번째 글자는 두 칸을 걸친다 — 폭도 그만큼 준다. */
+    const wideIndex = glyphs.length === 3 && p.kind !== 'ellipse' ? 2 : -1;
 
-    for (const g of glyphs) {
-      const px = (box.x + g.x * box.w) * SIZE;
-      const py = (box.y + g.y * box.h) * SIZE;
-      if (style.carve) {
-        // 잉크 상자를 재려면 일단 아무 크기로나 그려 봐야 한다(측정용 기준 크기).
-        const probe = 100;
-        ctx.font = `bold ${probe}px ${fam}`;
-        const m = ctx.measureText(g.char);
-        const iw = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) || probe * 0.7;
-        const ih = (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) || probe * 0.7;
-        const sx = (cellW * style.scale) / iw;
-        const sy = (cellH * style.scale) / ih;
-        // 잉크 상자의 **중심**을 칸 중심에 맞춘다 — 글꼴 기준선은 글자마다 달라 못 믿는다.
-        const cxOff = (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
-        const cyOff = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-        ctx.save();
-        ctx.translate(px, py);
-        ctx.scale(sx, sy);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText(g.char, -cxOff, cyOff);
-        ctx.restore();
+    /**
+     * 블록 전체를 도형 한가운데로 옮긴다.
+     * 배치 좌표는 칸 격자 기준이라, 글자 수·모양에 따라 덩어리가 한쪽으로 치우칠 수 있다
+     * — 실제로 그려질 자리들의 외곽을 재서 그 중심을 도형 중심에 맞춘다(모든 모양 공통).
+     */
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    glyphs.forEach((g, i) => {
+      const w = (i === wideIndex ? cellW * 2 : cellW) * style.scale;
+      const h = cellH * style.scale;
+      const cx = (box.x + g.x * box.w) * SIZE;
+      const cy = (box.y + g.y * box.h) * SIZE;
+      minX = Math.min(minX, cx - w / 2); maxX = Math.max(maxX, cx + w / 2);
+      minY = Math.min(minY, cy - h / 2); maxY = Math.max(maxY, cy + h / 2);
+    });
+    const dx = SIZE / 2 - (minX + maxX) / 2;
+    const dy = SIZE / 2 - (minY + maxY) / 2;
+
+    glyphs.forEach((g, gi) => {
+      const px = (box.x + g.x * box.w) * SIZE + dx;
+      const py = (box.y + g.y * box.h) * SIZE + dy;
+      const ink = style.carve ? glyphInk(g.char, fam) : null;
+      if (ink) {
+        // 잰 잉크 상자를 칸에 그대로 눌러 넣는다 — 위치·크기 둘 다 계산이 필요 없다.
+        const w = (gi === wideIndex ? cellW * 2 : cellW) * style.scale;
+        const h = cellH * style.scale;
+        const tint = document.createElement('canvas');
+        tint.width = Math.max(1, Math.round(w));
+        tint.height = Math.max(1, Math.round(h));
+        const tc = tint.getContext('2d')!;
+        tc.drawImage(ink.cv, ink.x, ink.y, ink.w, ink.h, 0, 0, tint.width, tint.height);
+        // 검은 실루엣에 도장 색을 입힌다(색이 조절값이라 미리 칠해 둘 수 없다).
+        tc.globalCompositeOperation = 'source-in';
+        tc.fillStyle = style.color;
+        tc.fillRect(0, 0, tint.width, tint.height);
+        ctx.drawImage(tint, px - w / 2, py - h / 2, w, h);
       } else {
         const size = Math.round(SIZE * g.size * style.scale * fs * Math.min(box.w, box.h) / 0.9);
         ctx.font = `bold ${size}px ${fam}`;
         ctx.textBaseline = 'middle';
         ctx.fillText(g.char, px, py);
       }
-    }
+    });
   }
 
   // 인주 자국 — 개인·법인 공통. 벡터로 그린 뒤 후처리한다.
