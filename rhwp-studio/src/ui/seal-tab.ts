@@ -102,6 +102,8 @@ type SealStyle = {
   wobble: number;
   /** 타원 방향 — 세로(기본) / 가로 */
   portrait: boolean;
+  /** 전각(篆刻) 채움 — 글자를 제 칸에 꽉 채워 늘린다 */
+  carve: boolean;
   centerText: string;
   centerFace: string;
   centerSize: number;
@@ -114,7 +116,7 @@ type SealStyle = {
  */
 const DEFAULT_STYLE: SealStyle = {
   target: 'personal', preset: 'circle', sealMark: true, face: 'batang', order: 'modern',
-  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4, portrait: true,
+  texture: 0.35, color: '#c0392b', border: 10, ratio: 1, scale: 1, wobble: 0.4, portrait: true, carve: true,
   centerText: '代表理事', centerFace: 'batang', centerSize: 50, marker: 'dot',
 };
 
@@ -170,12 +172,53 @@ export function drawSeal(canvas: HTMLCanvasElement, name: string, style: SealSty
     ctx.textBaseline = 'middle';
     const fam = familyOf(style.face);
     const fs = faceScale(style.face);
-    for (const g of layoutSealChars(name, layoutShapeOf(p.kind), style.order, style.sealMark)) {
+    const glyphs = layoutSealChars(name, layoutShapeOf(p.kind), style.order, style.sealMark);
+
+    /**
+     * 전각(篆刻) 채움 — 글자를 제 칸에 **꽉 차게 늘린다**.
+     *
+     * 왜: 도장 서체(고인체·인전체·전서체…)의 인상은 획 모양보다 **글자가 칸을 남김없이
+     * 채워 테두리에 닿는 것**에서 나온다. 그 폰트들은 전부 도장 제작소 상용이라 번들할
+     * 수 없지만(2026-08-04 라이선스 조사), 채움은 폰트 없이 흉내 낼 수 있다 —
+     * 글자마다 실제 잉크 상자를 재서 칸 크기로 비균일 확대하면 된다.
+     *
+     * 칸 크기는 배치가 정하는 모양을 그대로 따른다: 1자=칸 전체, 2자=위아래 반, 3·4자=2×2.
+     */
+    const n = glyphs.length;
+    const cols = n >= 3 ? 2 : 1;
+    const rows = n === 1 ? 1 : n === 2 ? 2 : 2;
+    const GAP = 0.9; // 칸끼리 딱 붙으면 글자가 서로 먹는다 — 한 줌만 띄운다
+    const cellW = (box.w / cols) * GAP * SIZE;
+    const cellH = (box.h / rows) * GAP * SIZE;
+
+    for (const g of glyphs) {
       const px = (box.x + g.x * box.w) * SIZE;
       const py = (box.y + g.y * box.h) * SIZE;
-      const size = Math.round(SIZE * g.size * style.scale * fs * Math.min(box.w, box.h) / 0.9);
-      ctx.font = `bold ${size}px ${fam}`;
-      ctx.fillText(g.char, px, py);
+      if (style.carve) {
+        // 잉크 상자를 재려면 일단 아무 크기로나 그려 봐야 한다(측정용 기준 크기).
+        const probe = 100;
+        ctx.font = `bold ${probe}px ${fam}`;
+        const m = ctx.measureText(g.char);
+        const iw = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) || probe * 0.7;
+        const ih = (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) || probe * 0.7;
+        const sx = (cellW * style.scale) / iw;
+        const sy = (cellH * style.scale) / ih;
+        // 잉크 상자의 **중심**을 칸 중심에 맞춘다 — 글꼴 기준선은 글자마다 달라 못 믿는다.
+        const cxOff = (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+        const cyOff = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.scale(sx, sy);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(g.char, -cxOff, cyOff);
+        ctx.restore();
+      } else {
+        const size = Math.round(SIZE * g.size * style.scale * fs * Math.min(box.w, box.h) / 0.9);
+        ctx.font = `bold ${size}px ${fam}`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(g.char, px, py);
+      }
     }
   }
 
@@ -302,6 +345,18 @@ export function createSealTab(onChange: () => void): SignTab {
   const portText = document.createElement('span');
   portText.textContent = '세로';
   portToggle.append(portBox, portText);
+
+  // 전각 채움 — 도장 서체의 인상을 폰트 없이 내는 핵심 스위치라 늘 보이게 둔다.
+  const carveToggle = document.createElement('label');
+  carveToggle.className = 'sgn-check';
+  carveToggle.title = '글자를 칸에 꽉 채워 도장 서체처럼 보이게 합니다';
+  const carveBox = document.createElement('input');
+  carveBox.type = 'checkbox';
+  carveBox.checked = style.carve;
+  carveBox.addEventListener('change', () => { style.carve = carveBox.checked; repaint(); });
+  const carveText = document.createElement('span');
+  carveText.textContent = '전각';
+  carveToggle.append(carveBox, carveText);
   const tune2 = document.createElement('div');
   tune2.className = 'sgn-row sgn-tune';
   tune2.append(
@@ -311,7 +366,7 @@ export function createSealTab(onChange: () => void): SignTab {
   );
   const tune3 = document.createElement('div');
   tune3.className = 'sgn-row sgn-tune';
-  tune3.append(wobbleSlider, portToggle);
+  tune3.append(wobbleSlider, portToggle, carveToggle);
 
   // ── 법인 전용 ───────────────────────────────────────────
   const corp = document.createElement('div');
@@ -384,7 +439,8 @@ export function createSealTab(onChange: () => void): SignTab {
     const corp = style.target === 'corporate';
     wobbleSlider.hidden = corp || !p.handmade;
     portToggle.hidden = corp || p.kind !== 'ellipse';
-    tune3.hidden = wobbleSlider.hidden && portToggle.hidden;
+    carveToggle.hidden = corp;
+    tune3.hidden = wobbleSlider.hidden && portToggle.hidden && carveToggle.hidden;
   }
   function syncMarker() {
     const keys = ['dot', 'star', 'diamond', 'none'];
