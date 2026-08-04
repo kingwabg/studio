@@ -92,12 +92,23 @@ test('없는 도구·범위 밖 표는 ERROR 로 모델에 돌아가고 문서�
   assert.match(lastFed, /ERROR: 표 9 없음/);
 });
 
-test('루프 상한에서 멈춘다 — 같은 도구를 무한 반복해도 폭주하지 않는다', async () => {
+test('루프 상한에서 멈춘다 — 끊지 않고 마무리 보고를 강제한다', async () => {
   const { services } = mockServices();
   let rounds = 0;
-  const r = await runAgentTurn(services, '요청', async () => { rounds++; return '{"tool":"doc_outline"}'; });
-  assert.equal(rounds, 6);                                 // MAX_ROUNDS
-  assert.match(r.finalText, /상한/);
+  const r = await runAgentTurn(services, '요청', async (_s, u) => {
+    rounds++;
+    // 마무리 호출([도구 사용 종료])에는 done 으로 답한다 — 읽은 것으로 보고하는 경로.
+    if (u.includes('[도구 사용 종료]')) return '{"tool":"done","report":"표 5개를 읽었습니다"}';
+    return '{"tool":"doc_outline"}';
+  });
+  assert.equal(rounds, 11);                                // MAX_ROUNDS(10) + 마무리 1
+  assert.equal(r.finalText, '표 5개를 읽었습니다');
+});
+
+test('마무리 호출조차 도구를 부르면 사용량 한도가 아니라고 밝힌다', async () => {
+  const { services } = mockServices();
+  const r = await runAgentTurn(services, '요청', async () => '{"tool":"doc_outline"}');
+  assert.match(r.finalText, /사용량 한도가 아닙니다/);
 });
 
 test('프롬프트가 수치 지어내기 금지와 done 규약을 담는다(계약 잠금)', () => {

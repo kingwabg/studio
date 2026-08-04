@@ -16,8 +16,13 @@
 import type { CanvaServices } from './canva-services';
 import { readTable } from './table-grid.ts';
 
-/** 한 턴에서 도구를 부를 수 있는 최대 횟수 — 폭주 방지. 6이면 읽기 2~3 + 쓰기 1~2 로 충분하다. */
-const MAX_ROUNDS = 6;
+/**
+ * 한 턴에서 도구를 부를 수 있는 최대 횟수 — 폭주 방지.
+ * ⚠ 6은 부족했다(실사고 2026-08-05): 공모 서식엔 표가 5개라 "표에 뭐가 있는지" 한 질문에
+ *   개요 1 + 표 읽기 5 = 6회를 다 쓰고 **보고할 기회가 없었다**. 10이면 표 7~8개 문서까지
+ *   여유가 있고, 한도에 닿아도 아래 마무리 호출이 지금까지 읽은 것으로 보고한다.
+ */
+const MAX_ROUNDS = 10;
 /** 셀·문단 텍스트 조회 상한. */
 const READ_LIMIT = 400;
 /** 도구 결과로 모델에 돌려주는 최대 글자 — 프롬프트 폭주 방지. */
@@ -233,7 +238,19 @@ export async function runAgentTurn(
     transcript += `\n\n[${call.tool} 결과]\n${result}`;
   }
 
-  const timeout: AgentStep = { kind: 'final', summary: '작업 횟수 상한에 닿아 멈췄습니다. 요청을 나눠서 다시 시도해 주세요.' };
+  // 한도에 닿았다 — 그냥 끊지 말고 **지금까지 읽은 것으로 보고를 강제**한다.
+  // (실사고 2026-08-05: 여기서 낸 "상한" 문구를 사용자가 API 사용량 한도로 오해했다.
+  //  게다가 5개 표를 다 읽고도 보고 없이 끊겨, 읽은 내용이 통째로 버려졌다.)
+  transcript += '\n\n[도구 사용 종료] 더 이상 도구를 부를 수 없다. 지금까지의 도구 결과만으로 '
+    + '{"tool":"done","report":"..."} 를 출력해 사용자 질문에 답하라.';
+  const finalReply = await callModel(AGENT_PROMPT, transcript);
+  const finalCall = parseToolCall(finalReply);
+  const summary = finalCall?.tool === 'done' && typeof finalCall.args?.report === 'string'
+    ? String(finalCall.args.report)
+    : (!finalCall && finalReply.trim())
+      ? finalReply.trim()   // 산문으로 답했으면 그것도 답이다
+      : '작업이 길어져 여기까지만 진행했습니다. 요청을 더 작게 나눠 다시 시도해 주세요. (AI 사용량 한도가 아닙니다)';
+  const timeout: AgentStep = { kind: 'final', summary };
   steps.push(timeout);
-  return { finalText: timeout.summary, steps, wrote: state.wrote };
+  return { finalText: summary, steps, wrote: state.wrote };
 }
