@@ -19,9 +19,21 @@
  */
 import type { CommandServices } from '@/command/types';
 
+/**
+ * 1 화면 px = 75 HWPUNIT (7200/96).
+ *
+ * ⚠ **이 환산이 빠져 있어서 그림이 안 보였다**(2026-08-04 실측). insertPicture 의
+ *   width/height 는 px 가 아니라 **HWPUNIT** 이다. 도장은 57 을 그대로 넘겨
+ *   57 HWPUNIT = 0.76px 짜리로 들어갔다 — 문서 레이아웃에는 image 컨트롤이 잡히는데
+ *   화면엔 아무것도 안 보여서 "삽입이 안 된다"로 보였다(엔진은 ok 를 돌려준다).
+ *   드롭 경로(input-handler.ts fitDroppedImageSizeRaw)는 처음부터 PX_TO_HWPUNIT 을
+ *   곱하고 있었다 — 우리만 빠뜨렸다.
+ */
+const PX_TO_HWPUNIT = 7200 / 96;
+
 export type InsertPictureArgs = {
   data: Uint8Array;
-  /** 문서에 앉힐 크기(px @96dpi) */
+  /** 문서에 앉힐 크기(**px @96dpi** — HWPUNIT 환산은 여기서 한다) */
   drawW: number;
   drawH: number;
   /** 원본 픽셀 크기 */
@@ -48,9 +60,9 @@ export function insertPictureAtCursor(services: CommandServices, a: InsertPictur
       operationType: 'insertPicture',
       operation: (wasm: typeof services.wasm) => {
         const r = wasm.insertPicture(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, '',
-          a.data, a.drawW, a.drawH, a.naturalW, a.naturalH, 'png', a.description);
-        console.log('[진단] pos', JSON.stringify(pos), 'r', JSON.stringify(r),
-          'drawW', a.drawW, 'drawH', a.drawH, 'bytes', a.data.length, 'pages', wasm.pageCount);
+          a.data,
+          Math.round(a.drawW * PX_TO_HWPUNIT), Math.round(a.drawH * PX_TO_HWPUNIT),
+          a.naturalW, a.naturalH, 'png', a.description);
         // ⚠ insertPicture 는 **떠 있는 그림**으로 넣는다 — 글자취급으로 바꿔야 서명란에
         //   글자처럼 앉는다(드롭 경로도 같은 후처리를 한다. 이걸 빼먹어 논리 길이 0으로
         //   "안 들어갔다"고 오판했다, 2026-08-01 실측).
@@ -63,10 +75,6 @@ export function insertPictureAtCursor(services: CommandServices, a: InsertPictur
       },
     });
     if (ok) services.eventBus.emit('document-changed');
-    try {
-      const lay = (services.wasm as any).getPageControlLayout(1);
-      console.log('[진단] 1쪽 컨트롤 수', lay?.controls?.length ?? 'n/a');
-    } catch (e) { console.log('[진단] 레이아웃 조회 실패', String(e).slice(0, 80)); }
     return ok;
   } finally {
     // 어떤 경로로 나가든 모드는 원래대로 — 사용자가 양식 모드로 두고 있었다면 그 상태가 맞다.
