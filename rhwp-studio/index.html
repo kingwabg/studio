@@ -14,6 +14,17 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
+  <!-- [부팅 스플래시 2026-08-04] 강제새로고침은 캐시를 비워 번들·WASM 을 전부 다시
+       받는다 — 그동안 스타일 없는 미완성 UI 가 노출됐다(사용자 신고). 인라인 스타일이라
+       CSS 로드 전에도 즉시 덮고, main.ts 가 초기화 완료 시 걷는다. -->
+  <div id="boot-splash" style="position:fixed;inset:0;z-index:99999;background:#f6f7f9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;">
+    <div style="font-size:22px;font-weight:700;color:#1e293b;"><span style="color:#2b6cb0;">rhwp</span> studio</div>
+    <div style="width:160px;height:3px;background:#e2e8f0;border-radius:2px;overflow:hidden;">
+      <div id="boot-splash-bar" style="width:30%;height:100%;background:#2b6cb0;border-radius:2px;animation:rhwpBootSlide 1.1s ease-in-out infinite;"></div>
+    </div>
+    <div style="font-size:12.5px;color:#64748b;">문서 편집기를 불러오는 중…</div>
+  </div>
+  <style>@keyframes rhwpBootSlide{0%{margin-left:-30%}100%{margin-left:100%}}</style>
   <div id="studio-root">
     <!-- ── 리본 헤더 (디자인 "rhwp 헤더·리본 재설계" 2a — 2행 106px) ──
          화면에 보이는 헤더는 이것 하나다. 마크업은 src/ui/ribbon-header.ts 가 데이터

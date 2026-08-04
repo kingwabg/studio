@@ -962,6 +962,13 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
     await updateLoadProgress(96, '편집 상태 초기화 중...');
     inputHandler?.activateWithCaretPosition();
     await updateLoadProgress(100, '완료');
+    // [부팅 스플래시] 첫 문서가 화면에 앉으면 걷는다 — 짧은 페이드로
+    const splash = document.getElementById('boot-splash');
+    if (splash) {
+      splash.style.transition = 'opacity 180ms ease';
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 220);
+    }
     msg.textContent = displayName;
     console.log('[initDoc] 8. 완료');
 
