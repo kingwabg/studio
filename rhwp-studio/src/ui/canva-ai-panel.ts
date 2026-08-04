@@ -37,6 +37,12 @@ export class CanvaAiPanel {
   private mode: 'writer' | 'agent' = 'writer';
   /** 작성 세션 — 문서 모델이 턴을 넘어 살아 "Ⅱ장만 고쳐줘"가 되게 한다. */
   private writer = new WriterSession();
+  /**
+   * 작성 방향 설정 — 첫 요청에서 바로 쓰지 않고 유형·목적·분량·문체를 확인받는다
+   * (사용자 지시 2026-08-05: "클로드 코드가 방향 물어보듯 우리도 물어보자").
+   * 한 세션에 한 번만 묻는다 — 이후 턴은 같은 방향으로 이어 쓴다.
+   */
+  private writerSetup: string | null = null;
   /** 문서 내용이 외부 모델로 나가는 경로라 첫 사용 때 1회 동의를 받는다(세션 한정). */
   private agentConsent = false;
   // 상단 기능 버튼 줄: 문서 작성 ↔ 문서 작업(모드 토글) + 문서 검토(실행)
@@ -200,16 +206,77 @@ export class CanvaAiPanel {
    * 문서 작업과 달리 동의가 없다: 문서 내용이 밖으로 나가지 않는 경로다
    * (나가는 것은 사용자 요청과 모델이 스스로 만든 목차뿐).
    */
+  /**
+   * 문서 환경설정 카드 — 유형·목적·분량·문체를 칩으로 고르고 「이 설정으로 작성」.
+   * 유형은 요청 문장에서 추정해 「추천」 표시를 붙인다(칩 선택이 곧 확정이라 오답이어도 무해).
+   * 파일 형식 칩은 두지 않았다 — 여기는 HWP 편집기 안이라 선택지가 하나뿐이다.
+   */
+  private renderWriterSetup(text: string): void {
+    const infer = (): string => {
+      if (/계획/.test(text)) return '사업계획서';
+      if (/제안|기획/.test(text)) return '제안서';
+      if (/회의/.test(text)) return '회의록';
+      if (/공문|협조|안내문/.test(text)) return '공문';
+      if (/보고/.test(text)) return '보고서';
+      return '보고서';
+    };
+    const groups: Array<{ label: string; options: string[]; pick: string }> = [
+      { label: '어떤 문서를 만들까요?', options: ['사업계획서', '보고서', '제안서', '회의록', '공문', '기타'], pick: infer() },
+      { label: '주요 목적은?', options: ['대외 제출용', '내부 검토용', '개인·기타'], pick: '대외 제출용' },
+      { label: '분량은?', options: ['표준(3~5장)', '간략(1~2장)', '상세(6장 이상)'], pick: '표준(3~5장)' },
+      { label: '문체는?', options: ['공식 공문체', '일반 서술체'], pick: '공식 공문체' },
+    ];
+    const picks = groups.map((g) => g.pick);
+
+    const msgEl = this.pushMsg({ role: 'ai', text: '문서 환경설정 — 방향을 확인하고 시작할게요.' });
+    const card = mkEl('div', 'canva-ai-setup');
+    groups.forEach((g, gi) => {
+      card.appendChild(mkEl('div', 'canva-ai-setup-label', g.label));
+      const row = mkEl('div', 'canva-ai-setup-row');
+      g.options.forEach((opt) => {
+        const chip = mkButton('canva-ai-setup-chip', { text: opt === g.pick ? `${opt} ·추천` : opt });
+        chip.classList.toggle('is-on', opt === g.pick);
+        chip.addEventListener('click', () => {
+          picks[gi] = opt;
+          [...row.children].forEach((c) => c.classList.toggle('is-on', (c as HTMLElement).textContent?.startsWith(opt) ?? false));
+        });
+        row.appendChild(chip);
+      });
+      card.appendChild(row);
+    });
+    const go = mkButton('canva-ai-setup-go', { text: '이 설정으로 작성' });
+    go.addEventListener('click', () => {
+      go.disabled = true;
+      // 선택을 모델 지시문으로 — 프롬프트의 문체 규칙(개조식/경어체)과 이어지게 쓴다.
+      this.writerSetup = [
+        `문서 유형: ${picks[0]}`,
+        `용도: ${picks[1]}${picks[1] === '대외 제출용' ? ' (격식을 최대로)' : ''}`,
+        `분량: ${picks[2]}`,
+        `문체: ${picks[3]}${picks[3] === '일반 서술체' ? ' (개조식 규칙 대신 자연스러운 서술형)' : ''}`,
+      ].join(' / ');
+      card.remove();
+      this.pushMsg({ role: 'ai', text: `설정 확정 — ${this.writerSetup}` });
+      void this.sendWriter(text);
+    });
+    card.appendChild(go);
+    msgEl.appendChild(card);
+  }
+
   private async sendWriter(text: string): Promise<void> {
     if (this.services.wasm.pageCount === 0) {
       this.pushMsg({ role: 'ai', text: '문서가 열려 있지 않습니다. 새 문서를 먼저 열어 주세요.' });
+      return;
+    }
+    // 첫 요청이면 방향(유형·목적·분량·문체)을 먼저 확인한다 — 방향이 틀리면 전부 다시 쓴다.
+    if (!this.writerSetup) {
+      this.renderWriterSetup(text);
       return;
     }
     this.setBusy(true);
     const thinking = this.pushMsg({ role: 'ai', text: '목차를 설계하는 중…' });
     try {
       const result = await this.writer.runTurn(
-        this.services, text,
+        this.services, `[작성 방향] ${this.writerSetup}\n요청: ${text}`,
         // 섹션 본문이 길다 — 토큰을 넉넉히(부족하면 JSON 이 잘려 깨진다).
         (sys, user) => this.callModel(user, sys, 4096),
         (step) => { thinking.querySelector('.bubble')!.textContent = `작성 중 — ${step.name}: ${step.summary}`; },

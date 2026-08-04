@@ -1626,3 +1626,24 @@
   color: var(--color-primary, #2c5aa0);
   border-bottom-color: var(--color-primary, #2c5aa0);
 }
+
+
+/* AI 문서 작성 — 방향 설정 카드 (2026-08-05, 첫 요청에서 유형·목적·분량·문체 확인) */
+.canva-ai-setup { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.canva-ai-setup-label { font-size: 11px; opacity: 0.7; margin-top: 6px; }
+.canva-ai-setup-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.canva-ai-setup-chip {
+  height: 24px; padding: 0 9px; font: inherit; font-size: 11px; cursor: pointer;
+  border: 1px solid var(--ui-border, #d9d6d2); border-radius: 999px;
+  background: var(--ui-surface, #fff); color: inherit;
+}
+.canva-ai-setup-chip.is-on {
+  background: var(--color-primary-weak, #eef3fb); color: var(--color-primary, #2c5aa0);
+  border-color: var(--color-primary, #2c5aa0); font-weight: 600;
+}
+.canva-ai-setup-go {
+  margin-top: 10px; height: 32px; font: inherit; font-size: 12.5px; font-weight: 700;
+  border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--color-primary, #2c5aa0); color: #fff;
+}
+.canva-ai-setup-go:disabled { opacity: 0.5; cursor: default; }
