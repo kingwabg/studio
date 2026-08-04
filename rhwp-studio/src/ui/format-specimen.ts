@@ -34,7 +34,7 @@ function cssAlign(a: string | undefined): string {
  * 글자 서식 한 벌을 style 에 입힌다 — 견본 문단·구간 span·칩 글리프가 공유한다.
  * 흰 글자는 흰 카드 위에서 사라지므로 견본에서만 회색으로 대신 보여준다.
  */
-function applyCharStyle(st: CSSStyleDeclaration, p: CharProperties, sizePx?: string): void {
+export function applyCharStyle(st: CSSStyleDeclaration, p: CharProperties, sizePx?: string): void {
   st.fontWeight = p.bold ? '700' : '400';
   st.fontStyle = p.italic ? 'italic' : 'normal';
   const dec = [p.underline && 'underline', p.strikethrough && 'line-through']

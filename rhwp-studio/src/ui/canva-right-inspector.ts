@@ -22,6 +22,7 @@ import { openPolishPop } from './polish-pop';
 import { openTablePanel } from './canva-sidebars';
 import { insertFormatted } from './ai-doc-insert';
 import { TemplatePickerModal } from './template-picker-modal';
+import { applyCharStyle } from './format-specimen';
 import { showTemplateFlyout } from './template-flyout';
 import { openTemplateEditBar, closeTemplateEditBar } from './template-edit-bar';
 import { extractDocBody, saveTemplate, deleteTemplate, createTemplateId } from '@/media/template-store';
@@ -161,10 +162,18 @@ export class CanvaRightInspector {
     for (const t of TEXT_STYLES) {
       const b = mkButton(`canva-style-card canva-style--${t.id}`, { title: t.hint });
       b.textContent = t.label;
+      // [내 스타일 2026-08-04] 카드 우하단에 크기 뱃지 — 고르기 전 가늠(사용자 제안)
+      b.appendChild(mkEl('span', 'canva-style-badge', `${t.pt}pt`));
       b.addEventListener('mousedown', (e) => { e.preventDefault(); this.applyTextStyle(t); });
       styles.appendChild(b);
     }
     styleSec.appendChild(styles);
+
+    // [내 스타일 2026-08-04] 자주 쓰는 서식을 이름으로 저장해 카드로 재사용한다 —
+    // 카드가 그 서식 그대로 그려져(미리보기) 고르기 쉽고, 클릭 한 번으로 문단에 입힌다.
+    this.myStylesHost = mkEl('div', 'canva-mystyles');
+    styleSec.appendChild(this.myStylesHost);
+    this.renderMyStyles();
 
     // [2026-08-03 사용자 지시] 글자 탭의 「스타일 설정…」 제거 — 같은 진입점이 스타일 탭
     // 하단과 홈 리본에 이미 있어 세 겹이었다. 여기 프리셋 카드는 "빠른 적용"만 맡는다.
@@ -542,6 +551,89 @@ export class CanvaRightInspector {
    * 글자(크기·굵게)는 문단 범위 char 서식으로, 번호는 para 서식으로 — 모두 커맨드
    * 경로라 Ctrl+Z 한 번에 되돌아간다.
    */
+  private myStylesHost!: HTMLElement;
+
+  /** [내 스타일 2026-08-04] localStorage 보관 — 몇 개 안 되는 작은 JSON 이라 이걸로 충분 */
+  private loadMyStyles(): { id: string; name: string; props: CharProperties }[] {
+    try { return JSON.parse(localStorage.getItem('rhwpMyStyles') || '[]'); } catch { return []; }
+  }
+
+  private saveMyStyles(list: { id: string; name: string; props: CharProperties }[]): void {
+    localStorage.setItem('rhwpMyStyles', JSON.stringify(list));
+  }
+
+  private renderMyStyles(): void {
+    const host = this.myStylesHost;
+    host.textContent = '';
+    for (const st of this.loadMyStyles()) {
+      const card = mkButton('canva-style-card canva-mystyle-card', {
+        title: `${st.name} — 클릭해 문단에 적용`,
+      });
+      const label = mkEl('span', 'canva-mystyle-label', st.name);
+      applyCharStyle(label.style, st.props);
+      card.appendChild(label);
+      const del = mkEl('span', 'canva-mystyle-del', '×');
+      del.title = '삭제';
+      del.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.saveMyStyles(this.loadMyStyles().filter((x) => x.id !== st.id));
+        this.renderMyStyles();
+      });
+      card.appendChild(del);
+      card.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this.applyMyStyle(st.props);
+      });
+      host.appendChild(card);
+    }
+    // ＋ 지금 서식을 스타일로 — 누르면 인라인 이름 입력으로 바뀐다(⚠ prompt 금지)
+    const add = mkButton('canva-mystyle-add', { text: '＋ 지금 서식을 스타일로' });
+    add.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const row = mkEl('div', 'canva-mystyle-addrow');
+      const input = mkEl('input', 'canva-mystyle-input') as HTMLInputElement;
+      input.type = 'text';
+      input.placeholder = '스타일 이름';
+      const save = () => {
+        const name = input.value.trim();
+        const p = this.lastCharProps;
+        if (!name || !p) { this.renderMyStyles(); return; }
+        const props: CharProperties = {
+          fontSize: p.fontSize, bold: p.bold, italic: p.italic,
+          underline: p.underline, strikethrough: p.strikethrough,
+          textColor: p.textColor,
+        } as CharProperties;
+        const list = this.loadMyStyles();
+        list.push({ id: `ms-${list.length}-${name}`, name, props });
+        this.saveMyStyles(list);
+        this.renderMyStyles();
+      };
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+        if (ev.key === 'Escape') this.renderMyStyles();
+      });
+      input.addEventListener('blur', () => save());
+      row.appendChild(input);
+      add.replaceWith(row);
+      input.focus();
+    });
+    host.appendChild(add);
+  }
+
+  private applyMyStyle(props: CharProperties): void {
+    const ih = this.services.getInputHandler() as any;
+    if (!ih) return;
+    try {
+      const pos = ih.cursor.getPosition();
+      if (pos.parentParaIndex !== undefined) return;
+      const len = this.services.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex);
+      ih.applyCharPropsToRange({ ...pos, charOffset: 0 }, { ...pos, charOffset: len }, props);
+    } catch (err) {
+      console.warn('[inspector] 내 스타일 적용 실패:', err);
+    }
+  }
+
   private applyTextStyle(t: { pt: number; bold: boolean; level?: number }): void {
     const ih = this.services.getInputHandler() as any;
     if (!ih) return;
