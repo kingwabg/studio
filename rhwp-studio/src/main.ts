@@ -94,9 +94,49 @@ const autosaveManager = new AutosaveManager({
   onStatus: handleAutosaveStatus,
 });
 autosaveManager.connect(eventBus);
-// [독스 모델 2026-08-04] 나가기 직전 마지막 타이핑까지 초안에 밀어 넣는다 —
-// idle 10초를 기다리다 새로고침에 잘리는 유실 창을 닫는다.
-window.addEventListener('pagehide', () => { void autosaveManager.flushNow('pagehide'); });
+
+// [독스 모델 2026-08-04·v2] 나가기 직전 마지막 타이핑 보존.
+// flushNow(IndexedDB)는 pagehide 의 언로드에 비동기 체인이 잘려 못 미덥다(실측:
+// 새로고침 직전 2초 입력 유실). **동기 localStorage 백업**이 정본 — wasm 직렬화도
+// setItem 도 동기라 언로드가 못 자른다. 대용량(>4MB)은 IDB 초안에 맡긴다.
+const EMERGENCY_DRAFT_KEY = 'rhwpEmergencyDraft';
+function saveEmergencyDraftSync(): void {
+  try {
+    if (wasm.pageCount === 0) return;
+    const bytes = wasm.exportHwp();
+    if (bytes.byteLength === 0 || bytes.byteLength > 4_000_000) return;
+    let bin = '';
+    const CH = 0x8000;
+    for (let i = 0; i < bytes.length; i += CH) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + CH));
+    }
+    localStorage.setItem(EMERGENCY_DRAFT_KEY, JSON.stringify({
+      fileName: wasm.fileName,
+      sourceFormat: wasm.getSourceFormat(),
+      savedAt: Date.now(),
+      b64: btoa(bin),
+    }));
+  } catch { /* 백업 실패는 조용히 — IDB 초안이 뒤를 받친다 */ }
+}
+function readEmergencyDraft(): { fileName: string; sourceFormat: string; savedAt: number; data: Uint8Array } | null {
+  try {
+    const raw = localStorage.getItem(EMERGENCY_DRAFT_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw);
+    const bin = atob(j.b64);
+    const data = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+    return { fileName: j.fileName, sourceFormat: j.sourceFormat, savedAt: j.savedAt, data };
+  } catch { return null; }
+}
+window.addEventListener('pagehide', () => {
+  saveEmergencyDraftSync();
+  void autosaveManager.flushNow('pagehide');
+});
+// 탭 전환·최소화 시점엔 여유가 있어 IDB 초안도 미리 갱신해 둔다
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') void autosaveManager.flushNow('hidden');
+});
 initThemeSync((effective, mode) => {
   eventBus.emit('theme-changed', { mode, effective });
   eventBus.emit('command-state-changed');
@@ -1059,7 +1099,8 @@ async function offerAutosaveRecoveryIfIdle(): Promise<void> {
 
   try {
     const drafts = (await listAutosaveDrafts()).filter((draft) => draft.data.byteLength > 0);
-    if (drafts.length === 0) return;
+    const emergency = readEmergencyDraft();
+    if (drafts.length === 0 && !emergency) return;
     if (wasm.pageCount > 0 || documentState.isDirty()) return;
 
     // [복구 나침반 2026-08-03] 한/글처럼 **사고로 꺼졌을 때만** 묻는다.
@@ -1070,9 +1111,14 @@ async function offerAutosaveRecoveryIfIdle(): Promise<void> {
     // 강제새로고침마다 화면이 사라졌다(사용자 신고). crash 는 기존 대화상자 유지
     // (여러 후보 중 고르기).
     if (lastExit !== 'crash') {
-      const latest = [...drafts].sort((a, b) => b.savedAt - a.savedAt)[0];
+      const latestDraft = [...drafts].sort((a, b) => b.savedAt - a.savedAt)[0];
+      // 비상 백업(pagehide 동기 저장)이 더 새로우면 그쪽 — 마지막 타이핑까지 정확
+      const latest = emergency && (!latestDraft || emergency.savedAt > latestDraft.savedAt)
+        ? emergency
+        : latestDraft;
       try {
         await loadBytes(new Uint8Array(latest.data), latest.fileName, null);
+        localStorage.removeItem(EMERGENCY_DRAFT_KEY);
         documentState.markDirty('autosave-restored');
         // 복원 로드가 이전 초안을 지우므로 곧바로 다시 심는다 — 연속 새로고침 안전
         void autosaveManager.flushNow('restore-reseed');
