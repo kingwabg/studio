@@ -86,9 +86,10 @@ export class CaretRenderer {
     if (prev && prev.width > 0 && this.virtualScroll.getPageWidth(prev.pageIndex) > 0) {
       const pageOffset = this.virtualScroll.getPageOffset(prev.pageIndex);
       const pageLeft = this.calcPageLeft(prev.pageIndex);
-      // 엔진 rect 기준선 = y + 0.8·height — 밑줄은 기준선 바로 아래.
+      // 밑줄 앵커는 rect 바닥 — 기준선 추정(y+0.8·h)은 50pt에서 글자를 12px 관통했다.
+      // 실측(12pt·50pt 픽셀 계측): 한글 잉크 바닥 = 글자 rect 바닥 − 1px.
       this.caretEl.style.left = `${pageLeft + prev.x * zoom}px`;
-      this.caretEl.style.top = `${pageOffset + (prev.y + prev.height * 0.8) * zoom}px`;
+      this.caretEl.style.top = `${pageOffset + (prev.y + prev.height) * zoom}px`;
       this.caretEl.style.width = `${Math.max(2, prev.width * zoom)}px`;
       this.caretEl.style.height = '2px';
       return;
