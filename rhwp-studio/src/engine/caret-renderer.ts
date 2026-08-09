@@ -1,7 +1,7 @@
-import type { CursorRect, SelectionRect } from '@/core/types';
+import type { CursorRect } from '@/core/types';
 import { VirtualScroll } from '@/view/virtual-scroll';
 
-/** 하늘색 캐럿 — 공백/문단 시작은 세로 바, 글자 뒤는 그 글자 폭의 밑줄 (한컴 스타일). */
+/** 하늘색 캐럿 — 이동/클릭은 세로 바, 한글 조합 중에만 조합 글자 폭 밑줄 (한컴 정합). */
 const CARET_COLOR = '#87CEEB';
 
 /** Canvas 위에 깜박이는 캐럿을 렌더링한다 */
@@ -10,9 +10,6 @@ export class CaretRenderer {
   private blinkTimer: number | null = null;
   private visible = false;
   private currentRect: CursorRect | null = null;
-  /** 직전 글자의 화면 rect. null 이면 세로 캐럿 (문단 시작·공백·컨트롤 뒤·조회 실패). */
-  private prevCharProbe: (() => SelectionRect | null) | null = null;
-
   // IME 조합 중 여부 — 조합 글자는 엔진이 문서에 넣어 캔버스가 직접 그린다.
   // 캐럿 렌더러는 그 아래 밑줄(가로선)만 담당한다. 종전엔 블랙박스+흰 글자
   // 오버레이로 캔버스 글자를 덮었는데, 줌/스크롤에서 어긋나면 글자가 두 개
@@ -55,11 +52,6 @@ export class CaretRenderer {
     this.currentRect = null;
   }
 
-  /** 직전 글자 rect 공급자를 배선한다 (input-handler 가 커서 위치·wasm 으로 계산). */
-  setPrevCharProbe(probe: () => SelectionRect | null): void {
-    this.prevCharProbe = probe;
-  }
-
   /** 줌/스크롤 변경 시 위치를 갱신한다 */
   updatePosition(zoom: number): void {
     if (!this.currentRect) return;
@@ -75,21 +67,9 @@ export class CaretRenderer {
     if (this.isCompMode) return;
     this.caretEl.style.display = 'block';
 
-    // 글자 뒤 캐럿 = 그 글자 폭의 밑줄 (한컴 스타일). 직전 글자 rect 를 그대로 쓰므로
-    // 줄바꿈 직후에도 글자가 있는 줄에 정확히 붙는다. 실패·부재 시 세로 바.
-    const prev = this.prevCharProbe?.() ?? null;
-    if (prev && prev.width > 0 && this.virtualScroll.getPageWidth(prev.pageIndex) > 0) {
-      const pageOffset = this.virtualScroll.getPageOffset(prev.pageIndex);
-      const pageLeft = this.calcPageLeft(prev.pageIndex);
-      // 밑줄 앵커는 rect 바닥 — 기준선 추정(y+0.8·h)은 50pt에서 글자를 12px 관통했다.
-      // 실측(12pt·50pt 픽셀 계측): 한글 잉크 바닥 = 글자 rect 바닥 − 1px.
-      this.caretEl.style.left = `${pageLeft + prev.x * zoom}px`;
-      this.caretEl.style.top = `${pageOffset + (prev.y + prev.height) * zoom}px`;
-      this.caretEl.style.width = `${Math.max(2, prev.width * zoom)}px`;
-      this.caretEl.style.height = '2px';
-      return;
-    }
-
+    // 이동/클릭 캐럿은 항상 세로 바 — 한컴 실측(2026-08-10): 밑줄은 조합 중에만.
+    // 종전 "확정 글자 뒤 = 그 글자 폭 밑줄"은 공백 앞으로 이동하면 캐럿이 직전
+    // 글자 밑에 그려져, 공백을 건너뛰고 텍스트로 점프한 것처럼 보였다(사용자 신고).
     const { x, y, height } = this.clampCaretRect(this.currentRect, zoom);
     const pageOffset = this.virtualScroll.getPageOffset(pageIndex);
     const pageLeft = this.calcPageLeft(pageIndex);
