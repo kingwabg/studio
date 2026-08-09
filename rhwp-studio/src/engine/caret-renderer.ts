@@ -1,5 +1,8 @@
-import type { CursorRect } from '@/core/types';
+import type { CursorRect, SelectionRect } from '@/core/types';
 import { VirtualScroll } from '@/view/virtual-scroll';
+
+/** 하늘색 캐럿 — 공백/문단 시작은 세로 바, 글자 뒤는 그 글자 폭의 밑줄 (한컴 스타일). */
+const CARET_COLOR = '#87CEEB';
 
 /** Canvas 위에 깜박이는 캐럿을 렌더링한다 */
 export class CaretRenderer {
@@ -7,6 +10,8 @@ export class CaretRenderer {
   private blinkTimer: number | null = null;
   private visible = false;
   private currentRect: CursorRect | null = null;
+  /** 직전 글자의 화면 rect. null 이면 세로 캐럿 (문단 시작·공백·컨트롤 뒤·조회 실패). */
+  private prevCharProbe: (() => SelectionRect | null) | null = null;
 
   // IME 조합 오버레이
   private compEl: HTMLDivElement;
@@ -19,7 +24,7 @@ export class CaretRenderer {
     this.caretEl = document.createElement('div');
     this.caretEl.className = 'caret';
     this.caretEl.style.cssText =
-      'position:absolute;width:2px;background:#000;pointer-events:none;z-index:10;display:none;';
+      `position:absolute;width:2px;background:${CARET_COLOR};pointer-events:none;z-index:10;display:none;`;
 
     // IME 조합 오버레이 (블랙박스 + 흰색 글자)
     this.compEl = document.createElement('div');
@@ -57,6 +62,11 @@ export class CaretRenderer {
     this.currentRect = null;
   }
 
+  /** 직전 글자 rect 공급자를 배선한다 (input-handler 가 커서 위치·wasm 으로 계산). */
+  setPrevCharProbe(probe: () => SelectionRect | null): void {
+    this.prevCharProbe = probe;
+  }
+
   /** 줌/스크롤 변경 시 위치를 갱신한다 */
   updatePosition(zoom: number): void {
     if (!this.currentRect) return;
@@ -69,12 +79,28 @@ export class CaretRenderer {
       return;
     }
     this.caretEl.style.display = this.isCompMode ? 'none' : 'block';
+
+    // 글자 뒤 캐럿 = 그 글자 폭의 밑줄 (한컴 스타일). 직전 글자 rect 를 그대로 쓰므로
+    // 줄바꿈 직후에도 글자가 있는 줄에 정확히 붙는다. 실패·부재 시 세로 바.
+    const prev = this.isCompMode ? null : this.prevCharProbe?.() ?? null;
+    if (prev && prev.width > 0 && this.virtualScroll.getPageWidth(prev.pageIndex) > 0) {
+      const pageOffset = this.virtualScroll.getPageOffset(prev.pageIndex);
+      const pageLeft = this.calcPageLeft(prev.pageIndex);
+      // 엔진 rect 기준선 = y + 0.8·height — 밑줄은 기준선 바로 아래.
+      this.caretEl.style.left = `${pageLeft + prev.x * zoom}px`;
+      this.caretEl.style.top = `${pageOffset + (prev.y + prev.height * 0.8) * zoom}px`;
+      this.caretEl.style.width = `${Math.max(2, prev.width * zoom)}px`;
+      this.caretEl.style.height = '2px';
+      return;
+    }
+
     const { x, y, height } = this.clampCaretRect(this.currentRect, zoom);
     const pageOffset = this.virtualScroll.getPageOffset(pageIndex);
     const pageLeft = this.calcPageLeft(pageIndex);
 
     this.caretEl.style.left = `${pageLeft + x * zoom}px`;
     this.caretEl.style.top = `${pageOffset + y * zoom}px`;
+    this.caretEl.style.width = '2px';
     this.caretEl.style.height = `${height * zoom}px`;
   }
 

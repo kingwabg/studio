@@ -517,6 +517,7 @@ export class InputHandler {
   ) {
     this.cursor = new CursorState(wasm);
     this.caret = new CaretRenderer(container, virtualScroll);
+    this.caret.setPrevCharProbe(() => this.probePrevCharRectForCaret());
     this.fieldMarker = new FieldMarkerRenderer(container, virtualScroll);
     this.memoOverlay = new MemoOverlay(container, virtualScroll);
     this.ghostOverlay = new GhostOverlay(container, virtualScroll);
@@ -5269,6 +5270,53 @@ export class InputHandler {
   // 방향 결정(2026-08-04): 항상 잠김 / 패널 토글로 해제 / 캐럿 진입 시에만 자물쇠 표시.
 
   private lastCellLockToastAt = 0;
+
+  /**
+   * 밑줄 캐럿용 — 커서 직전 글자의 화면 rect. null 이면 세로 캐럿으로 그린다:
+   * 문단 시작·공백 뒤·인라인 컨트롤 뒤(표·수식은 글자가 아니다)·머리말/각주·중첩 표·조회 실패.
+   * 오프셋 좌표계: 커서 charOffset 은 논리, getSelectionRects 도 논리(renderSelection 선례),
+   * getTextRange 만 텍스트 좌표라 logicalToTextOffset 으로 변환해 직전 유닛의 글자 여부를 가른다.
+   */
+  private probePrevCharRectForCaret(): import('@/core/types').SelectionRect | null {
+    try {
+      if (this.cursor.isInHeaderFooter() || this.cursor.isInFootnote()) return null;
+      const pos = this.cursor.getPosition();
+      const off = pos.charOffset;
+      if (off <= 0) return null;
+      if (pos.cellPath && pos.cellPath.length > 1) return null; // 중첩 표 v1 미지원
+      const inCell =
+        pos.parentParaIndex !== undefined &&
+        pos.controlIndex !== undefined &&
+        pos.cellIndex !== undefined;
+
+      let rects: import('@/core/types').SelectionRect[];
+      if (inCell) {
+        const cellPara = pos.cellParaIndex ?? 0;
+        const ch = this.wasm.getTextInCell(
+          pos.sectionIndex, pos.parentParaIndex!, pos.controlIndex!, pos.cellIndex!,
+          cellPara, off - 1, 1,
+        );
+        if (!ch || ch.trim() === '') return null;
+        rects = this.wasm.getSelectionRectsInCell(
+          pos.sectionIndex, pos.parentParaIndex!, pos.controlIndex!, pos.cellIndex!,
+          cellPara, off - 1, cellPara, off,
+        );
+      } else {
+        const textOff = this.wasm.logicalToTextOffset(pos.sectionIndex, pos.paragraphIndex, off);
+        const textOffPrev = this.wasm.logicalToTextOffset(pos.sectionIndex, pos.paragraphIndex, off - 1);
+        if (textOff - textOffPrev !== 1) return null; // 직전 논리 유닛이 컨트롤
+        const ch = this.wasm.getTextRange(pos.sectionIndex, pos.paragraphIndex, textOffPrev, 1);
+        if (!ch || ch.trim() === '') return null;
+        rects = this.wasm.getSelectionRects(
+          pos.sectionIndex, pos.paragraphIndex, off - 1, pos.paragraphIndex, off,
+        );
+      }
+      const r = rects[rects.length - 1];
+      return r && r.width > 0 ? r : null;
+    } catch {
+      return null;
+    }
+  }
 
   /** 커서가 잠긴 셀 안이면 그 셀 좌표를 준다(아니면 null). 중첩 표는 바깥 표 기준(v1). */
   private cursorLockedCell(): { sec: number; ppi: number; ci: number; cellIdx: number } | null {
