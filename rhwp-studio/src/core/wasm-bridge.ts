@@ -643,6 +643,12 @@ export class WasmBridge {
     return this.doc.insertTextLogical(sec, para, logicalOffset, text);
   }
 
+  /** 논리 좌표 삭제 — insertTextLogical 의 짝 (IME preedit 교체용, TAC 문단 정합) */
+  deleteTextLogical(sec: number, para: number, logicalOffset: number, count: number): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return this.doc.deleteTextLogical(sec, para, logicalOffset, count);
+  }
+
   /** 논리 좌표 범위 삭제 — 걸친 인라인 표·그림도 함께 지운다(한컴 O8) */
   deleteRangeLogical(sec: number, startPara: number, startOffset: number, endPara: number, endOffset: number): string {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');

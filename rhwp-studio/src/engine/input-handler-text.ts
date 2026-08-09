@@ -719,8 +719,10 @@ export function insertTextAtRaw(this: any, pos: DocumentPosition, text: string):
       this.wasm.insertTextInCell(sec, ppi!, ci!, cei!, cpi!, charOffset, text);
     }
   } else {
+    // 커서 좌표는 논리(인라인 컨트롤=1칸) — TAC 표 문단에서 텍스트 좌표 API 에 넘기면
+    // 삽입/삭제가 한 칸 밀린다 (조합 자모 잔류 "ㄴ니" 실측, 2026-08-10).
     const { sectionIndex: sec, paragraphIndex: para, charOffset } = pos;
-    this.wasm.insertText(sec, para, charOffset, text);
+    this.wasm.insertTextLogical(sec, para, charOffset, text);
   }
 }
 
@@ -749,7 +751,8 @@ export function deleteTextAt(this: any, pos: DocumentPosition, count: number): v
     const { sectionIndex: sec, parentParaIndex: ppi, controlIndex: ci, cellIndex: cei, cellParaIndex: cpi, charOffset } = pos;
     this.wasm.deleteTextInCell(sec, ppi!, ci!, cei!, cpi!, charOffset, count);
   } else {
+    // 커서 좌표는 논리 — insertTextAtRaw 와 같은 이유로 논리 API 사용.
     const { sectionIndex: sec, paragraphIndex: para, charOffset } = pos;
-    this.wasm.deleteText(sec, para, charOffset, count);
+    this.wasm.deleteTextLogical(sec, para, charOffset, count);
   }
 }
