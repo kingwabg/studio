@@ -13,8 +13,11 @@ export class CaretRenderer {
   /** 직전 글자의 화면 rect. null 이면 세로 캐럿 (문단 시작·공백·컨트롤 뒤·조회 실패). */
   private prevCharProbe: (() => SelectionRect | null) | null = null;
 
-  // IME 조합 오버레이
-  private compEl: HTMLDivElement;
+  // IME 조합 중 여부 — 조합 글자는 엔진이 문서에 넣어 캔버스가 직접 그린다.
+  // 캐럿 렌더러는 그 아래 밑줄(가로선)만 담당한다. 종전엔 블랙박스+흰 글자
+  // 오버레이로 캔버스 글자를 덮었는데, 줌/스크롤에서 어긋나면 글자가 두 개
+  // 겹쳐 보였다(2026-08-10 사용자 신고 — 한컴 실측: 조합 글자 정상 표시 +
+  // 글리프 폭 밑줄만 깜빡임).
   private isCompMode = false;
 
   constructor(
@@ -26,24 +29,12 @@ export class CaretRenderer {
     this.caretEl.style.cssText =
       `position:absolute;width:2px;background:${CARET_COLOR};pointer-events:none;z-index:10;display:none;`;
 
-    // IME 조합 오버레이 — 글자는 본문처럼 검정으로 그대로 보이고, 깜빡임은 아래
-    // 밑줄 캐럿(가로선)만 한다. 종전 블랙박스+흰 글자 반전은 한컴 실측(2026-08-10,
-    // 조합 중 = 정상 글자 + 글리프 폭 밑줄 깜빡임)과 달라 검은 사각형이 깜빡이는
-    // 것처럼 보였다(사용자 신고).
-    this.compEl = document.createElement('div');
-    this.compEl.className = 'caret-composition';
-    this.compEl.style.cssText =
-      'position:absolute;background:transparent;color:#000;pointer-events:none;z-index:10;display:none;' +
-      'line-height:1;overflow:hidden;white-space:pre;text-align:left;box-sizing:border-box;';
-
     // scroll-content 안에 배치 (스크롤과 함께 이동)
     const scrollContent = container.querySelector('#scroll-content');
     if (scrollContent) {
       scrollContent.appendChild(this.caretEl);
-      scrollContent.appendChild(this.compEl);
     } else {
       container.appendChild(this.caretEl);
-      container.appendChild(this.compEl);
     }
   }
 
@@ -60,7 +51,6 @@ export class CaretRenderer {
   hide(): void {
     this.stopBlink();
     this.caretEl.style.display = 'none';
-    this.compEl.style.display = 'none';
     this.isCompMode = false;
     this.currentRect = null;
   }
@@ -139,8 +129,8 @@ export class CaretRenderer {
     }
   }
 
-  /** IME 조합 오버레이를 표시한다 — 글자 + 아래 밑줄 캐럿(가로선, 깜빡임) */
-  showComposition(startRect: CursorRect, charWidth: number, zoom: number, text: string, fontFamily: string): void {
+  /** IME 조합 밑줄 캐럿(가로선)을 표시한다 — 조합 글자 자체는 캔버스가 그린다. */
+  showComposition(startRect: CursorRect, charWidth: number, zoom: number): void {
     this.ensureAttached();
     this.isCompMode = true;
 
@@ -149,38 +139,20 @@ export class CaretRenderer {
     const pageOffset = this.virtualScroll.getPageOffset(pageIndex);
     const pageLeft = this.calcPageLeft(pageIndex);
 
-    const w = box.w * zoom;
-    const h = box.h * zoom;
-    const left = pageLeft + box.x * zoom;
-    const top = pageOffset + box.y * zoom;
-
-    this.compEl.style.left = `${left}px`;
-    this.compEl.style.top = `${top}px`;
-    this.compEl.style.width = `${w}px`;
-    this.compEl.style.height = `${h}px`;
-    this.compEl.style.fontSize = `${box.h * 0.85 * zoom}px`;
-    this.compEl.style.fontFamily = fontFamily || 'sans-serif';
-    this.compEl.style.lineHeight = `${h}px`;
-    this.compEl.textContent = text;
-    this.compEl.style.display = 'block';
-    this.compEl.style.opacity = '1';
-
-    // 조합 밑줄 캐럿: 조합 글자 폭 가로선을 상자 바닥 바로 아래에 — 깜빡임은 이 선만
+    // 조합 글자 폭 가로선을 글자 상자 바닥 바로 아래에 — 깜빡임은 이 선만
     // (한컴 실측: 조합 글자는 고정 표시, 밑줄이 캐럿 주기로 깜빡인다).
-    this.caretEl.style.left = `${left}px`;
-    this.caretEl.style.top = `${top + h + 1}px`;
-    this.caretEl.style.width = `${Math.max(2, w)}px`;
+    this.caretEl.style.left = `${pageLeft + box.x * zoom}px`;
+    this.caretEl.style.top = `${pageOffset + (box.y + box.h) * zoom + 1}px`;
+    this.caretEl.style.width = `${Math.max(2, box.w * zoom)}px`;
     this.caretEl.style.height = '2px';
     this.caretEl.style.display = 'block';
     this.visible = true;
     this.startBlink();
   }
 
-  /** IME 조합 오버레이를 숨기고 일반 캐럿으로 복귀한다 */
+  /** IME 조합 밑줄을 끝내고 일반 캐럿으로 복귀한다 */
   hideComposition(): void {
-    if (!this.isCompMode) return;
     this.isCompMode = false;
-    this.compEl.style.display = 'none';
   }
 
   /** 셀 bbox가 있는 캐럿은 DOM 선 폭까지 셀 안에 남도록 보정한다. */
@@ -199,7 +171,7 @@ export class CaretRenderer {
     };
   }
 
-  /** IME 조합창은 Canvas clip을 받지 않으므로 셀 가시 bbox로 별도 제한한다. */
+  /** 조합 밑줄은 Canvas clip을 받지 않으므로 셀 가시 bbox로 별도 제한한다. */
   private clampCompositionBox(
     rect: CursorRect,
     charWidth: number,
@@ -232,18 +204,14 @@ export class CaretRenderer {
 
   /** 캐럿 엘리먼트가 DOM에 없으면 재부착한다 (loadDocument 후 컨테이너 교체 대응) */
   private ensureAttached(): void {
+    if (this.caretEl.parentElement) return;
     const scrollContent = this.container.querySelector('#scroll-content');
-    if (this.caretEl.parentElement && this.compEl.parentElement) return;
-    if (scrollContent) {
-      if (!this.caretEl.parentElement) scrollContent.appendChild(this.caretEl);
-      if (!this.compEl.parentElement) scrollContent.appendChild(this.compEl);
-    }
+    if (scrollContent) scrollContent.appendChild(this.caretEl);
   }
 
   private startBlink(): void {
     this.stopBlink();
     this.visible = true;
-    // 조합 중에도 깜빡임은 캐럿(밑줄)만 — 조합 글자(compEl)는 고정 표시.
     this.caretEl.style.opacity = '1';
     this.blinkTimer = window.setInterval(() => {
       this.visible = !this.visible;
@@ -261,6 +229,5 @@ export class CaretRenderer {
   dispose(): void {
     this.stopBlink();
     this.caretEl.remove();
-    this.compEl.remove();
   }
 }

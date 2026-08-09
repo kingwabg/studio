@@ -2921,7 +2921,7 @@ export class InputHandler {
       const zoom = this.viewportManager.getZoom();
       const caretRect = this.adjustExitedFieldEndCaretRect(rect);
 
-      // IME 조합 중: 블랙박스 캐럿 표시
+      // IME 조합 중: 조합 글자 아래 밑줄 캐럿(가로선) — 글자는 캔버스가 그린다
       if (this.isComposing && this.compositionAnchor && this.compositionLength > 0) {
         try {
           const anchor = this.compositionAnchor;
@@ -2954,14 +2954,7 @@ export class InputHandler {
             );
           }
           const charWidth = rect.x - startRect.x;
-          const text = this.textarea.value || '';
-          // 현재 커서 위치의 글꼴 정보
-          let fontFamily = 'sans-serif';
-          try {
-            const props = this.getCharPropertiesAtCursor();
-            if (props.fontFamily) fontFamily = props.fontFamily;
-          } catch { /* fallback */ }
-          this.caret.showComposition(startRect, charWidth, zoom, text, fontFamily);
+          this.caret.showComposition(startRect, charWidth, zoom);
         } catch {
           // getCursorRect 실패 시 일반 캐럿
           this.caret.hideComposition();
