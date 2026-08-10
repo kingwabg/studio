@@ -146,8 +146,16 @@ export class TableResizeRenderer {
     }
 
     if (candidates.length === 0) return null;
-    candidates.sort((a, b) => a.distance - b.distance || a.priority - b.priority);
-    return candidates[0].edge;
+    // 표 **외곽** 경계(최상/최하/최좌/최우)는 리사이즈 대상에서 제외 — 외곽 근접
+    // 클릭이 그립에 먹혀 캐럿이 안 서고, 호버 리사이즈 커서도 소음이었다
+    // (2026-08-10 사용자 요청: 외곽은 끄고 내부 경계만 유지).
+    const inner = candidates.filter((c) => {
+      const last = c.edge.type === 'row' ? rowLines.length - 1 : colLines.length - 1;
+      return c.edge.index > 0 && c.edge.index < last;
+    });
+    if (inner.length === 0) return null;
+    inner.sort((a, b) => a.distance - b.distance || a.priority - b.priority);
+    return inner[0].edge;
   }
 
   /** 경계선 위에 마커(하이라이트 라인)를 표시한다 */

@@ -238,7 +238,6 @@ export class CanvasView {
     // 서브픽셀 리샘플되며 텍스트가 전면적으로 흐려졌다(실측 x물리 320.19px). 위치는
     // renderCanvas 와 viewport-resize 재스냅(snapCanvasLeft) 두 곳에서만 정한다.
     const pageLeft = this.virtualScroll.getPageLeft(pageIdx);
-    this.applySnappedLeft(canvas, pageLeft);
 
     // WASM이 Canvas 크기를 자동 설정한다 (물리 픽셀 = 페이지크기 × zoom × DPR)
     let renderResult = { needsTextEditStaticLayerVerification: false };
@@ -254,6 +253,9 @@ export class CanvasView {
     // CSS 표시 크기 = 물리 픽셀 / DPR (= 페이지크기 × zoom)
     canvas.style.width = `${canvas.width / dpr}px`;
     canvas.style.height = `${canvas.height / dpr}px`;
+    // left 스냅은 **폭 확정 뒤** — 풀에서 재사용된 캔버스의 직전 폭으로 중앙을 잡으면
+    // 새로 생긴 페이지가 옆으로 밀린 채 남았다(2026-08-10 신고: 2쪽째 오른쪽 밀림).
+    this.applySnappedLeft(canvas, pageLeft);
     this.renderGridOverlay(pageIdx, canvas);
     if (renderResult.needsTextEditStaticLayerVerification) {
       this.scheduleTextEditStaticLayerVerification(pageIdx);

@@ -1882,7 +1882,7 @@ export class InputHandler {
       return;
     }
 
-    const hit = this.hitTestFromClientPoint(this.dragLastClientX, this.dragLastClientY);
+    let hit = this.hitTestFromClientPoint(this.dragLastClientX, this.dragLastClientY);
     if (hit && hit.paragraphIndex < 0xFFFFFF00) {
       // [Issue #669] 셀 내부 드래그: anchor와 같은 셀 컨텍스트인 경우만 커서 이동.
       // 셀↔본문 혼합은 선택 렌더링 불가이므로 무시 (셀 내 선택 유지).
@@ -1896,9 +1896,49 @@ export class InputHandler {
         if (anchorInCell && !hitInSameCell) {
           return;
         }
+        // 본문 앵커 드래그가 표 셀 위를 지나면: 셀로 들어가지 않고 표를 한 글자로
+        // 취급해 표 좌/우 경계의 본문 위치로 클램프 — 한컴처럼 표가 통째로 선택
+        // 밴드에 잡힌다 (2026-08-10 신고: 표 위 드래그 시 선택이 사라짐).
+        if (!anchorInCell && hit.parentParaIndex !== undefined
+            && (hit.cellPath?.length ?? 0) <= 1) {
+          const clamped = this.clampCellHitToBodyTableEdge(hit);
+          if (!clamped) return; // 경계 재히트 실패 — 선택 유지
+          hit = clamped;
+        }
       }
-      this.cursor.moveTo(hit);
+      this.cursor.moveTo(hit!);
       this.updateCaretDuringDrag();
+    }
+  }
+
+  /** 셀 히트를 그 표(1-depth)의 좌/우 경계 본문 위치로 재해석한다 — 포인터가 표
+   *  중앙보다 왼쪽이면 표 앞, 오른쪽이면 표 뒤. 엔진 인라인 밴드 hitTest 를 재사용. */
+  private clampCellHitToBodyTableEdge(hit: any): any | null {
+    try {
+      const { sectionIndex: sec, parentParaIndex: ppi, controlIndex: ci } = hit;
+      const bboxes = this.wasm.getTableCellBboxes(sec, ppi, ci);
+      if (!bboxes?.length) return null;
+      const pageIndex = bboxes[0].pageIndex;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const b of bboxes) {
+        if (b.pageIndex !== pageIndex) continue;
+        minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x + b.w);
+        minY = Math.min(minY, b.y); maxY = Math.max(maxY, b.y + b.h);
+      }
+      // 포인터의 페이지 좌표
+      const scrollContent = this.container.querySelector('#scroll-content');
+      if (!scrollContent) return null;
+      const rect = scrollContent.getBoundingClientRect();
+      const zoom = this.viewportManager.getZoom();
+      const pageLeft = this.virtualScroll.getPageLeftResolved(pageIndex, scrollContent.clientWidth);
+      const pageX = (this.dragLastClientX - rect.left + scrollContent.scrollLeft - pageLeft) / zoom;
+      const outsideX = pageX < (minX + maxX) / 2 ? minX - 2 : maxX + 2;
+      const midY = (minY + maxY) / 2;
+      const h: any = this.wasm.hitTest(pageIndex, outsideX, midY);
+      if (h && h.paragraphIndex !== undefined && h.parentParaIndex === undefined) return h;
+      return null;
+    } catch {
+      return null;
     }
   }
 

@@ -358,9 +358,10 @@ export class SplitParagraphCommand implements EditCommand {
   constructor(private position: DocumentPosition) {}
 
   execute(wasm: WasmBridge): DocumentPosition {
-    const { sectionIndex: sec, paragraphIndex: para } = this.position;
-    // splitParagraph 는 텍스트 좌표 — 커서(논리)를 변환해 TAC 표 뒤 Enter 정합
-    const charOffset = bodyTextOffset(wasm, this.position);
+    const { sectionIndex: sec, paragraphIndex: para, charOffset } = this.position;
+    // splitParagraph 는 **논리** 좌표(엔진 split_at 이 내부에서 논리→텍스트 변환).
+    // 종전엔 여기서 텍스트 좌표로 미리 변환해 이중 변환 — TAC 표 문단에서 분할점이
+    // 한 칸 밀려 Enter 시 마지막 글자('?')가 새 문단으로 딸려 내려갔다(2026-08-10 신고).
     const result = JSON.parse(wasm.splitParagraph(sec, para, charOffset));
     if (result.ok) {
       return { sectionIndex: sec, paragraphIndex: result.paraIdx, charOffset: 0 };
@@ -390,10 +391,9 @@ export class MergeParagraphCommand implements EditCommand {
 
   execute(wasm: WasmBridge): DocumentPosition {
     const { sectionIndex: sec, paragraphIndex: para } = this.position;
-    // 병합 전 이전 문단 길이 기억 — undo 분할점은 텍스트 좌표, 병합 후 캐럿은
-    // 논리 좌표(이전 문단이 TAC 표로 끝나면 둘이 다르다)
-    this.mergePointOffset = wasm.getParagraphLength(sec, para - 1);
+    // 병합 전 이전 문단 논리 길이 기억 — splitParagraph(undo 분할점)도 캐럿도 논리 좌표.
     const caretOffset = wasm.getLogicalLength(sec, para - 1);
+    this.mergePointOffset = caretOffset;
     wasm.mergeParagraph(sec, para);
     return { sectionIndex: sec, paragraphIndex: para - 1, charOffset: caretOffset };
   }
