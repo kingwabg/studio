@@ -661,6 +661,12 @@ export class WasmBridge {
     return (this.doc as any).getInlineControlIndexAtLogical(sec, para, logicalOffset);
   }
 
+  /** 컨트롤 인덱스 → 논리 오프셋 (역방향). 인라인 컨트롤이 아니면 -1 */
+  getControlLogicalPosition(sec: number, para: number, controlIdx: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return (this.doc as any).getControlLogicalPosition(sec, para, controlIdx);
+  }
+
   getParagraphCount(sec: number): number {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return this.doc.getParagraphCount(sec);

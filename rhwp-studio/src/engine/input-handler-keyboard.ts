@@ -947,9 +947,13 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
     }
     // 수정자 키만 누른 경우 무시
     if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
-    // 그 외 키 → 표 객체 선택 해제 후 기본 키 처리
-    this.cursor.exitTableObjectSelection();
+    // 그 외 키(타이핑·Home/End 등) → 캐럿을 **표 밖(표 바로 뒤)**에 놓고 기본 처리.
+    // 종전 exitTableObjectSelection(셀 편집 복귀)은 캐럿이 셀 A1 에 남아 있어
+    // "표 뒤에 쓰려던 글자가 첫 셀로 들어가는" 함정이었다 (2026-08-11 실측:
+    // 한컴 웹은 개체 선택 상태 자체가 없고 타이핑은 항상 텍스트 캐럿 위치로 간다).
+    this.cursor.moveOutOfSelectedTable();
     this.eventBus.emit('table-object-selection-changed', false);
+    this.updateCaret();
     // fall through
   }
 

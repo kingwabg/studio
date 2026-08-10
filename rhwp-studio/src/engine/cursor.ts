@@ -1496,13 +1496,27 @@ export class CursorState {
         isTextBox: stillInTextBox ? true : undefined,
       };
     } else {
-      // 단일 표 객체 선택 → 표 밖으로 이동
-      const paraCount = this.wasm.getParagraphCount(sec);
-      if (ppi + 1 < paraCount) {
-        this.position = { sectionIndex: sec, paragraphIndex: ppi + 1, charOffset: 0 };
-      } else if (ppi > 0) {
-        const prevLen = this.wasm.getLogicalLength(sec, ppi - 1);
-        this.position = { sectionIndex: sec, paragraphIndex: ppi - 1, charOffset: prevLen };
+      // 단일 표 객체 선택 → 표 밖으로 이동.
+      // TAC(글자취급) 표는 앵커 문단 안의 한 글자다 — 캐럿은 **표 바로 뒤** 논리
+      // 오프셋으로 간다. 종전 다음-문단 점프는 문단 내 위치를 유실했고, 특히
+      // "그 외 키" 해제가 셀 편집 복귀로 떨어져 타이핑이 셀 A1 로 들어갔다.
+      const { ci } = this.selectedTableRef;
+      let placed = false;
+      try {
+        const pos = this.wasm.getControlLogicalPosition?.(sec, ppi, ci) ?? -1;
+        if (pos >= 0) {
+          this.position = { sectionIndex: sec, paragraphIndex: ppi, charOffset: pos + 1 };
+          placed = true;
+        }
+      } catch { /* 폴백으로 */ }
+      if (!placed) {
+        const paraCount = this.wasm.getParagraphCount(sec);
+        if (ppi + 1 < paraCount) {
+          this.position = { sectionIndex: sec, paragraphIndex: ppi + 1, charOffset: 0 };
+        } else if (ppi > 0) {
+          const prevLen = this.wasm.getLogicalLength(sec, ppi - 1);
+          this.position = { sectionIndex: sec, paragraphIndex: ppi - 1, charOffset: prevLen };
+        }
       }
     }
     this.exitTableObjectSelection();
