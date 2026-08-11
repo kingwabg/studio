@@ -244,19 +244,20 @@ export const tableCommands: CommandDef[] = [
           kind: 'snapshot',
           operationType: 'createTable',
           operation: (wasm) => {
-            const result = options
-              ? wasm.createTableEx({
-                  sectionIdx: pos.sectionIndex,
-                  paraIdx: pos.paragraphIndex,
-                  charOffset: pos.charOffset,
-                  rowCount: rows,
-                  colCount: cols,
-                  ...options,
-                })
-              : wasm.createTable(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, rows, cols);
+            // 그리드/대화상자 공용 단일 경로 — 레거시 createTable 분기는 기본값
+            // (테두리 0.12mm·여백)·TAC 세부를 놓쳐 "같은 UI, 다른 표"를 만들었다.
+            const result = wasm.createTableEx({
+              sectionIdx: pos.sectionIndex,
+              paraIdx: pos.paragraphIndex,
+              charOffset: pos.charOffset,
+              rowCount: rows,
+              colCount: cols,
+              ...(options ?? { treatAsChar: false }),
+            });
             if (result.ok) {
-              // [캔버스 한컴 포크] 새 표 기본 테두리를 진한 검은 실선으로(엔진 기본 0.12mm가 흐림)
-              wasm.applyDefaultTableBorders(pos.sectionIndex, result.paraIdx, result.controlIdx);
+              // 기본 테두리는 엔진 기본(0.12mm, 사용자 지정 2026-08-11)을 그대로 둔다.
+              // 종전 applyDefaultTableBorders(0.25mm 덮어쓰기)는 속성창이 0.25로 보이는
+              // 원인이었다 — 얇은 선의 흐림은 렌더러 헤어라인 바닥(1px)으로 해결.
               // [기본 배치] 가로 기준을 "종이"로 — 드래그가 용지 전체에서 자유로워진다
               // (사용자 지정 기본값 2026-07-27). 오프셋을 왼쪽 여백으로 줘 화면상 위치는
               // 지금과 동일(본문 왼쪽 시작). 세로는 문단 기준 유지(본문 흐름을 따라감).

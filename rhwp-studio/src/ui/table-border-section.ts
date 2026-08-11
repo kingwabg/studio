@@ -41,8 +41,8 @@ const PRESETS: Array<[Preset, [number, number, number, number], number]> = [
 /** 단일 셀에는 안쪽 선이 없다 — 셀 탭에서 끈다 */
 const INNER_ONLY: Preset[] = ['안쪽', '가로선', '세로선'];
 
-/** 스냅샷에 값이 없을 때의 기본선 — 엔진 새 표 기본(실선 0.1mm 검정) */
-const DEFAULT_LINE: BorderLineInfo = { type: 1, width: 0, color: '#000000' };
+/** 스냅샷에 값이 없을 때의 기본선 — 엔진 새 표 기본(실선 0.12mm 검정, 2026-08-11 사양) */
+const DEFAULT_LINE: BorderLineInfo = { type: 1, width: 1, color: '#000000' };
 
 /** 프리셋이 이 셀의 어느 변을 건드리는지 — 표 가장자리 여부로 안쪽/바깥을 가른다 */
 function edgesFor(preset: Preset, c: CellBbox, rows: number, cols: number): Edge[] {

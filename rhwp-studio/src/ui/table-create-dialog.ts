@@ -170,7 +170,11 @@ export class TableCreateDialog {
       const cols = this.hoverCol + 1;
       this.hide();
       if (this.onApply) {
-        this.onApply(rows, cols);
+        // 그리드 픽커도 상세 대화상자의 기본값과 **같은 옵션 객체**를 넘긴다 —
+        // 옵션 없이 넘기면 소비자가 레거시 createTable 경로로 갈라져 같은 UI 에서
+        // 만든 표가 서로 다른 물성(테두리·여백·앵커)을 갖던 결함 (2026-08-11 신고
+        // "두 개의 표가 다른 건가?").
+        this.onApply(rows, cols, { treatAsChar: false });
       }
     });
 

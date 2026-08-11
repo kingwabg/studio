@@ -147,6 +147,7 @@ export class CanvasKitLayerRenderer {
       canvas.save();
       canvas.clear(this.color(hasPageBackground ? 'rgba(0,0,0,0)' : '#ffffff'));
       canvas.scale(scale, scale);
+      this.pageScale = scale;
       const rightOverflowSlop =
         tree.outputOptions?.showParagraphMarks || tree.outputOptions?.showControlCodes ? 48 : undefined;
       for (const replayPlane of CANVASKIT_REPLAY_PLANES) {
@@ -380,8 +381,16 @@ export class CanvasKitLayerRenderer {
     });
   }
 
+  /** 마지막 renderPage 의 scale(zoom×dpr) — 헤어라인 바닥 계산용. */
+  private pageScale = 1;
+
   private renderLine(canvas: SkCanvas, op: LayerLineOp): void {
-    const paint = this.makeStrokePaint(op.style?.color ?? '#000000', op.style?.width ?? 1);
+    // [헤어라인 바닥] 0.12mm(0.5px) 급 얇은 테두리가 장치 픽셀 1개 미만이면 AA 로
+    // 회색·불균일하게 보인다(2026-07-28 신고). 한컴 화면 렌더처럼 최소 장치 1px 로
+    // 또렷하게 — 저장 데이터(0.12mm)는 건드리지 않는 표시 전용 바닥.
+    const w = op.style?.width ?? 1;
+    const floored = w * this.pageScale < 1 ? 1 / this.pageScale : w;
+    const paint = this.makeStrokePaint(op.style?.color ?? '#000000', floored);
     canvas.drawLine(op.x1, op.y1, op.x2, op.y2, paint);
     paint.delete?.();
   }
