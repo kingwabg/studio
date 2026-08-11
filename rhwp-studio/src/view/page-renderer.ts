@@ -61,7 +61,14 @@ export class PageRenderer {
   ): PageRenderResult {
     if (this.backend === 'canvaskit') {
       this.layerSummaryCache.delete(pageIdx);
-      this.renderPageCanvasKit(pageIdx, canvas, renderScale);
+      // 헤어라인 픽셀 스냅용 물리 스케일(zoom×실제 dpr) — 백킹(renderScale)은
+      // dpr 1 화면에서 2× 슈퍼샘플이라 백킹 격자에 맞춰도 물리 픽셀에선 번진다.
+      this.renderPageCanvasKit(
+        pageIdx,
+        canvas,
+        renderScale,
+        _displayScale * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
+      );
       return { needsTextEditStaticLayerVerification: false };
     }
 
@@ -109,6 +116,7 @@ export class PageRenderer {
     pageIdx: number,
     canvas: HTMLCanvasElement,
     renderScale: number,
+    physicalScale?: number,
   ): void {
     if (!this.canvaskitRenderer) {
       throw new Error('CanvasKit renderer가 초기화되지 않았습니다');
@@ -129,7 +137,7 @@ export class PageRenderer {
 
     const tree = this.wasm.getPageLayerTreeObject(pageIdx, this.renderProfile);
     try {
-      this.canvaskitRenderer.renderPage(tree, canvas, renderScale, pageInfo);
+      this.canvaskitRenderer.renderPage(tree, canvas, renderScale, pageInfo, physicalScale);
     } catch (error) {
       this.canvaskitRenderer.recordRenderFailure(error);
       console.error(`[PageRenderer] CanvasKit 페이지 렌더링 실패 (page=${pageIdx}):`, error);

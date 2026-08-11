@@ -122,7 +122,13 @@ export class CanvasKitLayerRenderer {
     return new CanvasKitLayerRenderer(canvasKit, renderMode, resolvedSurfaceRequest, defaultTypeface);
   }
 
-  renderPage(tree: PageLayerTree, targetCanvas: HTMLCanvasElement, scale: number, pageInfo?: PageInfo): void {
+  renderPage(
+    tree: PageLayerTree,
+    targetCanvas: HTMLCanvasElement,
+    scale: number,
+    pageInfo?: PageInfo,
+    physicalScale?: number,
+  ): void {
     if (this.disposed) {
       throw new Error('CanvasKit renderer가 이미 dispose되었습니다');
     }
@@ -148,6 +154,9 @@ export class CanvasKitLayerRenderer {
       canvas.clear(this.color(hasPageBackground ? 'rgba(0,0,0,0)' : '#ffffff'));
       canvas.scale(scale, scale);
       this.pageScale = scale;
+      // 헤어라인 스냅은 **물리 픽셀 격자** 기준 — dpr 1 화면은 백킹이 2× 슈퍼샘플이라
+      // 백킹 격자 스냅만으로는 CSS 절반 축소에서 다시 번진다.
+      this.snapScale = physicalScale && physicalScale > 0 ? physicalScale : scale;
       const rightOverflowSlop =
         tree.outputOptions?.showParagraphMarks || tree.outputOptions?.showControlCodes ? 48 : undefined;
       for (const replayPlane of CANVASKIT_REPLAY_PLANES) {
@@ -381,17 +390,32 @@ export class CanvasKitLayerRenderer {
     });
   }
 
-  /** 마지막 renderPage 의 scale(zoom×dpr) — 헤어라인 바닥 계산용. */
+  /** 마지막 renderPage 의 scale(zoom×백킹 dpr) — 헤어라인 바닥 계산용. */
   private pageScale = 1;
+  /** 물리 픽셀 스케일(zoom×실제 dpr) — 헤어라인 픽셀 스냅 격자. */
+  private snapScale = 1;
 
   private renderLine(canvas: SkCanvas, op: LayerLineOp): void {
-    // [헤어라인 바닥] 0.12mm(0.5px) 급 얇은 테두리가 장치 픽셀 1개 미만이면 AA 로
-    // 회색·불균일하게 보인다(2026-07-28 신고). 한컴 화면 렌더처럼 최소 장치 1px 로
-    // 또렷하게 — 저장 데이터(0.12mm)는 건드리지 않는 표시 전용 바닥.
+    // [헤어라인 크리스프] 0.12mm(0.5px) 급 얇은 테두리는 두 단계로 또렷하게 만든다
+    // (저장 데이터는 불변 — 표시 전용):
+    //  ① 폭 바닥: 장치 1px 미만이면 1px (2026-07-28 '회색' 신고)
+    //  ② 픽셀 스냅: 축 정렬 선의 중심을 장치 픽셀 격자(k+w/2)에 맞춘다 — 1px AA 선이
+    //     격자에 안 맞으면 두 픽셀로 번져 100% 줌에서 흐렸다(2026-08-11 신고,
+    //     170%에서야 진해 보이던 원인).
     const w = op.style?.width ?? 1;
-    const floored = w * this.pageScale < 1 ? 1 / this.pageScale : w;
-    const paint = this.makeStrokePaint(op.style?.color ?? '#000000', floored);
-    canvas.drawLine(op.x1, op.y1, op.x2, op.y2, paint);
+    const s = this.snapScale;
+    let x1 = op.x1, y1 = op.y1, x2 = op.x2, y2 = op.y2;
+    let drawW = w;
+    const dev = w * s;
+    if (dev < 1.5 && s > 0) {
+      const devW = Math.max(1, Math.round(dev));
+      drawW = devW / s;
+      const snap = (v: number) => (Math.floor(v * s) + (devW % 2) * 0.5) / s;
+      if (Math.abs(y1 - y2) < 1e-6) { y1 = y2 = snap(y1); }
+      else if (Math.abs(x1 - x2) < 1e-6) { x1 = x2 = snap(x1); }
+    }
+    const paint = this.makeStrokePaint(op.style?.color ?? '#000000', drawW);
+    canvas.drawLine(x1, y1, x2, y2, paint);
     paint.delete?.();
   }
 
