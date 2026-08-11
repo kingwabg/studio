@@ -154,8 +154,8 @@ export class CanvasKitLayerRenderer {
       canvas.clear(this.color(hasPageBackground ? 'rgba(0,0,0,0)' : '#ffffff'));
       canvas.scale(scale, scale);
       this.pageScale = scale;
-      // 헤어라인 스냅은 **물리 픽셀 격자** 기준 — dpr 1 화면은 백킹이 2× 슈퍼샘플이라
-      // 백킹 격자 스냅만으로는 CSS 절반 축소에서 다시 번진다.
+      // 헤어라인 스냅은 **CSS 픽셀 격자**(zoom) 기준 — 물리 격자는 레티나에서 절반
+      // 굵기(희미), 백킹 격자는 dpr 1 화면의 2× 슈퍼샘플 축소에서 번진다.
       this.snapScale = physicalScale && physicalScale > 0 ? physicalScale : scale;
       const rightOverflowSlop =
         tree.outputOptions?.showParagraphMarks || tree.outputOptions?.showControlCodes ? 48 : undefined;
@@ -392,7 +392,7 @@ export class CanvasKitLayerRenderer {
 
   /** 마지막 renderPage 의 scale(zoom×백킹 dpr) — 헤어라인 바닥 계산용. */
   private pageScale = 1;
-  /** 물리 픽셀 스케일(zoom×실제 dpr) — 헤어라인 픽셀 스냅 격자. */
+  /** CSS 픽셀 스케일(=zoom) — 헤어라인 픽셀 스냅 격자 (한컴 두께 정합). */
   private snapScale = 1;
 
   private renderLine(canvas: SkCanvas, op: LayerLineOp): void {

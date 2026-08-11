@@ -61,14 +61,10 @@ export class PageRenderer {
   ): PageRenderResult {
     if (this.backend === 'canvaskit') {
       this.layerSummaryCache.delete(pageIdx);
-      // 헤어라인 픽셀 스냅용 물리 스케일(zoom×실제 dpr) — 백킹(renderScale)은
-      // dpr 1 화면에서 2× 슈퍼샘플이라 백킹 격자에 맞춰도 물리 픽셀에선 번진다.
-      this.renderPageCanvasKit(
-        pageIdx,
-        canvas,
-        renderScale,
-        _displayScale * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
-      );
+      // 헤어라인 스냅용 CSS 픽셀 스케일(=zoom). 물리 px 격자로 스냅하면 레티나에서
+      // 1물리px(=CSS 0.5px) 선이 되어 한컴(1 CSS px)보다 절반 굵기로 여전히 희미하다
+      // (2026-08-11 재신고). CSS 격자 스냅 = dpr 무관 한컴 두께·또렷함.
+      this.renderPageCanvasKit(pageIdx, canvas, renderScale, _displayScale);
       return { needsTextEditStaticLayerVerification: false };
     }
 
