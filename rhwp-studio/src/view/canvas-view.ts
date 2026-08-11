@@ -242,6 +242,8 @@ export class CanvasView {
     // WASM이 Canvas 크기를 자동 설정한다 (물리 픽셀 = 페이지크기 × zoom × DPR)
     let renderResult = { needsTextEditStaticLayerVerification: false };
     try {
+      // canvas2d 경로 헤어라인 CSS 스냅 격자 — 엔진에 표시 줌 전달
+      this.wasm.setDisplayZoom?.(zoom);
       renderResult = this.pageRenderer.renderPage(pageIdx, canvas, renderScale, zoom, dpr, renderContext);
     } catch (e) {
       console.error(`[CanvasView] 페이지 ${pageIdx} 렌더링 실패:`, e);

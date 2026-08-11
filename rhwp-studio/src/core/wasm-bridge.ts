@@ -661,6 +661,12 @@ export class WasmBridge {
     return (this.doc as any).getInlineControlIndexAtLogical(sec, para, logicalOffset);
   }
 
+  /** 표시 줌(CSS 스케일) 전달 — canvas2d 헤어라인 스냅 격자 (구 wasm 에선 부재) */
+  setDisplayZoom(zoom: number): void {
+    if (!this.doc) return;
+    (this.doc as any).setDisplayZoom?.(zoom);
+  }
+
   /** 컨트롤 인덱스 → 논리 오프셋 (역방향). 인라인 컨트롤이 아니면 -1 */
   getControlLogicalPosition(sec: number, para: number, controlIdx: number): number {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
