@@ -1647,3 +1647,80 @@
   background: var(--color-primary, #2c5aa0); color: #fff;
 }
 .canva-ai-setup-go:disabled { opacity: 0.5; cursor: default; }
+
+
+/* 글자 탭 「기본」 — 라벨-값 40px 행 (2026-08-12, claude.ai/design 「Studio 인스펙터」)
+   값이 한눈에 읽히고 만질 것이 그 자리에 있는 형태. 색은 KRDS 팔레트. */
+.canva-rowsec-head {
+  display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px;
+  background: var(--ui-bg-light, #f4f5f6);
+  border-top: 1px solid var(--color-border, #e6e8ea);
+  border-bottom: 1px solid var(--color-border, #e6e8ea);
+  /* ⚠ 음수 마진 금지 — .canva-char-body 는 좌우 패딩이 0이라 패널 밖으로 14px씩 삐져나갔다(실측). */
+}
+.canva-rowsec-title { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .08em; opacity: .72; }
+.canva-rowsec-link {
+  margin-left: auto; border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 700; color: var(--color-primary, #256ef4);
+}
+.canva-row {
+  display: flex; align-items: center; height: 40px;
+  border-bottom: 1px solid var(--ui-bg-light, #f4f5f6);
+}
+.canva-row-label { font-size: 11.5px; font-weight: 600; opacity: .82; }
+.canva-row-value { margin-left: auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.canva-row-select {
+  max-width: 132px; height: 26px; padding: 0 4px; font: inherit; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--ui-border, #cdd1d5); border-radius: 6px;
+  background: var(--ui-surface, #fff); color: inherit;
+}
+/* 크기 스테퍼 */
+.canva-row-step { display: inline-flex; align-items: center; border: 1px solid var(--ui-border, #cdd1d5); border-radius: 6px; overflow: hidden; }
+.canva-row-stepbtn {
+  width: 26px; height: 26px; border: 0; cursor: pointer; font: inherit; font-size: 13px;
+  background: var(--ui-surface, #fff); color: inherit; opacity: .7;
+}
+.canva-row-stepbtn:hover { opacity: 1; background: var(--ui-hover, #f4f5f6); }
+.canva-row-stepinput {
+  width: 42px; height: 26px; text-align: center; font: inherit; font-size: 12.5px; font-weight: 600;
+  border: 0; border-left: 1px solid var(--ui-border, #cdd1d5); border-right: 1px solid var(--ui-border, #cdd1d5);
+  outline: none; background: var(--ui-surface, #fff); color: inherit;
+}
+/* 스타일 토글 3종 */
+.canva-row-btns { display: flex; align-items: center; gap: 4px; }
+.canva-row-style {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--ui-border, #cdd1d5); border-radius: 6px; cursor: pointer;
+  background: var(--ui-surface, #fff); color: inherit; font: inherit; font-size: 12px; font-weight: 700;
+}
+.canva-row-style.is-i { font-style: italic; }
+.canva-row-style.is-u { text-decoration: underline; }
+.canva-row-style.is-on {
+  background: var(--color-primary, #256ef4); border-color: var(--color-primary, #256ef4); color: #fff;
+}
+/* 색 */
+.canva-row-color { position: relative; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.canva-row-hex { font-size: 12.5px; font-weight: 600; }
+.canva-row-swatch {
+  width: 22px; height: 22px; flex: none; border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--ui-border, #cdd1d5);
+}
+.canva-row-swatch.is-on { box-shadow: 0 0 0 2px var(--color-primary, #256ef4); }
+.canva-row-swatch.is-none {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: auto; padding: 0 6px; border-style: dashed; background: transparent;
+  font-size: 10px; white-space: nowrap; opacity: .7;
+}
+/* 네이티브 색 입력은 스와치 위에 투명하게 겹친다 — 별도 팔레트를 새로 만들지 않는다 */
+.canva-row-colorinput { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+/* 토글 */
+.canva-row-toggle {
+  position: relative; width: 38px; height: 20px; border-radius: 10px; cursor: pointer;
+  background: var(--ui-border, #cdd1d5); transition: background-color .14s ease;
+}
+.canva-row-toggle.is-on { background: var(--color-primary, #256ef4); }
+.canva-row-knob {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; transition: left .14s ease;
+}
+.canva-row-toggle.is-on .canva-row-knob { left: 20px; }

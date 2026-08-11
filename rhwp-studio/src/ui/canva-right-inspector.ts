@@ -36,6 +36,7 @@ import { buildEmphasisSection } from './char-sections/emphasis-dot';
 import { buildLineDecorSection } from './char-sections/line-decor';
 import { buildCharShadeSection } from './char-sections/char-shade';
 import { buildRelativeSizeSection } from './char-sections/relative-size';
+import { buildCharShapeRows, buildFillRows, isParaWideApply } from './char-sections/basic-rows';
 
 type Ctx = 'none' | 'body' | 'cell' | 'table' | 'picture' | 'form';
 export type PanelTab = 'props' | 'text' | 'table' | 'cell';
@@ -696,6 +697,32 @@ export class CanvaRightInspector {
    * [2026-08-05 사용자 지시] 한 화면에 서식을 다 쌓으면 스크롤이 길어져 아래 것들을
    * 아무도 못 찾는다. 속성 = 사용자가 짚은 범위(밑줄·취소선 ~ 글자 음영) + 성격이 같은 상대 크기.
    */
+  /**
+   * 커서가 있는 문단 **전체**에 글자 서식을 건다(「문단 전체 적용」 스위치).
+   * 성공하면 true — 실패하면 호출부가 평소 경로(emit)로 되돌아간다.
+   */
+  private applyCharToParagraph(patch: Record<string, unknown>): boolean {
+    const ih = this.services.getInputHandler() as any;
+    if (!ih) return false;
+    /**
+     * ⚠ 직접 짠 executeOperation({kind:'snapshot'}) 는 쓰지 않는다 — 양식 모드가 snapshot 을
+     *   **던지지 않고 조용히 삼켜서**(input-handler.ts:3744) "적용했다"고 거짓 성공을 돌려준다
+     *   (2026-08-12 실측). 같은 파일의 applyMyStyle/applyTextStyle 이 이미 쓰는
+     *   applyCharPropsToRange 가 정본 경로다.
+     */
+    try {
+      const pos = ih.cursor.getPosition();
+      if (pos.parentParaIndex !== undefined) return false; // 셀 안은 문단 범위가 다르다 — 평소 경로로
+      const len = this.services.wasm.getParagraphLength(pos.sectionIndex, pos.paragraphIndex);
+      if (!len) return false;
+      ih.applyCharPropsToRange({ ...pos, charOffset: 0 }, { ...pos, charOffset: len }, patch);
+      return true;
+    } catch (err) {
+      console.warn('[inspector] 문단 전체 적용 실패:', err);
+      return false;
+    }
+  }
+
   private buildCharSections(): void {
     this.charStrip.innerHTML = '';
     this.charBody.innerHTML = '';
@@ -724,10 +751,18 @@ export class CanvaRightInspector {
       charProps: this.lastCharProps ?? null,
       getCharProps: () => this.lastCharProps ?? null,
       onCharChange: (fn) => { this.charSectionWatchers.push(fn); },
-      applyChar: (patch) => this.services.eventBus.emit('format-char', patch),
+      applyChar: (patch) => {
+        // 「문단 전체 적용」이 켜져 있으면 선택/대기서식 대신 **문단 전체**에 건다.
+        if (isParaWideApply() && this.applyCharToParagraph(patch)) return;
+        this.services.eventBus.emit('format-char', patch);
+      },
       redraw: () => this.buildCharSections(),
     };
     if (this.charSub === 'basic') {
+      // [2026-08-12 디자인 이식] 「글자 모양 / 채우기」 40px 행 목록이 기본 탭의 본체다.
+      //   같은 서식·강조점은 그 아래로 내린다 — 자주 쓰는 값이 위에 와야 한다.
+      buildCharShapeRows(this.charBody, charDeps);
+      buildFillRows(this.charBody, charDeps);
       buildSameFormatSection(this.charBody, charDeps);
       buildEmphasisSection(this.charBody, charDeps);
     } else {
