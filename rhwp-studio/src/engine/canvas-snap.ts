@@ -4,6 +4,8 @@
 // 좌표계: 페이지 로컬 px (getPageControlLayout·HWPUNIT/75 과 동일). Alt = 스냅 해제.
 // document-studio 캔버스(snap.ts)의 검증된 규약을 rhwp 구조로 재구현 — 로직 원본과 독립.
 
+import { applyTableGrabBorderStyle } from './table-object-renderer';
+
 export const SNAP_EPS_PX = 5;
 
 export type SnapGuide = { axis: 'x' | 'y'; pos: number };
@@ -305,13 +307,26 @@ export class TableHoverLayer {
   ): void {
     const layer = this.ensure();
     if (!layer) return;
+    // [2026-08-11] 표 hover 그림의 **소유자는 하나**다 — 핸들 hover 레이어가 이미
+    // 같은 표를 그리고 있으면 여기서 겹쳐 칠하지 않는다. 종전엔 두 레이어의 8% 채움이
+    // 포개져(≈15%) hover 가 선택보다 진했다(사용자 신고: 두 효과가 다르다).
+    const handleBorder = this.container.querySelector(
+      '.table-hover-handle-layer > div',
+    ) as HTMLElement | null;
+    if (handleBorder && handleBorder.style.display !== 'none') {
+      this.clear();
+      return;
+    }
     const el = (layer.firstElementChild as HTMLDivElement) ?? document.createElement('div');
-    el.style.cssText = 'position:absolute;box-sizing:border-box;pointer-events:none;' +
-      'border:2px solid var(--ui-menu-open,#256ef4);background:color-mix(in srgb, var(--ui-menu-open,#256ef4) 8%, transparent);';
-    el.style.left = `${ctx.pageLeft + (bbox.x - 1.5) * ctx.zoom}px`;
-    el.style.top = `${ctx.pageTop + (bbox.y - 1.5) * ctx.zoom}px`;
-    el.style.width = `${(bbox.width + 3) * ctx.zoom}px`;
-    el.style.height = `${(bbox.height + 3) * ctx.zoom}px`;
+    // 테두리·채움은 선택 상태와 같은 단일 진실(applyTableGrabBorderStyle)
+    applyTableGrabBorderStyle(
+      el,
+      ctx.pageLeft + bbox.x * ctx.zoom,
+      ctx.pageTop + bbox.y * ctx.zoom,
+      bbox.width * ctx.zoom,
+      bbox.height * ctx.zoom,
+      ctx.zoom,
+    );
     if (!el.parentElement) layer.appendChild(el);
   }
   clear(): void {
