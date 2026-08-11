@@ -31,7 +31,7 @@ function createObjectHandle(cx: number, cy: number, size: number, locked: boolea
 }
 
 /** 표 크기 조절 핸들 — 파란 사각형, 오른쪽아래 모서리는 파란 원 (사용자 색구분 결정) */
-function createTableResizeHandle(cx: number, cy: number, size: number, corner: boolean): HTMLDivElement {
+export function createTableResizeHandle(cx: number, cy: number, size: number, corner: boolean): HTMLDivElement {
   const half = size / 2;
   const el = document.createElement('div');
   el.style.cssText =
@@ -43,7 +43,7 @@ function createTableResizeHandle(cx: number, cy: number, size: number, corner: b
 }
 
 /** 크기 조절 불가 자리: 평소엔 투명, 호버하면 ⃠ 표시 + 금지 커서 (CSS .tbl-noresize-zone) */
-function createNoResizeHoverZone(cx: number, cy: number, size: number): HTMLDivElement {
+export function createNoResizeHoverZone(cx: number, cy: number, size: number): HTMLDivElement {
   const half = size / 2;
   const el = document.createElement('div');
   el.className = 'tbl-noresize-zone';
@@ -61,6 +61,40 @@ function createNoResizeHoverZone(cx: number, cy: number, size: number): HTMLDivE
   mark.appendChild(slash);
   el.appendChild(mark);
   return el;
+}
+
+/** 표 "잡힘" 핸들 기준 크기(px, 화면 고정) — 선택/hover 공용 */
+export const TABLE_GRAB_HANDLE_SIZE = 8;
+
+/** 잡힘 8핸들의 방향과 표 상자 기준 상대 위치(0~1) — 선택/hover 공용 */
+export const TABLE_GRAB_HANDLE_POS: Array<{ dir: HandleDirection; fx: number; fy: number }> = [
+  { dir: 'nw', fx: 0, fy: 0 }, { dir: 'n', fx: 0.5, fy: 0 }, { dir: 'ne', fx: 1, fy: 0 },
+  { dir: 'e', fx: 1, fy: 0.5 }, { dir: 'se', fx: 1, fy: 1 }, { dir: 's', fx: 0.5, fy: 1 },
+  { dir: 'sw', fx: 0, fy: 1 }, { dir: 'w', fx: 0, fy: 0.5 },
+];
+
+/**
+ * [단일 진실 2026-08-11] 표 "잡힘" 테두리 — 개체 선택 상태와 선택 전 hover 가
+ * **같은 그림**을 쓴다(사용자 지시). 종전엔 hover 가 1px 파란선 + 흰 사각 8개로
+ * 따로 그려져, 클릭해 선택하는 순간 그림이 통째로 바뀌었다.
+ */
+export function applyTableGrabBorderStyle(
+  el: HTMLElement, left: number, top: number, width: number, height: number, zoom: number,
+): void {
+  el.style.cssText =
+    `position:absolute;box-sizing:border-box;pointer-events:none;` +
+    `left:${left - 1.5 * zoom}px;top:${top - 1.5 * zoom}px;` +
+    `width:${width + 3 * zoom}px;height:${height + 3 * zoom}px;` +
+    `border:2px solid var(--ui-menu-open,#256ef4);` +
+    `background:color-mix(in srgb, var(--ui-menu-open,#256ef4) 8%, transparent);`;
+}
+
+/** 방향별 잡힘 핸들 — 조절 가능(e/s/se)은 파란 핸들(se 는 원), 나머지는 ⃠ 회색 원 */
+export function createTableGrabHandle(dir: HandleDirection, cx: number, cy: number): HTMLDivElement {
+  const resizable = dir === 'e' || dir === 's' || dir === 'se';
+  return resizable
+    ? createTableResizeHandle(cx, cy, TABLE_GRAB_HANDLE_SIZE + 2, dir === 'se')
+    : createNoResizeHoverZone(cx, cy, TABLE_GRAB_HANDLE_SIZE + 4);
 }
 
 function createSvgRoot(width: string, height: string): SVGSVGElement {
@@ -255,13 +289,8 @@ export class TableObjectRenderer {
       const border = document.createElement('div');
       if (wholeHighlight) {
         // [캔버스 한컴 포크] 표 개체 선택 = hover "전체 표 잡기" 강조와 동일하게(accent 채움+2px 테두리).
-        // "표가 잡혔다"를 hover 때와 같은 시각으로 상시 표시 — canvas-snap.ts TableHoverLayer와 스타일 일치.
-        border.style.cssText =
-          `position:absolute;box-sizing:border-box;pointer-events:none;` +
-          `left:${left - 1.5 * zoom}px;top:${top - 1.5 * zoom}px;` +
-          `width:${width + 3 * zoom}px;height:${height + 3 * zoom}px;` +
-          `border:2px solid var(--ui-menu-open,#256ef4);` +
-          `background:color-mix(in srgb, var(--ui-menu-open,#256ef4) 8%, transparent);`;
+        // 그림 자체는 applyTableGrabBorderStyle 단일 진실 — hover(TableHoverHandles)와 같은 함수.
+        applyTableGrabBorderStyle(border, left, top, width, height, zoom);
       } else {
         // 외곽선 — HWP 스타일 (검은색 실선)
         border.style.cssText =
@@ -278,8 +307,9 @@ export class TableObjectRenderer {
     const hs = TableObjectRenderer.HANDLE_SIZE;
     for (const bbox of bboxes) {
       const po = this.virtualScroll.getPageOffset(bbox.pageIndex);
-      const pdw = this.virtualScroll.getPageWidth(bbox.pageIndex);
-      const pl = (contentWidth - pdw) / 2;
+      // 테두리와 **같은** 중앙정렬 정본을 쓴다 — 종전 사본 `(contentWidth - pageWidth)/2`
+      // 는 그리드 모드에서 테두리와 핸들이 서로 다른 열에 그려졌다(위 H4 주석 경고분).
+      const pl = this.virtualScroll.getPageLeftResolved(bbox.pageIndex, contentWidth);
       const l = pl + bbox.x * zoom;
       const t = po + bbox.y * zoom;
       const w = bbox.width * zoom;
@@ -299,16 +329,10 @@ export class TableObjectRenderer {
       for (const pos of positions) {
         // [경계선 재설계 2026-08-04] 표 크기 조절은 오른쪽·아래·오른쪽아래만.
         // 색 구분(사용자 결정): 조절 가능 = 파란 핸들(모서리는 원), 불가 = 회색 ⃠ 상시 표시.
-        // 그림 쪽은 render() 경로라 영향 없다.
-        const resizable = pos.dir === 'e' || pos.dir === 's' || pos.dir === 'se';
-        let el: HTMLDivElement;
-        if (locked) {
-          el = createObjectHandle(pos.cx, pos.cy, hs, true);
-        } else if (resizable) {
-          el = createTableResizeHandle(pos.cx, pos.cy, hs + 2, pos.dir === 'se');
-        } else {
-          el = createNoResizeHoverZone(pos.cx, pos.cy, hs + 4);
-        }
+        // 그림 쪽은 render() 경로라 영향 없다. 핸들 그림은 createTableGrabHandle 단일 진실.
+        const el = locked
+          ? createObjectHandle(pos.cx, pos.cy, hs, true)
+          : createTableGrabHandle(pos.dir, pos.cx, pos.cy);
         this.layer.appendChild(el);
         this.handles.push({ dir: pos.dir, el, cx: pos.cx, cy: pos.cy });
       }
