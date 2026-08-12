@@ -389,6 +389,22 @@ export function startResizeDrag(this: any,
 ): void {
   if (!this.cachedTableRef || !this.cachedCellBboxes || !this.tableResizeRenderer) return;
 
+  // [스테일 캐시 수리 2026-08-12] hover 캐시는 키보드 리사이즈(F5 Ctrl/Alt/Shift) 등 마우스
+  // 밖 변경을 모른다 — 스테일 bbox 로 커밋하면 이웃/보존(freeze) renderHeight 가 옛값으로
+  // 나가 행이 무너지고, 힌트 합≠표 높이로 균등 폴백까지 발동한다(실측: Alt 이동 뒤 드래그
+  // → 전 행 27.8px 균등 붕괴). 드래그 시작은 드문 이벤트라 1회 재조회 비용은 성능 가드
+  // (일반 클릭 재조회 금지, resolveTableResizeHit)의 취지와 충돌하지 않는다.
+  try {
+    const fresh = this.wasm.getTableCellBboxes(
+      this.cachedTableRef.sec, this.cachedTableRef.ppi, this.cachedTableRef.ci);
+    if (Array.isArray(fresh) && fresh.length > 0) {
+      this.cachedCellBboxes = fresh;
+      const pi = pageBboxes[0]?.pageIndex ?? edge.pageIndex;
+      const freshPage = fresh.filter((b: CellBbox) => b.pageIndex === pi);
+      if (freshPage.length > 0) pageBboxes = freshPage;
+    }
+  } catch { /* 조회 실패면 기존 캐시로 진행 */ }
+
   // 경계선 원래 위치 계산
   const { rowLines, colLines } = this.tableResizeRenderer.computeBorderLines(pageBboxes);
   let borderOriginalPos: number;
@@ -765,6 +781,18 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       // ② 한 세그의 이웃이 최소높이면 전역 클램프가 0이 되어 전체가 무동작이었다
       // (2026-08-04 신고 "안 움직여지고 오른쪽이 길어져"). 세그별로 계산하면 어긋난 줄을
       // 드래그 한 번으로 다시 붙일 수 있고, 클램프도 세그별로만 걸린다.
+      // [유령 공간 수리 2026-08-12] 행 축소 한계 = max(절대 최소, 콘텐츠 글줄 바닥).
+      // 절대 최소(1276)만 쓰면 12pt 글줄 바닥(1484) 밑까지 줄어 — 격자(기록값)는 줄고
+      // 표 상자(측정 바닥)는 안 줄어 2.7px 유령 공간이 남았다. 한컴: 행은 글줄 밑으로 못 줄임.
+      let rowFloors: number[] | undefined;
+      if (state.edge.type === 'row') {
+        try {
+          rowFloors = this.wasm.getCellContentFloors(
+            state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci);
+        } catch { rowFloors = undefined; }
+      }
+      const effMinOf = (idx: number) =>
+        Math.max(minCellSizeHwp(state.edge.type), rowFloors?.[idx] ?? 0);
       const segs = pairBoxes.map((pair) => {
         const segBoundaryPx = state.edge.type === 'col'
           ? pair.targetBox.x + pair.targetBox.w
@@ -775,6 +803,8 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
           getCellDisplaySize(pair.targetBox, state.edge),
           pair.neighborBox ? getCellDisplaySize(pair.neighborBox, state.edge) : null,
           requested,
+          effMinOf(pair.targetCellIdx),
+          pair.neighborCellIdx !== null ? effMinOf(pair.neighborCellIdx) : undefined,
         );
         return { ...pair, segDelta: clamped };
       });
@@ -792,7 +822,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
           pair.targetCellIdx,
         );
         const targetDesiredSize = Math.max(
-          minCellSizeHwp(state.edge.type),
+          effMinOf(pair.targetCellIdx),
           getCellDisplaySize(pair.targetBox, state.edge) + pair.segDelta,
         );
         pushLocalResizeDisplayHint(
@@ -812,7 +842,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
             pair.neighborCellIdx,
           );
           const neighborDesiredSize = Math.max(
-            minCellSizeHwp(state.edge.type),
+            effMinOf(pair.neighborCellIdx),
             getCellDisplaySize(pair.neighborBox, state.edge) - pair.segDelta,
           );
           pushLocalResizeDisplayHint(
@@ -1313,7 +1343,9 @@ export function resizeCellBoundaryWhole(this: any, key: 'ArrowUp' | 'ArrowDown' 
   const step = (key === 'ArrowRight' || key === 'ArrowDown') ? KBD_RESIZE_STEP_HWP : -KBD_RESIZE_STEP_HWP;
   let bboxes: CellBbox[];
   try { bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci); } catch { return; }
-  const updates = buildKbdWholeUpdates(ctx, range, isHoriz, step, bboxes, this.wasm);
+  let floors: number[] | undefined;
+  if (!isHoriz) { try { floors = this.wasm.getCellContentFloors(ctx.sec, ctx.ppi, ctx.ci); } catch { floors = undefined; } }
+  const updates = buildKbdWholeUpdates(ctx, range, isHoriz, step, bboxes, this.wasm, floors);
   if (updates.length === 0) return;
   try {
     this.executeOperation({ kind: 'snapshot', operationType: 'resizeTableCells',
@@ -1333,7 +1365,9 @@ export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown'
   const requestedDelta = (key === 'ArrowRight' || key === 'ArrowDown') ? KBD_RESIZE_STEP_HWP : -KBD_RESIZE_STEP_HWP;
   let bboxes: CellBbox[];
   try { bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci); } catch { return; }
-  const updates = buildKbdSingleUpdates(ctx, range, isHoriz, requestedDelta, bboxes, this.wasm);
+  let floors: number[] | undefined;
+  if (!isHoriz) { try { floors = this.wasm.getCellContentFloors(ctx.sec, ctx.ppi, ctx.ci); } catch { floors = undefined; } }
+  const updates = buildKbdSingleUpdates(ctx, range, isHoriz, requestedDelta, bboxes, this.wasm, floors);
   if (updates.length === 0) return;
   try {
     this.executeOperation({ kind: 'snapshot', operationType: 'resizeTableCells',

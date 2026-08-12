@@ -882,6 +882,12 @@ export class WasmBridge {
     return JSON.parse(this.doc.getTableCellBboxes(sec, parentPara, controlIdx, pageHint ?? undefined));
   }
 
+  /** 셀별 행 축소 한계(HU) — 콘텐츠 글줄 범위+상하 패딩. 인덱스=cellIdx. (한컴: 행은 글줄 밑으로 못 줄임) */
+  getCellContentFloors(sec: number, parentPara: number, controlIdx: number): number[] {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse(this.doc.getCellContentFloors(sec, parentPara, controlIdx));
+  }
+
   getTableBBox(sec: number, parentPara: number, controlIdx: number): { pageIndex: number; x: number; y: number; width: number; height: number } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.getTableBBox(sec, parentPara, controlIdx));

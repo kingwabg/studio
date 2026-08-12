@@ -79,14 +79,15 @@ test('buildKbdWholeUpdates(Alt)는 정렬된 세 행 전부에 모델 widthDelta
   assert.ok(updates.every(u => u.localResize === undefined));
 });
 
-test('Alt 정렬 그룹: 어긋난 행은 빠지고, 흡착 복귀하면 다시 포함된다 (합성 버그 회귀 가드)', () => {
-  // row1 col1이 어긋남(폭 44 → 오른쪽 경계 84): 정렬 그룹에서 빠져야
+test('Alt 정렬 그룹은 논리 경계 기준 — 어긋난 세그먼트도 줄 전체가 함께 움직인다', () => {
+  // [2026-08-04 재설계 정본] 좌표(±1px) 필터는 어긋난 표에서 그룹을 한 셀로 무너뜨려 제거됐다.
+  // 한컴: 경계선은 줄 전체가 움직인다 — px 로 어긋난 세그먼트(row1 폭 44)도 그룹에 남는다.
+  // (이 테스트는 07-14 좌표 필터 시절 기대값으로 남아 있던 낡은 핀 — 2026-08-12 현행화)
   const misaligned = grid3x3({ 4: { w: 44 } });
   assert.deepEqual(
     findAlignedLogicalResizeAffectedCells(COL, { cellIdx: 1, side: 'end' }, misaligned).sort((a, b) => a - b),
-    [1, 7],
+    [1, 4, 7],
   );
-  // 흡착 복귀(폭 40 → 경계 80): 세 행 모두 다시 포함 → Alt가 통째로 움직인다
   assert.deepEqual(
     findAlignedLogicalResizeAffectedCells(COL, { cellIdx: 1, side: 'end' }, grid3x3()).sort((a, b) => a - b),
     [1, 4, 7],
@@ -108,4 +109,50 @@ test('clampSingleCellResizeDelta / clampCompensatedResizeDelta는 최소 크기(
   const wasm = mockWasm(cells, { 5: { width: MIN_COL_WIDTH_HWP + 100 } });
   assert.equal(clampSingleCellResizeDelta(wasm, ref, COL, 4, 5, 1000), 100);
   assert.equal(clampCompensatedResizeDelta(wasm, ref, COL, [{ targetCellIdx: 4, neighborCellIdx: 5 }], 1000), 100);
+});
+
+test('buildKbdWholeUpdates(Alt) 세로는 display+renderHeight 로 움직인다 — 모델 최소 무동작(F5 신고) 회귀 가드', () => {
+  const cells = grid3x3();
+  // 모델 높이 = 한컴 빈 셀 저장 규약(패딩만 284). 예전엔 모델 클램프(284-1276<0 → 0)로 항상 무동작.
+  const wasm = mockWasm(cells, Object.fromEntries([...Array(9).keys()].map(i => [i, { height: 284 }])));
+  const updates = buildKbdWholeUpdates(ref, sel(0, 0), false, STEP, cells, wasm);
+  assert.ok(updates.length > 0, 'Alt+세로가 무동작이면 안 된다(2026-08-12 신고)');
+  const byIdx = Object.fromEntries(updates.map(u => [u.cellIdx, u]));
+  const delta = (byIdx[0].renderHeight ?? 0) - 1500; // 표시 20px = 1500HU
+  assert.ok(delta > 0, '경계가 이동해야 한다');
+  for (const i of [0, 1, 2]) assert.equal(byIdx[i].renderHeight, 1500 + delta, '대상 행(0) 확대');
+  for (const i of [3, 4, 5]) assert.equal(byIdx[i].renderHeight, 1500 - delta, '반대편 행(1) 보상 축소');
+  for (const i of [6, 7, 8]) assert.equal(byIdx[i].renderHeight, 1500, '나머지 행 표시 보존');
+  // 표 높이 보존: renderHeight 합 = 원래 합
+  const sum = updates.reduce((a, u) => a + (u.renderHeight ?? 0), 0);
+  assert.equal(sum, 1500 * 9);
+});
+
+test('buildKbdWholeUpdates(Alt) 세로 축소 한계 = 콘텐츠 글줄 바닥(contentFloors) — 유령 공간 가드', () => {
+  const cells = grid3x3();
+  const wasm = mockWasm(cells);
+  const floors = Array(9).fill(1484); // 12pt 글줄 바닥
+  const updates = buildKbdWholeUpdates(ref, sel(0, 0), false, STEP, cells, wasm, floors);
+  const byIdx = Object.fromEntries(updates.map(u => [u.cellIdx, u]));
+  // 반대편(row1, 1500)은 1484 밑으로 못 줄어듦 → delta 는 16으로 클램프
+  assert.equal(byIdx[3].renderHeight, 1484, '보상측이 글줄 바닥에서 멈춰야 한다');
+  assert.equal(byIdx[0].renderHeight, 1516);
+});
+
+test('buildKbdWholeUpdates(Alt) 가로: 걸침(span) 반대편도 보상된다 — 표 폭 증가(어긋난 표) 회귀 가드', () => {
+  // col1 이 rows0-1 을 걸치는 병합 셀(cellIdx 1, rowSpan 2) — row1 의 col0(3) 이웃 페어 탐색은
+  // b.row===1 정확일치라 이 걸침 셀을 놓친다(구현 종전 결함). 보상 집합 방식이면 잡힌다.
+  const cells = grid3x3().filter(c => c.cellIdx !== 4);
+  const span = cells.find(c => c.cellIdx === 1)!;
+  Object.assign(span, { rowSpan: 2, h: 40 });
+  const wasm = mockWasm(cells);
+  const updates = buildKbdWholeUpdates(ref, sel(0, 0), true, STEP, cells, wasm);
+  const byIdx = Object.fromEntries(updates.map(u => [u.cellIdx, u.widthDelta]));
+  assert.equal(byIdx[0], STEP); assert.equal(byIdx[3], STEP); assert.equal(byIdx[6], STEP);
+  assert.equal(byIdx[1], -STEP, '걸침 반대편 셀 보상');
+  assert.equal(byIdx[7], -STEP);
+  // 표 폭 보존: 델타 합 = 0 이 아니라, 열폭(max) 기준 +d/−d 대칭이 성립해야 한다
+  const plus = updates.filter(u => (u.widthDelta ?? 0) > 0).length;
+  const minus = updates.filter(u => (u.widthDelta ?? 0) < 0).length;
+  assert.ok(plus > 0 && minus > 0);
 });

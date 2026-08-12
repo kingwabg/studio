@@ -111,18 +111,24 @@ export function clampSingleCellResizeDelta(
   }
 }
 
+// [유령 공간 수리 2026-08-12] targetMin/neighborMin: 셀별 축소 한계(기본 = 절대 최소).
+// 행은 콘텐츠 글줄 바닥(getCellContentFloors)을 넘겨야 한다 — 절대 최소(1276)가 글줄
+// 바닥(12pt=1484)보다 작아, 격자(기록값)는 줄고 표 상자(측정 바닥)는 안 줄어 2.7px
+// 유령 공간이 생겼다. 한컴: 행은 글줄 밑으로 줄어들지 않는다.
 export function clampSingleCellDisplayDelta(
   edge: BorderEdge,
   targetDisplaySize: number,
   neighborDisplaySize: number | null,
   requestedDelta: number,
+  targetMin: number = minCellSizeHwp(edge.type),
+  neighborMin: number = minCellSizeHwp(edge.type),
 ): number {
   if (neighborDisplaySize === null || requestedDelta === 0) return requestedDelta;
   if (requestedDelta > 0) {
-    const maxDelta = Math.max(0, Math.round(neighborDisplaySize - minCellSizeHwp(edge.type)));
+    const maxDelta = Math.max(0, Math.round(neighborDisplaySize - neighborMin));
     return Math.min(requestedDelta, maxDelta);
   }
-  const maxDelta = Math.max(0, Math.round(targetDisplaySize - minCellSizeHwp(edge.type)));
+  const maxDelta = Math.max(0, Math.round(targetDisplaySize - targetMin));
   return -Math.min(Math.abs(requestedDelta), maxDelta);
 }
 
@@ -256,6 +262,12 @@ export function snapKbdBoundaryDelta(edge: BorderEdge, targetBox: CellBbox, bbox
 // ── 빌더: 셀 선택 키보드 리사이즈 → resizeTableCells updates 배열 ──
 
 // Alt = 경계 좌표가 같은(정렬된) 셀들의 경계선을 통째 이동(이웃 보상, 표 크기 유지).
+// [2026-08-12 수리 2건] ① 보상 = 이웃 페어가 아니라 **경계 반대편(시작변이 경계) 셀 전체**
+// — 어긋난 표에서 걸침 이웃이 페어 탐색에 안 잡혀 보상이 빠지면 표 크기가 변한다(마우스
+// 모델 경로와 동일 수리). ② 세로(행)는 모델 높이(빈 셀=패딩만 284)를 클램프 기준으로 쓰면
+// 항상 delta=0 → F5 후 Alt+↑↓ 가 늘 무동작이었다("잘 안 된다" 신고). 마우스 드래그
+// (2026-07-14)와 동일하게 display 크기 + renderHeight 강제로 통일하고, 축소 한계는
+// max(절대 최소, 콘텐츠 글줄 바닥) — 한컴: 행은 글줄 밑으로 줄어들지 않는다.
 export function buildKbdWholeUpdates(
   ctx: TableRef,
   range: CellRange,
@@ -263,6 +275,7 @@ export function buildKbdWholeUpdates(
   step: number,
   bboxes: CellBbox[],
   wasm: CellPropsProvider,
+  contentFloors?: number[],
 ): KbdResizeUpdate[] {
   const edge: BorderEdge = { type: isHoriz ? 'col' : 'row', index: 0, pageIndex: 0 };
   const line = isHoriz ? range.endCol : range.endRow;
@@ -272,21 +285,74 @@ export function buildKbdWholeUpdates(
   if (!targetBox) return [];
   const alignedIdxs = findAlignedLogicalResizeAffectedCells(edge, { cellIdx: targetBox.cellIdx, side: 'end' }, bboxes);
   if (alignedIdxs.length === 0) return [];
-  const pairs = alignedIdxs.map(idx => {
-    const b = bboxes.find(x => x.cellIdx === idx) as CellBbox;
-    return { targetCellIdx: idx, neighborCellIdx: findResizeCompensationNeighbor(edge, b, bboxes) };
-  });
+  const boundaryLine = isHoriz ? targetBox.col + targetBox.colSpan : targetBox.row + targetBox.rowSpan;
+  const compIdxs: number[] = [...new Set<number>(
+    bboxes
+      .filter(b => (isHoriz ? b.col === boundaryLine : b.row === boundaryLine))
+      .map(b => b.cellIdx),
+  )];
   let delta = snapKbdBoundaryDelta(edge, targetBox, bboxes, step); // 흡착(어긋난 세그먼트 재정렬)
-  delta = clampCompensatedResizeDelta(wasm, ctx, edge, pairs, delta);
-  if (delta === 0) return [];
   const updates: KbdResizeUpdate[] = [];
-  const added = new Set<number>();
-  for (const p of pairs) {
-    updates.push(isHoriz ? { cellIdx: p.targetCellIdx, widthDelta: delta } : { cellIdx: p.targetCellIdx, heightDelta: delta });
-    if (p.neighborCellIdx !== null && !added.has(p.neighborCellIdx)) {
-      added.add(p.neighborCellIdx);
-      updates.push(isHoriz ? { cellIdx: p.neighborCellIdx, widthDelta: -delta } : { cellIdx: p.neighborCellIdx, heightDelta: -delta });
+  const aligned = new Set<number>(alignedIdxs);
+
+  if (isHoriz) {
+    const pairs = alignedIdxs.map(idx => {
+      const b = bboxes.find(x => x.cellIdx === idx) as CellBbox;
+      return { targetCellIdx: idx, neighborCellIdx: findResizeCompensationNeighbor(edge, b, bboxes) };
+    });
+    delta = clampCompensatedResizeDelta(wasm, ctx, edge, pairs, delta);
+    if (delta > 0 && compIdxs.length > 0) {
+      const limits: number[] = [];
+      for (const idx of compIdxs) {
+        try {
+          const size = wasm.getCellProperties(ctx.sec, ctx.ppi, ctx.ci, idx).width;
+          if (Number.isFinite(size)) limits.push(Math.max(0, Math.round(size - minCellSizeHwp('col'))));
+        } catch { /* 조회 실패 셀은 clamp 대상에서 제외 */ }
+      }
+      if (limits.length > 0) delta = Math.min(delta, Math.min(...limits));
     }
+    if (delta === 0) return [];
+    for (const idx of alignedIdxs) updates.push({ cellIdx: idx, widthDelta: delta });
+    for (const idx of compIdxs) {
+      if (!aligned.has(idx)) updates.push({ cellIdx: idx, widthDelta: -delta });
+    }
+    return updates;
+  }
+
+  // 세로(행): display 기반 — 마우스 드래그 display 경로와 같은 재료(renderHeight+heightDelta)
+  const dispOf = new Map<number, number>();
+  for (const b of bboxes) {
+    if (!dispOf.has(b.cellIdx)) dispOf.set(b.cellIdx, getCellDisplaySize(b, edge));
+  }
+  const effMin = (idx: number) => Math.max(minCellSizeHwp('row'), contentFloors?.[idx] ?? 0);
+  const shrinkSide = delta < 0 ? alignedIdxs : compIdxs;
+  const limits: number[] = [];
+  for (const idx of shrinkSide) {
+    const d = dispOf.get(idx);
+    if (d !== undefined) limits.push(Math.max(0, d - effMin(idx)));
+  }
+  if (limits.length > 0) {
+    const lim = Math.min(...limits);
+    delta = delta > 0 ? Math.min(delta, lim) : Math.max(delta, -lim);
+  }
+  if (delta === 0) return [];
+  const comp = new Set<number>(compIdxs);
+  const modelH = (idx: number): number => {
+    try { return wasm.getCellProperties(ctx.sec, ctx.ppi, ctx.ci, idx).height; } catch { return 0; }
+  };
+  for (const idx of alignedIdxs) {
+    const size = (dispOf.get(idx) ?? 0) + delta;
+    pushLocalResizeHeightHint(updates, idx, size, size - modelH(idx));
+  }
+  for (const idx of compIdxs) {
+    if (aligned.has(idx)) continue;
+    const size = (dispOf.get(idx) ?? 0) - delta;
+    pushLocalResizeHeightHint(updates, idx, size, size - modelH(idx));
+  }
+  // 나머지 셀은 현재 표시 높이 보존(freeze) — 드래그 display 경로와 동일
+  for (const b of bboxes) {
+    if (aligned.has(b.cellIdx) || comp.has(b.cellIdx)) continue;
+    pushLocalResizeHeightHint(updates, b.cellIdx, dispOf.get(b.cellIdx) ?? 0);
   }
   return updates;
 }
@@ -300,6 +366,7 @@ export function buildKbdSingleUpdates(
   requestedDelta: number,
   bboxes: CellBbox[],
   wasm: CellPropsProvider,
+  contentFloors?: number[],
 ): KbdResizeUpdate[] {
   const edge: BorderEdge = { type: isHoriz ? 'col' : 'row', index: 0, pageIndex: 0 };
   const line = isHoriz ? range.endCol : range.endRow;
@@ -331,13 +398,15 @@ export function buildKbdSingleUpdates(
       if (neighborIdx !== null) updates.push({ cellIdx: neighborIdx, widthDelta: -delta });
     } else {
       // 세로(행 높이)는 renderHeight(localResize)로 표시만 강제(단일 셀). 마우스 Shift+드래그와 동일.
+      // 축소 한계 = max(절대 최소, 콘텐츠 글줄 바닥) — 유령 공간 방지(2026-08-12).
+      const effMin = (idx: number) => Math.max(minCellSizeHwp('row'), contentFloors?.[idx] ?? 0);
       const neighborBox = neighborIdx === null ? null : bboxes.find(b => b.cellIdx === neighborIdx) ?? null;
       const targetDisplay = getCellDisplaySize(target, edge);
       const snapped = snapKbdBoundaryDelta(edge, target, bboxes, requestedDelta); // 흡착
-      let applied = Math.max(minCellSizeHwp(edge.type), targetDisplay + snapped) - targetDisplay;
+      let applied = Math.max(effMin(target.cellIdx), targetDisplay + snapped) - targetDisplay;
       if (neighborBox) {
         const nDisplay = getCellDisplaySize(neighborBox, edge);
-        applied = nDisplay - Math.max(minCellSizeHwp(edge.type), nDisplay - applied); // 이웃 최소 클램프
+        applied = nDisplay - Math.max(effMin(neighborBox.cellIdx), nDisplay - applied); // 이웃 최소 클램프
       }
       if (applied === 0) continue;
       const tFinal = targetDisplay + applied;
