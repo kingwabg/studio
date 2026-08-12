@@ -706,33 +706,58 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
     // 순수 model이라야 Alt(모델 통째)와 합성되므로(2026-07-14 fix) 이력 없으면 현행 model 유지.
     const useDisplayPath = hasLocalHistory || state.edge.type === 'row';
     if (!useDisplayPath) {
-      const delta = clampCompensatedResizeDelta(
+      // [어긋난 표 보상 수리 2026-08-12] 보상 상대는 '같은 행의 이웃 페어'가 아니라
+      // **경계선 반대편(시작변이 이 경계인) 셀 전체**다. 어긋낸 표에선 걸침(span)
+      // 이웃이 row 정확일치 페어 탐색에 안 잡혀 보상(−d)이 빠졌고, 열폭은 셀 max 로
+      // 유도되므로 빠진 행만큼 표 폭이 자랐다(실측 +20.8px). 대상 전체 +d /
+      // 반대편 전체 −d 면 표 폭이 항상 보존된다(규칙: 자기 축만·표 크기 불변).
+      const anchorBox = pairBoxes.find((p) => p.targetBox)?.targetBox ?? null;
+      const compIdxs: number[] = anchorBox
+        ? [...new Set<number>(
+            state.bboxes
+              .filter((b: CellBbox) => (state.edge.type === 'col'
+                ? b.col === anchorBox.col + anchorBox.colSpan
+                : b.row === anchorBox.row + anchorBox.rowSpan))
+              .map((b: CellBbox) => b.cellIdx),
+          )]
+        : [];
+      let delta = clampCompensatedResizeDelta(
         this.wasm,
         state.tableRef,
         state.edge,
         pairs,
         deltaHwpUnit,
       );
+      if (delta > 0 && compIdxs.length > 0) {
+        const limits: number[] = [];
+        for (const idx of compIdxs) {
+          try {
+            const props = this.wasm.getCellProperties(
+              state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci, idx);
+            const size = getCellModelSize(props, state.edge);
+            if (Number.isFinite(size)) {
+              limits.push(Math.max(0, Math.round(size - minCellSizeHwp(state.edge.type))));
+            }
+          } catch { /* 조회 실패 셀은 clamp 대상에서 제외 */ }
+        }
+        if (limits.length > 0) delta = Math.min(delta, Math.min(...limits));
+      }
       if (delta === 0) {
         this.cleanupResizeDrag();
         return;
       }
       updates = [];
-      const addedNeighbors = new Set<number>();
-      for (const pair of pairs) {
-        if (state.edge.type === 'col') {
-          updates.push({ cellIdx: pair.targetCellIdx, widthDelta: delta });
-          if (pair.neighborCellIdx !== null && !addedNeighbors.has(pair.neighborCellIdx)) {
-            updates.push({ cellIdx: pair.neighborCellIdx, widthDelta: -delta });
-            addedNeighbors.add(pair.neighborCellIdx);
-          }
-        } else {
-          updates.push({ cellIdx: pair.targetCellIdx, heightDelta: delta });
-          if (pair.neighborCellIdx !== null && !addedNeighbors.has(pair.neighborCellIdx)) {
-            updates.push({ cellIdx: pair.neighborCellIdx, heightDelta: -delta });
-            addedNeighbors.add(pair.neighborCellIdx);
-          }
-        }
+      const targetIdxs = new Set<number>(pairs.map((p) => p.targetCellIdx));
+      for (const idx of targetIdxs) {
+        updates.push(state.edge.type === 'col'
+          ? { cellIdx: idx, widthDelta: delta }
+          : { cellIdx: idx, heightDelta: delta });
+      }
+      for (const idx of compIdxs) {
+        if (targetIdxs.has(idx)) continue;
+        updates.push(state.edge.type === 'col'
+          ? { cellIdx: idx, widthDelta: -delta }
+          : { cellIdx: idx, heightDelta: -delta });
       }
     } else {
       // display 경로: 세그별 delta — 각 세그의 경계를 **같은 목표 위치(newPos)로 정렬**한다.
