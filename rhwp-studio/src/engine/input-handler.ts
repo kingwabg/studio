@@ -3777,11 +3777,16 @@ export class InputHandler {
   /** hover 핸들 호스트 API — 현재 배율 */
   getZoom(): number { return this.viewportManager.getZoom(); }
 
-  /** 표 hover 핸들을 지금 보여도 되는가 (캔버스 모드·개체 미선택·드래그/리사이즈 아님) */
+  /** 표 hover 핸들을 지금 보여도 되는가 (캔버스 모드·개체 미선택·셀 편집 아님·드래그/리사이즈 아님) */
   canShowTableHoverHandles(): boolean {
     return this.canvasMode
       && !this.cursor.isInTableObjectSelection()
       && !this.cursor.isInPictureObjectSelection()
+      // [2026-08-12 사용자 규칙] 셀에 들어가 텍스트 편집 중(셀 캐럿/셀 블록 선택)이면
+      // "전체 표 잡기" hover 는 뜨지 않는다 — 편집 중 표 위를 지날 때마다 파란
+      // 테두리·핸들이 덮여 방해됐다. 경계선 리사이즈 hover 는 별도 경로라 유지.
+      && !this.cursor.getCellTableContext?.()
+      && !this.cursor.isInCellSelectionMode()
       && !this.isMoveDragging
       && !this.isTableHandleResizing;
   }

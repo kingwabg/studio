@@ -2028,7 +2028,9 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
     const nearTable = findTableBBoxNear(this, pageIdx, pageX, pageY, zoneTol);
     if (nearTable) {
       const dir = handleZoneDir(nearTable, pageX, pageY, zoneTol);
-      if (dir) {
+      // [2026-08-12 사용자 규칙] 셀 편집 중(셀 캐럿/셀 블록 선택)엔 전체 표 잡기 hover 금지
+      const inCellEdit = !!this.cursor.getCellTableContext?.() || this.cursor.isInCellSelectionMode?.();
+      if (dir && !inCellEdit) {
         this.container.style.cursor = 'move'; // [캔버스 한컴 포크] 선택 전 = 잡기(move), 리사이즈 아님
         this.tableResizeRenderer.clear();
         tableHoverFor(this.container).show(nearTable, { zoom, pageLeft, pageTop: pageOffset });
@@ -2061,7 +2063,9 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
   try {
     const bbox = this.wasm.getTableBBox(tableRef.sec, tableRef.ppi, tableRef.ci);
     const dir = handleZoneDir(bbox, pageX, pageY, zoneTol);
-    if (dir) {
+    // [2026-08-12 사용자 규칙] 셀 편집 중엔 전체 표 잡기 hover 금지 (경계선 hover 는 아래에서 계속)
+    const inCellEditZone = !!this.cursor.getCellTableContext?.() || this.cursor.isInCellSelectionMode?.();
+    if (dir && !inCellEditZone) {
       this.container.style.cursor = 'move'; // [캔버스 한컴 포크] 선택 전 = 잡기(move), 리사이즈 아님
       this.tableResizeRenderer.clear();
       tableHoverFor(this.container).show(bbox, { zoom, pageLeft, pageTop: pageOffset });
