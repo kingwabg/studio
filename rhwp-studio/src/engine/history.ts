@@ -51,7 +51,15 @@ export class CommandHistory {
     const command = this.undoStack.pop();
     if (!command) return null;
 
-    const cursorAfter = command.undo(wasm);
+    let cursorAfter: DocumentPosition;
+    try {
+      cursorAfter = command.undo(wasm);
+    } catch (err) {
+      // [2026-08-13] 복원 실패(스냅샷 축출 등)면 명령을 스택에 되돌린다 — 종전엔
+      // pop 만 되고 redo 에도 안 들어가 되돌리기 항목이 통째로 사라졌다.
+      this.undoStack.push(command);
+      throw err;
+    }
     this.redoStack.push(command);
     return cursorAfter;
   }

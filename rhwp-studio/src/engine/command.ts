@@ -1176,7 +1176,18 @@ export class SnapshotCommand implements EditCommand {
     // 최초 실행: before 저장 → 작업 수행 → after 저장
     this.beforeId = wasm.saveSnapshot();
     if (this.operation) {
-      this.cursorAfter = this.operation(wasm);
+      try {
+        this.cursorAfter = this.operation(wasm);
+      } catch (err) {
+        // [스냅샷 누수 수리 2026-08-13] 엔진 가드가 거부하면(어긋내기 한계 등) 종전엔
+        // before 스냅샷이 그대로 남았다. 엔진 스냅샷 저장소는 100개 상한이라 거부가
+        // 쌓이면 **진짜 undo 스냅샷이 조용히 축출**되고, 그 뒤 ⌘Z 가 '스냅샷 없음'으로
+        // 실패하며 되돌리기 항목이 영구 소실됐다(신고 ① "되돌리기가 안 됨"의 한 갈래).
+        try { wasm.discardSnapshot(this.beforeId); } catch { /* 이미 정리됨 */ }
+        this.beforeId = null;
+        this.operation = null;
+        throw err;
+      }
     }
     this.afterId = wasm.saveSnapshot();
 

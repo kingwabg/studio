@@ -66,9 +66,25 @@ export class TableResizeRenderer {
       colXs.add(ry(b.x + b.w));
     }
 
-    // 정렬하여 인덱스 부여
-    const sortedRowYs = [...rowYs].sort((a, b) => a - b);
-    const sortedColXs = [...colXs].sort((a, b) => a - b);
+    // 정렬하여 인덱스 부여.
+    // [근사 중복 병합 2026-08-13] 같은 논리 경계가 셀 bbox 부동소수 오차(x+w vs 이웃 x,
+    // ~0.03px)로 0.1px 반올림을 넘어 두 항목(예: 340.6/340.7)이 되면 — 어긋난 표에서 실측 —
+    // 선 인덱스가 한 칸 밀려 리사이즈 클램프 창이 뒤집힌다(min>orig → 왼쪽으로 끌어도
+    // 오른쪽으로 점프, 2026-08-13 신고 ①). 0.5px 미만 간격은 한 선으로 흡수한다(실제
+    // 인접 경계 최소 간격은 최소 셀 폭 ≫ 0.5px 라 안전).
+    const mergeNear = (vals: number[]): number[] => {
+      const out: number[] = [];
+      for (const v of vals) {
+        if (out.length > 0 && Math.abs(v - out[out.length - 1]) < 0.5) {
+          out[out.length - 1] = (out[out.length - 1] + v) / 2;
+        } else {
+          out.push(v);
+        }
+      }
+      return out;
+    };
+    const sortedRowYs = mergeNear([...rowYs].sort((a, b) => a - b));
+    const sortedColXs = mergeNear([...colXs].sort((a, b) => a - b));
 
     const rowLines: RowLine[] = sortedRowYs.map((y, i) => ({
       y, xStart: minX, xEnd: maxX, index: i,

@@ -462,7 +462,26 @@ export function startResizeDrag(this: any,
   // [경계선 재설계 2026-08-04] 일반 드래그 = 항상 줄 전체·표 크기 불변.
   // Shift+드래그 = 한 칸 어긋내기 — 엔진 격자 재구성(offsetCellBoundary) 정본.
   // 렌더 흉내(segment 기억·renderHint 로컬)는 봉쇄 유지.
-  const shouldResizeSingleCell = shiftResize;
+  // [어긋난 세그 일반 드래그 2026-08-13] Shift 없이 **이미 어긋난** 경계선을 잡으면 그
+  // 선은 애초에 그 칸만의 선이다 — 종전엔 일반 경로(resizeTableCells 폭 이전)로 커밋해
+  // 격자는 어긋난 채 크기만 변했고, 제자리로 끌어다 놔도 정렬이 복원되지 않아 "꼭
+  // Shift 를 눌러야만 돌아간다"는 신고(①)가 됐다. 어긋난 선은 어긋내기 축으로 취급해
+  // 엔진 재이동(offsetCellBoundary)에 맡긴다 — 정렬선에 닿으면 엔진이 복원으로 승격해
+  // 격자가 접힌다. 승격을 **드래그 시작 시점**에 하는 게 핵심: 이동 한계(bounds)도 단일
+  // 셀 기준으로 잡혀야 원래 정렬선까지 끌 수 있다(줄 기준이면 정렬선이 곧 하한이 되어
+  // 18.9px 앞에서 막혔다 — 실측 318.7 고착). 정렬된 선은 종전대로 줄 전체 이동(규칙 1).
+  const isMisalignedSegment = (() => {
+    const tb = this.cachedCellBboxes.find((b: CellBbox) => b.cellIdx === resizeTarget.cellIdx);
+    if (!tb) return false;
+    const isCol = edge.type === 'col';
+    const line = resizeTarget.side === 'end'
+      ? (isCol ? tb.col + tb.colSpan : tb.row + tb.rowSpan)
+      : (isCol ? tb.col : tb.row);
+    return !this.cachedCellBboxes.some((b: CellBbox) => (isCol
+      ? b.row !== tb.row && (b.col === line || b.col + b.colSpan === line)
+      : b.col !== tb.col && (b.row === line || b.row + b.rowSpan === line)));
+  })();
+  const shouldResizeSingleCell = shiftResize || isMisalignedSegment;
   const singleCellTarget = shouldResizeSingleCell ? resizeTarget : null;
   const logicalAffectedCellIndices = !shouldResizeSingleCell
     ? findAlignedLogicalResizeAffectedCells(edge, resizeTarget, this.cachedCellBboxes)
