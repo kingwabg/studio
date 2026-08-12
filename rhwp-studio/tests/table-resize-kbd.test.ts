@@ -3,9 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildKbdWholeUpdates,
-  buildKbdSingleUpdates,
   snapKbdBoundaryDelta,
-  clampSingleCellResizeDelta,
   clampCompensatedResizeDelta,
   findAlignedLogicalResizeAffectedCells,
   MIN_COL_WIDTH_HWP,
@@ -48,28 +46,6 @@ function mockWasm(cells: CellBbox[], modelOverrides: Record<number, Partial<{ wi
 
 const sel = (r: number, c: number): CellRange => ({ startRow: r, startCol: c, endRow: r, endCol: c });
 
-test('buildKbdSingleUpdates 가로(Shift)는 순수 모델 widthDelta만 낸다 — localResize 자국 없음(Alt와 합성의 핵심)', () => {
-  const cells = grid3x3();
-  const updates = buildKbdSingleUpdates(ref, sel(1, 1), true, STEP, cells, mockWasm(cells));
-  assert.deepEqual(updates, [
-    { cellIdx: 4, widthDelta: STEP },
-    { cellIdx: 5, widthDelta: -STEP },
-  ]);
-  // 회귀 가드: render override가 붙으면(예전 버그) 이후 Alt가 이 셀을 못 움직인다
-  assert.ok(updates.every(u => u.localResize === undefined && u.renderWidth === undefined));
-});
-
-test('buildKbdSingleUpdates 세로(Shift)는 localResize renderHeight를 쓴다 — 모델 행높이 자동확장 회피', () => {
-  const cells = grid3x3();
-  const updates = buildKbdSingleUpdates(ref, sel(1, 1), false, STEP, cells, mockWasm(cells));
-  const target = updates.find(u => u.cellIdx === 4);
-  assert.ok(target, 'target 셀 업데이트 존재');
-  assert.equal(target!.localResize, true);
-  assert.equal(typeof target!.renderHeight, 'number');
-  // 모델 높이 델타(heightDelta 비0)로 처리하면 안 된다
-  assert.ok(updates.every(u => u.heightDelta === undefined || u.heightDelta === 0));
-});
-
 test('buildKbdWholeUpdates(Alt)는 정렬된 세 행 전부에 모델 widthDelta + 이웃 보상을 낸다', () => {
   const cells = grid3x3();
   const updates = buildKbdWholeUpdates(ref, sel(0, 1), true, STEP, cells, mockWasm(cells));
@@ -103,11 +79,10 @@ test('snapKbdBoundaryDelta는 가까운 어긋난 경계로 흡착하고, 이미
   assert.equal(snapKbdBoundaryDelta(COL, target, grid3x3(), STEP), STEP);
 });
 
-test('clampSingleCellResizeDelta / clampCompensatedResizeDelta는 최소 크기(이웃)를 지킨다', () => {
+test('clampCompensatedResizeDelta는 최소 크기(이웃)를 지킨다', () => {
   const cells = grid3x3();
   // 이웃 col2를 최소+100으로 → 100까지만 줄일 수 있음
   const wasm = mockWasm(cells, { 5: { width: MIN_COL_WIDTH_HWP + 100 } });
-  assert.equal(clampSingleCellResizeDelta(wasm, ref, COL, 4, 5, 1000), 100);
   assert.equal(clampCompensatedResizeDelta(wasm, ref, COL, [{ targetCellIdx: 4, neighborCellIdx: 5 }], 1000), 100);
 });
 
@@ -147,12 +122,9 @@ test('바깥 테두리(마지막 행/열 끝 경계)는 키보드로도 이동 �
   assert.deepEqual(buildKbdWholeUpdates(ref, sel(2, 0), false, -STEP, cells, wasm), []);
   // 마지막 열(2) 선택 Alt+→: 오른쪽 경계 = 바깥 테두리 → 무동작
   assert.deepEqual(buildKbdWholeUpdates(ref, sel(0, 2), true, STEP, cells, mockWasm(cells)), []);
-  // Shift(단일)도 동일
-  assert.deepEqual(buildKbdSingleUpdates(ref, sel(2, 1), false, STEP, cells, wasm), []);
-  assert.deepEqual(buildKbdSingleUpdates(ref, sel(1, 2), true, STEP, cells, mockWasm(cells)), []);
-  // 안쪽 경계는 계속 동작(가드가 과잉 차단하지 않는다)
+  // 안쪽 경계는 계속 동작(가드가 과잉 차단하지 않는다). Shift(단일)의 바깥 가드는
+  // resizeCellBoundarySingle(엔진 offsetCellBoundary 경로) 안에 있다 — headless 로 검증.
   assert.ok(buildKbdWholeUpdates(ref, sel(0, 0), false, STEP, cells, wasm).length > 0);
-  assert.ok(buildKbdSingleUpdates(ref, sel(0, 1), true, STEP, cells, mockWasm(cells)).length > 0);
 });
 
 test('buildKbdWholeUpdates(Alt) 가로: 걸침(span) 반대편도 보상된다 — 표 폭 증가(어긋난 표) 회귀 가드', () => {

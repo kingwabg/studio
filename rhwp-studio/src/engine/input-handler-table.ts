@@ -17,9 +17,9 @@ import {
   MIN_ROW_HEIGHT_HWP, MIN_COL_WIDTH_HWP, minCellSizeHwp, KBD_RESIZE_STEP_HWP,
   findAlignedLogicalResizeAffectedCells, findResizeCompensationNeighbor,
   getCellModelSize, getCellDisplaySize,
-  clampSingleCellResizeDelta, clampSingleCellDisplayDelta, clampCompensatedResizeDelta, clampCompensatedDisplayDelta,
+  clampSingleCellDisplayDelta, clampCompensatedResizeDelta, clampCompensatedDisplayDelta,
   pushLocalResizeWidthHint, pushLocalResizeHeightHint, pushLocalResizeDisplayHint,
-  buildKbdWholeUpdates, buildKbdSingleUpdates,
+  buildKbdWholeUpdates,
 } from './table-resize-kbd';
 
 // [캔버스 한컴 포크] 내부 경계선 조절 스냅 (합체 4단계-③)
@@ -1354,26 +1354,67 @@ export function resizeCellBoundaryWhole(this: any, key: 'ArrowUp' | 'ArrowDown' 
   } catch (err) { console.warn('[InputHandler] Alt 경계선 리사이즈 실패:', err); }
 }
 
-// [캔버스 한컴 포크] 셀 선택 상태 Shift+방향키 = 선택 셀의 "단일 경계"만 이동(localResize).
-// 마우스 Shift+드래그와 동일 — 선택 셀(과 같은 행/열 이웃)만 변하고 다른 행/열의 같은 경계는
-// 그대로(정렬이 깨진 로컬 리사이즈). 대상 = 선택 블록 안에서 far edge에 닿는 셀들.
+// [캔버스 한컴 포크] 셀 선택 상태 Shift+방향키 = **한 칸 어긋내기** — 마우스 Shift+드래그와
+// 같은 엔진 격자 재구성(offsetCellBoundary) 정본이다. [2026-08-12 수리] 종전엔 재설계(08-04)
+// 이전의 renderHeight 힌트(렌더 흉내) 경로가 남아 키보드로만 가짜 어긋내기가 먹혔다 —
+// 파일에 저장되지 않고 마우스 어긋내기·복원과 장부가 갈렸다("shift 키보드 뚫림" 신고).
+// 치유(마우스 CATCH 규칙 동일): 이동 후 위치가 다른 경계선 6px 이내 + 주변이 어긋나(span)
+// 있으면 offset 대신 복원(restoreCellBoundary) — 격자가 단순한 모양으로 돌아온다.
 export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
   const ctx = this.cursor.getCellTableContext();
   const range = this.cursor.getSelectedCellRange();
   if (!ctx || !range) return;
   const isHoriz = (key === 'ArrowLeft' || key === 'ArrowRight');
-  const requestedDelta = (key === 'ArrowRight' || key === 'ArrowDown') ? KBD_RESIZE_STEP_HWP : -KBD_RESIZE_STEP_HWP;
+  const delta = (key === 'ArrowRight' || key === 'ArrowDown') ? KBD_RESIZE_STEP_HWP : -KBD_RESIZE_STEP_HWP;
   let bboxes: CellBbox[];
   try { bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci); } catch { return; }
-  let floors: number[] | undefined;
-  if (!isHoriz) { try { floors = this.wasm.getCellContentFloors(ctx.sec, ctx.ppi, ctx.ci); } catch { floors = undefined; } }
-  const updates = buildKbdSingleUpdates(ctx, range, isHoriz, requestedDelta, bboxes, this.wasm, floors);
-  if (updates.length === 0) return;
+  // 대상 = **선택 끝을 포함하는 셀** — 끝줄 정확일치(row+span−1===line)로 찾으면 이미
+  // 어긋나 span 이 된 셀이 매칭에서 빠져 복원(Shift 반대방향)이 무동작이 된다(실측 S2).
+  const endRow = range.endRow;
+  const endCol = range.endCol;
+  const targetBox = bboxes.find((b: CellBbox) =>
+    b.row <= endRow && endRow < b.row + b.rowSpan && b.col <= endCol && endCol < b.col + b.colSpan);
+  if (!targetBox) return;
+  // 바깥 테두리 이동 금지 — **픽셀 위치 기준**. 어긋낸 표는 조각 행/열 번호가 재구성돼
+  // 논리 인덱스 가드(경계 ≥ 총 행/열)가 뚫린다(실측 S4: 마지막 행 Shift+↓ 로 표 성장).
+  let tableBBox: { x: number; y: number; width: number; height: number };
+  try { tableBBox = this.wasm.getTableBBox(ctx.sec, ctx.ppi, ctx.ci); } catch { return; }
+  const OUTER_TOL_PX = 1.0;
+  const boundaryPos = isHoriz ? targetBox.x + targetBox.w : targetBox.y + targetBox.h;
+  const outerPos = isHoriz ? tableBBox.x + tableBBox.width : tableBBox.y + tableBBox.height;
+  if (Math.abs(boundaryPos - outerPos) <= OUTER_TOL_PX) return;
+  const edgeName: 'bottom' | 'right' = isHoriz ? 'right' : 'bottom';
+  const curPos = boundaryPos;
+  const newPos = curPos + delta / 75;
+  const CATCH_PX = 6;
+  const nearLine = bboxes.some((b: CellBbox) => {
+    const p = isHoriz ? b.x + b.w : b.y + b.h;
+    return Math.abs(p - curPos) > 0.5 && Math.abs(newPos - p) <= CATCH_PX;
+  });
+  const neighbor = isHoriz
+    ? bboxes.find((b: CellBbox) => b.row === targetBox.row && b.col === targetBox.col + targetBox.colSpan)
+    : bboxes.find((b: CellBbox) => b.col === targetBox.col && b.row === targetBox.row + targetBox.rowSpan);
+  const spanOf = (b: CellBbox | undefined) => (b ? (isHoriz ? b.colSpan : b.rowSpan) : 1);
+  const healing = nearLine && (spanOf(targetBox) > 1 || spanOf(neighbor) > 1);
   try {
-    this.executeOperation({ kind: 'snapshot', operationType: 'resizeTableCells',
-      operation: (wasm: any) => { wasm.resizeTableCells(ctx.sec, ctx.ppi, ctx.ci, updates); return this.cursor.getPosition(); } });
+    this.executeOperation({
+      kind: 'snapshot',
+      operationType: healing ? 'restoreCellBoundary' : 'offsetCellBoundary',
+      operation: (wasm: any) => {
+        if (healing) {
+          wasm.restoreCellBoundary(ctx.sec, ctx.ppi, ctx.ci, targetBox.cellIdx, edgeName);
+        } else {
+          wasm.offsetCellBoundary(ctx.sec, ctx.ppi, ctx.ci, targetBox.cellIdx, edgeName, delta);
+        }
+        return this.cursor.getPosition();
+      },
+    });
     this.updateCellSelection();
-  } catch (err) { console.warn('[InputHandler] Shift 단일 셀 리사이즈 실패:', err); }
+  } catch (err) {
+    // 엔진 가드(스팬 불일치·한계 등)는 마우스와 같은 문구로 안내
+    const msg = err instanceof Error ? err.message : String(err);
+    showToast({ message: `한 칸 어긋내기: ${msg.replace(/^.*RenderError[:( ]*/, '')}`, durationMs: 4000 });
+  }
 }
 
 /** 전체 표 비율 리사이즈 (phase 3, Ctrl+방향키) */

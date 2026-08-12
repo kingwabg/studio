@@ -84,33 +84,6 @@ export function getCellDisplaySize(box: CellBbox, edge: BorderEdge): number {
 
 // ── 클램프(최소 크기 가드) ───────────────────────────────────────
 
-export function clampSingleCellResizeDelta(
-  wasm: CellPropsProvider,
-  tableRef: TableRef,
-  edge: BorderEdge,
-  targetCellIdx: number,
-  neighborCellIdx: number | null,
-  requestedDelta: number,
-): number {
-  if (neighborCellIdx === null || requestedDelta === 0) return requestedDelta;
-  try {
-    const targetProps = wasm.getCellProperties(tableRef.sec, tableRef.ppi, tableRef.ci, targetCellIdx);
-    const neighborProps = wasm.getCellProperties(tableRef.sec, tableRef.ppi, tableRef.ci, neighborCellIdx);
-    const targetSize = edge.type === 'col' ? targetProps.width : targetProps.height;
-    const neighborSize = edge.type === 'col' ? neighborProps.width : neighborProps.height;
-    if (!Number.isFinite(targetSize) || !Number.isFinite(neighborSize)) return requestedDelta;
-
-    if (requestedDelta > 0) {
-      const maxDelta = Math.max(0, Math.round(neighborSize - minCellSizeHwp(edge.type)));
-      return Math.min(requestedDelta, maxDelta);
-    }
-    const maxDelta = Math.max(0, Math.round(targetSize - minCellSizeHwp(edge.type)));
-    return -Math.min(Math.abs(requestedDelta), maxDelta);
-  } catch {
-    return requestedDelta;
-  }
-}
-
 // [유령 공간 수리 2026-08-12] targetMin/neighborMin: 셀별 축소 한계(기본 = 절대 최소).
 // 행은 콘텐츠 글줄 바닥(getCellContentFloors)을 넘겨야 한다 — 절대 최소(1276)가 글줄
 // 바닥(12pt=1484)보다 작아, 격자(기록값)는 줄고 표 상자(측정 바닥)는 안 줄어 2.7px
@@ -361,82 +334,6 @@ export function buildKbdWholeUpdates(
   for (const b of bboxes) {
     if (aligned.has(b.cellIdx) || comp.has(b.cellIdx)) continue;
     pushLocalResizeHeightHint(updates, b.cellIdx, dispOf.get(b.cellIdx) ?? 0);
-  }
-  return updates;
-}
-
-// Shift = 선택 셀의 단일 경계만 이동. 가로(열 폭)=순수 모델(그 행 경계만·override 안 남김·Alt와
-// 합성). 세로(행 높이)=모델 높이가 자동확장 최소값이라 renderHeight(localResize)로 표시만 강제.
-export function buildKbdSingleUpdates(
-  ctx: TableRef,
-  range: CellRange,
-  isHoriz: boolean,
-  requestedDelta: number,
-  bboxes: CellBbox[],
-  wasm: CellPropsProvider,
-  contentFloors?: number[],
-): KbdResizeUpdate[] {
-  const edge: BorderEdge = { type: isHoriz ? 'col' : 'row', index: 0, pageIndex: 0 };
-  const line = isHoriz ? range.endCol : range.endRow;
-  // [바깥 테두리 금지 2026-08-12] 마지막 행/열의 끝 경계는 Shift(단일)도 이동 금지 —
-  // 마우스 Shift+드래그는 엔진(offsetCellBoundary) 가드가 막지만 이 경로는 renderHint
-  // 직행이라 뚫렸다. 통째(Alt)와 같은 규칙.
-  const totalLines = isHoriz
-    ? Math.max(...bboxes.map(b => b.col + b.colSpan))
-    : Math.max(...bboxes.map(b => b.row + b.rowSpan));
-  if (line + 1 >= totalLines) return [];
-  const targets: CellBbox[] = [];
-  const seen = new Set<number>();
-  for (const b of bboxes) {
-    const inSel = b.row >= range.startRow && b.row <= range.endRow && b.col >= range.startCol && b.col <= range.endCol;
-    const endLine = isHoriz ? b.col + b.colSpan - 1 : b.row + b.rowSpan - 1;
-    if (!inSel || endLine !== line || seen.has(b.cellIdx)) continue;
-    seen.add(b.cellIdx);
-    targets.push(b);
-  }
-  if (targets.length === 0) return [];
-  const updates: KbdResizeUpdate[] = [];
-  const doneLines = new Set<number>(); // 이미 처리한 행(가로)/열(세로) — 한 세그먼트만
-  for (const target of targets) {
-    const lineKey = isHoriz ? target.row : target.col;
-    if (doneLines.has(lineKey)) continue;
-    doneLines.add(lineKey);
-    const neighborIdx = findResizeCompensationNeighbor(edge, target, bboxes);
-    if (isHoriz) {
-      // 순수 모델(target +delta / neighbor -delta). 예전 localResize는 자국이 wasm에 남아 이후
-      // Alt(모델 경계 통째)가 그 셀에만 안 먹었다 — Shift로 어긋냈다 흡착 복귀 후 Alt가 그 열만
-      // 빼먹는 버그(실측 2026-07-14). 모델 widthDelta는 셀별 독립이라 그 행 경계만 움직이며 자국 無.
-      let delta = snapKbdBoundaryDelta(edge, target, bboxes, requestedDelta); // 흡착
-      delta = clampSingleCellResizeDelta(wasm, ctx, edge, target.cellIdx, neighborIdx, delta);
-      if (delta === 0) continue;
-      updates.push({ cellIdx: target.cellIdx, widthDelta: delta });
-      if (neighborIdx !== null) updates.push({ cellIdx: neighborIdx, widthDelta: -delta });
-    } else {
-      // 세로(행 높이)는 renderHeight(localResize)로 표시만 강제(단일 셀). 마우스 Shift+드래그와 동일.
-      // 축소 한계 = max(절대 최소, 콘텐츠 글줄 바닥) — 유령 공간 방지(2026-08-12).
-      const effMin = (idx: number) => Math.max(minCellSizeHwp('row'), contentFloors?.[idx] ?? 0);
-      const neighborBox = neighborIdx === null ? null : bboxes.find(b => b.cellIdx === neighborIdx) ?? null;
-      const targetDisplay = getCellDisplaySize(target, edge);
-      const snapped = snapKbdBoundaryDelta(edge, target, bboxes, requestedDelta); // 흡착
-      let applied = Math.max(effMin(target.cellIdx), targetDisplay + snapped) - targetDisplay;
-      if (neighborBox) {
-        const nDisplay = getCellDisplaySize(neighborBox, edge);
-        applied = nDisplay - Math.max(effMin(neighborBox.cellIdx), nDisplay - applied); // 이웃 최소 클램프
-      }
-      if (applied === 0) continue;
-      const tFinal = targetDisplay + applied;
-      pushLocalResizeHeightHint(updates, target.cellIdx, tFinal, 0);
-      if (neighborBox) {
-        const nFinal = getCellDisplaySize(neighborBox, edge) - applied;
-        pushLocalResizeHeightHint(updates, neighborBox.cellIdx, nFinal, 0);
-      }
-      // 같은 열의 나머지 셀은 현재 높이로 보존(localResize)
-      for (const b of bboxes) {
-        if (b.col !== lineKey) continue;
-        if (b.cellIdx === target.cellIdx || b.cellIdx === neighborIdx) continue;
-        pushLocalResizeHeightHint(updates, b.cellIdx, getCellDisplaySize(b, edge));
-      }
-    }
   }
   return updates;
 }
