@@ -286,6 +286,14 @@ export function buildKbdWholeUpdates(
   const alignedIdxs = findAlignedLogicalResizeAffectedCells(edge, { cellIdx: targetBox.cellIdx, side: 'end' }, bboxes);
   if (alignedIdxs.length === 0) return [];
   const boundaryLine = isHoriz ? targetBox.col + targetBox.colSpan : targetBox.row + targetBox.rowSpan;
+  // [바깥 테두리 금지 2026-08-12] 마지막 행/열의 끝 경계 = 바깥 테두리 — 마우스는
+  // startResizeDrag 에서 개체 선택으로 전환(이동 금지)하는데 키보드는 뚫렸다(신고).
+  // 보상 상대(반대편 셀)가 없어 무보상 +d 로 표가 자랐다. 표 크기는 Ctrl(비율)·개체
+  // 핸들로만 — 규칙 "바깥 테두리 이동 금지·크기 조절은 핸들만"의 키보드 이행.
+  const totalLines = isHoriz
+    ? Math.max(...bboxes.map(b => b.col + b.colSpan))
+    : Math.max(...bboxes.map(b => b.row + b.rowSpan));
+  if (boundaryLine >= totalLines) return [];
   const compIdxs: number[] = [...new Set<number>(
     bboxes
       .filter(b => (isHoriz ? b.col === boundaryLine : b.row === boundaryLine))
@@ -370,6 +378,13 @@ export function buildKbdSingleUpdates(
 ): KbdResizeUpdate[] {
   const edge: BorderEdge = { type: isHoriz ? 'col' : 'row', index: 0, pageIndex: 0 };
   const line = isHoriz ? range.endCol : range.endRow;
+  // [바깥 테두리 금지 2026-08-12] 마지막 행/열의 끝 경계는 Shift(단일)도 이동 금지 —
+  // 마우스 Shift+드래그는 엔진(offsetCellBoundary) 가드가 막지만 이 경로는 renderHint
+  // 직행이라 뚫렸다. 통째(Alt)와 같은 규칙.
+  const totalLines = isHoriz
+    ? Math.max(...bboxes.map(b => b.col + b.colSpan))
+    : Math.max(...bboxes.map(b => b.row + b.rowSpan));
+  if (line + 1 >= totalLines) return [];
   const targets: CellBbox[] = [];
   const seen = new Set<number>();
   for (const b of bboxes) {

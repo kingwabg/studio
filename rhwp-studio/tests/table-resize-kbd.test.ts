@@ -139,6 +139,22 @@ test('buildKbdWholeUpdates(Alt) 세로 축소 한계 = 콘텐츠 글줄 바닥(c
   assert.equal(byIdx[0].renderHeight, 1516);
 });
 
+test('바깥 테두리(마지막 행/열 끝 경계)는 키보드로도 이동 금지 — 무보상 표 성장(뚫림) 회귀 가드', () => {
+  const cells = grid3x3();
+  const wasm = mockWasm(cells, Object.fromEntries([...Array(9).keys()].map(i => [i, { height: 284 }])));
+  // 마지막 행(2) 선택 Alt+↓/↑: 아래 경계 = 바깥 테두리 → 무동작
+  assert.deepEqual(buildKbdWholeUpdates(ref, sel(2, 0), false, STEP, cells, wasm), []);
+  assert.deepEqual(buildKbdWholeUpdates(ref, sel(2, 0), false, -STEP, cells, wasm), []);
+  // 마지막 열(2) 선택 Alt+→: 오른쪽 경계 = 바깥 테두리 → 무동작
+  assert.deepEqual(buildKbdWholeUpdates(ref, sel(0, 2), true, STEP, cells, mockWasm(cells)), []);
+  // Shift(단일)도 동일
+  assert.deepEqual(buildKbdSingleUpdates(ref, sel(2, 1), false, STEP, cells, wasm), []);
+  assert.deepEqual(buildKbdSingleUpdates(ref, sel(1, 2), true, STEP, cells, mockWasm(cells)), []);
+  // 안쪽 경계는 계속 동작(가드가 과잉 차단하지 않는다)
+  assert.ok(buildKbdWholeUpdates(ref, sel(0, 0), false, STEP, cells, wasm).length > 0);
+  assert.ok(buildKbdSingleUpdates(ref, sel(0, 1), true, STEP, cells, mockWasm(cells)).length > 0);
+});
+
 test('buildKbdWholeUpdates(Alt) 가로: 걸침(span) 반대편도 보상된다 — 표 폭 증가(어긋난 표) 회귀 가드', () => {
   // col1 이 rows0-1 을 걸치는 병합 셀(cellIdx 1, rowSpan 2) — row1 의 col0(3) 이웃 페어 탐색은
   // b.row===1 정확일치라 이 걸침 셀을 놓친다(구현 종전 결함). 보상 집합 방식이면 잡힌다.
