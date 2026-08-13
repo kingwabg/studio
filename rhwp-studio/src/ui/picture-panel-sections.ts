@@ -227,8 +227,23 @@ export function buildPicturePanel(
     }
     // 쪽 영역 제한을 켜면 겹침 허용은 꺼진다
     if (p.restrictInPage === true) p.allowOverlap = false;
+    // [정렬 이동 2026-08-13] 엔진은 기준/정렬을 **오프셋 없이** 바꾸면 rebase 로 개체를
+    // 제자리에 붙든다("같은 자리를 다른 잣대로 다시 재라"). 그래서 정렬만 보내면
+    // 「가운데」를 눌러도 안 움직였다(신고). 정렬을 바꿀 때는 현재 오프셋을 함께 실어
+    // 그 opt-out(명시 오프셋 동봉)을 발동시킨다 — 개체가 새 정렬 기준으로 이동한다.
+    // 기준(rel_to)만 바꿀 때는 일부러 안 싣는다: 잣대만 바꾸는 것이니 제자리가 맞다.
+    if (p.horzAlign !== undefined && p.horzOffset === undefined) {
+      p.horzOffset = props.horzOffset ?? 0;
+    }
+    if (p.vertAlign !== undefined && p.vertOffset === undefined) {
+      p.vertOffset = props.vertOffset ?? 0;
+    }
     // 값이 그대로면 스냅샷을 만들지 않는다(되돌리기 이력 낭비 차단)
-    const changed = Object.keys(p).some((k) => props[k] !== p[k]);
+    // 동봉한 오프셋은 "값이 같아도 보내야 하는" 키라 변경 판정에서 뺀다
+    const meaningful = Object.keys(p).filter((k) =>
+      !((k === 'horzOffset' && p.horzAlign !== undefined && patch.horzOffset === undefined)
+        || (k === 'vertOffset' && p.vertAlign !== undefined && patch.vertOffset === undefined)));
+    const changed = meaningful.some((k) => props[k] !== p[k]);
     if (!changed || Object.keys(p).length === 0) return;
     run(() => ih.setObjectProperties?.(ref, p));
     Object.assign(props, p);
