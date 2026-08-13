@@ -7,6 +7,7 @@
 
 import type { CommandDef, CommandServices, EditorContext } from '../types';
 import { ChartDataDialog } from '../../ui/chart-data-dialog';
+import { ChartGalleryDialog } from '../../ui/chart-gallery-dialog';
 import {
   defaultChartSpec,
   getChartSpec,
@@ -33,10 +34,21 @@ export const chartCommands: CommandDef[] = [
     label: '차트',
     canExecute: (ctx: EditorContext) => ctx.hasDocument,
     execute(services: CommandServices) {
-      const ih = services.getInputHandler();
-      if (!ih) return;
+      const handler = services.getInputHandler();
+      if (!handler) return;
+      const ih = handler;
       const pos = ih.getPosition();
-      dialog = new ChartDataDialog(defaultChartSpec(), 'insert');
+      // 한컴 정합: 종류를 그림으로 먼저 고르고(갤러리) → 데이터를 채운다
+      const gallery = new ChartGalleryDialog('column');
+      gallery.onPick = (styleId: string) => {
+        const base = defaultChartSpec();
+        base.style = styleId;
+        openDataDialog(base);
+      };
+      gallery.show();
+
+      function openDataDialog(base: ChartSpec): void {
+      dialog = new ChartDataDialog(base, 'insert');
       dialog.onApply = (spec: ChartSpec) => {
         try {
           // 스냅샷 연산으로 감싸면 ⌘Z 가 공짜로 따라온다(그림 삽입과 같은 경로)
@@ -54,6 +66,7 @@ export const chartCommands: CommandDef[] = [
         }
       };
       dialog.show();
+      }
     },
   },
   {

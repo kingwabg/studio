@@ -12,6 +12,8 @@ export interface ChartSeries {
 
 /** 차트 데이터 — 삽입·편집 대화상자가 다루는 전부 */
 export interface ChartSpec {
+  /** 갤러리에서 고른 세부 종류(예: 'column-stacked'). 엔진이 이 id 로 한컴 템플릿을 고른다. */
+  style: string;
   type: 'column' | 'bar' | 'line' | 'pie';
   title: string;
   categories: string[];
@@ -56,7 +58,13 @@ export function getChartSpec(
   try {
     const v = JSON.parse(doc(bridge).getChartSpec(sec, para, ctrl));
     if (!v || v.ok !== true) return null;
-    return { type: v.type, title: v.title ?? '', categories: v.categories ?? [], series: v.series ?? [] };
+    return {
+      style: v.style ?? '',
+      type: v.type,
+      title: v.title ?? '',
+      categories: v.categories ?? [],
+      series: v.series ?? [],
+    };
   } catch {
     return null; // 차트 아닌 개체 — 호출자가 타입 판별에 쓴다
   }
@@ -77,6 +85,7 @@ export function setChartSpec(
 /** 새 차트의 기본 데이터 — 한컴 '차트 만들기' 초기값과 같은 모양 */
 export function defaultChartSpec(): ChartSpec {
   return {
+    style: 'column',
     type: 'column',
     title: '',
     categories: ['항목 1', '항목 2', '항목 3', '항목 4'],

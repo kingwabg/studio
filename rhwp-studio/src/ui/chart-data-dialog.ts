@@ -34,6 +34,7 @@ export class ChartDataDialog extends ModalDialog {
     this.confirmLabel = mode === 'insert' ? '만들기' : '적용';
     // 깊은 복사 — 취소해도 원본이 안 바뀌게
     this.spec = {
+      style: spec.style,
       type: spec.type,
       title: spec.title,
       categories: [...spec.categories],
@@ -63,6 +64,8 @@ export class ChartDataDialog extends ModalDialog {
     }
     this.typeSelect.addEventListener('change', () => {
       this.spec.type = this.typeSelect.value as ChartSpec['type'];
+      // 대분류를 바꾸면 세부 스타일도 그 대분류 기본값으로(갤러리 선택을 덮어쓴다)
+      this.spec.style = this.typeSelect.value;
       this.renderGrid(); // 원형은 계열 1개만 쓴다는 안내가 바뀐다
     });
 
