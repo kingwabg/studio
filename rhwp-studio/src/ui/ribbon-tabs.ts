@@ -295,7 +295,8 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('x', '취소 후 다음', 'review:reject-change'),
       P('caret-left', '이전 변경', 'review:prev-change'),
       P('caret-right', '다음 변경', 'review:next-change'),
-      P('eye', '본 최종', 'review:view-final'),
+      P('eye', '변경 내용 보기', 'review:view-final',
+        '변경 적용본을 한 화면 · 2단 A4 · 창 중 하나로 봅니다'),
       O('checks', '모두 적용', '', 'review:accept-all'),
       O('trash', '모두 취소', '', 'review:reject-all'),
       gap(),
@@ -336,7 +337,8 @@ export const DEFAULT_OFF: Record<string, string[]> = {
   insert: ['필드 입력', '미주', '이모지'],
   layout: ['격자 설정', '새 번호로 시작', '구역 나누기', '쪽 테두리/배경', '바탕쪽'],
   tools: ['스크립트', '사전', '번역', '상용구', 'NDA 생성기', '동의율 시뮬레이터', '서식 규정 검사'],
-  review: ['조판 부호', '문단 부호', '본 최종'],
+  // [캔버스 한컴 포크] '변경 내용 보기'는 접지 않는다 — 2단/창 미리보기의 유일한 진입점.
+  review: ['조판 부호', '문단 부호'],
 };
 
 const HIDDEN_KEY = 'rhwpRibbonHidden';

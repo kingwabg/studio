@@ -24,6 +24,8 @@
 @import './styles/photo-picker.css';
 @import './styles/command-palette.css';
 @import './styles/compare-dialog.css';
+/* [캔버스 한컴 포크] 변경 적용본 미리보기(2단/창) */
+@import './styles/track-preview.css';
 @import './styles/responsive.css';
 /* [캔버스 한컴 포크] KRDS 룩 — 반드시 마지막(캐스케이드 승리). 업스트림 diff 최소화 원칙. */
 @import './styles/krds-theme.css';

@@ -1,0 +1,71 @@
+/* [캔버스 한컴 포크] 변경 적용본 미리보기 — 2단(도킹) / 창 두 모드가 같은 DOM 을 쓴다 */
+.tfp {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-surface);
+  border-left: 1px solid var(--ui-border-light);
+}
+/* 도킹: #canva-workspace 의 flex 형제로 들어간다(본문은 flex:1 이라 알아서 줄어든다) */
+.tfp--dock {
+  flex: 0 0 38%;
+  max-width: 560px;
+}
+.tfp--window {
+  position: fixed;
+  right: 24px;
+  top: 64px;
+  width: min(560px, 46vw);
+  height: min(80vh, 900px);
+  border: 1px solid var(--ui-border-light);
+  border-radius: 6px;
+  box-shadow: var(--shadow-dialog);
+  z-index: 1300;
+}
+.tfp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ui-border-light);
+  font-size: 12px;
+  font-weight: 600;
+}
+.tfp-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tfp-mini {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.tfp-body {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  padding: 10px;
+  background: var(--ui-bg-light);
+}
+.tfp-canvas {
+  align-self: flex-start;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.tfp-status {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--ui-text-secondary, #667);
+}
+.tfp-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px;
+  border-top: 1px solid var(--ui-border-light);
+  font-size: 12px;
+}
