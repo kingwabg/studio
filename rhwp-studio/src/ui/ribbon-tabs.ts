@@ -145,6 +145,7 @@ export const RIBBON_TABS: Array<{ id: string; label: string; items: RibbonItem[]
       P('images', '내 사진', 'insert:my-photos'),
       PP('shapes', '도형', 'insert:shape'),
       P('text-t', '글상자', 'insert:textbox'),
+      PP('chart-bar', '차트', 'insert:chart'),
       gap(),
       P('math-operations', '수식', 'insert:equation'),
       P('asterisk', '문자표', 'insert:symbols'),

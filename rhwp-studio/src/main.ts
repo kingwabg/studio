@@ -38,6 +38,7 @@ import { editCommands } from '@/command/commands/edit';
 import { syncTextMarkMenu, viewCommands } from '@/command/commands/view';
 import { formatCommands } from '@/command/commands/format';
 import { insertCommands } from '@/command/commands/insert';
+import { chartCommands } from '@/command/commands/insert-chart';
 import { tableCommands } from '@/command/commands/table';
 import { pageCommands } from '@/command/commands/page';
 import { reviewTrackCommands } from '@/command/commands/review-track';
@@ -224,6 +225,7 @@ registry.registerAll(editCommands);
 registry.registerAll(viewCommands);
 registry.registerAll(formatCommands);
 registry.registerAll(insertCommands);
+registry.registerAll(chartCommands);
 registry.registerAll(tableCommands);
 registry.registerAll(pageCommands);
 registry.registerAll(reviewTrackCommands); // 변경 내용 추적 (track-changes.md)
@@ -1232,6 +1234,11 @@ eventBus.on('open-document-bytes', async (payload) => {
 // 수식 더블클릭 → 수식 편집 대화상자
 eventBus.on('equation-edit-request', () => {
   dispatcher.dispatch('insert:equation-edit');
+});
+
+// 차트 더블클릭 → 차트 데이터 편집 대화상자
+eventBus.on('chart-edit-request', () => {
+  dispatcher.dispatch('chart:edit-data');
 });
 
 /**

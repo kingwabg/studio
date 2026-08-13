@@ -1484,6 +1484,22 @@ export function onDblClick(this: any, e: MouseEvent): void {
   // 객체 선택 중 더블클릭
   if (this.cursor.isInPictureObjectSelection()) {
     const ref = this.cursor.getSelectedPictureRef();
+    // [차트 2026-08-13] OLE 개체 중 **차트**면 데이터 편집 대화상자.
+    // 차트는 별도 개체 타입을 만들지 않고 OLE 로 들어가므로(선택·이동·크기조절 인프라
+    // 재사용), 타입이 아니라 "차트 데이터를 읽을 수 있는가"로 가린다. 차트가 아닌 OLE
+    // 는 아래 기존 분기로 흘러간다.
+    if (ref && ref.type === 'ole') {
+      let isChart = false;
+      try {
+        const spec = JSON.parse(this.wasm.doc.getChartSpec(ref.sec, ref.ppi, ref.ci));
+        isChart = spec?.ok === true;
+      } catch { isChart = false; }
+      if (isChart) {
+        e.preventDefault();
+        this.eventBus.emit('chart-edit-request', { sec: ref.sec, ppi: ref.ppi, ci: ref.ci });
+        return;
+      }
+    }
     // 수식 객체 → 수식 편집 대화상자
     if (ref && ref.type === 'equation') {
       e.preventDefault();
