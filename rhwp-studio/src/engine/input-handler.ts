@@ -2666,24 +2666,57 @@ export class InputHandler {
 
   /** Undo 처리 */
   private handleUndo(): void {
+    const keep = this.pictureSelectionToRestore();
     const newPos = this.history.undo(this.wasm);
     if (newPos) {
       this.clearFormObjectSelection(); // 스냅숏 복원 뒤 개체 인덱스가 낡는다
       this.clearTableResizeRuntimeCache();
       this.cursor.moveTo(newPos);
+      this.restorePictureSelection(keep);
       this.afterEdit();
     }
   }
 
   /** Redo 처리 */
   private handleRedo(): void {
+    const keep = this.pictureSelectionToRestore();
     const newPos = this.history.redo(this.wasm);
     if (newPos) {
       this.clearFormObjectSelection();
       this.clearTableResizeRuntimeCache();
       this.cursor.moveTo(newPos);
+      this.restorePictureSelection(keep);
       this.afterEdit();
     }
+  }
+
+  /**
+   * [2026-08-13] 되돌리기 전 개체 선택을 기억한다 — `cursor.moveTo` 가 개체 선택을
+   * 해제하므로, 속성을 고치고 ⌘Z 를 누르면 **패널이 통째로 사라졌다**. 값을 되돌려
+   * 보며 다듬는 흐름이 끊긴다. 개체가 그대로 있으면 같은 자리를 다시 고른다.
+   */
+  private pictureSelectionToRestore(): any | null {
+    try {
+      return this.cursor.isInPictureObjectSelection?.()
+        ? this.cursor.getSelectedPictureRef?.() ?? null
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private restorePictureSelection(ref: any | null): void {
+    if (!ref) return;
+    try {
+      // 개체가 아직 그 자리에 있을 때만 — 없으면(삭제 undo 등) 조용히 포기
+      const props = _picture.getObjectProperties.call(this, ref);
+      if (!props) return;
+      this.cursor.enterPictureObjectSelectionDirect(
+        ref.sec, ref.ppi, ref.ci, ref.type,
+        ref.cellIdx, ref.cellParaIdx, ref.headerFooter,
+        ref.outerTableControlIdx, ref.cellPath, ref.noteRef,
+      );
+    } catch { /* 자리가 바뀌었으면 선택 없이 둔다 */ }
   }
 
   /**

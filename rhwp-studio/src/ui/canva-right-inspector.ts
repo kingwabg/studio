@@ -11,6 +11,7 @@ import { TablePanelSections } from './table-panel-sections';
 import { TextPanelSections, TEXT_SECTIONS } from './text-panel-sections';
 import { buildTextTab } from './text-panel-chrome';
 import { mkEl, mkButton } from './canva-dom';
+import { buildPicturePanel } from './picture-panel-sections';
 import { FormatSpecimen } from './format-specimen';
 import { currentTextRuns, describeBodySelection, detectMixedFormat, scanFormatRuns, selectRun } from './selection-summary';
 import { buildFixParts, type LintItemLike } from './fix-preview';
@@ -99,6 +100,9 @@ export class CanvaRightInspector {
   private lastMulti = false;
   /** 표/셀 컨텍스트에서 지금 보고 있는 셀 — 이게 바뀌면 패널을 다시 그린다 */
   private lastCellKey = '';
+  /** [2026-08-13] 선택된 그림 개체의 신원 — 그림에서 그림으로 옮겨도 ctx 는 'picture' 그대로라
+   *  패널이 처음 물었던 개체를 계속 편집하는 함정이 생긴다(셀 이동의 cellKey 와 같은 뿌리). */
+  private lastPicKey = '';
 
   private banner!: HTMLElement;
   /** lint 오버레이가 밀어 주는 검사 결과 — 「수정본」 줄의 재료 */
@@ -409,7 +413,10 @@ export class CanvaRightInspector {
     // 계속 쓰게 되어, 셀 보호·제목 셀이 **엉뚱한 칸**에 걸린다(사용자 신고 2026-08-04).
     const cellKey = (ctx === 'cell' || ctx === 'table') ? cellIdentity(ih) : '';
     const cellMoved = cellKey !== this.lastCellKey;
-    if (ctx === this.ctx && this.painted && multi === this.lastMulti && !cellMoved) {
+    // 그림→그림 이동도 같은 이유로 다시 그려야 한다(속성 값이 개체마다 다르다)
+    const picKey = ctx === 'picture' ? pictureIdentity(ih) : '';
+    const picMoved = picKey !== this.lastPicKey;
+    if (ctx === this.ctx && this.painted && multi === this.lastMulti && !cellMoved && !picMoved) {
       // 같은 컨텍스트·같은 셀 안의 커서 이동 — 위치 설명(쪽·문단·셀 주소)만 따라간다
       this.paintBanner();
       return;
@@ -418,6 +425,7 @@ export class CanvaRightInspector {
     this.ctx = ctx;
     this.lastMulti = multi;
     this.lastCellKey = cellKey;
+    this.lastPicKey = picKey;
     // [컨텍스트 탭] 선택이 곧 탭이다 — 셀 클릭=셀, 표 개체=표, 그 외=서식 패널.
     // ctx 가 바뀔 때만 건드리므로, 표 안에서 사용자가 손으로 고른 탭은 유지된다.
     this.panelTab = ctx === 'table' ? 'table' : ctx === 'cell' ? 'cell' : 'props';
@@ -833,73 +841,6 @@ export class CanvaRightInspector {
     return '';
   }
 
-  /**
-   * 그림 빠른 설정 — 배치 방식과 크기(mm).
-   *
-   * ⚠ 배치 방식이 첫 칸인 이유: 「글자처럼 배치」가 켜져 있으면 **드래그로 못 옮긴다**
-   *   (input-handler-picture.ts:601). 도장을 넣고 "왜 이동이 안 되지"로 막힌 신고가
-   *   실제로 있었다 — 그 벽을 여기서 바로 넘게 한다.
-   *
-   * 값 읽기는 이 파일의 다른 곳과 같은 방식(getInputHandler() as any)이다.
-   */
-  private pictureQuickControls(): HTMLElement {
-    const wrap = mkEl('div', 'canva-pic-quick');
-    const ih = this.services.getInputHandler() as any;
-    const ref = ih?.cursor?.getSelectedPictureRef?.();
-    let props: any = null;
-    try { props = ref ? ih.getObjectProperties?.(ref) : null; } catch { props = null; }
-
-    // ① 배치 방식
-    const row = mkEl('div', 'canva-pic-row');
-    const label = mkEl('span', 'canva-pic-label');
-    label.textContent = '배치';
-    const seg = mkEl('div', 'canva-pic-seg');
-    const inline = !!props?.treatAsChar;
-    ([['글자처럼', true], ['자유 이동', false]] as Array<[string, boolean]>).forEach(([txt, want]) => {
-      const b = mkButton('canva-pic-seg-btn', { title: want ? '본문에 글자처럼 실린다(이동 불가)' : '원하는 자리로 끌어 옮길 수 있다' });
-      b.textContent = txt;
-      b.classList.toggle('is-on', inline === want);
-      b.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        if (inline === want) return;
-        this.services.dispatcher.dispatch('object:toggle-inline');
-        // ⚠ refreshContext 는 **맥락이 바뀌었을 때만** 다시 그린다. 여기서는 'picture' 그대로라
-        //   조기 반환해서 버튼이 옛 상태로 남았다(2026-08-04 실측). 본문을 다시 짓는 쪽을 부른다.
-        setTimeout(() => this.applyContext(), 60);
-      });
-      seg.appendChild(b);
-    });
-    row.append(label, seg);
-    wrap.appendChild(row);
-
-    // ② 크기(mm) — HWPUNIT 1mm = 7200/25.4
-    const MM = 7200 / 25.4;
-    if (props && typeof props.width === 'number' && typeof props.height === 'number') {
-      const sizeRow = mkEl('div', 'canva-pic-row');
-      const sl = mkEl('span', 'canva-pic-label');
-      sl.textContent = '크기';
-      const mk = (key: 'width' | 'height', unitText: string) => {
-        const i = document.createElement('input');
-        i.type = 'number';
-        i.className = 'canva-pic-num';
-        i.min = '1';
-        i.value = String(Math.round(props[key] / MM));
-        i.title = unitText;
-        i.addEventListener('change', () => {
-          const mm = Math.max(1, Number(i.value) || 1);
-          if (!ref) return;
-          try { ih.setObjectProperties?.(ref, { [key]: Math.round(mm * MM) }); } catch { /* 무시 */ }
-          setTimeout(() => this.applyContext(), 60);
-        });
-        return i;
-      };
-      const unit = mkEl('span', 'canva-pic-unit');
-      unit.textContent = 'mm';
-      sizeRow.append(sl, mk('width', '가로(mm)'), mk('height', '세로(mm)'), unit);
-      wrap.appendChild(sizeRow);
-    }
-    return wrap;
-  }
 
   /** 같은 패널의 표/셀 탭으로 보내는 버튼 — 예전 '표/셀 속성…' 대화상자 자리 */
   private panelLink(label: string, kind: 'table' | 'cell', section: string): HTMLElement {
@@ -1144,10 +1085,14 @@ export class CanvaRightInspector {
 
     if (this.ctx === 'picture') {
       const sec = this.section('그림');
-      // [2026-08-04] 자주 쓰는 것은 **여기서 바로** 끝낸다 — 대화상자(2,825줄)를 열지 않고.
-      //   자세한 설정은 아래 「그림 속성…」이 계속 맡는다.
-      if (!this.lastMulti) sec.appendChild(this.pictureQuickControls());
-      sec.appendChild(fullBtn('그림 속성…', 'format:object-properties', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>'));
+      // [2026-08-13] 옛 「개체 속성」 대화상자(2,825줄)의 내용을 여기로 옮겼다 —
+      //   크기·회전 / 위치 / 여백·캡션 / 그림 4개 섹션. 대화상자를 열 필요가 없다.
+      let panelOk = false;
+      if (!this.lastMulti) panelOk = buildPicturePanel(sec, this.services, () => this.applyContext());
+      // 속성을 못 읽는 개체(도형·OLE 등)는 종전대로 대화상자에 맡긴다
+      if (!panelOk && !this.lastMulti) {
+        sec.appendChild(fullBtn('개체 속성…', 'format:object-properties', '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>'));
+      }
       host.appendChild(sec);
       // [캔버스 한컴 포크] 다중 선택(2개 이상)일 때만 개체 정렬 노출
       if (this.lastMulti) {
@@ -1173,6 +1118,18 @@ function rgbToHex(v: string): string {
 }
 
 /** 커서가 지금 어느 표·어느 셀에 있는지의 신원 문자열(없으면 빈 문자열) */
+/** 선택된 그림 개체의 신원 문자열 — 개체가 바뀌면 값이 달라진다. */
+function pictureIdentity(ih: any): string {
+  try {
+    const r = ih?.cursor?.getSelectedPictureRef?.();
+    if (!r) return '';
+    return [r.sec, r.ppi, r.ci, r.type, r.cellIdx ?? '', r.cellParaIdx ?? '',
+      (r.cellPath ?? []).join('.'), r.headerFooter ? 'hf' : ''].join('/');
+  } catch {
+    return '';
+  }
+}
+
 function cellIdentity(ih: any): string {
   const ref = ih?.cursor?.getCellTableContext?.() ?? ih?.getSelectedTableRef?.();
   if (!ref) return '';

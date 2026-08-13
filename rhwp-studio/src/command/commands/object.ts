@@ -31,7 +31,16 @@ function toggleInline(services: Parameters<CommandDef['execute']>[0]): void {
   if (!ref) return;
   const cur = ih.getObjectProperties?.(ref);
   if (!cur) return;
-  ih.setObjectProperties?.(ref, { treatAsChar: !cur.treatAsChar });
+  // [2026-08-13] 스냅샷으로 감싸 ⌘Z 로 되돌릴 수 있게 한다 — 종전엔 직호출이라
+  // 배치를 뒤집고 되돌리려 해도 이 변경만 undo 이력에서 빠져 있었다.
+  ih.executeOperation?.({
+    kind: 'snapshot',
+    operationType: 'objectProps',
+    operation: () => {
+      ih.setObjectProperties?.(ref, { treatAsChar: !cur.treatAsChar });
+      return ih.getCursorPosition?.() ?? ih.getPosition?.();
+    },
+  }) ?? ih.setObjectProperties?.(ref, { treatAsChar: !cur.treatAsChar });
 }
 
 export const objectCommands: CommandDef[] = [

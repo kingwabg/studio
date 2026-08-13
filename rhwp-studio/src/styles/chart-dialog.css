@@ -119,3 +119,36 @@
   font-size: 11.5px;
   color: var(--ui-text-muted, #7a828c);
 }
+
+/* ── 그림 개체 속성 패널 (2026-08-13, 대화상자 → 우측 패널 이식) ── */
+.pps-body { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+
+.pps-note {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ui-text-muted, #7a828c);
+  background: #f6f8fa;
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+
+.pps-quad { border: 1px solid var(--ui-border, #e4e8ee); border-radius: 6px; padding: 8px; }
+.pps-quad-title { font-size: 11.5px; font-weight: 600; color: var(--ui-text-muted, #5b6471); margin-bottom: 6px; }
+.pps-quad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pps-quad-cell { display: flex; align-items: center; gap: 6px; }
+.pps-quad-label { font-size: 11.5px; color: var(--ui-text-muted, #7a828c); min-width: 26px; }
+.pps-quad-cell input { flex: 1; min-width: 0; }
+
+.pps-desc {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 7px;
+  border: 1px solid var(--ui-border, #d8dde5);
+  border-radius: 5px;
+}
+
+/* 대칭 토글 — 배타 선택이 아니라 각각 켜고 끄는 버튼 */
+.pps-body .tps-seg-btn[disabled] { opacity: .45; cursor: default; }

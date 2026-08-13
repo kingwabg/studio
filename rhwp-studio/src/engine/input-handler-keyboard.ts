@@ -833,8 +833,15 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
     }
     // Shift/Ctrl/Alt/Meta 키만 누름 → 무시
     if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+    // [2026-08-13] 되돌리기·다시실행은 **선택을 유지**한다. 개체 속성을 우측 패널에서
+    // 고치는 흐름에서 ⌘Z 를 누르면 여기서 선택이 풀려 패널이 통째로 사라졌다 —
+    // 값을 되돌려 보며 다듬는 흐름이 끊긴다. 되돌리기 자체가 개체를 지웠다면
+    // handleUndo 의 복원이 실패해 자연히 선택이 없어진다(이중 안전).
+    // ⚠ 여기서 return 하면 되돌리기 **자체가** 막힌다(이 핸들러가 폴스루로 처리한다).
+    //   해제만 건너뛰고 계속 흘려보낸다.
+    const undoRedoKey = (e.metaKey || e.ctrlKey) && ['z', 'Z', 'y', 'Y'].includes(e.key);
     // 기타 키 → 개체 선택 해제 후 일반 처리로 폴스루
-    this.exitPictureObjectSelectionIfNeeded();
+    if (!undoRedoKey) this.exitPictureObjectSelectionIfNeeded();
   }
 
   // ─── 표 객체 선택 모드 중 키 처리 ──────────────────────────
