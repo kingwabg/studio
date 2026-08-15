@@ -5554,11 +5554,73 @@ export class InputHandler {
       const hit = this.wasm.hitTest(pageIdx, pageX, pageY);
       if (hit.paragraphIndex === undefined || (hit as any).parentParaIndex !== undefined) return; // 셀 안 낙하는 v1 밖
       if (hit.sectionIndex !== sel.hit.sec) return;
+
+      // [2026-08-15 신고 "명령 단추·선택 상자·입력 상자 자유 이동이 안 된다"]
+      // 같은 문단 안에서 끌었으면 **자유 이동**(시각 오프셋 델타), 다른 문단으로
+      // 끌었으면 종전대로 글자 사이 재앵커링. 분기로 두는 이유는 문단 간 이동이
+      // 이미 동작하는 기능이라 없애면 그게 회귀이기 때문이다.
+      if (hit.paragraphIndex === sel.hit.para && this.commitFormFreeMove(drag, e, pageIdx, zoom)) {
+        return;
+      }
       const textOffset = this.wasm.logicalToTextOffset(hit.sectionIndex, hit.paragraphIndex, hit.charOffset);
       this.moveSelectedFormObject({ toPara: hit.paragraphIndex, offset: textOffset });
     } catch (err) {
       console.warn('[InputHandler] 양식 드래그 낙하 실패:', err);
     }
+  }
+
+  /**
+   * 양식 개체를 앵커(글자 사이)는 그대로 둔 채 **보이는 위치만** 델타로 옮긴다.
+   * 성공하면 true — 호출자가 문단 간 재앵커링을 건너뛴다.
+   *
+   * 엔진 계약: `setFormObjectProps` 의 horzOffset/vertOffset(HWPUNIT, 음수 허용).
+   * 조판(폭 예약·줄 높이·캐럿 칸)은 안 건드리므로 줄에 빈칸이 남는 건 정의된 동작이다.
+   */
+  private commitFormFreeMove(
+    drag: { startX: number; startY: number },
+    e: MouseEvent,
+    pageIdx: number,
+    zoom: number,
+  ): boolean {
+    const sel = this.formObjectSelection;
+    if (!sel?.hit || sel.hit.sec === undefined || sel.hit.para === undefined || sel.hit.ci === undefined) return false;
+    // 표 셀 안 양식은 제외 — 히트가 돌려주는 (para, ci) 쌍이 호스트 문단 기준이라
+    // 그대로 setProps 에 넣으면 엉뚱한 컨트롤(최악은 표 자체)을 건드린다.
+    if ((sel.hit as any).inCell) return false;
+
+    const { sec, para, ci } = sel.hit as { sec: number; para: number; ci: number };
+    let cur: Record<string, string> = {};
+    try {
+      const info = this.wasm.getFormObjectInfo(sec, para, ci) as any;
+      if (info?.ok === false) return false;
+      cur = (info?.properties ?? {}) as Record<string, string>;
+    } catch { return false; }
+
+    const num = (k: string) => { const n = Number(cur[k]); return Number.isFinite(n) ? n : 0; };
+    let dh = num('PosHorzOffset') + Math.round(((e.clientX - drag.startX) / zoom) * 75);
+    let dv = num('PosVertOffset') + Math.round(((e.clientY - drag.startY) / zoom) * 75);
+
+    // 쪽 밖으로 던져 못 찾는 상태를 막는다 — 개체 좌상단이 쪽 안에 남도록 자른다
+    const bbox = sel.hit.bbox;
+    if (bbox) {
+      const pageWpx = this.virtualScroll.getPageWidth(pageIdx) / zoom;
+      const pageHpx = this.virtualScroll.getPageHeight(pageIdx) / zoom;
+      const minH = Math.round((-bbox.x) * 75);
+      const maxH = Math.round((pageWpx - bbox.x - bbox.w) * 75);
+      const minV = Math.round((-bbox.y) * 75);
+      const maxV = Math.round((pageHpx - bbox.y - bbox.h) * 75);
+      dh = Math.min(Math.max(dh, minH), Math.max(minH, maxH));
+      dv = Math.min(Math.max(dv, minV), Math.max(minV, maxV));
+    }
+
+    let ok = false;
+    this.runFormObjectOp('formFreeMove', () => {
+      ok = this.wasm.setFormObjectProps(sec, para, ci, { horzOffset: dh, vertOffset: dv })?.ok === true;
+    });
+    if (!ok) return false;
+    this.eventBus.emit('document-changed');
+    requestAnimationFrame(() => this.refreshFormObjectSelection());
+    return true;
   }
 
   /**
