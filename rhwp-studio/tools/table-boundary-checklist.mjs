@@ -6,6 +6,10 @@
 //   node tools/table-boundary-checklist.mjs
 // 규약: mydocs 표 경계선 6규칙(안쪽 전체 이동·바깥 금지·어긋내기 자기축·표 크기 불변).
 import puppeteer from 'puppeteer-core';
+import { writeFileSync, readFileSync } from 'node:fs';
+
+// --html-only: 마지막 실행의 결과(JSON)로 HTML 보고서만 재생성
+const HTML_ONLY = process.argv.includes('--html-only');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const results = [];
 let shot = 0;
@@ -19,7 +23,16 @@ const check = async (page, cat, name, ok, detail = '') => {
   }
 };
 
-const browser = await puppeteer.connect({ browserURL: 'http://127.0.0.1:9666', defaultViewport: null, protocolTimeout: 900000 });
+let browser = null;
+if (!HTML_ONLY) {
+  browser = await puppeteer.connect({ browserURL: 'http://127.0.0.1:9666', defaultViewport: null, protocolTimeout: 900000 });
+}
+if (HTML_ONLY) {
+  const saved = JSON.parse(readFileSync(new URL('./table-boundary-results.json', import.meta.url), 'utf8'));
+  results.push(...saved);
+  writeHtml(results);
+  process.exit(0);
+}
 for (const p of await browser.pages()) { const u = p.url(); if (u.includes('7702') || u.includes('sc-hazel')) await p.close().catch(() => {}); }
 const page = await browser.newPage();
 await page.bringToFront();
@@ -305,9 +318,74 @@ for (const mode of ['마우스', '키보드']) {
   }
 }
 
-// ═══════════ 요약 ═══════════
+// ═══════════ 요약 + HTML 보고서 생성 ═══════════
 const fail = results.filter(r => !r.ok);
 console.log(`\n═══ 체크리스트 요약: ${results.length - fail.length}/${results.length} 통과, 실패 ${fail.length}건 ═══`);
 for (const f of fail) console.log(`  ✗ [${f.cat}] ${f.name} — ${f.detail}`);
+
+writeFileSync(new URL('./table-boundary-results.json', import.meta.url), JSON.stringify(results, null, 1));
+writeHtml(results);
+
+function writeHtml(results) {
+  const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const fail2 = results.filter(r => !r.ok);
+  const rows = results.map(r => {
+    let g = (r.cat === '어긋키보드' || r.cat === 'F5이동') ? '키보드' : '마우스';
+    if (r.cat === '연쇄') g = r.name.startsWith('키보드') ? '키보드' : '마우스';
+    return { ...r, group: g };
+  });
+  const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const section = (g) => rows.filter(r => r.group === g).map(r =>
+    `<tr class="${r.ok ? 'ok' : 'bad'}"><td>${r.ok ? '✓' : '✗'}</td><td>[${r.cat}] ${esc(r.name)}</td><td>${esc(r.detail)}</td></tr>`).join('\n');
+  const count = (g) => { const rr = rows.filter(r => r.group === g); return `${rr.filter(r => r.ok).length}/${rr.length}`; };
+  const script = readFileSync(new URL('./table-boundary-user-section.js', import.meta.url), 'utf8');
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+<title>표 경계선 체크리스트 — ${stamp}</title>
+<style>
+body{font-family:'Apple SD Gothic Neo',system-ui,sans-serif;margin:24px auto;max-width:980px;color:#1a1a1a;background:#fafafa}
+h1{font-size:22px} h2{font-size:17px;margin:28px 0 8px;border-bottom:2px solid #ddd;padding-bottom:4px}
+.meta{color:#666;font-size:13px}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:13px}
+td,th{border:1px solid #e2e2e2;padding:5px 8px;text-align:left;vertical-align:top}
+tr.ok td:first-child{color:#0a7d32;font-weight:700;width:24px;text-align:center}
+tr.bad{background:#fdecec} tr.bad td:first-child{color:#c62828;font-weight:700;text-align:center}
+.badge{display:inline-block;background:#eef4ff;border:1px solid #c6d8f7;border-radius:12px;padding:1px 10px;font-size:12px;margin-left:8px}
+select{padding:2px 4px} input[type=text]{width:96%;padding:3px 6px;border:1px solid #ccc;border-radius:4px}
+select.s-완성{background:#e6f6ea} select.s-안됨{background:#fdecec} select.s-보류{background:#fff7e0}
+button{padding:4px 12px;margin-right:6px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer}
+button:hover{background:#f0f0f0}
+.toolbar{margin:10px 0}
+</style></head><body>
+<h1>표 경계선 전 조작 체크리스트 <span class="badge">자동 ${results.length - fail2.length}/${results.length}</span></h1>
+<div class="meta">생성: ${stamp} · 도구: tools/table-boundary-checklist.mjs (재생성: node tools/table-boundary-checklist.mjs --html-only) · 3×3 표, 항목마다 새 문서 · 표 크기 ±0.4px 불변 동시 검사</div>
+
+<h2>마우스 <span class="badge">${count('마우스')}</span></h2>
+<table><tr><th></th><th>항목</th><th>상세</th></tr>
+${section('마우스')}
+</table>
+
+<h2>키보드 <span class="badge">${count('키보드')}</span></h2>
+<table><tr><th></th><th>항목</th><th>상세</th></tr>
+${section('키보드')}
+</table>
+
+<h2>사용자 수동 확인 <span class="badge" id="userBadge"></span></h2>
+<div class="meta">직접 해보고 상태를 고르세요(완성/안됨/보류). 메모와 항목 추가(직접입력) 가능 — 이 브라우저에 자동 저장됩니다.</div>
+<div class="toolbar">
+  <button id="btnAdd">＋ 항목 추가(직접입력)</button>
+  <button id="btnExport">내보내기(JSON)</button>
+  <button id="btnReset">초기화</button>
+</div>
+<table id="userTable"><tr><th style="width:110px">상태</th><th style="width:44%">항목</th><th>메모(직접입력)</th><th style="width:34px"></th></tr></table>
+
+<script>
+${script}
+</script>
+</body></html>`;
+  const out = new URL('./table-boundary-checklist.html', import.meta.url).pathname;
+  writeFileSync(out, html);
+  console.log(`HTML 보고서: ${out}`);
+}
+
 browser.disconnect();
 process.exit(fail.length ? 1 : 0);
