@@ -1395,12 +1395,38 @@ export class CursorState {
   /** 선택된 셀 범위를 반환한다 (정렬된 start/end). */
   getSelectedCellRange(): { startRow: number; startCol: number; endRow: number; endCol: number } | null {
     if (!this._cellSelectionMode || !this.cellAnchor || !this.cellFocus) return null;
-    return {
-      startRow: Math.min(this.cellAnchor.row, this.cellFocus.row),
-      startCol: Math.min(this.cellAnchor.col, this.cellFocus.col),
-      endRow: Math.max(this.cellAnchor.row, this.cellFocus.row),
-      endCol: Math.max(this.cellAnchor.col, this.cellFocus.col),
-    };
+    let startRow = Math.min(this.cellAnchor.row, this.cellFocus.row);
+    let startCol = Math.min(this.cellAnchor.col, this.cellFocus.col);
+    let endRow = Math.max(this.cellAnchor.row, this.cellFocus.row);
+    let endCol = Math.max(this.cellAnchor.col, this.cellFocus.col);
+    // [2026-08-16] 스팬 클로저 — 범위에 걸친 병합/어긋 조각(span) 셀을 **완전히 포함**
+    // 할 때까지 확장한다. 앵커·포커스의 시작 코너만 쓰면 어긋난 표에서 전체 드래그가
+    // 스팬 셀 시작행 기준으로 좁게 잡혀 아래 조각 행들이 선택·병합에서 빠졌다
+    // (사용자 스크린샷: 전체 선택인데 좌하 조각 셀만 흰색).
+    try {
+      const ctx = this.cellTableCtx;
+      if (ctx) {
+        const bboxes = ctx.cellPath
+          ? this.wasm.getTableCellBboxesByPath(ctx.sec, ctx.ppi, JSON.stringify(ctx.cellPath))
+          : this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci!);
+        let changed = true;
+        let guard = 0;
+        while (changed && guard++ < 16) {
+          changed = false;
+          for (const b of bboxes) {
+            const bEndR = b.row + b.rowSpan - 1;
+            const bEndC = b.col + b.colSpan - 1;
+            if (b.row <= endRow && bEndR >= startRow && b.col <= endCol && bEndC >= startCol) {
+              if (b.row < startRow) { startRow = b.row; changed = true; }
+              if (bEndR > endRow) { endRow = bEndR; changed = true; }
+              if (b.col < startCol) { startCol = b.col; changed = true; }
+              if (bEndC > endCol) { endCol = bEndC; changed = true; }
+            }
+          }
+        }
+      }
+    } catch { /* bbox 조회 실패 시 원시 범위 유지 */ }
+    return { startRow, startCol, endRow, endCol };
   }
 
   /** 제외된 셀 목록을 반환한다. */

@@ -171,17 +171,6 @@ function promoteResizeDragToSingleCell(self: any, state: any, shiftKey: boolean)
   return state.singleCellTarget;
 }
 
-// [2026-08-16] 이 셀의 해당 변 경계선이 **어긋난 선**인가 — 다른 줄의 어떤 셀도 그 선을
-// 경계로 쓰지 않으면 어긋난 것. 치유(restore 승격)는 이때만 허용한다. 정렬 세그를 새로
-// 어긋내는 조작이 남의 어긋 선 근처(정확 겹침 포함)에 떨어졌다고 복원을 부르면, 어긋난
-// 적 없는 셀에 restore 가 나가 격자가 자랐다(키보드 이웃 열 연속 실측 +283HU/회).
-function segIsMisaligned(bboxes: CellBbox[], target: CellBbox, isCol: boolean): boolean {
-  const line = isCol ? target.col + target.colSpan : target.row + target.rowSpan;
-  return !bboxes.some((b: CellBbox) => (isCol
-    ? b.row !== target.row && (b.col === line || b.col + b.colSpan === line)
-    : b.col !== target.col && (b.row === line || b.row + b.rowSpan === line)));
-}
-
 function clampResizePosition(pos: number, bounds: { min: number; max: number }): number {
   return Math.min(Math.max(pos, bounds.min), bounds.max);
 }
@@ -695,39 +684,19 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       cellIdx = prev.cellIdx;
     }
     const edgeName: 'bottom' | 'right' = state.edge.type === 'col' ? 'right' : 'bottom';
-    // [치유 2026-08-04·v2] 놓은 위치가 다른 경계선에 캐치 반경 안이고 이 경계 주변이
-    // 어긋나 있으면 offset 대신 복원 — **양방향**: 어긋난 세그를 원위치로 끌어도,
-    // 정렬된 세그를 어긋난 선에 맞춰도 격자가 단순한 모양으로 돌아온다(신고 수리).
-    const CATCH_PX = 6;
-    const nearLine = (state.snapTargets ?? [])
-      .some((p2: number) => Math.abs(clamped - p2) <= CATCH_PX);
-    const finalBox = state.bboxes.find((b: CellBbox) => b.cellIdx === cellIdx);
-    const spanOf = (b: CellBbox | undefined) =>
-      b ? (state.edge.type === 'col' ? b.colSpan : b.rowSpan) : 1;
-    const neighborBox = finalBox
-      ? (state.edge.type === 'col'
-        ? state.bboxes.find((b: CellBbox) => b.row === finalBox.row && b.col === finalBox.col + finalBox.colSpan)
-        : state.bboxes.find((b: CellBbox) => b.col === finalBox.col && b.row === finalBox.row + finalBox.rowSpan))
-      : undefined;
-    const healing = nearLine
-      && (spanOf(finalBox) > 1 || spanOf(neighborBox) > 1)
-      && !!finalBox && segIsMisaligned(state.bboxes, finalBox, state.edge.type === 'col');
+    // [2026-08-16] 치유(복원) 승격은 스튜디오가 아니라 **엔진**이 판정한다 — 종전
+    // "아무 경계선 6px 이내 → 복원"은 다른 열의 어긋선에 접근만 해도 원위치로
+    // 튕겨(진동·기준선 통과 불가) offset 을 그대로 보낸다. 엔진이 정렬선 ±MIN_CELL
+    // 복귀는 복원으로, 다른 열 선 근처는 합류로 스스로 처리한다.
     try {
       this.executeOperation({
         kind: 'snapshot',
-        operationType: healing ? 'restoreCellBoundary' : 'offsetCellBoundary',
+        operationType: 'offsetCellBoundary',
         operation: (wasm: any) => {
-          if (healing) {
-            wasm.restoreCellBoundary(
-              state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
-              cellIdx, edgeName,
-            );
-          } else {
-            wasm.offsetCellBoundary(
-              state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
-              cellIdx, edgeName, deltaHwpUnit,
-            );
-          }
+          wasm.offsetCellBoundary(
+            state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
+            cellIdx, edgeName, deltaHwpUnit,
+          );
           return this.cursor.getPosition();
         },
       });
@@ -1412,8 +1381,7 @@ export function resizeCellBoundaryWhole(this: any, key: 'ArrowUp' | 'ArrowDown' 
 // 같은 엔진 격자 재구성(offsetCellBoundary) 정본이다. [2026-08-12 수리] 종전엔 재설계(08-04)
 // 이전의 renderHeight 힌트(렌더 흉내) 경로가 남아 키보드로만 가짜 어긋내기가 먹혔다 —
 // 파일에 저장되지 않고 마우스 어긋내기·복원과 장부가 갈렸다("shift 키보드 뚫림" 신고).
-// 치유(마우스 CATCH 규칙 동일): 이동 후 위치가 다른 경계선 6px 이내 + 주변이 어긋나(span)
-// 있으면 offset 대신 복원(restoreCellBoundary) — 격자가 단순한 모양으로 돌아온다.
+// 치유(복원)·합류는 엔진이 판정 — 여기선 offset 만 보낸다.
 export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
   const ctx = this.cursor.getCellTableContext();
   const range = this.cursor.getSelectedCellRange();
@@ -1438,30 +1406,14 @@ export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown'
   const outerPos = isHoriz ? tableBBox.x + tableBBox.width : tableBBox.y + tableBBox.height;
   if (Math.abs(boundaryPos - outerPos) <= OUTER_TOL_PX) return;
   const edgeName: 'bottom' | 'right' = isHoriz ? 'right' : 'bottom';
-  const curPos = boundaryPos;
-  const newPos = curPos + delta / 75;
-  const CATCH_PX = 6;
-  const nearLine = bboxes.some((b: CellBbox) => {
-    const p = isHoriz ? b.x + b.w : b.y + b.h;
-    return Math.abs(p - curPos) > 0.5 && Math.abs(newPos - p) <= CATCH_PX;
-  });
-  const neighbor = isHoriz
-    ? bboxes.find((b: CellBbox) => b.row === targetBox.row && b.col === targetBox.col + targetBox.colSpan)
-    : bboxes.find((b: CellBbox) => b.col === targetBox.col && b.row === targetBox.row + targetBox.rowSpan);
-  const spanOf = (b: CellBbox | undefined) => (b ? (isHoriz ? b.colSpan : b.rowSpan) : 1);
-  const healing = nearLine
-    && (spanOf(targetBox) > 1 || spanOf(neighbor) > 1)
-    && segIsMisaligned(bboxes, targetBox, isHoriz);
+  // [2026-08-16] 치유(복원) 승격은 엔진이 판정 — 종전 "아무 경계선 6px 이내 → 복원"은
+  // 다른 열의 어긋선에 접근하는 스텝마다 원위치로 튕겨 연속 어긋내기가 진동했다.
   try {
     this.executeOperation({
       kind: 'snapshot',
-      operationType: healing ? 'restoreCellBoundary' : 'offsetCellBoundary',
+      operationType: 'offsetCellBoundary',
       operation: (wasm: any) => {
-        if (healing) {
-          wasm.restoreCellBoundary(ctx.sec, ctx.ppi, ctx.ci, targetBox.cellIdx, edgeName);
-        } else {
-          wasm.offsetCellBoundary(ctx.sec, ctx.ppi, ctx.ci, targetBox.cellIdx, edgeName, delta);
-        }
+        wasm.offsetCellBoundary(ctx.sec, ctx.ppi, ctx.ci, targetBox.cellIdx, edgeName, delta);
         return this.cursor.getPosition();
       },
     });
