@@ -6,21 +6,23 @@
 //   node tools/table-boundary-checklist.mjs
 // 규약: mydocs 표 경계선 6규칙(안쪽 전체 이동·바깥 금지·어긋내기 자기축·표 크기 불변).
 import puppeteer from 'puppeteer-core';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 
 // --html-only: 마지막 실행의 결과(JSON)로 HTML 보고서만 재생성
 const HTML_ONLY = process.argv.includes('--html-only');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const results = [];
-let shot = 0;
+const SHOTS_DIR = new URL('./checklist-shots/', import.meta.url).pathname;
+mkdirSync(SHOTS_DIR, { recursive: true });
+// 모든 항목의 실행 직후 화면을 남긴다 — 보고서에서 "이 조작이 뭘 했는지" 눈으로 확인
 const check = async (page, cat, name, ok, detail = '') => {
-  results.push({ cat, name, ok, detail });
+  const shotRel = `checklist-shots/${String(results.length).padStart(3, '0')}.png`;
+  try {
+    await page.screenshot({ path: SHOTS_DIR + shotRel.split('/')[1], clip: { x: 150, y: 195, width: 640, height: 220 } });
+  } catch {}
+  results.push({ cat, name, ok, detail, shot: shotRel });
   const mark = ok ? '✓' : '✗';
   console.log(`${mark} [${cat}] ${name}${detail ? ' — ' + detail : ''}`);
-  if (!ok) {
-    const f = `/tmp/tbc-${String(shot++).padStart(2, '0')}.png`;
-    try { await page.screenshot({ path: f, clip: { x: 140, y: 190, width: 720, height: 360 } }); console.log(`    ↳ ${f}`); } catch {}
-  }
 };
 
 let browser = null;
@@ -116,6 +118,18 @@ const selRange = () => page.evaluate(() => {
   const r = ih.cursor?.getSelectedCellRange?.();
   return r ? `${r.startRow},${r.startCol}-${r.endRow},${r.endCol}` : null;
 });
+
+// ═══════════ 0. 용어 그림 — 기준·어긋내기·치유가 어떤 모양인지 ═══════════
+{
+  await freshDoc();
+  await page.screenshot({ path: SHOTS_DIR + 'legend-base.png', clip: { x: 150, y: 195, width: 640, height: 220 } });
+  const v = await vis(0, 0);
+  await dragV(v.cx, v.bottomY, 0, 12, true);
+  await page.screenshot({ path: SHOTS_DIR + 'legend-stagger.png', clip: { x: 150, y: 195, width: 640, height: 220 } });
+  const v2 = await vis(0, 0);
+  await dragV(v2.cx, v2.bottomY, 0, -12, true);
+  await page.screenshot({ path: SHOTS_DIR + 'legend-heal.png', clip: { x: 150, y: 195, width: 640, height: 220 } });
+}
 
 // ═══════════ 1. 일반 경계 이동(마우스, 전체 선) — 규약 1: 선 전체 이동·표 크기 불변 ═══════════
 for (const [name, seg, d] of [
@@ -335,8 +349,25 @@ function writeHtml(results) {
     return { ...r, group: g };
   });
   const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const section = (g) => rows.filter(r => r.group === g).map(r =>
-    `<tr class="${r.ok ? 'ok' : 'bad'}"><td>${r.ok ? '✓' : '✗'}</td><td>[${r.cat}] ${esc(r.name)}</td><td>${esc(r.detail)}</td></tr>`).join('\n');
+  const CAT_DESC = {
+    '일반이동': 'Shift 없이 경계선 드래그 — 그 선 전체가 움직인다. 신선한 표의 가로선은 줄일 여유가 없어 무동작이 정상.',
+    '어긋단발': 'Shift+드래그 한 칸 어긋내기 — 잡은 칸의 경계만 12px, 표 크기 불변.',
+    '어긋왕복': '어긋낸 경계를 반대로 12px — 원래 표로 완전 복귀(치유).',
+    '어긋키보드': '셀에서 F5 → Shift+화살표 — 키보드 한 칸 어긋내기. 마지막 행·열의 바깥 방향은 무동작이 정상.',
+    '연쇄': '첫 행을 어긋낸 뒤 아래 행도 같은 방식으로 — 신고 ② 시나리오.',
+    'F5이동': '어긋낸 표에서 F5 블록 이동으로 표 전체를 돌 수 있는가 — 신고 ① 시나리오.',
+    '클릭진입': '어긋낸 표의 아무 셀이나 클릭하면 커서가 들어가는가.',
+  };
+  const section = (g) => {
+    const rr = rows.filter(r => r.group === g);
+    const cats = [...new Set(rr.map(r => r.cat))];
+    return cats.map(cat => {
+      const items = rr.filter(r => r.cat === cat);
+      const head = `<tr><td colspan="4" class="cathead"><b>${cat}</b> — ${CAT_DESC[cat] || ''}</td></tr>`;
+      return head + items.map(r =>
+        `<tr class="${r.ok ? 'ok' : 'bad'}"><td>${r.ok ? '✓' : '✗'}</td><td>${esc(r.name)}</td><td>${esc(r.detail)}</td><td class="shotcell">${r.shot ? `<a href="${r.shot}" target="_blank"><img src="${r.shot}" alt=""></a>` : ''}</td></tr>`).join('\n');
+    }).join('\n');
+  };
   const count = (g) => { const rr = rows.filter(r => r.group === g); return `${rr.filter(r => r.ok).length}/${rr.length}`; };
   const script = readFileSync(new URL('./table-boundary-user-section.js', import.meta.url), 'utf8');
   const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
@@ -355,17 +386,30 @@ select.s-완성{background:#e6f6ea} select.s-안됨{background:#fdecec} select.s
 button{padding:4px 12px;margin-right:6px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer}
 button:hover{background:#f0f0f0}
 .toolbar{margin:10px 0}
+.cathead{background:#f2f6fc;font-size:13px}
+.shotcell img{max-height:56px;border:1px solid #ddd;border-radius:3px;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap}
+.legend figure{margin:0;width:300px}
+.legend img{width:100%;border:1px solid #ddd;border-radius:4px}
+.legend figcaption{font-size:12.5px;color:#444;margin-top:4px}
 </style></head><body>
 <h1>표 경계선 전 조작 체크리스트 <span class="badge">자동 ${results.length - fail2.length}/${results.length}</span></h1>
-<div class="meta">생성: ${stamp} · 도구: tools/table-boundary-checklist.mjs (재생성: node tools/table-boundary-checklist.mjs --html-only) · 3×3 표, 항목마다 새 문서 · 표 크기 ±0.4px 불변 동시 검사</div>
+<div class="meta">생성: ${stamp} · 도구: tools/table-boundary-checklist.mjs (재생성: node tools/table-boundary-checklist.mjs --html-only) · 3×3 표, 항목마다 새 문서 · 표 크기 ±0.4px 불변 동시 검사 · 이미지 클릭 = 원본</div>
+
+<h2>용어 그림</h2>
+<div class="legend">
+  <figure><img src="checklist-shots/legend-base.png" alt="기준"><figcaption><b>기준</b> — 새 3×3 표. 모든 검사의 출발점.</figcaption></figure>
+  <figure><img src="checklist-shots/legend-stagger.png" alt="어긋내기"><figcaption><b>어긋내기</b> — (0,0) 하변을 Shift+드래그 +12px. 그 칸의 경계만 내려가고 표 크기는 그대로.</figcaption></figure>
+  <figure><img src="checklist-shots/legend-heal.png" alt="치유"><figcaption><b>치유(왕복)</b> — 반대로 12px 끌면 원래 표로 복귀.</figcaption></figure>
+</div>
 
 <h2>마우스 <span class="badge">${count('마우스')}</span></h2>
-<table><tr><th></th><th>항목</th><th>상세</th></tr>
+<table><tr><th></th><th>항목</th><th>상세</th><th style="width:150px">화면</th></tr>
 ${section('마우스')}
 </table>
 
 <h2>키보드 <span class="badge">${count('키보드')}</span></h2>
-<table><tr><th></th><th>항목</th><th>상세</th></tr>
+<table><tr><th></th><th>항목</th><th>상세</th><th style="width:150px">화면</th></tr>
 ${section('키보드')}
 </table>
 

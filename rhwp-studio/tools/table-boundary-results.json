@@ -3,660 +3,770 @@
   "cat": "일반이동",
   "name": "가로 내부선1 ↓ [신선=무동작]",
   "ok": true,
-  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/000.png"
  },
  {
   "cat": "일반이동",
   "name": "가로 내부선1 ↑ [신선=무동작]",
   "ok": true,
-  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/001.png"
  },
  {
   "cat": "일반이동",
   "name": "가로 내부선2 ↓ [신선=무동작]",
   "ok": true,
-  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/002.png"
  },
  {
   "cat": "일반이동",
   "name": "가로 내부선2 ↑ [신선=무동작]",
   "ok": true,
-  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 0.0/0.0/0.0 (기대 0) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/003.png"
  },
  {
   "cat": "일반이동",
   "name": "세로 내부선1 →",
   "ok": true,
-  "detail": "세그 이동 8.8/8.8/8.8 (기대 8) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 8.8/8.8/8.8 (기대 8) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/004.png"
  },
  {
   "cat": "일반이동",
   "name": "세로 내부선1 ←",
   "ok": true,
-  "detail": "세그 이동 -7.2/-7.2/-7.2 (기대 -8) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 -7.2/-7.2/-7.2 (기대 -8) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/005.png"
  },
  {
   "cat": "일반이동",
   "name": "세로 내부선2 →",
   "ok": true,
-  "detail": "세그 이동 8.4/8.4/8.4 (기대 8) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 8.4/8.4/8.4 (기대 8) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/006.png"
  },
  {
   "cat": "일반이동",
   "name": "세로 내부선2 ←",
   "ok": true,
-  "detail": "세그 이동 -7.6/-7.6/-7.6 (기대 -8) 표 559.4x59.4→559.4x59.4"
+  "detail": "세그 이동 -7.6/-7.6/-7.6 (기대 -8) 표 559.4x59.4→559.4x59.4",
+  "shot": "checklist-shots/007.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(0,0) +12",
   "ok": true,
-  "detail": "이동 11.9 표 59.4→59.4"
+  "detail": "이동 11.9 표 59.4→59.4",
+  "shot": "checklist-shots/008.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(0,0) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/009.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(0,0) −12",
   "ok": true,
-  "detail": "이동 -12.1 표 59.4→59.4"
+  "detail": "이동 -12.1 표 59.4→59.4",
+  "shot": "checklist-shots/010.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(0,0) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/011.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(0,1) +12",
   "ok": true,
-  "detail": "이동 11.9 표 59.4→59.4"
+  "detail": "이동 11.9 표 59.4→59.4",
+  "shot": "checklist-shots/012.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(0,1) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/013.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(0,1) −12",
   "ok": true,
-  "detail": "이동 -12.1 표 59.4→59.4"
+  "detail": "이동 -12.1 표 59.4→59.4",
+  "shot": "checklist-shots/014.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(0,1) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/015.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(0,2) +12",
   "ok": true,
-  "detail": "이동 11.9 표 59.4→59.4"
+  "detail": "이동 11.9 표 59.4→59.4",
+  "shot": "checklist-shots/016.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(0,2) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/017.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(0,2) −12",
   "ok": true,
-  "detail": "이동 -12.1 표 59.4→59.4"
+  "detail": "이동 -12.1 표 59.4→59.4",
+  "shot": "checklist-shots/018.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(0,2) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/019.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(1,0) +12",
   "ok": true,
-  "detail": "이동 11.1 표 59.4→59.4"
+  "detail": "이동 11.1 표 59.4→59.4",
+  "shot": "checklist-shots/020.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(1,0) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/021.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(1,0) −12",
   "ok": true,
-  "detail": "이동 -12.9 표 59.4→59.4"
+  "detail": "이동 -12.9 표 59.4→59.4",
+  "shot": "checklist-shots/022.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(1,0) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/023.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(1,1) +12",
   "ok": true,
-  "detail": "이동 11.1 표 59.4→59.4"
+  "detail": "이동 11.1 표 59.4→59.4",
+  "shot": "checklist-shots/024.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(1,1) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/025.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(1,1) −12",
   "ok": true,
-  "detail": "이동 -12.9 표 59.4→59.4"
+  "detail": "이동 -12.9 표 59.4→59.4",
+  "shot": "checklist-shots/026.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(1,1) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/027.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(1,2) +12",
   "ok": true,
-  "detail": "이동 11.1 표 59.4→59.4"
+  "detail": "이동 11.1 표 59.4→59.4",
+  "shot": "checklist-shots/028.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(1,2) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/029.png"
  },
  {
   "cat": "어긋단발",
   "name": "하(1,2) −12",
   "ok": true,
-  "detail": "이동 -12.9 표 59.4→59.4"
+  "detail": "이동 -12.9 표 59.4→59.4",
+  "shot": "checklist-shots/030.png"
  },
  {
   "cat": "어긋왕복",
   "name": "하(1,2) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/031.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(0,0) +12",
   "ok": true,
-  "detail": "이동 12.8 표 59.4→59.4"
+  "detail": "이동 12.8 표 59.4→59.4",
+  "shot": "checklist-shots/032.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(0,0) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/033.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(0,0) −12",
   "ok": true,
-  "detail": "이동 -11.2 표 59.4→59.4"
+  "detail": "이동 -11.2 표 59.4→59.4",
+  "shot": "checklist-shots/034.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(0,0) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/035.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(1,0) +12",
   "ok": true,
-  "detail": "이동 12.8 표 59.4→59.4"
+  "detail": "이동 12.8 표 59.4→59.4",
+  "shot": "checklist-shots/036.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(1,0) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/037.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(1,0) −12",
   "ok": true,
-  "detail": "이동 -11.2 표 59.4→59.4"
+  "detail": "이동 -11.2 표 59.4→59.4",
+  "shot": "checklist-shots/038.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(1,0) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/039.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(2,0) +12",
   "ok": true,
-  "detail": "이동 12.8 표 59.4→59.4"
+  "detail": "이동 12.8 표 59.4→59.4",
+  "shot": "checklist-shots/040.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(2,0) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/041.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(2,0) −12",
   "ok": true,
-  "detail": "이동 -11.2 표 59.4→59.4"
+  "detail": "이동 -11.2 표 59.4→59.4",
+  "shot": "checklist-shots/042.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(2,0) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/043.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(0,1) +12",
   "ok": true,
-  "detail": "이동 12.4 표 59.4→59.4"
+  "detail": "이동 12.4 표 59.4→59.4",
+  "shot": "checklist-shots/044.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(0,1) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/045.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(0,1) −12",
   "ok": true,
-  "detail": "이동 -11.6 표 59.4→59.4"
+  "detail": "이동 -11.6 표 59.4→59.4",
+  "shot": "checklist-shots/046.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(0,1) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/047.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(1,1) +12",
   "ok": true,
-  "detail": "이동 12.4 표 59.4→59.4"
+  "detail": "이동 12.4 표 59.4→59.4",
+  "shot": "checklist-shots/048.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(1,1) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/049.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(1,1) −12",
   "ok": true,
-  "detail": "이동 -11.6 표 59.4→59.4"
+  "detail": "이동 -11.6 표 59.4→59.4",
+  "shot": "checklist-shots/050.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(1,1) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/051.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(2,1) +12",
   "ok": true,
-  "detail": "이동 12.4 표 59.4→59.4"
+  "detail": "이동 12.4 표 59.4→59.4",
+  "shot": "checklist-shots/052.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(2,1) +→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/053.png"
  },
  {
   "cat": "어긋단발",
   "name": "우(2,1) −12",
   "ok": true,
-  "detail": "이동 -11.6 표 59.4→59.4"
+  "detail": "이동 -11.6 표 59.4→59.4",
+  "shot": "checklist-shots/054.png"
  },
  {
   "cat": "어긋왕복",
   "name": "우(2,1) −→복귀",
   "ok": true,
-  "detail": "셀 9 표 59.4"
+  "detail": "셀 9 표 59.4",
+  "shot": "checklist-shots/055.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,0) ArrowDown",
   "ok": true,
-  "detail": "이동 3.8 표 59.4→59.4"
+  "detail": "이동 3.8 표 59.4→59.4",
+  "shot": "checklist-shots/056.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,0) ArrowUp",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/057.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,0) ArrowRight",
   "ok": true,
-  "detail": "이동 3.7 표 59.4→59.4"
+  "detail": "이동 3.7 표 59.4→59.4",
+  "shot": "checklist-shots/058.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,0) ArrowLeft",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/059.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,1) ArrowDown",
   "ok": true,
-  "detail": "이동 3.8 표 59.4→59.4"
+  "detail": "이동 3.8 표 59.4→59.4",
+  "shot": "checklist-shots/060.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,1) ArrowUp",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/061.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,1) ArrowRight",
   "ok": true,
-  "detail": "이동 3.7 표 59.4→59.4"
+  "detail": "이동 3.7 표 59.4→59.4",
+  "shot": "checklist-shots/062.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,1) ArrowLeft",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/063.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,2) ArrowDown",
   "ok": true,
-  "detail": "이동 3.8 표 59.4→59.4"
+  "detail": "이동 3.8 표 59.4→59.4",
+  "shot": "checklist-shots/064.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,2) ArrowUp",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/065.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,2) ArrowRight [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/066.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(0,2) ArrowLeft [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/067.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,0) ArrowDown",
   "ok": true,
-  "detail": "이동 3.8 표 59.4→59.4"
+  "detail": "이동 3.8 표 59.4→59.4",
+  "shot": "checklist-shots/068.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,0) ArrowUp",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/069.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,0) ArrowRight",
   "ok": true,
-  "detail": "이동 3.7 표 59.4→59.4"
+  "detail": "이동 3.7 표 59.4→59.4",
+  "shot": "checklist-shots/070.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,0) ArrowLeft",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/071.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,1) ArrowDown",
   "ok": true,
-  "detail": "이동 3.8 표 59.4→59.4"
+  "detail": "이동 3.8 표 59.4→59.4",
+  "shot": "checklist-shots/072.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,1) ArrowUp",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/073.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,1) ArrowRight",
   "ok": true,
-  "detail": "이동 3.7 표 59.4→59.4"
+  "detail": "이동 3.7 표 59.4→59.4",
+  "shot": "checklist-shots/074.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,1) ArrowLeft",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/075.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,2) ArrowDown",
   "ok": true,
-  "detail": "이동 3.8 표 59.4→59.4"
+  "detail": "이동 3.8 표 59.4→59.4",
+  "shot": "checklist-shots/076.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,2) ArrowUp",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/077.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,2) ArrowRight [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/078.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(1,2) ArrowLeft [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/079.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,0) ArrowDown [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/080.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,0) ArrowUp [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/081.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,0) ArrowRight",
   "ok": true,
-  "detail": "이동 3.7 표 59.4→59.4"
+  "detail": "이동 3.7 표 59.4→59.4",
+  "shot": "checklist-shots/082.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,0) ArrowLeft",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/083.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,1) ArrowDown [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/084.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,1) ArrowUp [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/085.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,1) ArrowRight",
   "ok": true,
-  "detail": "이동 3.7 표 59.4→59.4"
+  "detail": "이동 3.7 표 59.4→59.4",
+  "shot": "checklist-shots/086.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,1) ArrowLeft",
   "ok": true,
-  "detail": "이동 -3.8 표 59.4→59.4"
+  "detail": "이동 -3.8 표 59.4→59.4",
+  "shot": "checklist-shots/087.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,2) ArrowDown [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/088.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,2) ArrowUp [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/089.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,2) ArrowRight [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/090.png"
  },
  {
   "cat": "어긋키보드",
   "name": "(2,2) ArrowLeft [바깥=무동작]",
   "ok": true,
-  "detail": "이동 0.0 표 59.4→59.4"
+  "detail": "이동 0.0 표 59.4→59.4",
+  "shot": "checklist-shots/091.png"
  },
  {
   "cat": "연쇄",
   "name": "마우스 열0 위→아래 순차",
   "ok": true,
-  "detail": "2스텝 정상"
+  "detail": "2스텝 정상",
+  "shot": "checklist-shots/092.png"
  },
  {
   "cat": "연쇄",
   "name": "마우스 열1 위→아래 순차",
   "ok": true,
-  "detail": "2스텝 정상"
+  "detail": "2스텝 정상",
+  "shot": "checklist-shots/093.png"
  },
  {
   "cat": "연쇄",
   "name": "마우스 열2 위→아래 순차",
   "ok": true,
-  "detail": "2스텝 정상"
+  "detail": "2스텝 정상",
+  "shot": "checklist-shots/094.png"
  },
  {
   "cat": "연쇄",
   "name": "키보드 열0 위→아래 순차",
   "ok": true,
-  "detail": "2스텝 정상"
+  "detail": "2스텝 정상",
+  "shot": "checklist-shots/095.png"
  },
  {
   "cat": "연쇄",
   "name": "키보드 열1 위→아래 순차",
   "ok": true,
-  "detail": "2스텝 정상"
+  "detail": "2스텝 정상",
+  "shot": "checklist-shots/096.png"
  },
  {
   "cat": "연쇄",
   "name": "키보드 열2 위→아래 순차",
   "ok": true,
-  "detail": "2스텝 정상"
+  "detail": "2스텝 정상",
+  "shot": "checklist-shots/097.png"
  },
  {
   "cat": "F5이동",
   "name": "어긋낸 표 S자 순회 8스텝",
   "ok": true,
-  "detail": "전 스텝 이동"
+  "detail": "전 스텝 이동",
+  "shot": "checklist-shots/098.png"
  },
  {
   "cat": "F5이동",
   "name": "시각(1,0)→위(병합 진입)",
   "ok": true,
-  "detail": "2,0-2,0 → 1,0-1,0"
+  "detail": "2,0-2,0 → 1,0-1,0",
+  "shot": "checklist-shots/099.png"
  },
  {
   "cat": "F5이동",
   "name": "시각(0,0)→아래 연속(끝까지)",
   "ok": true,
-  "detail": "ok ok 정지@3,0-3,0 최종 3,0-3,0"
+  "detail": "ok ok 정지@3,0-3,0 최종 3,0-3,0",
+  "shot": "checklist-shots/100.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(0,0)",
   "ok": true,
-  "detail": "cellIndex=0"
+  "detail": "cellIndex=0",
+  "shot": "checklist-shots/101.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(0,1)",
   "ok": true,
-  "detail": "cellIndex=1"
+  "detail": "cellIndex=1",
+  "shot": "checklist-shots/102.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(0,2)",
   "ok": true,
-  "detail": "cellIndex=2"
+  "detail": "cellIndex=2",
+  "shot": "checklist-shots/103.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(1,0)",
   "ok": true,
-  "detail": "cellIndex=2"
+  "detail": "cellIndex=2",
+  "shot": "checklist-shots/104.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(1,1)",
   "ok": true,
-  "detail": "cellIndex=3"
+  "detail": "cellIndex=3",
+  "shot": "checklist-shots/105.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(1,2)",
   "ok": true,
-  "detail": "cellIndex=4"
+  "detail": "cellIndex=4",
+  "shot": "checklist-shots/106.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(2,0)",
   "ok": true,
-  "detail": "cellIndex=6"
+  "detail": "cellIndex=6",
+  "shot": "checklist-shots/107.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(2,1)",
   "ok": true,
-  "detail": "cellIndex=7"
+  "detail": "cellIndex=7",
+  "shot": "checklist-shots/108.png"
  },
  {
   "cat": "클릭진입",
   "name": "시각(2,2)",
   "ok": true,
-  "detail": "cellIndex=8"
+  "detail": "cellIndex=8",
+  "shot": "checklist-shots/109.png"
  }
 ]
