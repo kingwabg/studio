@@ -171,6 +171,17 @@ function promoteResizeDragToSingleCell(self: any, state: any, shiftKey: boolean)
   return state.singleCellTarget;
 }
 
+// [2026-08-16] 이 셀의 해당 변 경계선이 **어긋난 선**인가 — 다른 줄의 어떤 셀도 그 선을
+// 경계로 쓰지 않으면 어긋난 것. 치유(restore 승격)는 이때만 허용한다. 정렬 세그를 새로
+// 어긋내는 조작이 남의 어긋 선 근처(정확 겹침 포함)에 떨어졌다고 복원을 부르면, 어긋난
+// 적 없는 셀에 restore 가 나가 격자가 자랐다(키보드 이웃 열 연속 실측 +283HU/회).
+function segIsMisaligned(bboxes: CellBbox[], target: CellBbox, isCol: boolean): boolean {
+  const line = isCol ? target.col + target.colSpan : target.row + target.rowSpan;
+  return !bboxes.some((b: CellBbox) => (isCol
+    ? b.row !== target.row && (b.col === line || b.col + b.colSpan === line)
+    : b.col !== target.col && (b.row === line || b.row + b.rowSpan === line)));
+}
+
 function clampResizePosition(pos: number, bounds: { min: number; max: number }): number {
   return Math.min(Math.max(pos, bounds.min), bounds.max);
 }
@@ -698,7 +709,9 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
         ? state.bboxes.find((b: CellBbox) => b.row === finalBox.row && b.col === finalBox.col + finalBox.colSpan)
         : state.bboxes.find((b: CellBbox) => b.col === finalBox.col && b.row === finalBox.row + finalBox.rowSpan))
       : undefined;
-    const healing = nearLine && (spanOf(finalBox) > 1 || spanOf(neighborBox) > 1);
+    const healing = nearLine
+      && (spanOf(finalBox) > 1 || spanOf(neighborBox) > 1)
+      && !!finalBox && segIsMisaligned(state.bboxes, finalBox, state.edge.type === 'col');
     try {
       this.executeOperation({
         kind: 'snapshot',
@@ -1436,7 +1449,9 @@ export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown'
     ? bboxes.find((b: CellBbox) => b.row === targetBox.row && b.col === targetBox.col + targetBox.colSpan)
     : bboxes.find((b: CellBbox) => b.col === targetBox.col && b.row === targetBox.row + targetBox.rowSpan);
   const spanOf = (b: CellBbox | undefined) => (b ? (isHoriz ? b.colSpan : b.rowSpan) : 1);
-  const healing = nearLine && (spanOf(targetBox) > 1 || spanOf(neighbor) > 1);
+  const healing = nearLine
+    && (spanOf(targetBox) > 1 || spanOf(neighbor) > 1)
+    && segIsMisaligned(bboxes, targetBox, isHoriz);
   try {
     this.executeOperation({
       kind: 'snapshot',
