@@ -175,6 +175,24 @@ function clampResizePosition(pos: number, bounds: { min: number; max: number }):
   return Math.min(Math.max(pos, bounds.min), bounds.max);
 }
 
+// [2026-08-16] Shift 어긋내기(한 칸)의 위치 한계 — 행 전체 리사이즈 한계(글줄 바닥)가
+// 아니라 **표 안쪽 전체**다. 조각 최소(빈 조각=MIN_CELL, 내용 조각=글줄 바닥)는 엔진이
+// 정본으로 클램프하고, 깨질 조작은 엔진 트랜잭션 안전망이 거부한다. 종전엔 리사이즈
+// 한계로 선클램프해 12px 을 끌어도 2.8px 에서 멈췄다(3×3 전수 실측).
+function staggerResizeBounds(state: any): { min: number; max: number } {
+  const MIN_PX = 200 / 75; // MIN_CELL
+  const isRow = state.edge.type === 'row';
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const b of state.bboxes as CellBbox[]) {
+    const s = isRow ? b.y : b.x;
+    const e = isRow ? b.y + b.h : b.x + b.w;
+    if (s < lo) lo = s;
+    if (e > hi) hi = e;
+  }
+  return { min: lo + MIN_PX, max: hi - MIN_PX };
+}
+
 function selectTableObjectFromResize(this: any, tableRef: { sec: number; ppi: number; ci: number }): void {
   this.cursor.clearSelection();
   this.cursor.exitCellSelectionMode();
@@ -539,10 +557,12 @@ export function updateResizeDrag(this: any, e: MouseEvent): void {
   const singleCellTarget = promoteResizeDragToSingleCell(this, this.resizeDragState, e.shiftKey);
 
   const rawNewPos = this.resizeDragState.edge.type === 'row' ? pageY : pageX;
-  const clamped = clampResizePosition(rawNewPos, {
-    min: this.resizeDragState.minResizePos,
-    max: this.resizeDragState.maxResizePos,
-  });
+  const clamped = clampResizePosition(
+    rawNewPos,
+    singleCellTarget
+      ? staggerResizeBounds(this.resizeDragState)
+      : { min: this.resizeDragState.minResizePos, max: this.resizeDragState.maxResizePos },
+  );
   // [캔버스 한컴 포크] 다른 경계선에 스냅(Alt=해제). 스냅되면 전체 페이지 관통 accent 선으로
   // "캐치"를 명확히 알린다(표 범위만 도는 드래그 마커와 색·길이로 구분).
   const snap = applyBoundarySnap(this.resizeDragState, clamped, e.altKey);
@@ -603,10 +623,12 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
   const singleCellTarget = promoteResizeDragToSingleCell(this, state, e.shiftKey);
 
   const rawNewPos = state.edge.type === 'row' ? pageY : pageX;
-  const clamped = clampResizePosition(rawNewPos, {
-    min: state.minResizePos,
-    max: state.maxResizePos,
-  });
+  const clamped = clampResizePosition(
+    rawNewPos,
+    singleCellTarget
+      ? staggerResizeBounds(state)
+      : { min: state.minResizePos, max: state.maxResizePos },
+  );
   // [캔버스 한컴 포크] 커밋도 스냅된 위치 기준(update와 동일 규칙) — 스냅선 정리
   const snapped = applyBoundarySnap(state, clamped, e.altKey);
   const newPos = snapped.pos;
