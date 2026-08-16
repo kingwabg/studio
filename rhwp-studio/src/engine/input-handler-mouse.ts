@@ -198,6 +198,16 @@ function resolveTableResizeHit(
   // 일반 클릭에서 새 bbox를 만들면 대형/중첩 표 문서가 수 초 동안 멈춘다.
   // 리사이즈 시작은 이미 확보된 bbox 캐시가 있을 때만 판정하고, 없으면 텍스트 클릭으로 처리한다.
   if (self.cachedTableRef && self.cachedCellBboxes?.length) {
+    // [2026-08-17 신고: 어긋낸 표 가운데 셀 선택 불가] 키보드 어긋내기 등으로 격자가
+    // 바뀌면 캐시가 스테일 — 이전 격자의 선이 현재 셀 **내부**를 지나는 것으로 판정돼
+    // 일반 클릭을 리사이즈 그랩이 가로채고 캐럿이 표 밖으로 떨어졌다. 캐시는 "어느
+    // 표인가"의 힌트로만 쓰고, 경계 판정은 항상 신선한 bbox로 한다(해당 표 1회 조회
+    // = 아래 콜드 경로와 동일 비용 — 대형 문서 성능 가드 취지 유지).
+    try {
+      const fresh = self.wasm.getTableCellBboxes(
+        self.cachedTableRef.sec, self.cachedTableRef.ppi, self.cachedTableRef.ci);
+      if (fresh?.length) self.cachedCellBboxes = fresh;
+    } catch { /* 조회 실패 시 기존 캐시 유지 */ }
     const pageBboxes = self.cachedCellBboxes.filter((b: any) => b.pageIndex === pageIdx);
     if (pageBboxes.length > 0) {
       return { tableRef: self.cachedTableRef, bboxes: self.cachedCellBboxes, pageBboxes };
