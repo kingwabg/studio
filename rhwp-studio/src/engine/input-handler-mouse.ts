@@ -2069,6 +2069,16 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
     if (this.cachedCellBboxes && this.cachedCellBboxes.length > 0) {
       const pageBboxes = this.cachedCellBboxes.filter((b: any) => b.pageIndex === pageIdx);
       const edge = this.tableResizeRenderer.hitTestBorder(pageX, pageY, pageBboxes);
+      // [2026-08-17] 바깥 테두리는 잡을 수 있는 구간(양 끝 1/3)을 눈에 보이게 —
+      // 가운데(표 잡기)에 있어도 힌트를 띄워 어디로 가야 하는지 알린다.
+      const outer = this.tableResizeRenderer.outerHoverInfo(pageX, pageY, pageBboxes);
+      if (outer) {
+        this.container.style.cursor = outer.inGrabZone
+          ? (outer.horiz ? 'row-resize' : 'col-resize')
+          : 'move';
+        this.tableResizeRenderer.showOuterHint(outer, zoom);
+        return;
+      }
       if (edge) {
         this.container.style.cursor = edge.type === 'row' ? 'row-resize' : 'col-resize';
         this.tableResizeRenderer.showMarker(edge, pageBboxes, zoom);
@@ -2141,7 +2151,14 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
 
   // 경계선 감지
   const edge = this.tableResizeRenderer.hitTestBorder(pageX, pageY, pageBboxes);
-  if (edge) {
+  const outerHover = this.tableResizeRenderer.outerHoverInfo(pageX, pageY, pageBboxes);
+  if (outerHover) {
+    hideProtectedCellHover(this);
+    this.container.style.cursor = outerHover.inGrabZone
+      ? (outerHover.horiz ? 'row-resize' : 'col-resize')
+      : 'move';
+    this.tableResizeRenderer.showOuterHint(outerHover, zoom);
+  } else if (edge) {
     hideProtectedCellHover(this);
     this.container.style.cursor = edge.type === 'row' ? 'row-resize' : 'col-resize';
     this.tableResizeRenderer.showMarker(edge, pageBboxes, zoom);

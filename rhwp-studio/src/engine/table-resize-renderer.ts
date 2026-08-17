@@ -21,6 +21,10 @@ export class TableResizeRenderer {
   private marker: HTMLDivElement | null = null;
   private static readonly MARKER_COLOR = 'rgba(0, 120, 215, 0.5)';
   private static readonly MARKER_THICKNESS = 3;
+  /** 바깥 테두리 호버 힌트 — 잡아서 크기 조절할 수 있는 구간 */
+  private static readonly GRAB_COLOR = 'rgba(0, 120, 215, 0.85)';
+  /** 바깥 테두리 호버 힌트 — 표를 통째로 잡는 가운데 구간 */
+  private static readonly HOLD_COLOR = 'rgba(120, 132, 145, 0.45)';
 
   constructor(
     private container: HTMLElement,
@@ -178,7 +182,79 @@ export class TableResizeRenderer {
   }
 
   /**
-   * 바깥 테두리에서 "표를 잡는" 가운데 구간인가 — 칸 구간의 가운데 1/3(최소 14px).
+   * [2026-08-17] 마우스가 **바깥 테두리 근처**인지와, 거기서 잡을 수 있는 구간이
+   * 어디인지 알려준다 — 호버 힌트용. 가운데(표 잡기)에 있어도 정보를 돌려주므로
+   * "어디를 잡아야 크기가 바뀌는지"를 그려줄 수 있다.
+   */
+  outerHoverInfo(
+    pageX: number, pageY: number, bboxes: CellBbox[], tolerance = 7,
+  ): { edge: BorderEdge; horiz: boolean; linePos: number; start: number; len: number; inGrabZone: boolean } | null {
+    if (bboxes.length === 0) return null;
+    const { rowLines, colLines } = this.computeBorderLines(bboxes);
+    const pageIndex = bboxes[0].pageIndex;
+    for (const horiz of [true, false]) {
+      const lines = horiz ? rowLines : colLines;
+      if (lines.length < 2) continue;
+      const last = lines[lines.length - 1];
+      const linePos = horiz ? (last as RowLine).y : (last as ColLine).x;
+      const across = horiz ? pageY : pageX;
+      if (Math.abs(across - linePos) > tolerance) continue;
+      const along = horiz ? pageX : pageY;
+      for (const b of bboxes) {
+        const end = horiz ? b.y + b.h : b.x + b.w;
+        if (Math.abs(end - linePos) > 1.0) continue;
+        const start = horiz ? b.x : b.y;
+        const len = horiz ? b.w : b.h;
+        if (along < start || along > start + len) continue;
+        const inGrabZone = Math.abs(along - (start + len / 2)) > (len / 3) / 2;
+        return {
+          edge: { type: horiz ? 'row' : 'col', index: lines.length - 1, pageIndex },
+          horiz, linePos, start, len, inGrabZone,
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 바깥 테두리 호버 힌트 — 양 끝 1/3(크기 조절 가능)은 진한 파랑,
+   * 가운데 1/3(표 잡기)은 옅은 회색으로 그려 어디를 잡아야 하는지 보이게 한다.
+   */
+  showOuterHint(
+    info: { edge: BorderEdge; horiz: boolean; linePos: number; start: number; len: number },
+    zoom: number,
+  ): void {
+    this.clear();
+    this.ensureAttached();
+    const scrollContent = this.container.querySelector('#scroll-content');
+    const contentWidth = scrollContent?.clientWidth ?? 0;
+    const pageOffset = this.virtualScroll.getPageOffset(info.edge.pageIndex);
+    const pageLeft = this.virtualScroll.getPageLeftResolved(info.edge.pageIndex, contentWidth);
+    const third = info.len / 3;
+    const bar = (from: number, size: number, color: string, thick: number) => {
+      const el = document.createElement('div');
+      if (info.horiz) {
+        el.style.cssText = `position:absolute;left:${pageLeft + from * zoom}px;`
+          + `top:${pageOffset + info.linePos * zoom - thick / 2}px;`
+          + `width:${size * zoom}px;height:${thick}px;background:${color};`
+          + `border-radius:${thick / 2}px;pointer-events:none;`;
+      } else {
+        el.style.cssText = `position:absolute;left:${pageLeft + info.linePos * zoom - thick / 2}px;`
+          + `top:${pageOffset + from * zoom}px;`
+          + `width:${thick}px;height:${size * zoom}px;background:${color};`
+          + `border-radius:${thick / 2}px;pointer-events:none;`;
+      }
+      this.layer.appendChild(el);
+      return el;
+    };
+    bar(info.start, third, TableResizeRenderer.GRAB_COLOR, 5);
+    bar(info.start + third, third, TableResizeRenderer.HOLD_COLOR, 3);
+    bar(info.start + third * 2, third, TableResizeRenderer.GRAB_COLOR, 5);
+    this.marker = this.layer.lastElementChild as HTMLDivElement;
+  }
+
+  /**
+   * 바깥 테두리에서 "표를 잡는" 가운데 구간인가 — 칸 구간의 가운데 1/3.
    * 이 구간은 리사이즈 그랩에서 빼서 표 개체 선택이 되게 한다(사용자 규칙 2026-08-17).
    */
   private isOuterGrabZone(
@@ -306,10 +382,9 @@ export class TableResizeRenderer {
 
   /** 마커를 제거한다 */
   clear(): void {
-    if (this.marker) {
-      this.marker.remove();
-      this.marker = null;
-    }
+    // 호버 힌트는 요소가 여러 개(양 끝 + 가운데)라 레이어를 통째로 비운다.
+    while (this.layer.firstChild) this.layer.removeChild(this.layer.firstChild);
+    this.marker = null;
   }
 
   /** 레이어가 DOM에 없으면 재부착한다 */
