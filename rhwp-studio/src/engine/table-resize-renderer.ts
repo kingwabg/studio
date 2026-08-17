@@ -22,9 +22,11 @@ export class TableResizeRenderer {
   private static readonly MARKER_COLOR = 'rgba(0, 120, 215, 0.5)';
   private static readonly MARKER_THICKNESS = 3;
   /** 바깥 테두리 호버 힌트 — 잡아서 크기 조절할 수 있는 구간 */
-  private static readonly GRAB_COLOR = 'rgba(0, 120, 215, 0.85)';
+  private static readonly GRAB_COLOR = 'rgba(0, 110, 210, 0.95)';
   /** 바깥 테두리 호버 힌트 — 표를 통째로 잡는 가운데 구간 */
-  private static readonly HOLD_COLOR = 'rgba(120, 132, 145, 0.45)';
+  private static readonly HOLD_COLOR = 'rgba(120, 132, 145, 0.55)';
+  /** 힌트 두께 — 표 테두리와 비슷하게(사용자 지시 2026-08-17) */
+  private static readonly HINT_THICKNESS = 2;
 
   constructor(
     private container: HTMLElement,
@@ -247,9 +249,12 @@ export class TableResizeRenderer {
       this.layer.appendChild(el);
       return el;
     };
-    bar(info.start, third, TableResizeRenderer.GRAB_COLOR, 5);
-    bar(info.start + third, third, TableResizeRenderer.HOLD_COLOR, 3);
-    bar(info.start + third * 2, third, TableResizeRenderer.GRAB_COLOR, 5);
+    // 표 선과 비슷한 굵기로 얹는다(2026-08-17 사용자 지시) — 굵은 막대는 테두리를
+    // 덮어 표가 두꺼워 보였다. 색만으로 구간을 구분한다.
+    const t = TableResizeRenderer.HINT_THICKNESS;
+    bar(info.start, third, TableResizeRenderer.GRAB_COLOR, t);
+    bar(info.start + third, third, TableResizeRenderer.HOLD_COLOR, t);
+    bar(info.start + third * 2, third, TableResizeRenderer.GRAB_COLOR, t);
     this.marker = this.layer.lastElementChild as HTMLDivElement;
   }
 
