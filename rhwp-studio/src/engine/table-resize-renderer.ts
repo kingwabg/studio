@@ -190,16 +190,17 @@ export class TableResizeRenderer {
     if (!line) return false;
     const linePos = horiz ? (line as RowLine).y : (line as ColLine).x;
     const along = horiz ? pageX : pageY;
+    // 가운데 1/3 이 표 잡기, 양 끝 1/3 씩이 크기 조절. **비율만** 쓴다 — 최소 픽셀을
+    // 두면 얇은 칸(예: 11px 행)에서 그 최소값이 칸 전체를 덮어 크기 조절이 아예
+    // 불가능해진다(배포 실측: 오른쪽 테두리 559→560.5px 무동작).
     const CENTER_RATIO = 1 / 3;
-    const MIN_CENTER_PX = 14;
     for (const b of bboxes) {
       const end = horiz ? b.y + b.h : b.x + b.w;
       if (Math.abs(end - linePos) > 1.0) continue; // 이 선에 맞닿은 칸만
       const start = horiz ? b.x : b.y;
       const len = horiz ? b.w : b.h;
       if (along < start || along > start + len) continue; // 이 칸 구간 밖
-      const center = Math.min(len, Math.max(MIN_CENTER_PX, len * CENTER_RATIO));
-      return Math.abs(along - (start + len / 2)) <= center / 2;
+      return Math.abs(along - (start + len / 2)) <= (len * CENTER_RATIO) / 2;
     }
     return false;
   }
