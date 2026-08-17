@@ -92,6 +92,33 @@ function isCanvasEditingHit(self: any, hit: any): boolean {
 }
 
 // [캔버스 한컴 포크] 표 hover 핸들(table-hover-handles)에서도 재사용하므로 export.
+/**
+ * [2026-08-17] 표 이동 드래그 시작 — 개체 선택 중 표 안(또는 테두리 허용오차 내)
+ * mousedown 과, 테두리 클릭으로 방금 선택된 순간(한컴식 잡아끌기 한 제스처)이 공유한다.
+ * 마우스를 안 움직이면 delta 0 으로 이동 없이 끝나므로 클릭 동작은 그대로다.
+ */
+function beginTableMoveDrag(
+  this: any,
+  ref: { sec: number; ppi: number; ci: number },
+  px: number, py: number,
+  enterCellHit: any = null,
+): void {
+  this.isMoveDragging = true;
+  // [드래그 안정화 2026-07-28] 어울림 재줄바꿈은 드롭에서 확정 — 드래그 중
+  // 재줄바꿈이 host 를 되밀어 톱니 진동(±15px)을 만들던 피드백 루프 차단.
+  try { (this.wasm as any).doc?.setSquareReflowSuppressed?.(true); } catch { /* 구버전 무시 */ }
+  this.moveDragState = {
+    tableRef: { sec: ref.sec, ppi: ref.ppi, ci: ref.ci },
+    startPpi: ref.ppi,
+    startPageX: px, startPageY: py,
+    lastPageX: px, lastPageY: py,
+    totalDeltaH: 0, totalDeltaV: 0,
+    pendingEnterCellHit: enterCellHit,
+  };
+  this.container.style.cursor = 'move';
+  document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
+}
+
 export function selectTableObject(this: any, tableRef: { sec: number; ppi: number; ci: number }): void {
   hideProtectedCellHover(this);
   this.cursor.clearSelection();
@@ -455,24 +482,15 @@ export function onClick(this: any, e: MouseEvent): void {
             }
           }
           const bbox = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
-          if (px >= bbox.x && px <= bbox.x + bbox.width &&
-              py >= bbox.y && py <= bbox.y + bbox.height) {
+          // [2026-08-17] 테두리 잡기 허용오차 — 경계선 자체(py==bbox.y 등)는 부동소수
+          // 반올림으로 포함 판정이 절반쯤 실패해, 이동 커서가 뜨는 윗변을 끌어도
+          // 무반응이었다(실측: 윗변 25% 지점 드래그 무동작).
+          const MOVE_GRAB_TOL = 3;
+          if (px >= bbox.x - MOVE_GRAB_TOL && px <= bbox.x + bbox.width + MOVE_GRAB_TOL &&
+              py >= bbox.y - MOVE_GRAB_TOL && py <= bbox.y + bbox.height + MOVE_GRAB_TOL) {
             clickedInsideSelectedTable = true;
             e.preventDefault();
-            this.isMoveDragging = true;
-            // [드래그 안정화 2026-07-28] 어울림 재줄바꿈은 드롭에서 확정 — 드래그 중
-            // 재줄바꿈이 host 를 되밀어 톱니 진동(±15px)을 만들던 피드백 루프 차단.
-            try { (this.wasm as any).doc?.setSquareReflowSuppressed?.(true); } catch { /* 구버전 무시 */ }
-            this.moveDragState = {
-              tableRef: { sec: ref.sec, ppi: ref.ppi, ci: ref.ci },
-              startPpi: ref.ppi,
-              startPageX: px, startPageY: py,
-              lastPageX: px, lastPageY: py,
-              totalDeltaH: 0, totalDeltaV: 0,
-              pendingEnterCellHit: enterCellHit,
-            };
-            this.container.style.cursor = 'move';
-            document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
+            beginTableMoveDrag.call(this, ref, px, py, enterCellHit);
             this.textarea.focus();
             return;
           }
@@ -1034,6 +1052,12 @@ export function onClick(this: any, e: MouseEvent): void {
         this.eventBus.emit('table-object-selection-changed', true);
         // [Task #394] 셀 진입 자동 ON 로직 비활성화 — input-handler.ts 의 코멘트 참고.
         // this.checkTransparentBordersTransition();
+        // [2026-08-17] 한컴식 잡아끌기 — 테두리를 눌러 선택한 그 제스처로 바로 이동.
+        // 종전엔 첫 드래그가 선택만 하고 끝나 "표 이동이 안 된다"로 체감됐다.
+        if (e.button === 0) {
+          beginTableMoveDrag.call(this,
+            { sec: hit.sectionIndex, ppi: hit.parentParaIndex, ci: hit.controlIndex }, pageX, pageY);
+        }
         this.textarea.focus();
         return;
       }
@@ -1052,6 +1076,8 @@ export function onClick(this: any, e: MouseEvent): void {
         this.eventBus.emit('table-object-selection-changed', true);
         // [Task #394] 셀 진입 자동 ON 로직 비활성화 — input-handler.ts 의 코멘트 참고.
         // this.checkTransparentBordersTransition();
+        // [2026-08-17] 한컴식 잡아끌기 — 선택 제스처에서 바로 이동 (위 분기와 동일).
+        if (e.button === 0) beginTableMoveDrag.call(this, tableHit, pageX, pageY);
         this.textarea.focus();
         return;
       }
