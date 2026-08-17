@@ -3206,6 +3206,11 @@ export class InputHandler {
     if (!this.cellSelectionRenderer) return;
     const range = this.cursor.getSelectedCellRange();
     const ctx = this.cursor.getCellTableContext();
+    // [2026-08-17] F5 셀 이동/확장(2·3연타 포함)마다 우측 패널 주소·범위 표시 갱신 —
+    // 모든 셀 선택 변경이 이 함수를 지난다. 'cursor-cell-changed' 는 Ruler 가 payload
+    // (inCell·cellX)를 소비해 상태가 흐트러지므로, Ruler 가드가 무시하고 인스펙터만
+    // 반응하는 'cursor-rect-updated'(무페이로드)로 알린다.
+    this.eventBus.emit('cursor-rect-updated');
     if (!range || !ctx) {
       this.cellSelectionRenderer.clear();
       return;

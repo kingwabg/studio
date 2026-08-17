@@ -820,19 +820,48 @@ export class CanvaRightInspector {
         return ih.cursor ? describeBodySelection(ih.cursor, this.services.wasm as never) : '';
       }
       if (c === 'cell' || c === 'table') {
-        const ref = ih.cursor?.getCellTableContext?.();
-        if (!ref) return '';
-        const dim = this.services.wasm.getTableDimensions?.(ref.sec, ref.ppi, ref.ci);
+        const ref = ih.cursor?.getCellTableContext?.() ?? ih.cursor?.getPosition?.();
+        const sec = ref?.sec ?? ref?.sectionIndex;
+        const ppi = ref?.ppi ?? ref?.parentParaIndex;
+        const ci = ref?.ci ?? ref?.controlIndex;
+        if (sec === undefined || ppi === undefined || ci === undefined) return '';
+        const dim = this.services.wasm.getTableDimensions?.(sec, ppi, ci);
         const size = dim?.rowCount && dim?.colCount ? `${dim.rowCount}×${dim.colCount}` : '';
-        const pos = ih.cursor?.getPosition?.();
-        // A1 표기 — 셀 인덱스에서 행/열 역산
+        // [2026-08-17] 주소는 격자 산술(cellIndex/colCount)이 아니라 **조각 순번**으로 —
+        // 어긋난 표에서 격자 행이 늘어나 주소가 밀렸다. 열 글자 = 격자 열, 숫자 = 그
+        // 열에서 위→아래 순번. F5 셀 선택 중엔 초점 주소 + 범위(셀 선택 B2-C2)를 병기.
+        let bboxes: any[] = [];
+        try { bboxes = this.services.wasm.getTableCellBboxes?.(sec, ppi, ci) ?? []; } catch { bboxes = []; }
+        const addrOf = (row: number, col: number): string => {
+          const cc = bboxes.find(b => row >= b.row && row < b.row + b.rowSpan && col >= b.col && col < b.col + b.colSpan);
+          if (!cc) return '';
+          const mates = bboxes
+            .filter(b => cc.col >= b.col && cc.col < b.col + b.colSpan)
+            .sort((a, b) => a.row - b.row);
+          const ord = mates.findIndex(b => b.cellIdx === cc.cellIdx);
+          return `${String.fromCharCode(65 + cc.col)}${ord + 1}`;
+        };
         let cell = '';
-        if (c === 'cell' && pos?.cellIndex !== undefined && dim?.colCount) {
-          const r = Math.floor(pos.cellIndex / dim.colCount);
-          const col = pos.cellIndex % dim.colCount;
-          cell = ` · ${String.fromCharCode(65 + col)}${r + 1}`;
+        let selNote = '';
+        const range = ih.cursor?.isInCellSelectionMode?.() ? ih.cursor?.getSelectedCellRange?.() : null;
+        if (range) {
+          const focus = addrOf(range.endRow, range.endCol);
+          const anchor = addrOf(range.startRow, range.startCol);
+          if (focus) cell = ` · ${focus}`;
+          if (anchor && focus && anchor !== focus) selNote = ` · 셀 선택 ${anchor}-${focus}`;
+        } else if (c === 'cell') {
+          const pos = ih.cursor?.getPosition?.();
+          if (pos?.cellIndex !== undefined) {
+            const own = bboxes.find(b => b.cellIdx === pos.cellIndex);
+            const a = own ? addrOf(own.row, own.col) : '';
+            if (a) cell = ` · ${a}`;
+            else if (dim?.colCount) {
+              const r = Math.floor(pos.cellIndex / dim.colCount);
+              cell = ` · ${String.fromCharCode(65 + (pos.cellIndex % dim.colCount))}${r + 1}`;
+            }
+          }
         }
-        return `표 블록${size ? ` · ${size}` : ''}${cell}`;
+        return `표 블록${size ? ` · ${size}` : ''}${cell}${selNote}`;
       }
       if (c === 'picture') {
         return ih.isMultiPictureSelection?.() ? '개체 2개 이상 선택' : '';
