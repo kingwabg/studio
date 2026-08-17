@@ -1312,37 +1312,63 @@ export class CursorState {
     let newCol = this.cellFocus.col;
 
     if (curCell) {
+      // [2026-08-17] 어긋난 표 순회 정규화 — 어긋내기로 a1 이 격자 두 행에 걸치면
+      // 종전 격자 산술(row+rowSpan, 랩=다음 행 0열)은 c1 다음 →에서 도로 a1 로
+      // 돌아갔다("a2 가 a1 이 된다" 신고). ↓/↑ 는 다음/이전 밴드에서 가로로 가장
+      // 많이 겹치는 셀, →/← 는 순번(k번째 조각) 기반. 병합 표에서도 그대로 동작.
+      const overlapX = (b: CellBbox) =>
+        Math.min(b.col + b.colSpan, curCell.col + curCell.colSpan) - Math.max(b.col, curCell.col);
+      const best = (cands: CellBbox[], score: (b: CellBbox) => number): CellBbox | null =>
+        cands.reduce<CellBbox | null>((acc, b) => (!acc || score(b) > score(acc) ? b : acc), null);
+      // 한 격자 열을 덮는 조각들을 위→아래로
+      const colPieces = (col: number) =>
+        bboxes.filter(b => col >= b.col && col < b.col + b.colSpan).sort((a, b) => a.row - b.row);
+
+      // 좌우는 **순번(k번째 조각)** 기반 — 사용자 규칙: 병합 없는 3×3 은 어긋내기와
+      // 무관하게 a1→b1→c1→a2→…→c3. 겹침 기반은 c2 랩이 a1 밴드(격자 행 1)로 붙어
+      // a2 로 되돌아갔다(실측).
+      const myPieces = colPieces(curCell.col);
+      const k = Math.max(0, myPieces.findIndex(b => b.cellIdx === curCell.cellIdx));
+      let target: CellBbox | null = null;
       if (deltaCol > 0) {
-        // 오른쪽: 현재 셀의 오른쪽 끝 다음 열로 이동
-        newCol = curCell.col + curCell.colSpan;
-        if (newCol >= colCount) {
-          // 오른쪽에 셀 없음 → 다음 행 첫 열
-          newRow = curCell.row + curCell.rowSpan;
-          newCol = 0;
+        const nextCol = curCell.col + curCell.colSpan;
+        if (nextCol < colCount) {
+          const m = colPieces(nextCol);
+          target = m[Math.min(k, m.length - 1)] ?? null;
+        } else {
+          // 랩: 첫 열의 k+1 번째 조각
+          target = colPieces(0)[k + 1] ?? null;
         }
       } else if (deltaCol < 0) {
-        // 왼쪽: 현재 셀 왼쪽 열로 이동
-        newCol = curCell.col - 1;
-        if (newCol < 0) {
-          // 왼쪽에 셀 없음 → 이전 행 마지막 열
-          newRow = curCell.row - 1;
-          newCol = colCount - 1;
+        const prevCol = curCell.col - 1;
+        if (prevCol >= 0) {
+          const m = colPieces(prevCol);
+          target = m[Math.min(k, m.length - 1)] ?? null;
+        } else {
+          // 랩: 마지막 열의 k-1 번째 조각
+          target = k > 0 ? colPieces(colCount - 1)[k - 1] ?? null : null;
         }
       } else if (deltaRow > 0) {
-        // 아래: 현재 셀 하단 다음 행으로 이동
-        newRow = curCell.row + curCell.rowSpan;
+        const nextRow = curCell.row + curCell.rowSpan;
+        if (nextRow < rowCount) {
+          target = best(bboxes.filter(b => nextRow >= b.row && nextRow < b.row + b.rowSpan).filter(b => overlapX(b) > 0), overlapX);
+        }
       } else if (deltaRow < 0) {
-        // 위: 현재 셀 위 행으로 이동
-        newRow = curCell.row - 1;
+        const prevRow = curCell.row - 1;
+        if (prevRow >= 0) {
+          target = best(bboxes.filter(b => prevRow >= b.row && prevRow < b.row + b.rowSpan).filter(b => overlapX(b) > 0), overlapX);
+        }
       }
+      if (!target) return; // 표 끝 → 멈춤
+      newRow = target.row;
+      newCol = target.col;
     } else {
       newRow += deltaRow;
       newCol += deltaCol;
-    }
-
-    // 범위 체크: 표 경계를 벗어나면 이동하지 않음
-    if (newRow < 0 || newRow >= rowCount || newCol < 0 || newCol >= colCount) {
-      return; // 표 끝 → 멈춤
+      // 범위 체크: 표 경계를 벗어나면 이동하지 않음
+      if (newRow < 0 || newRow >= rowCount || newCol < 0 || newCol >= colCount) {
+        return; // 표 끝 → 멈춤
+      }
     }
 
     this.cellAnchor = { row: newRow, col: newCol };
