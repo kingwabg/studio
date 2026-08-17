@@ -638,6 +638,46 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
   // 1 page px (96 DPI) = 75 HWPUNIT (7200/96)
   const deltaHwpUnit = Math.round(deltaPagePx * 75);
 
+  // [2026-08-18] 행 안쪽 경계 성장 폴백 — 이웃 행이 글줄 바닥(최소)이면 위치
+  // 클램프(maxResizePos)가 newPos 를 원위치로 되돌려, 기본 표에서 행 리사이즈가
+  // **어떤 드래그도 1px 미만 무시로 죽었다**(전면 감사 M03 — "전혀 안돼" 신고의
+  // 실체). 정본 규칙(안쪽=표 크기 불변)은 보상이 가능할 때만 성립한다 — 보상이
+  // 전무한 경우 한컴은 아래 행을 밀어내며 표가 커진다. 그때만 폴백한다.
+  if (state.edge.type === 'row' && !state.outerResize && !singleCellTarget) {
+    const rawDeltaHwp = Math.round((rawNewPos - state.borderOriginalPos) * 75);
+    // 클램프 창(이웃 행 여유, 보통 ±MIN_CELL)을 1px 이상 넘겨 끌었을 때 = 보상
+    // 불가 요청. 창 안 미세 커밋은 엔진 글줄 바닥이 어차피 거부한다(계측: exec
+    // resizeTableCells 커밋에도 행높이 불변).
+    if (rawDeltaHwp >= 75 && rawNewPos > state.maxResizePos + 1) {
+      const targets = (state.bboxes as CellBbox[]).filter((b) =>
+        Math.abs((b.y + b.h) - state.borderOriginalPos) <= 1.0);
+      if (targets.length > 0) {
+        try {
+          this.executeOperation({
+            kind: 'snapshot',
+            operationType: 'resizeTableRowGrow',
+            operation: (wasm: any) => {
+              for (const b of targets) {
+                const cur = Math.round(b.h * 75);
+                wasm.setCellProperties(
+                  state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
+                  b.cellIdx, { height: cur + rawDeltaHwp },
+                );
+              }
+              wasm.reflowLinesegs?.();
+              return this.cursor.getPosition();
+            },
+          });
+        } catch (err) {
+          console.warn('[InputHandler] 행 성장 폴백 실패:', err);
+        }
+        if (this.cursor.isInCellSelectionMode()) this.updateCellSelection();
+        this.cleanupResizeDrag();
+        return;
+      }
+    }
+  }
+
   // 너무 작은 드래그는 무시 (1px 미만)
   if (Math.abs(deltaHwpUnit) < 75) {
     const shouldSelectTable = isOuterResizeEdge(this, state.edge, state.pageBboxes);
@@ -874,6 +914,41 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
         return { ...pair, segDelta: clamped };
       });
       if (segs.every((s2) => s2.segDelta === 0)) {
+        // [2026-08-18] 행 안쪽 경계: 이웃 행이 글줄 바닥(최소)이면 보상 축소가 전부
+        // 0 으로 클램프돼 **기본 표에서 행 리사이즈가 완전 무동작**이었다(전면 감사
+        // M03 — 신고 "전혀 안돼"의 실체). 한컴은 이 경우 아래 행을 밀어내며 표가
+        // 커진다 — 보상 없이 대상 행만 키우는 커밋으로 폴백(아래로 끌 때만; 축소는
+        // 글줄 바닥 규약대로 무동작 유지).
+        if (state.edge.type === 'row') {
+          const grows = pairBoxes
+            .map((pair) => ({
+              pair,
+              req: Math.round((newPos - (pair.targetBox!.y + pair.targetBox!.h)) * 75),
+            }))
+            .filter((g2) => g2.req > 0);
+          if (grows.length > 0) {
+            try {
+              this.executeOperation({
+                kind: 'snapshot',
+                operationType: 'resizeTableRowGrow',
+                operation: (wasm: any) => {
+                  for (const g2 of grows) {
+                    const cur = Math.round(g2.pair.targetBox!.h * 75);
+                    wasm.setCellProperties(
+                      state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci,
+                      g2.pair.targetCellIdx, { height: cur + g2.req },
+                    );
+                  }
+                  wasm.reflowLinesegs?.();
+                  return this.cursor.getPosition();
+                },
+              });
+            } catch (err) {
+              console.warn('[InputHandler] 행 성장 폴백 실패:', err);
+            }
+            if (inCellSel) this.updateCellSelection();
+          }
+        }
         this.cleanupResizeDrag();
         return;
       }
