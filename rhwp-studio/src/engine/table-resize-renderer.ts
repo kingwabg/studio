@@ -162,16 +162,46 @@ export class TableResizeRenderer {
     }
 
     if (candidates.length === 0) return null;
-    // 표 **외곽** 경계(최상/최하/최좌/최우)는 리사이즈 대상에서 제외 — 외곽 근접
-    // 클릭이 그립에 먹혀 캐럿이 안 서고, 호버 리사이즈 커서도 소음이었다
-    // (2026-08-10 사용자 요청: 외곽은 끄고 내부 경계만 유지).
-    const inner = candidates.filter((c) => {
+    // [2026-08-17 사용자 규칙 변경] 아래·오른쪽 바깥 테두리도 크기 조절을 연다 —
+    // 단 **칸마다 가운데 구간은 표를 잡는 자리**로 남긴다(거기서 누르면 종전대로
+    // 표 개체 선택). 위·왼쪽 테두리는 계속 제외한다: 그 선을 끝변으로 갖는 칸이
+    // 없어 옮길 대상이 없고, 표 위치까지 움직이는 별개 조작이 된다.
+    const usable = candidates.filter((c) => {
       const last = c.edge.type === 'row' ? rowLines.length - 1 : colLines.length - 1;
-      return c.edge.index > 0 && c.edge.index < last;
+      if (c.edge.index <= 0) return false;
+      if (c.edge.index < last) return true;
+      return !this.isOuterGrabZone(pageX, pageY, bboxes, c.edge);
     });
-    if (inner.length === 0) return null;
-    inner.sort((a, b) => a.distance - b.distance || a.priority - b.priority);
-    return inner[0].edge;
+    if (usable.length === 0) return null;
+    usable.sort((a, b) => a.distance - b.distance || a.priority - b.priority);
+    return usable[0].edge;
+  }
+
+  /**
+   * 바깥 테두리에서 "표를 잡는" 가운데 구간인가 — 칸 구간의 가운데 1/3(최소 14px).
+   * 이 구간은 리사이즈 그랩에서 빼서 표 개체 선택이 되게 한다(사용자 규칙 2026-08-17).
+   */
+  private isOuterGrabZone(
+    pageX: number, pageY: number, bboxes: CellBbox[], edge: BorderEdge,
+  ): boolean {
+    const { rowLines, colLines } = this.computeBorderLines(bboxes);
+    const horiz = edge.type === 'row';
+    const line = (horiz ? rowLines : colLines).find(l => l.index === edge.index);
+    if (!line) return false;
+    const linePos = horiz ? (line as RowLine).y : (line as ColLine).x;
+    const along = horiz ? pageX : pageY;
+    const CENTER_RATIO = 1 / 3;
+    const MIN_CENTER_PX = 14;
+    for (const b of bboxes) {
+      const end = horiz ? b.y + b.h : b.x + b.w;
+      if (Math.abs(end - linePos) > 1.0) continue; // 이 선에 맞닿은 칸만
+      const start = horiz ? b.x : b.y;
+      const len = horiz ? b.w : b.h;
+      if (along < start || along > start + len) continue; // 이 칸 구간 밖
+      const center = Math.min(len, Math.max(MIN_CENTER_PX, len * CENTER_RATIO));
+      return Math.abs(along - (start + len / 2)) <= center / 2;
+    }
+    return false;
   }
 
   /** 경계선 위에 마커(하이라이트 라인)를 표시한다 */

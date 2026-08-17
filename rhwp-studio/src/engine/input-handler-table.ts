@@ -436,14 +436,14 @@ export function startResizeDrag(this: any,
     borderOriginalPos = line.x;
   }
 
-  // [경계선 재설계 2026-08-04] 바깥 테두리는 드래그 이동 금지 — 잡으면 표 개체 선택.
-  // 표 크기 조절은 개체 핸들(오른쪽·아래·오른쪽아래)로만 한다.
-  {
-    const lineCount = (edge.type === 'row' ? rowLines : colLines).length;
-    if (edge.index === 0 || edge.index === lineCount - 1) {
-      selectTableObjectFromResize.call(this, { ...this.cachedTableRef });
-      return;
-    }
+  // [2026-08-17 규칙 변경] 아래·오른쪽 바깥 테두리는 **크기 조절**을 허용한다 —
+  // 칸마다 가운데 구간은 hitTestBorder 가 걸러 표 개체 선택으로 보내므로, 여기 온
+  // 바깥 테두리는 크기 조절 의도다. 위·왼쪽 테두리는 종전대로 개체 선택(그 선을
+  // 끝변으로 갖는 칸이 없어 옮길 대상이 없다).
+  const outerResize = edge.index === (edge.type === 'row' ? rowLines : colLines).length - 1;
+  if (edge.index === 0) {
+    selectTableObjectFromResize.call(this, { ...this.cachedTableRef });
+    return;
   }
 
   // [캔버스 한컴 포크] 스냅 타깃 = 같은 축 다른 경계선 위치(자기 자신 제외). 정렬된 표에선
@@ -533,6 +533,7 @@ export function startResizeDrag(this: any,
     singleCellTarget,
     shiftResize: shouldResizeSingleCell,
     snapTargets, // [캔버스 한컴 포크]
+    outerResize, // 바깥(아래·오른쪽) 테두리 = 표 크기 자체를 늘리고 줄인다
   };
 
   // mouseup 리스너 등록 (document 레벨)
@@ -660,6 +661,47 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
   }>;
   const inCellSel = this.cursor.isInCellSelectionMode();
   const range = inCellSel ? this.cursor.getSelectedCellRange() : null;
+
+  // [2026-08-17] 바깥(아래·오른쪽) 테두리 = **표 크기 자체**를 바꾼다. 보상할 반대편
+  // 칸이 없으므로 resizeTableCells 의 재분배 경로를 쓸 수 없고(localResize 힌트가
+  // 붙으면 엔진이 표 크기를 원래대로 되돌린다), 표 핸들과 같은 절대값 지정
+  // (setCellProperties)으로 그 줄의 칸 크기를 직접 목표값에 놓는다.
+  if (state.outerResize && !state.singleCellTarget) {
+    const isCol = state.edge.type === 'col';
+    const minHwp = minCellSizeHwp(state.edge.type);
+    const targets = (state.bboxes as CellBbox[]).filter((b) => {
+      const end = isCol ? b.x + b.w : b.y + b.h;
+      return Math.abs(end - state.borderOriginalPos) <= 1.0;
+    });
+    if (targets.length === 0) {
+      this.cleanupResizeDrag();
+      return;
+    }
+    const deltaPx = newPos - state.borderOriginalPos;
+    try {
+      this.executeOperation({
+        kind: 'snapshot',
+        operationType: 'resizeTableOuterBorder',
+        operation: (wasm: any) => {
+          for (const b of targets) {
+            const cur = (isCol ? b.w : b.h) * 75;
+            const size = Math.max(minHwp, Math.round(cur + deltaPx * 75));
+            wasm.setCellProperties(
+              state.tableRef.sec, state.tableRef.ppi, state.tableRef.ci, b.cellIdx,
+              isCol ? { width: size } : { height: size },
+            );
+          }
+          wasm.reflowLinesegs?.();
+          return this.cursor.getPosition();
+        },
+      });
+    } catch (err) {
+      console.warn('[InputHandler] 바깥 테두리 크기 조절 실패:', err);
+    }
+    if (inCellSel) this.updateCellSelection();
+    this.cleanupResizeDrag();
+    return;
+  }
 
   if (state.singleCellTarget) {
     // [경계선 재설계 2026-08-04] Shift+드래그 = 한 칸 어긋내기 — 렌더 흉내가 아니라
