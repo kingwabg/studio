@@ -826,20 +826,35 @@ export class CanvaRightInspector {
         const ci = ref?.ci ?? ref?.controlIndex;
         if (sec === undefined || ppi === undefined || ci === undefined) return '';
         const dim = this.services.wasm.getTableDimensions?.(sec, ppi, ci);
-        const size = dim?.rowCount && dim?.colCount ? `${dim.rowCount}×${dim.colCount}` : '';
-        // [2026-08-17] 주소는 격자 산술(cellIndex/colCount)이 아니라 **조각 순번**으로 —
-        // 어긋난 표에서 격자 행이 늘어나 주소가 밀렸다. 열 글자 = 격자 열, 숫자 = 그
-        // 열에서 위→아래 순번. F5 셀 선택 중엔 초점 주소 + 범위(셀 선택 B2-C2)를 병기.
+        // [2026-08-17] 주소·크기는 격자 좌표가 아니라 **조각 순번**으로 — 어긋내기는
+        // 격자 행/열을 늘리므로(3×3 가 격자 4×3, 마지막 열이 D) 격자 산술은 화면과
+        // 어긋난다(신고). 열 글자 = 행 밴드에서 왼→오른쪽 순번, 숫자 = 열 밴드에서
+        // 위→아래 순번, 크기 = 밴드별 최대 조각 수. F5 중엔 범위(셀 선택 B2-C2) 병기.
         let bboxes: any[] = [];
         try { bboxes = this.services.wasm.getTableCellBboxes?.(sec, ppi, ci) ?? []; } catch { bboxes = []; }
+        let vRows = 0;
+        let vCols = 0;
+        for (let g = 0; g < (dim?.colCount ?? 0); g++) {
+          vRows = Math.max(vRows, bboxes.filter(b => g >= b.col && g < b.col + b.colSpan).length);
+        }
+        for (let g = 0; g < (dim?.rowCount ?? 0); g++) {
+          vCols = Math.max(vCols, bboxes.filter(b => g >= b.row && g < b.row + b.rowSpan).length);
+        }
+        const size = vRows && vCols
+          ? `${vRows}×${vCols}`
+          : (dim?.rowCount && dim?.colCount ? `${dim.rowCount}×${dim.colCount}` : '');
         const addrOf = (row: number, col: number): string => {
           const cc = bboxes.find(b => row >= b.row && row < b.row + b.rowSpan && col >= b.col && col < b.col + b.colSpan);
           if (!cc) return '';
-          const mates = bboxes
+          const colMates = bboxes
             .filter(b => cc.col >= b.col && cc.col < b.col + b.colSpan)
             .sort((a, b) => a.row - b.row);
-          const ord = mates.findIndex(b => b.cellIdx === cc.cellIdx);
-          return `${String.fromCharCode(65 + cc.col)}${ord + 1}`;
+          const rowMates = bboxes
+            .filter(b => cc.row >= b.row && cc.row < b.row + b.rowSpan)
+            .sort((a, b) => a.col - b.col);
+          const rowOrd = colMates.findIndex(b => b.cellIdx === cc.cellIdx);
+          const colOrd = rowMates.findIndex(b => b.cellIdx === cc.cellIdx);
+          return `${String.fromCharCode(65 + Math.max(0, colOrd))}${Math.max(0, rowOrd) + 1}`;
         };
         let cell = '';
         let selNote = '';
