@@ -1316,8 +1316,10 @@ export class CursorState {
       // 종전 격자 산술(row+rowSpan, 랩=다음 행 0열)은 c1 다음 →에서 도로 a1 로
       // 돌아갔다("a2 가 a1 이 된다" 신고). ↓/↑ 는 다음/이전 밴드에서 가로로 가장
       // 많이 겹치는 셀, →/← 는 순번(k번째 조각) 기반. 병합 표에서도 그대로 동작.
+      // [2026-08-18] 겹침은 격자 열 수가 아니라 **픽셀**로 — b2|c2 세로 어긋 후엔
+      // 격자 열 겹침이 동률이 되어 c1 ↓ 가 b2 로 붙었다(신고 "위아래 캐치 안 됨").
       const overlapX = (b: CellBbox) =>
-        Math.min(b.col + b.colSpan, curCell.col + curCell.colSpan) - Math.max(b.col, curCell.col);
+        Math.min(b.x + b.w, curCell.x + curCell.w) - Math.max(b.x, curCell.x);
       const best = (cands: CellBbox[], score: (b: CellBbox) => number): CellBbox | null =>
         cands.reduce<CellBbox | null>((acc, b) => (!acc || score(b) > score(acc) ? b : acc), null);
       // 한 격자 열을 덮는 조각들을 위→아래로
