@@ -1758,15 +1758,18 @@ export function handleCellSelectionDelete(this: any): void {
     if (wholeRows && !wholeTable) {
       const n = range.endRow - range.startRow + 1;
       if (await showConfirm('한글', `선택한 ${n}줄을 지울까요?`)) {
-        this.executeOperation({
-          kind: 'snapshot',
-          operationType: 'deleteTableRow',
-          operation: (wasm: any) => {
-            for (let r = range.endRow; r >= range.startRow; r--) wasm.deleteTableRow(ctx.sec, ctx.ppi, ctx.ci, r);
-            return this.cursor.getPosition();
-          },
-        });
-        exitSelection();
+        try {
+          this.executeOperation({
+            kind: 'snapshot',
+            operationType: 'deleteTableRow',
+            operation: (wasm: any) => {
+              for (let r = range.endRow; r >= range.startRow; r--) wasm.deleteTableRow(ctx.sec, ctx.ppi, ctx.ci, r);
+              return this.cursor.getPosition();
+            },
+          });
+        } finally {
+          exitSelection();
+        }
       }
       return;
     }
@@ -1774,15 +1777,18 @@ export function handleCellSelectionDelete(this: any): void {
     if (wholeCols && !wholeTable) {
       const n = range.endCol - range.startCol + 1;
       if (await showConfirm('한글', `선택한 ${n}칸을 지울까요?`)) {
-        this.executeOperation({
-          kind: 'snapshot',
-          operationType: 'deleteTableColumn',
-          operation: (wasm: any) => {
-            for (let c = range.endCol; c >= range.startCol; c--) wasm.deleteTableColumn(ctx.sec, ctx.ppi, ctx.ci, c);
-            return this.cursor.getPosition();
-          },
-        });
-        exitSelection();
+        try {
+          this.executeOperation({
+            kind: 'snapshot',
+            operationType: 'deleteTableColumn',
+            operation: (wasm: any) => {
+              for (let c = range.endCol; c >= range.startCol; c--) wasm.deleteTableColumn(ctx.sec, ctx.ppi, ctx.ci, c);
+              return this.cursor.getPosition();
+            },
+          });
+        } finally {
+          exitSelection();
+        }
       }
       return;
     }

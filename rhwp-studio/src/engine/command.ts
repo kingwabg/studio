@@ -1,6 +1,7 @@
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { DocumentPosition, CharProperties, ParaProperties, CellPathLike } from '@/core/types';
 import { MAX_PAGE_LOCAL_TEXT_EDIT_CHARS } from './input-edit-invalidation';
+import { showToast } from '@/ui/toast';
 
 /** 편집 명령 공통 인터페이스 */
 export interface EditCommand {
@@ -1183,9 +1184,17 @@ export class SnapshotCommand implements EditCommand {
         // before 스냅샷이 그대로 남았다. 엔진 스냅샷 저장소는 100개 상한이라 거부가
         // 쌓이면 **진짜 undo 스냅샷이 조용히 축출**되고, 그 뒤 ⌘Z 가 '스냅샷 없음'으로
         // 실패하며 되돌리기 항목이 영구 소실됐다(신고 ① "되돌리기가 안 됨"의 한 갈래).
+        // [불변식 가드 2026-09-02] 엔진이 격자를 깨는 표 명령을 롤백하고 Err 를 돌려준다.
+        // 여러 호출을 묶은 operation 은 중간까지 적용된 채 남으므로 before 로 복원하고,
+        // 엔진 메시지를 토스트로 보인다 — 명령별 console.warn 13곳이 각자 처리할 필요 없다.
+        if (this.beforeId !== null) {
+          try { wasm.restoreSnapshot(this.beforeId); } catch { /* 이미 정리됨 */ }
+        }
         try { wasm.discardSnapshot(this.beforeId); } catch { /* 이미 정리됨 */ }
         this.beforeId = null;
         this.operation = null;
+        const msg = (err instanceof Error ? err.message : String(err)).replace(/^렌더링 오류: /, '');
+        showToast({ message: msg });
         throw err;
       }
     }
