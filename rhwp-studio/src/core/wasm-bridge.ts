@@ -21,9 +21,6 @@ export interface TableCellResizeUpdate {
   cellIdx: number;
   widthDelta?: number;
   heightDelta?: number;
-  localResize?: boolean;
-  renderWidth?: number;
-  renderHeight?: number;
 }
 
 export interface TableTransposeResult {

@@ -20,9 +20,6 @@ export interface KbdResizeUpdate {
   cellIdx: number;
   widthDelta?: number;
   heightDelta?: number;
-  localResize?: boolean;
-  renderWidth?: number;
-  renderHeight?: number;
 }
 /** getCellProperties만 있으면 되는 최소 인터페이스(테스트에서 mock). */
 export interface CellPropsProvider {
@@ -159,54 +156,6 @@ export function clampCompensatedDisplayDelta(
   return -Math.min(Math.abs(requestedDelta), limit);
 }
 
-// ── localResize(render override) 힌트 ────────────────────────────
-
-export function pushLocalResizeWidthHint(
-  updates: KbdResizeUpdate[],
-  cellIdx: number,
-  renderWidth: number,
-  widthDelta = 0,
-): void {
-  const existing = updates.find(update => update.cellIdx === cellIdx);
-  if (existing) {
-    existing.localResize = true;
-    existing.renderWidth = renderWidth;
-    if (widthDelta !== 0) existing.widthDelta = widthDelta;
-    return;
-  }
-  updates.push({ cellIdx, widthDelta, localResize: true, renderWidth });
-}
-
-export function pushLocalResizeHeightHint(
-  updates: KbdResizeUpdate[],
-  cellIdx: number,
-  renderHeight: number,
-  heightDelta = 0,
-): void {
-  const existing = updates.find(update => update.cellIdx === cellIdx);
-  if (existing) {
-    existing.localResize = true;
-    existing.renderHeight = renderHeight;
-    if (heightDelta !== 0) existing.heightDelta = heightDelta;
-    return;
-  }
-  updates.push({ cellIdx, heightDelta, localResize: true, renderHeight });
-}
-
-export function pushLocalResizeDisplayHint(
-  updates: KbdResizeUpdate[],
-  edge: BorderEdge,
-  cellIdx: number,
-  renderSize: number,
-  sizeDelta = 0,
-): void {
-  if (edge.type === 'col') {
-    pushLocalResizeWidthHint(updates, cellIdx, renderSize, sizeDelta);
-  } else {
-    pushLocalResizeHeightHint(updates, cellIdx, renderSize, sizeDelta);
-  }
-}
-
 // ── 흡착 ─────────────────────────────────────────────────────────
 
 // 이동한 경계가 어긋난 세그먼트(같은 축, 다른 위치)에 SNAP_PX 이내로 가까우면 그 위치로 재정렬.
@@ -239,7 +188,7 @@ export function snapKbdBoundaryDelta(edge: BorderEdge, targetBox: CellBbox, bbox
 // — 어긋난 표에서 걸침 이웃이 페어 탐색에 안 잡혀 보상이 빠지면 표 크기가 변한다(마우스
 // 모델 경로와 동일 수리). ② 세로(행)는 모델 높이(빈 셀=패딩만 284)를 클램프 기준으로 쓰면
 // 항상 delta=0 → F5 후 Alt+↑↓ 가 늘 무동작이었다("잘 안 된다" 신고). 마우스 드래그
-// (2026-07-14)와 동일하게 display 크기 + renderHeight 강제로 통일하고, 축소 한계는
+// (2026-07-14)와 동일하게 display 기준(heightDelta=표시 높이 대비 변화량)으로 통일하고, 축소 한계는
 // max(절대 최소, 콘텐츠 글줄 바닥) — 한컴: 행은 글줄 밑으로 줄어들지 않는다.
 export function buildKbdWholeUpdates(
   ctx: TableRef,
@@ -300,7 +249,7 @@ export function buildKbdWholeUpdates(
     return updates;
   }
 
-  // 세로(행): display 기반 — 마우스 드래그 display 경로와 같은 재료(renderHeight+heightDelta)
+  // 세로(행): display 기반 — 마우스 드래그 display 경로와 같은 재료(heightDelta=표시 높이 대비 변화량)
   const dispOf = new Map<number, number>();
   for (const b of bboxes) {
     if (!dispOf.has(b.cellIdx)) dispOf.set(b.cellIdx, getCellDisplaySize(b, edge));
@@ -317,23 +266,9 @@ export function buildKbdWholeUpdates(
     delta = delta > 0 ? Math.min(delta, lim) : Math.max(delta, -lim);
   }
   if (delta === 0) return [];
-  const comp = new Set<number>(compIdxs);
-  const modelH = (idx: number): number => {
-    try { return wasm.getCellProperties(ctx.sec, ctx.ppi, ctx.ci, idx).height; } catch { return 0; }
-  };
-  for (const idx of alignedIdxs) {
-    const size = (dispOf.get(idx) ?? 0) + delta;
-    pushLocalResizeHeightHint(updates, idx, size, size - modelH(idx));
-  }
+  for (const idx of alignedIdxs) updates.push({ cellIdx: idx, heightDelta: delta });
   for (const idx of compIdxs) {
-    if (aligned.has(idx)) continue;
-    const size = (dispOf.get(idx) ?? 0) - delta;
-    pushLocalResizeHeightHint(updates, idx, size, size - modelH(idx));
-  }
-  // 나머지 셀은 현재 표시 높이 보존(freeze) — 드래그 display 경로와 동일
-  for (const b of bboxes) {
-    if (aligned.has(b.cellIdx) || comp.has(b.cellIdx)) continue;
-    pushLocalResizeHeightHint(updates, b.cellIdx, dispOf.get(b.cellIdx) ?? 0);
+    if (!aligned.has(idx)) updates.push({ cellIdx: idx, heightDelta: -delta });
   }
   return updates;
 }

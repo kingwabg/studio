@@ -364,7 +364,6 @@ export class InputHandler {
     singleCellTarget?: { cellIdx: number; side: 'start' | 'end' } | null;
     shiftResize?: boolean;
   } | null = null;
-  private tableLocalResizeSegments = new Set<string>();
 
   // 표 이동 드래그 상태
   private isMoveDragging = false;
@@ -1147,7 +1146,6 @@ export class InputHandler {
 
   /** 문서 스냅샷 전환 뒤 표 resize 런타임 캐시를 비운다. */
   private clearTableResizeRuntimeCache(): void {
-    this.tableLocalResizeSegments.clear();
     this.cachedTableRef = null;
     this.cachedCellBboxes = null;
     this.tableResizeRenderer?.clear();
@@ -1765,7 +1763,7 @@ export class InputHandler {
     _table.resizeCellBoundaryWhole.call(this, key);
   }
 
-  /** [캔버스 한컴 포크] 셀 선택 Shift+방향키 = 단일 셀 경계만 이동(가로=모델·세로=localResize) */
+  /** [캔버스 한컴 포크] 셀 선택 Shift+방향키 = 단일 셀 경계만 이동(한 칸 어긋내기·offsetCellBoundary) */
   private resizeCellBoundarySingle(key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'): void {
     _table.resizeCellBoundarySingle.call(this, key);
   }

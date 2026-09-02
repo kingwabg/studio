@@ -18,7 +18,6 @@ import {
   findAlignedLogicalResizeAffectedCells, findResizeCompensationNeighbor,
   getCellModelSize, getCellDisplaySize,
   clampSingleCellDisplayDelta, clampCompensatedResizeDelta, clampCompensatedDisplayDelta,
-  pushLocalResizeWidthHint, pushLocalResizeHeightHint, pushLocalResizeDisplayHint,
   buildKbdWholeUpdates,
 } from './table-resize-kbd';
 
@@ -113,44 +112,6 @@ function computeResizePositionBounds(
     min: prev === undefined ? -Infinity : prev + minSizePx,
     max: next === undefined ? Infinity : next - minSizePx,
   };
-}
-
-function computeAffectedResizePositionBounds(
-  edge: BorderEdge,
-  affectedCellIndices: number[],
-  bboxes: CellBbox[],
-): { min: number; max: number } | null {
-  const minSizePx = minCellSizeHwp(edge.type) / 75;
-  const minX = Math.min(...bboxes.map(b => b.x));
-  const maxX = Math.max(...bboxes.map(b => b.x + b.w));
-  const minY = Math.min(...bboxes.map(b => b.y));
-  const maxY = Math.max(...bboxes.map(b => b.y + b.h));
-  let min = -Infinity;
-  let max = Infinity;
-  let found = false;
-
-  for (const cellIdx of affectedCellIndices) {
-    const targetBox = bboxes.find(b => b.cellIdx === cellIdx);
-    if (!targetBox) continue;
-    const neighborIdx = findResizeCompensationNeighbor(edge, targetBox, bboxes);
-    const neighborBox = neighborIdx === null
-      ? null
-      : bboxes.find(b => b.cellIdx === neighborIdx) ?? null;
-
-    if (edge.type === 'col') {
-      min = Math.max(min, targetBox.x + minSizePx);
-      max = Math.min(max, neighborBox ? neighborBox.x + neighborBox.w - minSizePx : maxX);
-    } else {
-      min = Math.max(min, targetBox.y + minSizePx);
-      max = Math.min(max, neighborBox ? neighborBox.y + neighborBox.h - minSizePx : maxY);
-    }
-    found = true;
-  }
-
-  if (!found) return null;
-  if (!Number.isFinite(min)) min = edge.type === 'col' ? minX : minY;
-  if (!Number.isFinite(max)) max = edge.type === 'col' ? maxX : maxY;
-  return { min, max };
 }
 
 function promoteResizeDragToSingleCell(self: any, state: any, shiftKey: boolean): { cellIdx: number; side: 'start' | 'end' } | null {
@@ -279,126 +240,6 @@ function findSingleCellResizeNeighbor(
   return neighbor?.cellIdx ?? null;
 }
 
-function localResizeSegmentKey(
-  tableRef: { sec: number; ppi: number; ci: number },
-  edge: BorderEdge,
-  target: { cellIdx: number; side: 'start' | 'end' },
-  bboxes: CellBbox[],
-): string | null {
-  const targetBox = bboxes.find(b => b.cellIdx === target.cellIdx);
-  if (!targetBox) return null;
-
-  if (edge.type === 'col') {
-    const boundaryCol = target.side === 'end'
-      ? targetBox.col + targetBox.colSpan
-      : targetBox.col;
-    return [
-      tableRef.sec,
-      tableRef.ppi,
-      tableRef.ci,
-      'col',
-      boundaryCol,
-      targetBox.row,
-      targetBox.rowSpan,
-    ].join(':');
-  }
-
-  const boundaryRow = target.side === 'end'
-    ? targetBox.row + targetBox.rowSpan
-    : targetBox.row;
-  return [
-    tableRef.sec,
-    tableRef.ppi,
-    tableRef.ci,
-    'row',
-    boundaryRow,
-    targetBox.col,
-    targetBox.colSpan,
-  ].join(':');
-}
-
-function isSegmentSeparatedFromLogicalBoundary(
-  edge: BorderEdge,
-  target: { cellIdx: number; side: 'start' | 'end' },
-  bboxes: CellBbox[],
-): boolean {
-  const targetBox = bboxes.find(b => b.cellIdx === target.cellIdx);
-  if (!targetBox) return false;
-  const tolerance = 1.0;
-  const rounded = (v: number) => Math.round(v / tolerance) * tolerance;
-
-  if (edge.type === 'col') {
-    const boundaryCol = target.side === 'end'
-      ? targetBox.col + targetBox.colSpan
-      : targetBox.col;
-    const boundaryCells = bboxes.filter(b => b.col + b.colSpan === boundaryCol);
-    if (boundaryCells.length <= 1) return true;
-    const counts = new Map<number, number>();
-    for (const b of boundaryCells) {
-      const coord = rounded(b.x + b.w);
-      counts.set(coord, (counts.get(coord) ?? 0) + 1);
-    }
-    const targetCoord = rounded(target.side === 'end' ? targetBox.x + targetBox.w : targetBox.x);
-    const targetCount = counts.get(targetCoord) ?? 0;
-    const maxCount = Math.max(...counts.values());
-    return targetCount < maxCount;
-  }
-
-  const boundaryRow = target.side === 'end'
-    ? targetBox.row + targetBox.rowSpan
-    : targetBox.row;
-  const boundaryCells = bboxes.filter(b => b.row + b.rowSpan === boundaryRow);
-  if (boundaryCells.length <= 1) return true;
-  const counts = new Map<number, number>();
-  for (const b of boundaryCells) {
-    const coord = rounded(b.y + b.h);
-    counts.set(coord, (counts.get(coord) ?? 0) + 1);
-  }
-  const targetCoord = rounded(target.side === 'end' ? targetBox.y + targetBox.h : targetBox.y);
-  const targetCount = counts.get(targetCoord) ?? 0;
-  const maxCount = Math.max(...counts.values());
-  return targetCount < maxCount;
-}
-
-function isKnownLocalResizeSegment(
-  self: any,
-  tableRef: { sec: number; ppi: number; ci: number },
-  edge: BorderEdge,
-  target: { cellIdx: number; side: 'start' | 'end' },
-  bboxes: CellBbox[],
-): boolean {
-  const key = localResizeSegmentKey(tableRef, edge, target, bboxes);
-  if (!key) return false;
-  return self.tableLocalResizeSegments?.has(key) === true &&
-    isSegmentSeparatedFromLogicalBoundary(edge, target, bboxes);
-}
-
-function hasLocalResizeHistory(
-  self: any,
-  tableRef: { sec: number; ppi: number; ci: number },
-): boolean {
-  const segments = self.tableLocalResizeSegments;
-  if (!segments) return false;
-  const prefix = `${tableRef.sec}:${tableRef.ppi}:${tableRef.ci}:`;
-  for (const key of segments) {
-    if (typeof key === 'string' && key.startsWith(prefix)) return true;
-  }
-  return false;
-}
-
-function rememberLocalResizeSegment(
-  self: any,
-  tableRef: { sec: number; ppi: number; ci: number },
-  edge: BorderEdge,
-  target: { cellIdx: number; side: 'start' | 'end' },
-  bboxes: CellBbox[],
-): void {
-  const key = localResizeSegmentKey(tableRef, edge, target, bboxes);
-  if (!key) return;
-  if (!self.tableLocalResizeSegments) self.tableLocalResizeSegments = new Set<string>();
-  self.tableLocalResizeSegments.add(key);
-}
-
 export function startResizeDrag(this: any,
   edge: BorderEdge,
   pageX: number, pageY: number,
@@ -508,10 +349,7 @@ export function startResizeDrag(this: any,
     ? logicalAffectedCellIndices
     : coordinateAffectedCellIndices;
   if (affectedCellIndices.length === 0 && !singleCellTarget) return;
-  const affectedBounds = !singleCellTarget && hasLocalResizeHistory(this, this.cachedTableRef)
-    ? computeAffectedResizePositionBounds(edge, affectedCellIndices, this.cachedCellBboxes)
-    : null;
-  const resizeBounds = affectedBounds ?? computeResizePositionBounds(
+  const resizeBounds = computeResizePositionBounds(
     this,
     edge,
     pageBboxes,
@@ -691,20 +529,12 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
 
   // Shift 단일 셀 resize는 가로/세로 모두 singleCellTarget 분기에서 처리한다.
   // 일반 세로 경계는 셀 선택 상태와 무관하게 행 전체 높이 조절로 처리한다.
-  let updates: Array<{
-    cellIdx: number;
-    widthDelta?: number;
-    heightDelta?: number;
-    localResize?: boolean;
-    renderWidth?: number;
-    renderHeight?: number;
-  }>;
+  let updates: Array<{ cellIdx: number; widthDelta?: number; heightDelta?: number }>;
   const inCellSel = this.cursor.isInCellSelectionMode();
   const range = inCellSel ? this.cursor.getSelectedCellRange() : null;
 
   // [2026-08-17] 바깥(아래·오른쪽) 테두리 = **표 크기 자체**를 바꾼다. 보상할 반대편
-  // 칸이 없으므로 resizeTableCells 의 재분배 경로를 쓸 수 없고(localResize 힌트가
-  // 붙으면 엔진이 표 크기를 원래대로 되돌린다), 표 핸들과 같은 절대값 지정
+  // 칸이 없으므로 resizeTableCells 의 재분배 경로를 쓸 수 없고, 표 핸들과 같은 절대값 지정
   // (setCellProperties)으로 그 줄의 칸 크기를 직접 목표값에 놓는다.
   if (state.outerResize && !state.singleCellTarget) {
     const isCol = state.edge.type === 'col';
@@ -819,13 +649,12 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
         targetBox: CellBbox;
         neighborBox: CellBbox | null;
       } => pair.targetBox !== undefined);
-    const hasLocalHistory = hasLocalResizeHistory(this, state.tableRef);
     // [캔버스 한컴 포크] 행(높이)은 모델 높이가 자동확장 최소값(≈282 ≪ MIN 1276)이라 model 클램프가
-    // 항상 delta=0 → 이력 없는 표에서 행 경계 조절이 무동작이었다(실측 2026-07-14: 모델 클램프
-    // maxDelta=max(0,282-1276)=0). 행은 이력 무관하게 display 기반으로 통일 — 콘텐츠로 커진 행
-    // 축소 등이 정상 동작(display 크기로 클램프·renderHeight override). 열은 model==display이고
-    // 순수 model이라야 Alt(모델 통째)와 합성되므로(2026-07-14 fix) 이력 없으면 현행 model 유지.
-    const useDisplayPath = hasLocalHistory || state.edge.type === 'row';
+    // 항상 delta=0 → 행 경계 조절이 무동작이었다(실측 2026-07-14: 모델 클램프
+    // maxDelta=max(0,282-1276)=0). 행은 display 기반으로 통일 — 콘텐츠로 커진 행
+    // 축소 등이 정상 동작(display 크기로 클램프·heightDelta=표시 높이 대비 변화량). 열은 model==display이고
+    // 순수 model이라야 Alt(모델 통째)와 합성되므로(2026-07-14 fix) 현행 model 유지.
+    const useDisplayPath = state.edge.type === 'row';
     if (!useDisplayPath) {
       // [어긋난 표 보상 수리 2026-08-12] 보상 상대는 '같은 행의 이웃 페어'가 아니라
       // **경계선 반대편(시작변이 이 경계인) 셀 전체**다. 어긋낸 표에선 걸침(span)
@@ -954,59 +783,25 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       }
       updates = [];
       const updatedCells = new Set<number>();
+      const pushDelta = (cellIdx: number, d: number) => updates.push(state.edge.type === 'col'
+        ? { cellIdx, widthDelta: d } : { cellIdx, heightDelta: d });
       for (const pair of segs) {
-        const targetProps = this.wasm.getCellProperties(
-          state.tableRef.sec,
-          state.tableRef.ppi,
-          state.tableRef.ci,
-          pair.targetCellIdx,
-        );
-        const targetDesiredSize = Math.max(
-          effMinOf(pair.targetCellIdx),
-          getCellDisplaySize(pair.targetBox, state.edge) + pair.segDelta,
-        );
-        pushLocalResizeDisplayHint(
-          updates,
-          state.edge,
-          pair.targetCellIdx,
-          targetDesiredSize,
-          targetDesiredSize - getCellModelSize(targetProps, state.edge),
-        );
+        if (updatedCells.has(pair.targetCellIdx)) continue;
+        const targetDisplaySize = getCellDisplaySize(pair.targetBox, state.edge);
+        const targetDesiredSize = Math.max(effMinOf(pair.targetCellIdx), targetDisplaySize + pair.segDelta);
+        pushDelta(pair.targetCellIdx, targetDesiredSize - targetDisplaySize);
         updatedCells.add(pair.targetCellIdx);
 
         if (pair.neighborCellIdx !== null && pair.neighborBox && !updatedCells.has(pair.neighborCellIdx)) {
-          const neighborProps = this.wasm.getCellProperties(
-            state.tableRef.sec,
-            state.tableRef.ppi,
-            state.tableRef.ci,
-            pair.neighborCellIdx,
-          );
-          const neighborDesiredSize = Math.max(
-            effMinOf(pair.neighborCellIdx),
-            getCellDisplaySize(pair.neighborBox, state.edge) - pair.segDelta,
-          );
-          pushLocalResizeDisplayHint(
-            updates,
-            state.edge,
-            pair.neighborCellIdx,
-            neighborDesiredSize,
-            neighborDesiredSize - getCellModelSize(neighborProps, state.edge),
-          );
+          const neighborDisplaySize = getCellDisplaySize(pair.neighborBox, state.edge);
+          const neighborDesiredSize = Math.max(effMinOf(pair.neighborCellIdx), neighborDisplaySize - pair.segDelta);
+          pushDelta(pair.neighborCellIdx, neighborDesiredSize - neighborDisplaySize);
           updatedCells.add(pair.neighborCellIdx);
         }
       }
-      for (const box of state.bboxes) {
-        if (updatedCells.has(box.cellIdx)) continue;
-        pushLocalResizeDisplayHint(
-          updates,
-          state.edge,
-          box.cellIdx,
-          getCellDisplaySize(box, state.edge),
-        );
-      }
       updates = updates.filter(update => {
         const d = state.edge.type === 'col' ? update.widthDelta : update.heightDelta;
-        return d !== 0 || update.localResize === true;
+        return d !== 0;
       });
     }
   }
@@ -1026,15 +821,6 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
         return this.cursor.getPosition();
       },
     });
-    if (state.shiftResize && state.singleCellTarget) {
-      rememberLocalResizeSegment(
-        this,
-        state.tableRef,
-        state.edge,
-        state.singleCellTarget,
-        state.bboxes,
-      );
-    }
     if (inCellSel) this.updateCellSelection();
   } catch (err) {
     console.warn('[InputHandler] resizeTableCells 실패:', err);
@@ -1584,8 +1370,7 @@ export function resizeTableProportional(this: any, key: 'ArrowUp' | 'ArrowDown' 
 // 표 객체 선택 시 e(오른쪽=너비)·s(아래=높이)·se(대각=전체) 핸들 드래그로 표 "전체"를 비례
 // 확대/축소한다. ⚠ 초판은 마지막 행/열에만 델타를 몰아 아래 행 하나가 거대해졌다(사용자 보고).
 // 지금은 모든 셀을 같은 비율 sx/sy로 스케일 → 열/행 비율이 유지된 채 통째로 커지고 줄어든다.
-// wasm 계약: 너비는 cell-width-equal과 동일(widthDelta=목표모델폭−현재모델폭 + renderWidth),
-// 높이는 cell-height-equal과 동일(heightDelta:0 + renderHeight=현재표시높이×sy). 최소 셀 클램프.
+// 커밋은 setCellProperties 절대값(finishTableHandleResize 주석 참조). 최소 셀 클램프.
 // 프리뷰는 canvas-snap 가이드 레이어(우변·하변 위치). (_snapLayerFor는 파일 상단 import.)
 
 type HandleCell = { cellIdx: number; modelW: number; dispHhwp: number };
@@ -1690,7 +1475,7 @@ export function finishTableHandleResize(this: any, e: MouseEvent): void {
   const wantX = state.dir === 'e' || state.dir === 'se';
   const wantY = state.dir === 's' || state.dir === 'se';
   if ((!wantX || Math.abs(s.sx - 1) < 0.002) && (!wantY || Math.abs(s.sy - 1) < 0.002)) return; // 무변화
-  // ⚠ resizeTableCells는 표 크기를 유지한 채 재분배(localResize)하거나 마지막 행/열만 흡수해
+  // ⚠ resizeTableCells는 델타 재분배(표 크기 유지) 경로라
   // 균일 비례가 안 된다(실측). setCellProperties({width,height})로 각 셀 크기를 직접 목표값으로
   // 설정하면 모든 열/행이 비율대로 스케일된다(실측: width×1.4 → 전 열 정확히 ×1.40,
   // height=4500HWP → 전 행 60px). width=모델폭×sx, height=현재표시높이(dispHhwp)×sy.
