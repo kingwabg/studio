@@ -1,6 +1,6 @@
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
 import { capturePhoto } from '@/media/photo-capture';
-import type { DocumentInfo, PageInfo, PageDef, SectionDef, PageBorderFillSettings, EndnoteShapeSettings, NoteEditInfo, CursorRect, HitTestResult, BodyFootnoteMarkerHit, FootnoteAtCursorResult, DeleteFootnoteResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, CellPathLike, NavContextEntry, FieldInfoResult, BookmarkInfo, LayerRenderProfile, PageLayerTree } from './types';
+import type { DocumentInfo, PageInfo, PageDef, SectionDef, PageBorderFillSettings, EndnoteShapeSettings, NoteEditInfo, CursorRect, HitTestResult, BodyFootnoteMarkerHit, FootnoteAtCursorResult, DeleteFootnoteResult, LineInfo, TableDimensions, CellInfo, CellBbox, TableGrid, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, CellPathLike, NavContextEntry, FieldInfoResult, BookmarkInfo, LayerRenderProfile, PageLayerTree } from './types';
 
 /** HWPX 비표준 감지 경고 리포트 (#177). */
 export interface ValidationReport {
@@ -883,6 +883,22 @@ export class WasmBridge {
   getCellContentFloors(sec: number, parentPara: number, controlIdx: number): number[] {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.getCellContentFloors(sec, parentPara, controlIdx));
+  }
+
+  /** [12-b] 엔진 표 격자(선 소유권·셀 격자·유효 행높이). 구 wasm(메서드 없음)이면 null → 호출측 bbox 추정 폴백. */
+  getTableGrid(sec: number, parentPara: number, controlIdx: number): TableGrid | null {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    if (typeof (this.doc as any).getTableGrid !== 'function') return null;
+    return JSON.parse((this.doc as any).getTableGrid(sec, parentPara, controlIdx));
+  }
+
+  /** [12-b] 셀 오른쪽/아래 경계 이동 허용 델타 창(HU) — 엔진 바닥(MIN_CELL·글줄) 정본. 구 wasm 이면 null. */
+  getBoundaryMoveRange(
+    sec: number, parentPara: number, controlIdx: number, cellIdx: number, edge: 'right' | 'bottom',
+  ): { min: number; max: number } | null {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    if (typeof (this.doc as any).getBoundaryMoveRange !== 'function') return null;
+    return JSON.parse((this.doc as any).getBoundaryMoveRange(sec, parentPara, controlIdx, cellIdx, edge));
   }
 
   getTableBBox(sec: number, parentPara: number, controlIdx: number): { pageIndex: number; x: number; y: number; width: number; height: number } {

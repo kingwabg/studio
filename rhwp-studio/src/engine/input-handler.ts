@@ -43,7 +43,7 @@ import type { CellSelectionRenderer } from './cell-selection-renderer';
 import type { TableObjectRenderer } from './table-object-renderer';
 import type { TableHoverHandles } from './table-hover-handles';
 import type { TableResizeRenderer, BorderEdge } from './table-resize-renderer';
-import type { CellBbox, CellPathLike } from '@/core/types';
+import type { CellBbox, CellPathLike, TableGrid } from '@/core/types';
 import { showConfirm } from '@/ui/confirm-dialog';
 import * as _mouse from './input-handler-mouse';
 import * as _table from './input-handler-table';
@@ -344,6 +344,8 @@ export class InputHandler {
   private resizeHoverRafId = 0;
   private cachedTableRef: { sec: number; ppi: number; ci: number; pageHint?: number } | null = null;
   private cachedCellBboxes: CellBbox[] | null = null;
+  /** [12-b] 엔진 격자 캐시 — cachedCellBboxes 배열 1개당 1회 조회(tableGridFor). grid null = 구 wasm. */
+  private cachedTableGrid: { bboxes: CellBbox[]; grid: TableGrid | null } | null = null;
   private protectedCellHitCache: { key: string; protected: boolean } | null = null;
   private protectedCellHoverEl: HTMLDivElement | null = null;
   private deferredPaginationFlushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1148,6 +1150,7 @@ export class InputHandler {
   private clearTableResizeRuntimeCache(): void {
     this.cachedTableRef = null;
     this.cachedCellBboxes = null;
+    this.cachedTableGrid = null;
     this.tableResizeRenderer?.clear();
   }
 

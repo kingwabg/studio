@@ -1,5 +1,5 @@
 import { VirtualScroll } from '@/view/virtual-scroll';
-import type { CellBbox } from '@/core/types';
+import type { CellBbox, TableGrid } from '@/core/types';
 
 /** 경계선 종류 */
 export type BorderEdgeType = 'row' | 'col';
@@ -41,8 +41,9 @@ export class TableResizeRenderer {
     }
   }
 
-  /** 셀 bbox 배열에서 행/열 경계선 좌표를 계산한다 (페이지 좌표 기준) */
-  computeBorderLines(bboxes: CellBbox[]): { rowLines: RowLine[]; colLines: ColLine[] } {
+  /** 셀 bbox 배열에서 행/열 경계선 좌표를 계산한다 (페이지 좌표 기준).
+   * [12-b] grid 가 있으면 선 소유권은 엔진 정본 — 관통 칸이 있는 선(crossers>0)은 소유 칸 구간만 뻗는다. */
+  computeBorderLines(bboxes: CellBbox[], grid?: TableGrid | null): { rowLines: RowLine[]; colLines: ColLine[] } {
     if (bboxes.length === 0) return { rowLines: [], colLines: [] };
 
     // 표 전체 범위
@@ -99,6 +100,29 @@ export class TableResizeRenderer {
     const colLines: ColLine[] = sortedColXs.map((x, i) => ({
       x, yStart: minY, yEnd: maxY, index: i,
     }));
+
+    if (grid) {
+      // px 위치·index 는 bbox 군집 그대로(같은 논리선이 행마다 다른 x 에 있을 수 있어 px 가 식별자),
+      // 관통 여부만 엔진 선(bbox 변 → 논리 인덱스)에서 읽어 마커가 관통 칸 위를 지나지 않게 한다.
+      // ponytail: 소유 구간 hull — 비연속 소유(사이 행이 관통)면 그 칸도 덮는다. 세그 배열 마커가 필요해지면 분할.
+      const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
+      for (const line of colLines) {
+        const owners = bboxes.filter(b => near(b.x, line.x) || near(b.x + b.w, line.x));
+        if (owners.length === 0) continue;
+        const k = near(owners[0].x, line.x) ? owners[0].col : owners[0].col + owners[0].colSpan;
+        if (!(grid.colLines[k]?.crossers > 0)) continue;
+        line.yStart = Math.min(...owners.map(b => b.y));
+        line.yEnd = Math.max(...owners.map(b => b.y + b.h));
+      }
+      for (const line of rowLines) {
+        const owners = bboxes.filter(b => near(b.y, line.y) || near(b.y + b.h, line.y));
+        if (owners.length === 0) continue;
+        const k = near(owners[0].y, line.y) ? owners[0].row : owners[0].row + owners[0].rowSpan;
+        if (!(grid.rowLines[k]?.crossers > 0)) continue;
+        line.xStart = Math.min(...owners.map(b => b.x));
+        line.xEnd = Math.max(...owners.map(b => b.x + b.w));
+      }
+    }
 
     return { rowLines, colLines };
   }
@@ -291,12 +315,13 @@ export class TableResizeRenderer {
     edge: BorderEdge,
     bboxes: CellBbox[],
     zoom: number,
+    grid?: TableGrid | null,
   ): void {
     this.clear();
     this.ensureAttached();
     if (bboxes.length === 0) return;
 
-    const { rowLines, colLines } = this.computeBorderLines(bboxes);
+    const { rowLines, colLines } = this.computeBorderLines(bboxes, grid);
     const scrollContent = this.container.querySelector('#scroll-content');
     const contentWidth = scrollContent?.clientWidth ?? 0;
     const pageOffset = this.virtualScroll.getPageOffset(edge.pageIndex);

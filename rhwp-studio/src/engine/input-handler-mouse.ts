@@ -4,6 +4,7 @@
 import type { ContextMenuItem } from '@/ui/context-menu';
 import * as _connector from './input-handler-connector';
 import { tableHoverFor } from './canvas-snap'; // [캔버스 한컴 포크] 전체 표 잡기 호버 강조
+import { tableGridFor } from './input-handler-table'; // [12-b] 엔진 격자 캐시 — 어긋난 선 마커 구간
 
 // [캔버스 한컴 포크] 표 8핸들 구역 판정 — 선택 안 해도 표 위 hover 시 코너/모서리 8지점에서
 // "전체 표 잡기"를 띄운다. 지점 = 표 bbox의 4코너 + 4변 중점. 화면 기준 tol을 zoom으로 나눠 유지.
@@ -2107,7 +2108,7 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
       }
       if (edge) {
         this.container.style.cursor = edge.type === 'row' ? 'row-resize' : 'col-resize';
-        this.tableResizeRenderer.showMarker(edge, pageBboxes, zoom);
+        this.tableResizeRenderer.showMarker(edge, pageBboxes, zoom, tableGridFor(this));
         return;
       }
     }
@@ -2187,7 +2188,7 @@ export function handleResizeHover(this: any, e: MouseEvent): void {
   } else if (edge) {
     hideProtectedCellHover(this);
     this.container.style.cursor = edge.type === 'row' ? 'row-resize' : 'col-resize';
-    this.tableResizeRenderer.showMarker(edge, pageBboxes, zoom);
+    this.tableResizeRenderer.showMarker(edge, pageBboxes, zoom, tableGridFor(this));
   } else if (tableHit && isProtectedCellHit(this, tableHit)) {
     this.tableResizeRenderer.clear();
     showProtectedCellHover(this, e);

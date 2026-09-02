@@ -4,7 +4,7 @@
 import { MoveTableCommand, MovePictureCommand, MoveShapeCommand } from './command';
 import { getObjectProperties, setObjectProperties } from './input-handler-picture';
 import { pageClampRange, clampRangeForRelTo, clampToPage } from './canvas-snap';
-import type { CellBbox } from '@/core/types';
+import type { CellBbox, TableGrid } from '@/core/types';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { BorderEdge } from './table-resize-renderer';
 import { showToast } from '@/ui/toast';
@@ -18,7 +18,7 @@ import {
   findAlignedLogicalResizeAffectedCells, findResizeCompensationNeighbor,
   getCellModelSize, getCellDisplaySize,
   clampSingleCellDisplayDelta, clampCompensatedResizeDelta, clampCompensatedDisplayDelta,
-  buildKbdWholeUpdates,
+  buildKbdWholeUpdates, engineLineRange,
 } from './table-resize-kbd';
 
 // [캔버스 한컴 포크] 내부 경계선 조절 스냅 (합체 4단계-③)
@@ -114,6 +114,48 @@ function computeResizePositionBounds(
   };
 }
 
+/** [12-b] 엔진 격자 캐시 — cachedCellBboxes 와 같은 수명: bbox 배열이 갈릴 때(재조회·무효화) 1회만 재조회.
+ * 구 wasm(getTableGrid 없음)·조회 실패면 null → 호출측은 bbox 추정(종전 로직). */
+export function tableGridFor(self: any): TableGrid | null {
+  const ref = self.cachedTableRef;
+  const bboxes = self.cachedCellBboxes;
+  if (!ref || !bboxes) return null;
+  if (self.cachedTableGrid?.bboxes !== bboxes) {
+    let grid: TableGrid | null = null;
+    try { grid = self.wasm.getTableGrid(ref.sec, ref.ppi, ref.ci); } catch { grid = null; }
+    self.cachedTableGrid = { bboxes, grid };
+  }
+  return self.cachedTableGrid.grid;
+}
+
+/** Shift 어긋내기 커밋 대상 — 그 경계를 아래/오른쪽 변으로 갖는 칸(side 'start' 는 앞 칸으로 정규화). */
+function staggerCommitCell(state: any): number | null {
+  const tgt = state.singleCellTarget;
+  if (!tgt) return null;
+  const box = state.bboxes.find((b: CellBbox) => b.cellIdx === tgt.cellIdx);
+  if (!box) return null;
+  if (tgt.side !== 'start') return box.cellIdx;
+  const prev = state.edge.type === 'col'
+    ? state.bboxes.find((b: CellBbox) => b.row === box.row && b.col + b.colSpan === box.col)
+    : state.bboxes.find((b: CellBbox) => b.col === box.col && b.row + b.rowSpan === box.row);
+  return prev?.cellIdx ?? null;
+}
+
+/** [12-b] 엔진 이동 창(getBoundaryMoveRange 교집합)이 있으면 위치 한계(min/maxResizePos)를 덮어쓴다.
+ * 바깥 테두리(outerResize)는 칸 사이 경계가 아니라 제외. 창이 없으면 computeResizePositionBounds 결과 유지. */
+function applyEngineResizeBounds(self: any, state: any): void {
+  state.engineBounds = false;
+  if (state.outerResize) return;
+  const cells: number[] = state.singleCellTarget
+    ? [staggerCommitCell(state)].filter((c): c is number => c !== null)
+    : state.affectedCellIndices;
+  const eng = engineLineRange(self.wasm, state.tableRef, state.edge, cells);
+  if (!eng) return;
+  state.minResizePos = state.borderOriginalPos + eng.min / 75;
+  state.maxResizePos = state.borderOriginalPos + eng.max / 75;
+  state.engineBounds = true;
+}
+
 function promoteResizeDragToSingleCell(self: any, state: any, shiftKey: boolean): { cellIdx: number; side: 'start' | 'end' } | null {
   if (state.singleCellTarget) return state.singleCellTarget;
   if (!shiftKey || !state.resizeTarget) return null;
@@ -129,6 +171,7 @@ function promoteResizeDragToSingleCell(self: any, state: any, shiftKey: boolean)
   );
   state.minResizePos = resizeBounds.min;
   state.maxResizePos = resizeBounds.max;
+  applyEngineResizeBounds(self, state); // [12-b]
   return state.singleCellTarget;
 }
 
@@ -141,6 +184,8 @@ function clampResizePosition(pos: number, bounds: { min: number; max: number }):
 // 정본으로 클램프하고, 깨질 조작은 엔진 트랜잭션 안전망이 거부한다. 종전엔 리사이즈
 // 한계로 선클램프해 12px 을 끌어도 2.8px 에서 멈췄다(3×3 전수 실측).
 function staggerResizeBounds(state: any): { min: number; max: number } {
+  // [12-b] 엔진 이동 창이 잡혔으면(applyEngineResizeBounds) 그것이 정본 — 아래 표 안쪽 전체는 폴백.
+  if (state.engineBounds) return { min: state.minResizePos, max: state.maxResizePos };
   const MIN_PX = 200 / 75; // MIN_CELL
   const isRow = state.edge.type === 'row';
   let lo = Infinity;
@@ -263,6 +308,7 @@ export function startResizeDrag(this: any,
       if (freshPage.length > 0) pageBboxes = freshPage;
     }
   } catch { /* 조회 실패면 기존 캐시로 진행 */ }
+  const grid: TableGrid | null = tableGridFor(this); // [12-b] 신선한 bbox 와 같은 시점의 엔진 격자(구 wasm 이면 null)
 
   // 경계선 원래 위치 계산
   const { rowLines, colLines } = this.tableResizeRenderer.computeBorderLines(pageBboxes);
@@ -336,6 +382,9 @@ export function startResizeDrag(this: any,
     const line = resizeTarget.side === 'end'
       ? (isCol ? tb.col + tb.colSpan : tb.row + tb.rowSpan)
       : (isCol ? tb.col : tb.row);
+    // [12-b] 엔진 선 소유권(owners=앵커 행/열)이 있으면 정본, 없으면 bbox 앵커 추정(종전).
+    const owners = (isCol ? grid?.colLines : grid?.rowLines)?.[line]?.owners;
+    if (owners) return !owners.some((o: number) => o !== (isCol ? tb.row : tb.col));
     return !this.cachedCellBboxes.some((b: CellBbox) => (isCol
       ? b.row !== tb.row && (b.col === line || b.col + b.colSpan === line)
       : b.col !== tb.col && (b.row === line || b.row + b.rowSpan === line)));
@@ -372,7 +421,9 @@ export function startResizeDrag(this: any,
     shiftResize: shouldResizeSingleCell,
     snapTargets, // [캔버스 한컴 포크]
     outerResize, // 바깥(아래·오른쪽) 테두리 = 표 크기 자체를 늘리고 줄인다
+    grid, // [12-b] 드래그 시작 시점 엔진 격자(보상 이웃 cellGrid) — null 이면 bbox 추정
   };
+  applyEngineResizeBounds(this, this.resizeDragState); // [12-b] 엔진 이동 창이 있으면 위치 한계 덮어씀
 
   // mouseup 리스너 등록 (document 레벨)
   document.addEventListener('mouseup', this.onMouseUpBound, { once: true });
@@ -578,22 +629,10 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
     // 엔진 격자 재구성(offsetCellBoundary: 분할+병합)이라 파일에 그대로 저장되고
     // 한컴에서도 동일하다. side 'start'(위/왼쪽 경계를 잡음)는 그 경계를 아래/오른쪽
     // 경계로 갖는 앞 칸으로 정규화한다.
-    const tgt = state.singleCellTarget;
-    const box = state.bboxes.find((b: CellBbox) => b.cellIdx === tgt.cellIdx);
-    if (!box) {
+    const cellIdx = staggerCommitCell(state);
+    if (cellIdx === null) {
       this.cleanupResizeDrag();
       return;
-    }
-    let cellIdx = tgt.cellIdx;
-    if (tgt.side === 'start') {
-      const prev = state.edge.type === 'col'
-        ? state.bboxes.find((b: CellBbox) => b.row === box.row && b.col + b.colSpan === box.col)
-        : state.bboxes.find((b: CellBbox) => b.col === box.col && b.row + b.rowSpan === box.row);
-      if (!prev) {
-        this.cleanupResizeDrag();
-        return;
-      }
-      cellIdx = prev.cellIdx;
     }
     const edgeName: 'bottom' | 'right' = state.edge.type === 'col' ? 'right' : 'bottom';
     // [2026-08-16] 치유(복원) 승격은 스튜디오가 아니라 **엔진**이 판정한다 — 종전
@@ -632,7 +671,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
     const pairs: Array<{ targetCellIdx: number; neighborCellIdx: number | null }> =
       targetBboxes.map((bbox: CellBbox) => ({
       targetCellIdx: bbox.cellIdx,
-      neighborCellIdx: findResizeCompensationNeighbor(state.edge, bbox, state.bboxes),
+      neighborCellIdx: findResizeCompensationNeighbor(state.edge, bbox, state.bboxes, state.grid),
     }));
     const pairBoxes = pairs
       .map((pair: { targetCellIdx: number; neighborCellIdx: number | null }) => ({
@@ -671,14 +710,16 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
               .map((b: CellBbox) => b.cellIdx),
           )]
         : [];
-      let delta = clampCompensatedResizeDelta(
+      // [12-b] 엔진 이동 창 교집합이 있으면 정본(대상·반대편 바닥 모두 엔진 계산) — 모델 클램프는 폴백.
+      const eng = engineLineRange(this.wasm, state.tableRef, state.edge, pairs.map((p) => p.targetCellIdx));
+      let delta = eng ? clampResizePosition(deltaHwpUnit, eng) : clampCompensatedResizeDelta(
         this.wasm,
         state.tableRef,
         state.edge,
         pairs,
         deltaHwpUnit,
       );
-      if (delta > 0 && compIdxs.length > 0) {
+      if (!eng && delta > 0 && compIdxs.length > 0) {
         const limits: number[] = [];
         for (const idx of compIdxs) {
           try {
@@ -727,12 +768,14 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       }
       const effMinOf = (idx: number) =>
         Math.max(minCellSizeHwp(state.edge.type), rowFloors?.[idx] ?? 0);
+      // [12-b] 세그별 엔진 이동 창(getBoundaryMoveRange)이 있으면 정본 — 스튜디오 상수·글줄 바닥 클램프는 폴백.
       const segs = pairBoxes.map((pair) => {
         const segBoundaryPx = state.edge.type === 'col'
           ? pair.targetBox.x + pair.targetBox.w
           : pair.targetBox.y + pair.targetBox.h;
         const requested = Math.round((newPos - segBoundaryPx) * 75);
-        const clamped = clampSingleCellDisplayDelta(
+        const eng = engineLineRange(this.wasm, state.tableRef, state.edge, [pair.targetCellIdx]);
+        const clamped = eng ? clampResizePosition(requested, eng) : clampSingleCellDisplayDelta(
           state.edge,
           getCellDisplaySize(pair.targetBox, state.edge),
           pair.neighborBox ? getCellDisplaySize(pair.neighborBox, state.edge) : null,
@@ -740,7 +783,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
           effMinOf(pair.targetCellIdx),
           pair.neighborCellIdx !== null ? effMinOf(pair.neighborCellIdx) : undefined,
         );
-        return { ...pair, segDelta: clamped };
+        return { ...pair, segDelta: clamped, engine: !!eng };
       });
       if (segs.every((s2) => s2.segDelta === 0)) {
         // [2026-08-18] 행 안쪽 경계: 이웃 행이 글줄 바닥(최소)이면 보상 축소가 전부
@@ -788,13 +831,14 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
       for (const pair of segs) {
         if (updatedCells.has(pair.targetCellIdx)) continue;
         const targetDisplaySize = getCellDisplaySize(pair.targetBox, state.edge);
-        const targetDesiredSize = Math.max(effMinOf(pair.targetCellIdx), targetDisplaySize + pair.segDelta);
+        // 엔진 창으로 클램프된 세그는 스튜디오 바닥을 덧대지 않는다(덧대면 대상·이웃 합이 어긋나 표 크기가 변한다).
+        const targetDesiredSize = Math.max(pair.engine ? 0 : effMinOf(pair.targetCellIdx), targetDisplaySize + pair.segDelta);
         pushDelta(pair.targetCellIdx, targetDesiredSize - targetDisplaySize);
         updatedCells.add(pair.targetCellIdx);
 
         if (pair.neighborCellIdx !== null && pair.neighborBox && !updatedCells.has(pair.neighborCellIdx)) {
           const neighborDisplaySize = getCellDisplaySize(pair.neighborBox, state.edge);
-          const neighborDesiredSize = Math.max(effMinOf(pair.neighborCellIdx), neighborDisplaySize - pair.segDelta);
+          const neighborDesiredSize = Math.max(pair.engine ? 0 : effMinOf(pair.neighborCellIdx), neighborDisplaySize - pair.segDelta);
           pushDelta(pair.neighborCellIdx, neighborDesiredSize - neighborDisplaySize);
           updatedCells.add(pair.neighborCellIdx);
         }
@@ -838,6 +882,7 @@ export function cleanupResizeDrag(this: any): void {
   // 캐시 무효화 (크기 변경 후 bbox가 stale)
   this.cachedTableRef = null;
   this.cachedCellBboxes = null;
+  this.cachedTableGrid = null; // [12-b]
   if (this.dragRafId) {
     cancelAnimationFrame(this.dragRafId);
     this.dragRafId = 0;
@@ -1271,7 +1316,9 @@ export function resizeCellBoundaryWhole(this: any, key: 'ArrowUp' | 'ArrowDown' 
   try { bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci); } catch { return; }
   let floors: number[] | undefined;
   if (!isHoriz) { try { floors = this.wasm.getCellContentFloors(ctx.sec, ctx.ppi, ctx.ci); } catch { floors = undefined; } }
-  const updates = buildKbdWholeUpdates(ctx, range, isHoriz, step, bboxes, this.wasm, floors);
+  let grid: TableGrid | null = null; // [12-b] 신선한 bbox 와 같은 시점의 엔진 격자(구 wasm 이면 null)
+  try { grid = this.wasm.getTableGrid(ctx.sec, ctx.ppi, ctx.ci); } catch { grid = null; }
+  const updates = buildKbdWholeUpdates(ctx, range, isHoriz, step, bboxes, this.wasm, floors, grid);
   if (updates.length === 0) return;
   try {
     this.executeOperation({ kind: 'snapshot', operationType: 'resizeTableCells',

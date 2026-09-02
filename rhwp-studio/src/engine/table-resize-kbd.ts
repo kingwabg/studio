@@ -3,7 +3,7 @@
  * 마우스 경로(finishResizeDrag 등)와 키보드 경로가 공유하는 기하/클램프 헬퍼의 단일 소스. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { CellBbox } from '@/core/types';
+import type { CellBbox, TableGrid } from '@/core/types';
 import type { BorderEdge } from './table-resize-renderer';
 
 // 표 리사이즈 최소 크기 — 행/열 분리(이전엔 단일 200 HWPUNIT=0.7mm라 무한 찌부러짐).
@@ -24,6 +24,32 @@ export interface KbdResizeUpdate {
 /** getCellProperties만 있으면 되는 최소 인터페이스(테스트에서 mock). */
 export interface CellPropsProvider {
   getCellProperties(sec: number, ppi: number, ci: number, cellIdx: number): { width: number; height: number };
+  /** [12-b] 엔진 경계 이동 창(HU). 구 wasm·mock 은 없음 → 스튜디오 클램프 폴백. */
+  getBoundaryMoveRange?(
+    sec: number, ppi: number, ci: number, cellIdx: number, edge: 'right' | 'bottom',
+  ): { min: number; max: number } | null;
+}
+
+/** [12-b] 셀들의 끝변(오른쪽/아래)을 한 줄로 옮길 때 허용 델타(HU) = 엔진 창 교집합.
+ * 한 셀이라도 창이 없으면(구 wasm·조회 실패·빈 목록) null → 호출측은 종전 스튜디오 클램프. */
+export function engineLineRange(
+  wasm: CellPropsProvider,
+  ref: TableRef,
+  edge: BorderEdge,
+  cellIdxs: number[],
+): { min: number; max: number } | null {
+  if (cellIdxs.length === 0) return null;
+  const edgeName: 'right' | 'bottom' = edge.type === 'col' ? 'right' : 'bottom';
+  let min = -Infinity;
+  let max = Infinity;
+  for (const idx of cellIdxs) {
+    let r: { min: number; max: number } | null | undefined;
+    try { r = wasm.getBoundaryMoveRange?.(ref.sec, ref.ppi, ref.ci, idx, edgeName); } catch { r = null; }
+    if (!r) return null;
+    min = Math.max(min, r.min);
+    max = Math.min(max, r.max);
+  }
+  return { min, max };
 }
 
 // ── 정렬 그룹 / 이웃 ──────────────────────────────────────────────
@@ -60,7 +86,15 @@ export function findResizeCompensationNeighbor(
   edge: BorderEdge,
   bbox: CellBbox,
   bboxes: CellBbox[],
+  grid?: TableGrid | null,
 ): number | null {
+  if (grid) {
+    // [12-b] 엔진 cellGrid 점유자 = 경계 반대편 칸 — 걸침(span) 이웃도 잡힌다(앵커 정확일치 탐색은 놓쳤다).
+    const r = edge.type === 'col' ? bbox.row : bbox.row + bbox.rowSpan;
+    const c = edge.type === 'col' ? bbox.col + bbox.colSpan : bbox.col;
+    if (r >= grid.rowCount || c >= grid.colCount) return null;
+    return grid.cellGrid[r * grid.colCount + c] ?? null;
+  }
   if (edge.type === 'col') {
     const neighbor = bboxes.find(b => b.row === bbox.row && b.col === bbox.col + bbox.colSpan);
     return neighbor?.cellIdx ?? null;
@@ -198,6 +232,7 @@ export function buildKbdWholeUpdates(
   bboxes: CellBbox[],
   wasm: CellPropsProvider,
   contentFloors?: number[],
+  grid?: TableGrid | null,
 ): KbdResizeUpdate[] {
   const edge: BorderEdge = { type: isHoriz ? 'col' : 'row', index: 0, pageIndex: 0 };
   const line = isHoriz ? range.endCol : range.endRow;
@@ -224,14 +259,18 @@ export function buildKbdWholeUpdates(
   let delta = snapKbdBoundaryDelta(edge, targetBox, bboxes, step); // 흡착(어긋난 세그먼트 재정렬)
   const updates: KbdResizeUpdate[] = [];
   const aligned = new Set<number>(alignedIdxs);
+  // [12-b] 엔진 이동 창(getBoundaryMoveRange 교집합)이 있으면 정본 — 아래 스튜디오 상수·글줄 바닥 클램프는 폴백.
+  const eng = engineLineRange(wasm, ctx, edge, alignedIdxs);
 
   if (isHoriz) {
     const pairs = alignedIdxs.map(idx => {
       const b = bboxes.find(x => x.cellIdx === idx) as CellBbox;
-      return { targetCellIdx: idx, neighborCellIdx: findResizeCompensationNeighbor(edge, b, bboxes) };
+      return { targetCellIdx: idx, neighborCellIdx: findResizeCompensationNeighbor(edge, b, bboxes, grid) };
     });
-    delta = clampCompensatedResizeDelta(wasm, ctx, edge, pairs, delta);
-    if (delta > 0 && compIdxs.length > 0) {
+    delta = eng
+      ? Math.min(Math.max(delta, eng.min), eng.max)
+      : clampCompensatedResizeDelta(wasm, ctx, edge, pairs, delta);
+    if (!eng && delta > 0 && compIdxs.length > 0) {
       const limits: number[] = [];
       for (const idx of compIdxs) {
         try {
@@ -254,16 +293,20 @@ export function buildKbdWholeUpdates(
   for (const b of bboxes) {
     if (!dispOf.has(b.cellIdx)) dispOf.set(b.cellIdx, getCellDisplaySize(b, edge));
   }
-  const effMin = (idx: number) => Math.max(minCellSizeHwp('row'), contentFloors?.[idx] ?? 0);
-  const shrinkSide = delta < 0 ? alignedIdxs : compIdxs;
-  const limits: number[] = [];
-  for (const idx of shrinkSide) {
-    const d = dispOf.get(idx);
-    if (d !== undefined) limits.push(Math.max(0, d - effMin(idx)));
-  }
-  if (limits.length > 0) {
-    const lim = Math.min(...limits);
-    delta = delta > 0 ? Math.min(delta, lim) : Math.max(delta, -lim);
+  if (eng) {
+    delta = Math.min(Math.max(delta, eng.min), eng.max);
+  } else {
+    const effMin = (idx: number) => Math.max(minCellSizeHwp('row'), contentFloors?.[idx] ?? 0);
+    const shrinkSide = delta < 0 ? alignedIdxs : compIdxs;
+    const limits: number[] = [];
+    for (const idx of shrinkSide) {
+      const d = dispOf.get(idx);
+      if (d !== undefined) limits.push(Math.max(0, d - effMin(idx)));
+    }
+    if (limits.length > 0) {
+      const lim = Math.min(...limits);
+      delta = delta > 0 ? Math.min(delta, lim) : Math.max(delta, -lim);
+    }
   }
   if (delta === 0) return [];
   for (const idx of alignedIdxs) updates.push({ cellIdx: idx, heightDelta: delta });

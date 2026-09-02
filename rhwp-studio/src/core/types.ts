@@ -292,6 +292,23 @@ export interface CellBbox {
   h: number;
 }
 
+/** [12-b] 엔진 표 격자 선 하나 — owners=이 선을 변으로 갖는 칸의 앵커 행(세로선)/열(가로선), crossers=관통 칸 수 */
+export interface TableGridLine { owners: number[]; crossers: number }
+
+/** [12-b] 엔진 getTableGrid — 좌표는 HU. cellGrid 는 rowCount×colCount 행우선 슬롯 → cellIdx(null=빈). */
+export interface TableGrid {
+  colX: number[];
+  rowColX: (number[] | null)[];
+  rowYStored: number[];
+  rowYEff: number[];
+  colLines: TableGridLine[];
+  rowLines: TableGridLine[];
+  cellGrid: (number | null)[];
+  rowCount: number;
+  colCount: number;
+  minCell: number;
+}
+
 /** WASM moveVertical() 반환 타입 */
 export interface MoveVerticalResult {
   sectionIndex: number;
