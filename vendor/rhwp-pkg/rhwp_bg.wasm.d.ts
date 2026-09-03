@@ -61,6 +61,7 @@ export const hwpdocument_deleteTextInCellByPath: (a: number, b: number, c: numbe
 export const hwpdocument_deleteTextInCellEx: (a: number, b: number, c: number) => [number, number, number, number];
 export const hwpdocument_deleteTextInFootnote: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
 export const hwpdocument_deleteTextInHeaderFooter: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
+export const hwpdocument_deleteTextLogical: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
 export const hwpdocument_discardSnapshot: (a: number, b: number) => void;
 export const hwpdocument_endBatch: (a: number) => [number, number, number, number];
 export const hwpdocument_ensureDefaultBullet: (a: number, b: number, c: number) => number;
@@ -84,11 +85,13 @@ export const hwpdocument_fitTableToPage: (a: number, b: number, c: number, d: nu
 export const hwpdocument_flushDeferredPagination: (a: number) => [number, number, number, number];
 export const hwpdocument_formControlAtLogical: (a: number, b: number, c: number, d: number) => number;
 export const hwpdocument_getBookmarks: (a: number) => [number, number, number, number];
+export const hwpdocument_getBoundaryMoveRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
 export const hwpdocument_getBulletList: (a: number) => [number, number];
 export const hwpdocument_getCanvasKitReplayPlan: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const hwpdocument_getCanvasKitReplayPlanWithProfile: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const hwpdocument_getCaretPosition: (a: number) => [number, number, number, number];
 export const hwpdocument_getCellCharPropertiesAt: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
+export const hwpdocument_getCellContentFloors: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const hwpdocument_getCellInfo: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
 export const hwpdocument_getCellInfoByPath: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
 export const hwpdocument_getCellOwnProperties: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
@@ -103,11 +106,13 @@ export const hwpdocument_getCellShapePropertiesByPath: (a: number, b: number, c:
 export const hwpdocument_getCellStyleAt: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
 export const hwpdocument_getCellTextDirection: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
 export const hwpdocument_getCharPropertiesAt: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+export const hwpdocument_getChartSpec: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const hwpdocument_getClickHereProps: (a: number, b: number) => [number, number];
 export const hwpdocument_getClipboardText: (a: number) => [number, number];
 export const hwpdocument_getColumnDef: (a: number, b: number) => [number, number, number, number];
 export const hwpdocument_getControlImageData: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const hwpdocument_getControlImageMime: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const hwpdocument_getControlLogicalPosition: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const hwpdocument_getControlTextPositions: (a: number, b: number, c: number) => [number, number];
 export const hwpdocument_getCursorRect: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const hwpdocument_getCursorRectByPath: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
@@ -193,6 +198,7 @@ export const hwpdocument_getTableCellBboxesByPath: (a: number, b: number, c: num
 export const hwpdocument_getTableDimensions: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const hwpdocument_getTableDimensionsByPath: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
 export const hwpdocument_getTableFit: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+export const hwpdocument_getTableGrid: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const hwpdocument_getTableProperties: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const hwpdocument_getTables: (a: number, b: number) => [number, number, number, number];
 export const hwpdocument_getTextBoxControlIndex: (a: number, b: number, c: number) => number;
@@ -213,6 +219,7 @@ export const hwpdocument_hitTestInFootnote: (a: number, b: number, c: number, d:
 export const hwpdocument_hitTestInHeaderFooter: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
 export const hwpdocument_injectExternalImage: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
 export const hwpdocument_injectExternalImageByKey: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+export const hwpdocument_insertChart: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
 export const hwpdocument_insertClickHereField: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number, number];
 export const hwpdocument_insertClickHereFieldByPath: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number) => [number, number, number, number];
 export const hwpdocument_insertClickHereFieldByPathEx: (a: number, b: number, c: number) => [number, number, number, number];
@@ -310,8 +317,10 @@ export const hwpdocument_setCellZoneProperties: (a: number, b: number, c: number
 export const hwpdocument_setCharShapeId: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const hwpdocument_setCharShapeIdInCell: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
 export const hwpdocument_setCharShapeIdInCellEx: (a: number, b: number, c: number) => [number, number, number, number];
+export const hwpdocument_setChartSpec: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const hwpdocument_setClipEnabled: (a: number, b: number) => void;
 export const hwpdocument_setColumnDef: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const hwpdocument_setDisplayZoom: (a: number, b: number) => void;
 export const hwpdocument_setDpi: (a: number, b: number) => void;
 export const hwpdocument_setEquationProperties: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
 export const hwpdocument_setFallbackFont: (a: number, b: number, c: number) => void;
