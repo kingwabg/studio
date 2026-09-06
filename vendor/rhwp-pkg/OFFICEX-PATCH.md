@@ -1,6 +1,6 @@
 # vendor/rhwp-pkg — 포크 엔진 패치판 (sc- vendor/rhwp-core 패턴의 studio 판)
 
-- 출처: github.com/kingwabg/rhwp `officex/engine-fixes` **0f21002bf** (2026-09-03 빌드,
+- 출처: github.com/kingwabg/rhwp `officex/engine-fixes` **e54a62721** (2026-09-06 빌드,
   `wasm-pack build --target web --out-dir pkg`, release).
 - 직전 벤더(02af4f4dc+, 2026-08-09) 대비 추가분: 표 격자 단일 진실화 12단계 —
   구조·델타 불변식 관문(check_invariants/check_deltas, with_table_txn), HWPX row_sizes·common 치수 로더 수리,
