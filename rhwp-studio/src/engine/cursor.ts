@@ -1231,13 +1231,22 @@ export class CursorState {
     this.excludedCells.clear();
   }
 
-  /** 범위 선택: anchor 고정, focus만 이동 (phase 2) */
+  /**
+   * 범위 선택: anchor 고정, focus만 이동 (phase 2). 한 번에 **한 칸**씩 — 포커스가 병합·어긋난(스팬) 칸 위에 있으면
+   * 격자 한 줄이 아니라 그 칸의 반대편 끝을 지나 다음 칸으로 간다. 격자 단위 이동은 스팬 칸 안에서 제자리걸음이라
+   * 어긋낸 칸 옆으로 범위를 넓히려면 → 를 두 번 눌러야 했다(2026-09-06 실측).
+   */
   expandCellSelection(deltaRow: number, deltaCol: number): void {
     if (!this._cellSelectionMode || !this.cellFocus || !this.cellTableCtx) return;
     const { rowCount, colCount } = this.cellTableCtx;
+    const f = this.cellFocus;
+    const cur = this.cellSelectionBboxes().find(b =>
+      f.row >= b.row && f.row < b.row + b.rowSpan && f.col >= b.col && f.col < b.col + b.colSpan);
+    const row = cur && deltaRow > 0 ? cur.row + cur.rowSpan : cur && deltaRow < 0 ? cur.row - 1 : f.row + deltaRow;
+    const col = cur && deltaCol > 0 ? cur.col + cur.colSpan : cur && deltaCol < 0 ? cur.col - 1 : f.col + deltaCol;
     this.cellFocus = {
-      row: Math.max(0, Math.min(rowCount - 1, this.cellFocus.row + deltaRow)),
-      col: Math.max(0, Math.min(colCount - 1, this.cellFocus.col + deltaCol)),
+      row: Math.max(0, Math.min(rowCount - 1, row)),
+      col: Math.max(0, Math.min(colCount - 1, col)),
     };
   }
 

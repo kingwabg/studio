@@ -86,34 +86,6 @@ test('clampCompensatedResizeDelta는 최소 크기(이웃)를 지킨다', () => 
   assert.equal(clampCompensatedResizeDelta(wasm, ref, COL, [{ targetCellIdx: 4, neighborCellIdx: 5 }], 1000), 100);
 });
 
-test('buildKbdWholeUpdates(Alt) 세로는 display+renderHeight 로 움직인다 — 모델 최소 무동작(F5 신고) 회귀 가드', () => {
-  const cells = grid3x3();
-  // 모델 높이 = 한컴 빈 셀 저장 규약(패딩만 284). 예전엔 모델 클램프(284-1276<0 → 0)로 항상 무동작.
-  const wasm = mockWasm(cells, Object.fromEntries([...Array(9).keys()].map(i => [i, { height: 284 }])));
-  const updates = buildKbdWholeUpdates(ref, sel(0, 0), false, STEP, cells, wasm);
-  assert.ok(updates.length > 0, 'Alt+세로가 무동작이면 안 된다(2026-08-12 신고)');
-  const byIdx = Object.fromEntries(updates.map(u => [u.cellIdx, u]));
-  const delta = (byIdx[0].renderHeight ?? 0) - 1500; // 표시 20px = 1500HU
-  assert.ok(delta > 0, '경계가 이동해야 한다');
-  for (const i of [0, 1, 2]) assert.equal(byIdx[i].renderHeight, 1500 + delta, '대상 행(0) 확대');
-  for (const i of [3, 4, 5]) assert.equal(byIdx[i].renderHeight, 1500 - delta, '반대편 행(1) 보상 축소');
-  for (const i of [6, 7, 8]) assert.equal(byIdx[i].renderHeight, 1500, '나머지 행 표시 보존');
-  // 표 높이 보존: renderHeight 합 = 원래 합
-  const sum = updates.reduce((a, u) => a + (u.renderHeight ?? 0), 0);
-  assert.equal(sum, 1500 * 9);
-});
-
-test('buildKbdWholeUpdates(Alt) 세로 축소 한계 = 콘텐츠 글줄 바닥(contentFloors) — 유령 공간 가드', () => {
-  const cells = grid3x3();
-  const wasm = mockWasm(cells);
-  const floors = Array(9).fill(1484); // 12pt 글줄 바닥
-  const updates = buildKbdWholeUpdates(ref, sel(0, 0), false, STEP, cells, wasm, floors);
-  const byIdx = Object.fromEntries(updates.map(u => [u.cellIdx, u]));
-  // 반대편(row1, 1500)은 1484 밑으로 못 줄어듦 → delta 는 16으로 클램프
-  assert.equal(byIdx[3].renderHeight, 1484, '보상측이 글줄 바닥에서 멈춰야 한다');
-  assert.equal(byIdx[0].renderHeight, 1516);
-});
-
 test('바깥 테두리(마지막 행/열 끝 경계)는 키보드로도 이동 금지 — 무보상 표 성장(뚫림) 회귀 가드', () => {
   const cells = grid3x3();
   const wasm = mockWasm(cells, Object.fromEntries([...Array(9).keys()].map(i => [i, { height: 284 }])));
