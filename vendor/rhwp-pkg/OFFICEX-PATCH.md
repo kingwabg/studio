@@ -1,6 +1,6 @@
 # vendor/rhwp-pkg — 포크 엔진 패치판 (sc- vendor/rhwp-core 패턴의 studio 판)
 
-- 출처: github.com/kingwabg/rhwp `officex/engine-fixes` **9cee3f492** (2026-09-06 빌드,
+- 출처: github.com/kingwabg/rhwp `officex/engine-fixes` **0a8951beb** (2026-09-07 빌드,
   `wasm-pack build --target web --out-dir pkg`, release).
 - 직전 벤더(02af4f4dc+, 2026-08-09) 대비 추가분: 표 격자 단일 진실화 12단계 —
   구조·델타 불변식 관문(check_invariants/check_deltas, with_table_txn), HWPX row_sizes·common 치수 로더 수리,
@@ -13,6 +13,7 @@
   (어긋낸 칸+이웃 병합·표 전체 병합이 D1/D2 관문에 거부되던 결함), 행 삭제는 실효 높이 차감.
 - 9cee3f492 추가분: 가로 RowBreak 연속 쪽 "짧은 행 흘림"(260px) 폐기 — 쪽 밖으로 밀려 보이지 않던 행 수리(교육과정 385→414쪽),
   hp:label 왕복 보존, 고아 주석 정리, cargo fmt.
+- 0a8951beb 추가분: 새 쪽 첫 문단의 저장 vpos 스냅 건너뜀(이전 쪽 문단 끝 위치가 새 쪽에 42px 유령 오프셋으로 붙어 빈 쪽 발생).
 - `scripts/sync-rhwp-pkg.mjs` 가 이 디렉터리를 npm 판보다 우선 공급한다.
   npm 판으로 되돌리려면 이 디렉터리를 지우면 된다.
 - 갱신 절차: rhwp 체크아웃에서 위 명령으로 빌드 → 4파일 복사 → 이 문서의
