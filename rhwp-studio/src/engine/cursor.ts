@@ -1152,6 +1152,61 @@ export class CursorState {
     this.cellTableCtx = null;
   }
 
+  /**
+   * 표 구조가 바뀐 뒤(어긋내기·병합 등) 행·열 수를 엔진에서 다시 읽는다.
+   * F5 진입 시 굳힌 값을 쓰면 어긋내기로 격자 열이 하나 늘어난 뒤 마지막 열이 "표 끝"으로
+   * 판정돼 → 가 다음 행 첫 칸으로 랩했다(2026-09-06 실측 — 표 밖 클릭 뒤 재진입만 정상).
+   */
+  refreshCellTableContext(): void {
+    const ctx = this.cellTableCtx;
+    if (!ctx) return;
+    try {
+      const dims = (ctx.cellPath?.length ?? 0) > 0
+        ? this.wasm.getTableDimensionsByPath(ctx.sec, ctx.ppi, JSON.stringify(ctx.cellPath))
+        : this.wasm.getTableDimensions(ctx.sec, ctx.ppi, ctx.ci);
+      ctx.rowCount = dims.rowCount;
+      ctx.colCount = dims.colCount;
+    } catch { /* 조회 실패 시 종전 값 유지 */ }
+  }
+
+  /**
+   * 격자 재구성(어긋내기) 전에 앵커·포커스가 놓인 셀 번호를 잡아 둔다 — 포커스 앞쪽에
+   * 새 선이 끼면 (row,col) 번호가 이웃 칸을 가리키게 된다.
+   */
+  captureCellSelectionCells(): { anchor: number; focus: number } | null {
+    if (!this._cellSelectionMode || !this.cellAnchor || !this.cellFocus) return null;
+    const bboxes = this.cellSelectionBboxes();
+    const at = (p: { row: number; col: number }) => bboxes.find(b =>
+      p.row >= b.row && p.row < b.row + b.rowSpan && p.col >= b.col && p.col < b.col + b.colSpan)?.cellIdx;
+    const anchor = at(this.cellAnchor);
+    const focus = at(this.cellFocus);
+    return anchor === undefined || focus === undefined ? null : { anchor, focus };
+  }
+
+  /**
+   * 격자 재구성 뒤 같은 셀 번호의 새 (row,col)로 앵커·포커스를 되돌린다.
+   * 엔진 어긋내기는 셀 수와 행 우선 순서를 보존하므로 번호가 같으면 같은 칸이다.
+   */
+  restoreCellSelectionCells(saved: { anchor: number; focus: number } | null): void {
+    if (!saved || !this._cellSelectionMode) return;
+    this.refreshCellTableContext();
+    const bboxes = this.cellSelectionBboxes();
+    const a = bboxes.find(b => b.cellIdx === saved.anchor);
+    const f = bboxes.find(b => b.cellIdx === saved.focus);
+    if (a) this.cellAnchor = { row: a.row, col: a.col };
+    if (f) this.cellFocus = { row: f.row, col: f.col };
+  }
+
+  private cellSelectionBboxes(): CellBbox[] {
+    const ctx = this.cellTableCtx;
+    if (!ctx) return [];
+    try {
+      return ctx.cellPath
+        ? this.wasm.getTableCellBboxesByPath(ctx.sec, ctx.ppi, JSON.stringify(ctx.cellPath))
+        : this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci);
+    } catch { return []; }
+  }
+
   /** 셀 선택 단계를 반환한다. */
   getCellSelectionPhase(): number { return this._cellSelectionPhase; }
 

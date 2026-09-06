@@ -639,6 +639,8 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
     // "아무 경계선 6px 이내 → 복원"은 다른 열의 어긋선에 접근만 해도 원위치로
     // 튕겨(진동·기준선 통과 불가) offset 을 그대로 보낸다. 엔진이 정렬선 ±MIN_CELL
     // 복귀는 복원으로, 다른 열 선 근처는 합류로 스스로 처리한다.
+    // 선택 중 드래그면 앵커·포커스를 셀 번호로 잡아 두고 격자 재구성 뒤 새 (row,col)로 되돌린다.
+    const savedSel = inCellSel ? this.cursor.captureCellSelectionCells() : null;
     try {
       this.executeOperation({
         kind: 'snapshot',
@@ -651,6 +653,7 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
           return this.cursor.getPosition();
         },
       });
+      this.cursor.restoreCellSelectionCells(savedSel);
     } catch (err) {
       // 엔진 가드 메시지(바깥 테두리·스팬 불일치·이미 어긋난 방향)를 그대로 안내한다
       const msg = err instanceof Error ? err.message : String(err);
@@ -1358,6 +1361,8 @@ export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown'
   const edgeName: 'bottom' | 'right' = isHoriz ? 'right' : 'bottom';
   // [2026-08-16] 치유(복원) 승격은 엔진이 판정 — 종전 "아무 경계선 6px 이내 → 복원"은
   // 다른 열의 어긋선에 접근하는 스텝마다 원위치로 튕겨 연속 어긋내기가 진동했다.
+  // 앵커·포커스를 셀 번호로 잡아 두고 격자 재구성 뒤 새 (row,col)로 되돌린다(행·열 수도 갱신).
+  const savedSel = this.cursor.captureCellSelectionCells();
   try {
     this.executeOperation({
       kind: 'snapshot',
@@ -1367,6 +1372,7 @@ export function resizeCellBoundarySingle(this: any, key: 'ArrowUp' | 'ArrowDown'
         return this.cursor.getPosition();
       },
     });
+    this.cursor.restoreCellSelectionCells(savedSel);
     this.updateCellSelection();
   } catch (err) {
     // 엔진 가드(스팬 불일치·한계 등)는 마우스와 같은 문구로 안내

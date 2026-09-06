@@ -3205,6 +3205,8 @@ export class InputHandler {
   /** F5 셀 선택 하이라이트를 갱신한다 */
   private updateCellSelection(): void {
     if (!this.cellSelectionRenderer) return;
+    // 어긋내기·병합 등으로 격자 행·열 수가 바뀌어도 순회·확장·전체 선택이 새 수를 쓰도록 매번 다시 읽는다.
+    this.cursor.refreshCellTableContext();
     const range = this.cursor.getSelectedCellRange();
     const ctx = this.cursor.getCellTableContext();
     // [2026-08-17] F5 셀 이동/확장(2·3연타 포함)마다 우측 패널 주소·범위 표시 갱신 —
