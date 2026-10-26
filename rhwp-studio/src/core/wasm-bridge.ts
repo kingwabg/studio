@@ -658,7 +658,7 @@ export class WasmBridge {
     return (this.doc as any).getInlineControlIndexAtLogical(sec, para, logicalOffset);
   }
 
-  /** 표시 줌(CSS 스케일) 전달 — canvas2d 헤어라인 스냅 격자 (구 wasm 에선 부재) */
+  /** [캔버스 한컴 포크] 화면 물리 스케일 전달 — canvas2d 헤어라인 스냅 격자 (구 wasm 에선 부재) */
   setDisplayZoom(zoom: number): void {
     if (!this.doc) return;
     (this.doc as any).setDisplayZoom?.(zoom);

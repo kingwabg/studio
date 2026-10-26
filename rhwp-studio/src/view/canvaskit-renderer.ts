@@ -392,7 +392,7 @@ export class CanvasKitLayerRenderer {
 
   /** 마지막 renderPage 의 scale(zoom×백킹 dpr) — 헤어라인 바닥 계산용. */
   private pageScale = 1;
-  /** CSS 픽셀 스케일(=zoom) — 헤어라인 픽셀 스냅 격자 (한컴 두께 정합). */
+  /** [캔버스 한컴 포크] 물리 픽셀 스케일(zoom×DPR) — 헤어라인 스냅 격자. */
   private snapScale = 1;
 
   private renderLine(canvas: SkCanvas, op: LayerLineOp): void {

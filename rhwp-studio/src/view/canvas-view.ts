@@ -10,6 +10,7 @@ import { clampRenderScale, type RenderBackend } from './render-backend';
 import type { LayerRenderProfile } from '@/core/types';
 import { applyGridOverlayBox, createGridClipCornerOverlay, createGridOverlay } from './grid-overlay';
 import { getGridViewSettings } from './grid-settings';
+import { pageScreenOrigin, snapPageOffset } from './page-pixel-grid';
 
 const TEXT_EDIT_STATIC_LAYER_VERIFY_DELAY_MS = 800;
 
@@ -21,6 +22,7 @@ export class CanvasView {
 
   private scrollContent: HTMLElement;
   private pages: PageInfo[] = [];
+  private renderDpr = window.devicePixelRatio || 1;
   private currentVisiblePages: number[] = [];
   private unsubscribers: (() => void)[] = [];
   private pendingTextEditRefreshes = new Map<number, PageRenderContext>();
@@ -44,7 +46,10 @@ export class CanvasView {
     this.viewportManager.attachTo(container);
 
     this.unsubscribers.push(
-      eventBus.on('viewport-scroll', () => this.updateVisiblePages()),
+      eventBus.on('viewport-scroll', () => {
+        this.updateVisiblePages();
+        this.resnapVisibleCanvases();
+      }),
       eventBus.on('viewport-resize', () => this.onViewportResize()),
       eventBus.on('zoom-changed', (zoom) => this.onZoomChanged(zoom as number)),
       eventBus.on('document-page-invalidated', (payload) => this.refreshInvalidatedPage(payload)),
@@ -222,11 +227,8 @@ export class CanvasView {
       return false;
     }
     // iOS/WebKit과 GPU surface가 감당하기 어려운 물리 픽셀 수를 중앙 정책으로 제한한다.
-    // [정밀 렌더 2026-08-04] dpr 1 화면에서는 renderScale 이 zoom 그대로가 되어 10pt 글자가
-    // 13px 물리로 깔린다 — 글자가 뭉개지고 컬러 이모지 비트맵도 저품질로 뽑혀, 170% 로
-    // 확대해야 정상처럼 보였다(사용자 실측 신고). 유효 dpr 을 최소 2로 올려 항상 레티나
-    // 밀도로 그린다(레티나는 불변, 픽셀 상한은 clampRenderScale 이 계속 지킨다).
-    const renderScale = clampRenderScale(pageInfo, zoom * Math.max(rawDpr, 2));
+    // [캔버스 한컴 포크] 실제 화면 밀도로 그려 축소 보간과 CSS/물리 선 격자 불일치를 막는다.
+    const renderScale = clampRenderScale(pageInfo, zoom * rawDpr);
     const dpr = renderScale / (zoom > 0 ? zoom : 1);
 
     // Canvas를 DOM에 추가하고 위치를 설정한다
@@ -242,8 +244,8 @@ export class CanvasView {
     // WASM이 Canvas 크기를 자동 설정한다 (물리 픽셀 = 페이지크기 × zoom × DPR)
     let renderResult = { needsTextEditStaticLayerVerification: false };
     try {
-      // canvas2d 경로 헤어라인 CSS 스냅 격자 — 엔진에 표시 줌 전달
-      this.wasm.setDisplayZoom?.(zoom);
+      // canvas2d 경로도 백킹과 동일한 물리 픽셀 격자로 헤어라인을 맞춘다.
+      this.wasm.setDisplayZoom?.(renderScale);
       renderResult = this.pageRenderer.renderPage(pageIdx, canvas, renderScale, zoom, dpr, renderContext);
     } catch (e) {
       console.error(`[CanvasView] 페이지 ${pageIdx} 렌더링 실패:`, e);
@@ -257,7 +259,7 @@ export class CanvasView {
     canvas.style.height = `${canvas.height / dpr}px`;
     // left 스냅은 **폭 확정 뒤** — 풀에서 재사용된 캔버스의 직전 폭으로 중앙을 잡으면
     // 새로 생긴 페이지가 옆으로 밀린 채 남았다(2026-08-10 신고: 2쪽째 오른쪽 밀림).
-    this.applySnappedLeft(canvas, pageLeft);
+    this.applySnappedPageBox(pageIdx, canvas, pageLeft);
     this.renderGridOverlay(pageIdx, canvas);
     if (renderResult.needsTextEditStaticLayerVerification) {
       this.scheduleTextEditStaticLayerVerification(pageIdx);
@@ -267,37 +269,23 @@ export class CanvasView {
     return true;
   }
 
-  /** 뷰포트 리사이즈 처리 */
-  /** [officex] 캔버스 left 를 물리 픽셀 격자에 스냅해 서브픽셀 블러를 막는다. */
-  private applySnappedLeft(canvas: HTMLCanvasElement, pageLeft: number): void {
+  /** [캔버스 한컴 포크] 모든 지면 레이어를 같은 전역 물리 격자로 배치한다. */
+  private applySnappedPageBox(pageIdx: number, canvas: HTMLCanvasElement, pageLeft: number): void {
     const dpr = window.devicePixelRatio || 1;
-    if (pageLeft >= 0) {
-      canvas.style.left = `${Math.round(pageLeft * dpr) / dpr}px`;
-      canvas.style.transform = 'none';
-      return;
-    }
-    const parent = canvas.parentElement;
-    const cssW = parseFloat(canvas.style.width) || canvas.width / dpr;
-    if (!parent || !Number.isFinite(cssW)) {
-      canvas.style.left = '50%';
-      canvas.style.transform = 'translateX(-50%)';
-      return;
-    }
-    const left = Math.round(((parent.clientWidth - cssW) / 2) * dpr) / dpr;
-    canvas.style.left = `${left}px`;
+    const origin = pageScreenOrigin(this.scrollContent);
+    const cssWidth = parseFloat(canvas.style.width) || canvas.width / dpr;
+    const left = pageLeft >= 0 ? pageLeft : (this.scrollContent.clientWidth - cssWidth) / 2;
+    canvas.style.left = `${snapPageOffset(left, origin.x, dpr)}px`;
+    canvas.style.top = `${snapPageOffset(this.virtualScroll.getPageOffset(pageIdx), origin.y, dpr)}px`;
     canvas.style.transform = 'none';
+    this.pageRenderer.syncPageLayerBoxes(pageIdx, canvas);
   }
 
-  /** [officex] viewport 리사이즈 후 가시 캔버스들의 left 재스냅 (재렌더 없이 위치만). */
   private resnapVisibleCanvases(): void {
-    const canvases = this.scrollContent.querySelectorAll('canvas');
-    canvases.forEach((c, idx) => {
-      const el = c as HTMLCanvasElement;
-      if (el.id === 'h-ruler' || el.id === 'v-ruler') return;
-      // 그리드 모드 페이지는 renderCanvas 가 다시 돌며 left 를 정하므로 중앙정렬만 재계산
-      if (!this.virtualScroll.isGridMode()) this.applySnappedLeft(el, -1);
-      void idx;
-    });
+    for (const pageIdx of this.canvasPool.activePages) {
+      const canvas = this.canvasPool.getCanvas(pageIdx);
+      if (canvas) this.applySnappedPageBox(pageIdx, canvas, this.virtualScroll.getPageLeft(pageIdx));
+    }
   }
 
   private onViewportResize(): void {
@@ -311,7 +299,10 @@ export class CanvasView {
     this.recalcLayout();
     const isGrid = this.virtualScroll.isGridMode();
 
-    if (wasGrid || isGrid) {
+    const dpr = window.devicePixelRatio || 1;
+    const densityChanged = dpr !== this.renderDpr;
+    this.renderDpr = dpr;
+    if (wasGrid || isGrid || densityChanged) {
       // 그리드 관련 변경 시 전체 재렌더링
       this.cancelPendingTextEditRefresh();
       this.cancelTextEditStaticLayerVerification();

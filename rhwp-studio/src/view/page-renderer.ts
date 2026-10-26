@@ -61,10 +61,8 @@ export class PageRenderer {
   ): PageRenderResult {
     if (this.backend === 'canvaskit') {
       this.layerSummaryCache.delete(pageIdx);
-      // 헤어라인 스냅용 CSS 픽셀 스케일(=zoom). 물리 px 격자로 스냅하면 레티나에서
-      // 1물리px(=CSS 0.5px) 선이 되어 한컴(1 CSS px)보다 절반 굵기로 여전히 희미하다
-      // (2026-08-11 재신고). CSS 격자 스냅 = dpr 무관 한컴 두께·또렷함.
-      this.renderPageCanvasKit(pageIdx, canvas, renderScale, _displayScale);
+      // [캔버스 한컴 포크] 선과 백킹을 같은 물리 픽셀 격자로 맞춘다.
+      this.renderPageCanvasKit(pageIdx, canvas, renderScale, renderScale);
       return { needsTextEditStaticLayerVerification: false };
     }
 
@@ -124,12 +122,9 @@ export class PageRenderer {
     }
 
     const pageInfo = this.wasm.getPageInfo(pageIdx);
-    // [officex 2026-07-27] 백킹을 짝수로 스냅 — 홀수 백킹(예: A4×2=1587)은 CSS 크기가
-    // 793.5px(소수)가 되고, 중앙정렬과 결합해 캔버스가 물리 픽셀 격자에서 어긋나
-    // 전면 서브픽셀 보간(텍스트 흐림)을 만든다(실측: x물리 오프셋 0.19px). DPR 2에서
-    // 짝수 백킹 = 정수 CSS 크기. 마지막 1px 는 페이지 여백이라 잘림 무해.
-    canvas.width = Math.max(2, 2 * Math.floor((pageInfo.width * renderScale) / 2));
-    canvas.height = Math.max(2, 2 * Math.floor((pageInfo.height * renderScale) / 2));
+    // [캔버스 한컴 포크] 백킹은 물리 픽셀 정수면 충분하다. 짝수 강제는 DPR 2만 가정한다.
+    canvas.width = Math.max(1, Math.ceil(pageInfo.width * renderScale));
+    canvas.height = Math.max(1, Math.ceil(pageInfo.height * renderScale));
 
     const tree = this.wasm.getPageLayerTreeObject(pageIdx, this.renderProfile);
     try {
@@ -311,6 +306,14 @@ export class PageRenderer {
     layer.style.background = 'transparent';
     this.wasm.renderPageToCanvasFiltered(pageIdx, layer, renderScale, layerKind);
     return layer;
+  }
+
+  /** [캔버스 한컴 포크] 렌더 후 확정된 지면 위치를 이미지/정적 레이어에도 반영한다. */
+  syncPageLayerBoxes(pageIdx: number, canvas: HTMLCanvasElement): void {
+    const layers = canvas.parentElement?.querySelectorAll<HTMLElement>(`[data-rhwp-overlay-page="${pageIdx}"]`);
+    layers?.forEach((layer) => this.applyPageLayerBox(layer,
+      canvas.style.top, canvas.style.left, canvas.style.transform,
+      parseFloat(canvas.style.width), parseFloat(canvas.style.height)));
   }
 
   private applyPageLayerBox(
