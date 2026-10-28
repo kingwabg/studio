@@ -8,6 +8,7 @@
     "build:rhwp-app": "npm --prefix rhwp-studio run build:embed",
     "prebuild": "npm run build:rhwp-app",
     "build": "vite build",
+    "build:fast": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "verify:hwpx": "node scripts/hwpx-verify.mjs",
     "gen:hwpx-base": "node scripts/gen-hwpx-base.mjs",
