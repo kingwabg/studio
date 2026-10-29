@@ -83,6 +83,13 @@ export class RibbonHeader {
     on('format:italic', props.italic);
     on('format:underline', props.underline);
     on('format:strikethrough', props.strikethrough);
+    // [캔버스 한컴 포크] 글자 색·형광펜도 '켜짐' 표시 — 종전엔 굵게~취소선만 표시됐다.
+    // 기본값(검정 글자 / 흰 형광펜)이면 꺼짐, 그 외에는 켜짐(2026-10-29 사용자 지시).
+    const textColor = String(props.textColor ?? '').toLowerCase();
+    on('format:text-color', !!textColor && textColor !== '#000000' && textColor !== 'black');
+    const shade = String(props.shadeColor ?? '').toLowerCase();
+    on('format:highlight',
+      !!shade && shade !== '#ffffff' && shade !== '#fff' && shade !== 'none' && shade !== 'transparent');
     // 크기 값 상자 — 저장 단위는 HWPUNIT(1pt=100)
     const fs = Number(props.fontSize ?? 0);
     this.setValueBox('font-size', fs > 0 ? fs / 100 : undefined);
@@ -144,6 +151,12 @@ export class RibbonHeader {
       const cmd = b.dataset.cmd;
       if (!cmd) continue;
       b.classList.toggle('is-active', this.activeCmds.has(cmd));
+    }
+    // 색·형광펜은 구 서식바 컨트롤을 입양한 슬롯이라 data-cmd 가 없다 —
+    // 슬롯 자체에 상태를 칠해 '켜짐'을 보이게 한다.
+    for (const [slotName, cmd] of [['text-color', 'format:text-color'], ['highlight', 'format:highlight']] as const) {
+      const host = this.ribbonRow?.querySelector<HTMLElement>(`.rb-slot[data-slot="${slotName}"]`);
+      host?.classList.toggle('is-active', this.activeCmds.has(cmd));
     }
   }
 

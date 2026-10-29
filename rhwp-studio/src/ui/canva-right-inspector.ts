@@ -5,6 +5,7 @@
  *       상태 반영은 Toolbar와 같은 cursor-format-changed·cursor-para-changed 미러.
  */
 import type { CanvaServices } from './canva-services';
+import { inspectorTabTarget } from './inspector-tab-policy';
 import type { CharProperties, ParaProperties } from '@/core/types';
 import { TableBorderSection } from './table-border-section';
 import { TablePanelSections } from './table-panel-sections';
@@ -95,6 +96,10 @@ function svg(inner: string): string {
 export class CanvaRightInspector {
   private ctx: Ctx = 'none';
   private panelTab: PanelTab = 'props';
+  private tabTargetKey = '';
+  private manualTabKey = '';
+  private composing = false;
+  private pendingManualTab: PanelTab | null = null;
   private painted = false;
   /** [캔버스 한컴 포크] 그림 컨텍스트 내 다중 선택 여부 — 단일↔다중 전환 시 정렬 섹션 재렌더 */
   private lastMulti = false;
@@ -235,14 +240,29 @@ export class CanvaRightInspector {
       const ihc = (this.services.getInputHandler() as any)?.cursor;
       if (ihc) this.paintCorrections(ihc);
     });
-    bus.on('cursor-format-changed', (p) => this.reflectChar(p as CharProperties));
+    bus.on('cursor-format-changed', (p) => { this.reflectChar(p as CharProperties); this.refreshContext(); });
     bus.on('cursor-para-changed', (p) => this.reflectPara(p as ParaProperties));
+    // 조합 중에는 패널 DOM을 교체하지 않는다. 조합 종료 후 최신 상태를 한 번 읽는다.
+    this.root.ownerDocument.addEventListener('compositionstart', (e) => {
+      if(e.target === (this.services.getInputHandler() as any)?.textarea) this.composing = true;
+    }, true);
+    this.root.ownerDocument.addEventListener('compositionend', () => {
+      if(!this.composing)return;
+      this.composing = false;
+      queueMicrotask(() => {
+        this.refreshContext();
+        const ih=this.services.getInputHandler();
+        if(ih){this.reflectChar(ih.getCharProperties());this.reflectPara(ih.getParaProperties());}
+        if(this.pendingManualTab){const tab=this.pendingManualTab;this.pendingManualTab=null;this.setPanelTab(tab);}
+      });
+    }, true);
     bus.on('cursor-cell-changed', () => this.refreshContext());
     bus.on('cursor-rect-updated', () => this.refreshContext());
     bus.on('table-object-selection-changed', () => this.refreshContext());
     bus.on('picture-object-selection-changed', () => this.refreshContext());
     bus.on('form-object-selection-changed', () => this.refreshContext());
-    bus.on('document-changed', () => this.refreshContext());
+    // [캔버스 한컴 포크] 같은 문단 안에서 이동해도 드롭 후 위치 값을 다시 읽는다.
+    bus.on('document-changed', () => this.refreshContext(true));
     // 새 문서 생성/로드 완료는 command-state-changed로 온다 (initializeDocument)
     bus.on('command-state-changed', () => this.refreshContext());
   }
@@ -259,6 +279,7 @@ export class CanvaRightInspector {
 
   private reflectChar(p: CharProperties): void {
     this.lastCharProps = p;
+    if(this.composing || (this.services.getInputHandler() as any)?.isComposing)return;
     for (const fn of this.charSectionWatchers) {
       try { fn(p); } catch { /* 표시용 — 한 섹션이 죽어도 나머지는 칠한다 */ }
     }
@@ -377,6 +398,7 @@ export class CanvaRightInspector {
   }
 
   private reflectPara(p: ParaProperties): void {
+    if(this.composing || (this.services.getInputHandler() as any)?.isComposing)return;
     this.specimen.reflectPara(p);
     const a = p.alignment;
     for (const key of Object.keys(this.aligns)) this.aligns[key].classList.toggle('is-active', a === key);
@@ -387,8 +409,9 @@ export class CanvaRightInspector {
     }
   }
 
-  private refreshContext(): void {
+  private refreshContext(refreshTable = false): void {
     const ih = this.services.getInputHandler() as any;
+    if(this.composing || ih?.isComposing)return;
     const hasDoc = this.services.wasm.pageCount > 0;
     let ctx: Ctx;
     if (!ih || !hasDoc) ctx = 'none';
@@ -416,7 +439,15 @@ export class CanvaRightInspector {
     // 그림→그림 이동도 같은 이유로 다시 그려야 한다(속성 값이 개체마다 다르다)
     const picKey = ctx === 'picture' ? pictureIdentity(ih) : '';
     const picMoved = picKey !== this.lastPicKey;
-    if (ctx === this.ctx && this.painted && multi === this.lastMulti && !cellMoved && !picMoved) {
+    const target = inspectorTabTarget(ih,ctx,cellKey,picKey);
+    const targetMoved = target.key !== this.tabTargetKey;
+    if(targetMoved)this.manualTabKey='';
+    const recommended = this.manualTabKey === target.key ? this.panelTab : target.tab;
+    const tabChanged = recommended !== this.panelTab;
+    this.tabTargetKey = target.key;
+    this.panelTab = recommended;
+    if (ctx === this.ctx && this.painted && multi === this.lastMulti && !cellMoved && !picMoved && !targetMoved && !tabChanged
+      && !(refreshTable && ctx === 'table')) {
       // 같은 컨텍스트·같은 셀 안의 커서 이동 — 위치 설명(쪽·문단·셀 주소)만 따라간다
       this.paintBanner();
       return;
@@ -426,9 +457,7 @@ export class CanvaRightInspector {
     this.lastMulti = multi;
     this.lastCellKey = cellKey;
     this.lastPicKey = picKey;
-    // [컨텍스트 탭] 선택이 곧 탭이다 — 셀 클릭=셀, 표 개체=표, 그 외=서식 패널.
-    // ctx 가 바뀔 때만 건드리므로, 표 안에서 사용자가 손으로 고른 탭은 유지된다.
-    this.panelTab = ctx === 'table' ? 'table' : ctx === 'cell' ? 'cell' : 'props';
+    // [캔버스 한컴 포크] 글 편집/셀 범위/표 개체를 구분하고 같은 대상의 수동 탭을 유지한다.
     this.applyContext();
     this.syncTabs();
   }
@@ -820,7 +849,7 @@ export class CanvaRightInspector {
         return ih.cursor ? describeBodySelection(ih.cursor, this.services.wasm as never) : '';
       }
       if (c === 'cell' || c === 'table') {
-        const ref = ih.cursor?.getCellTableContext?.() ?? ih.cursor?.getPosition?.();
+        const ref = ih.getSelectedTableRef?.() ?? ih.cursor?.getCellTableContext?.() ?? ih.cursor?.getPosition?.();
         const sec = ref?.sec ?? ref?.sectionIndex;
         const ppi = ref?.ppi ?? ref?.parentParaIndex;
         const ci = ref?.ci ?? ref?.controlIndex;
@@ -902,6 +931,8 @@ export class CanvaRightInspector {
 
   /** 패널 탭 — 컨텍스트 탭: 표 안에서만 표·셀 두 개 */
   setPanelTab(tab: PanelTab): void {
+    if(this.composing || (this.services.getInputHandler() as any)?.isComposing){this.pendingManualTab=tab;return;}
+    this.manualTabKey = this.tabTargetKey;
     this.panelTab = tab;
     this.applyContext();
     this.syncTabs();
@@ -953,6 +984,7 @@ export class CanvaRightInspector {
       picture: { icon: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M4 17l5-5 4 4 3-3 4 4"/>', label: '그림 선택됨' },
       form: { icon: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 12l2 2 4-4"/>', label: '양식 개체 선택됨' },
     };
+    if(c==='cell')meta.cell.label=(this.services.getInputHandler() as any)?.isInCellSelectionMode?.()?'셀 선택':'글 편집';
     const sub = this.describeSelection(c);
     // ⚠ 스타일 편집 바(.sp-editbar)가 이 헤더에 얹혀 있다 — innerHTML 로 갈아엎으면
     //   편집 중에 커서만 움직여도 저장·취소 단추가 사라진다. 떼어 뒀다 다시 붙인다.
@@ -1175,7 +1207,8 @@ function pictureIdentity(ih: any): string {
 }
 
 function cellIdentity(ih: any): string {
-  const ref = ih?.cursor?.getCellTableContext?.() ?? ih?.getSelectedTableRef?.();
+  // [캔버스 한컴 포크] 이동한 표의 선택 참조가 이전 셀 커서보다 우선이다.
+  const ref = ih?.getSelectedTableRef?.() ?? ih?.cursor?.getCellTableContext?.();
   if (!ref) return '';
   const cellIdx = ih?.cursor?.getPosition?.()?.cellIndex ?? -1;
   return `${ref.sec}/${ref.ppi}/${ref.ci}/${cellIdx}`;

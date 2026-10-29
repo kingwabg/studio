@@ -235,6 +235,29 @@
   font-size: 7px; line-height: 1; padding: 1px 2px; cursor: pointer;
 }
 .rb-slot .sb-arrow:hover { color: var(--rb-accent); }
+/* [캔버스 한컴 포크] 스피너(▲▼) 눌린 효과 — 종전엔 hover 색만 바뀌고 눌러도 반응이 없었다
+   (2026-10-29 사용자 지시: "크기에서 위·아래 버튼 누를 때 누르는 효과"). */
+.rb-slot .sb-arrow:active {
+  color: var(--rb-accent);
+  background: color-mix(in srgb, var(--rb-accent) 22%, transparent);
+  border-radius: 3px;
+  transform: translateY(0.5px);
+}
+/* 색·형광펜 슬롯이 '켜짐'일 때 — **박스(배경)만** 바뀐다. 기존 단추(.rb-btn.is-active)와
+   같은 fill 배경이며, 아이콘·글자색은 건드리지 않는다(사용자 정정 2026-10-29:
+   "이미지 색이 아니라 박스색이 변경되는 것"). 입양 컨트롤의 실제 박스는 내부 button 이다. */
+/* 슬롯 **전체 크기**(아이콘+이름까지)에 박스색을 칠한다 — 사용자 지시 2026-10-29
+   "박스 전체크기에 색 넣자". 기존 단추(.rb-btn.is-active)가 이름 줄까지 덮는 것과 같은 모양. */
+.rb-slot[data-slot="text-color"].is-active,
+.rb-slot[data-slot="highlight"].is-active {
+  background: var(--rb-fill);
+  border-radius: 4px;
+}
+/* 내부 button 은 자체 배경이 있으면 슬롯색을 가리므로 비운다 */
+.rb-slot[data-slot="text-color"].is-active > .rb-adopted > button,
+.rb-slot[data-slot="highlight"].is-active > .rb-adopted > button {
+  background: transparent;
+}
 
 /* 색 피커 입양분(버튼 묶음)은 입력형 스타일(테두리·고정 높이)을 받지 않는다 */
 .rb-slot > .sb-color-wrap.rb-adopted,

@@ -5,6 +5,7 @@ import type { ContextMenuItem } from '@/ui/context-menu';
 import * as _connector from './input-handler-connector';
 import { tableHoverFor } from './canvas-snap'; // [캔버스 한컴 포크] 전체 표 잡기 호버 강조
 import { tableGridFor } from './input-handler-table'; // [12-b] 엔진 격자 캐시 — 어긋난 선 마커 구간
+import { planBlankBodyInput, applyBlankBodyInput } from './blank-body-input';
 
 // [캔버스 한컴 포크] 표 8핸들 구역 판정 — 선택 안 해도 표 위 hover 시 코너/모서리 8지점에서
 // "전체 표 잡기"를 띄운다. 지점 = 표 bbox의 4코너 + 4변 중점. 화면 기준 tol을 zoom으로 나눠 유지.
@@ -105,9 +106,7 @@ function beginTableMoveDrag(
   enterCellHit: any = null,
 ): void {
   this.isMoveDragging = true;
-  // [드래그 안정화 2026-07-28] 어울림 재줄바꿈은 드롭에서 확정 — 드래그 중
-  // 재줄바꿈이 host 를 되밀어 톱니 진동(±15px)을 만들던 피드백 루프 차단.
-  try { (this.wasm as any).doc?.setSquareReflowSuppressed?.(true); } catch { /* 구버전 무시 */ }
+  // [캔버스 한컴 포크] 드래그 중에도 어울림을 재배치해 프레임별 본문 갱신에 반영한다.
   this.moveDragState = {
     tableRef: { sec: ref.sec, ppi: ref.ppi, ci: ref.ci },
     startPpi: ref.ppi,
@@ -1016,6 +1015,12 @@ export function onClick(this: any, e: MouseEvent): void {
 
   try {
     const hit = this.wasm.hitTest(pageIdx, pageX, pageY);
+    // [캔버스 한컴 포크] 클릭 좌표와 본문/셀 판정·캐럿 좌표를 같은 기록으로 비교한다.
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tableDragTrace') === '1') {
+      let caret = null;
+      try { if (hit.parentParaIndex === undefined) caret = this.wasm.getCursorRect(hit.sectionIndex, hit.paragraphIndex, hit.charOffset); } catch { /* 실패도 null로 기록 */ }
+      console.info('[body-caret]', JSON.stringify({page:pageIdx,x:pageX,y:pageY,hit,caret}));
+    }
 
     // 머리말/꼬리말 마커 para_index(usize::MAX - hf_idx) 감지 → 무시
     if (hit.paragraphIndex >= 0xFFFFFF00) {
@@ -1445,6 +1450,7 @@ export function onClick(this: any, e: MouseEvent): void {
 
 export function onDblClick(this: any, e: MouseEvent): void {
   if (!this.active) return;
+  if (this.isComposing || (e as MouseEvent & { isComposing?: boolean }).isComposing) return;
   if (this.imagePlacementMode || this.textboxPlacementMode) return;
 
   // 다각형 그리기 모드: 더블클릭으로 완료
@@ -1566,6 +1572,34 @@ export function onDblClick(this: any, e: MouseEvent): void {
       this.enterTextboxEditing(ref.sec, ref.ppi, ref.ci);
       this.textarea.focus();
       return;
+    }
+  }
+
+  // [캔버스 한컴 포크] 문서 모드의 빈 본문 더블클릭은 실제 문단 입력 위치를 만든다.
+  if (!this.canvasMode && !this.cursor.isInHeaderFooter()) {
+    const point = this.pagePointFromClientPoint(e.clientX, e.clientY);
+    if (point) {
+      const trace = new URLSearchParams(window.location.search).get('tableDragTrace') === '1';
+      try {
+        const plan = planBlankBodyInput(this.wasm, point.pageIdx, point.pageX, point.pageY);
+        if (plan) {
+          e.preventDefault();
+          const before = trace ? { paragraphs: this.wasm.getParagraphCount(plan.sec), controls: this.wasm.getPageControlLayout(point.pageIdx).controls } : undefined;
+          this.cursor.clearSelection();
+          this.executeOperation({ kind: 'snapshot', operationType: 'blankBodyInput', operation: (wasm: any) => applyBlankBodyInput(wasm, plan) });
+          if (trace) {
+            const position = this.cursor.getPosition();
+            const props = this.wasm.getParaPropertiesAt(position.sectionIndex, position.paragraphIndex);
+            console.info('[blank-body-input]', JSON.stringify({ requested: point, kind: plan.kind, position, actual: this.cursor.getRect(), before, after: { paragraphs: this.wasm.getParagraphCount(plan.sec), controls: this.wasm.getPageControlLayout(point.pageIdx).controls }, paragraph: { marginLeft: props.marginLeft, spacingBefore: props.spacingBefore } }));
+          }
+          this.textarea.focus();
+          return;
+        }
+      } catch (error) {
+        if (trace) console.warn('[blank-body-input]', JSON.stringify({ requested: point, error: String(error) }));
+        this.textarea.focus();
+        return;
+      }
     }
   }
 

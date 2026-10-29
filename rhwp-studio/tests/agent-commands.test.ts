@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { allowedCommands, describeCommands, isAllowed } from '../src/ui/agent-commands.ts';
+import { allowedCommands, describeCommands, describeCapabilities, isAllowed } from '../src/ui/agent-commands.ts';
 
 /**
  * 에이전트에게 여는 명령 목록 잠금.
@@ -48,4 +48,39 @@ test('키워드로 좁혀 보여준다 — 전부 주면 프롬프트가 터진�
 
 test('없는 키워드는 ERROR 로 알린다(빈 목록으로 침묵하지 않는다)', () => {
   assert.match(describeCommands(ALL, '존재하지않는것'), /^ERROR/);
+});
+
+// [캔버스 한컴 포크] 전체 기능 발견과 직접 실행 권한은 서로 다른 계약이다.
+test('전체 목록은 UI 경유·미구현·편집 도구와 일반 명령을 구분한다', () => {
+  const all = [...ALL,
+    { id: 'table:create', label: '표 만들기' },
+    { id: 'format:apply-style', label: '스타일 적용' },
+    { id: 'insert:hyperlink', label: '하이퍼링크' },
+  ];
+  const out = describeCapabilities(all);
+  assert.match(out, /file:save\t저장\tui_required/);
+  assert.match(out, /format:bold\t진하게\tcommand/);
+  assert.match(out, /table:create\t표 만들기\teditor_tool/);
+  assert.match(out, /insert:hyperlink\t하이퍼링크\tunsupported/);
+  assert.match(out, /styleId:정수/);
+  assert.match(out, /실행·검증 완료를 뜻하지 않습니다/);
+  assert.equal(isAllowed(all, 'format:apply-style'), true);
+  assert.equal(isAllowed(all, 'insert:hyperlink'), false);
+});
+
+test('편집 성공처럼 보이던 대화상자 명령을 직접 실행 목록에서 제외한다', () => {
+  const ids = ['table:create', 'table:border-each', 'table:border-one',
+    'table:insert-row-col', 'table:delete-row-col', 'table:cell-split',
+    'table:block-formula', 'insert:chart', 'insert:endnote-shape',
+    'edit:compare-documents', 'edit:document-history', 'edit:goto'];
+  const all = ids.map(id => ({ id, label: id }));
+  assert.deepEqual(allowedCommands(all), []);
+  for (const id of ids) assert.match(describeCapabilities(all, id), new RegExp(id));
+});
+
+test('전체 기능 조회도 키워드·상한을 적용하고 빈 결과를 명시한다', () => {
+  assert.match(describeCapabilities(ALL, '저장'), /file:save/);
+  assert.doesNotMatch(describeCapabilities(ALL, '저장'), /format:bold/);
+  assert.match(describeCapabilities(ALL, '', 1), /외 10개/);
+  assert.match(describeCapabilities(ALL, '없는기능'), /^ERROR/);
 });

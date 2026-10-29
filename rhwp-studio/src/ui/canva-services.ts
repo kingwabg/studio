@@ -13,4 +13,5 @@ export interface CanvaServices {
   eventBus: EventBus;
   dispatcher: CommandDispatcher;
   getInputHandler: () => InputHandler | null;
+  navigateToPage?: (page: number) => void;
 }

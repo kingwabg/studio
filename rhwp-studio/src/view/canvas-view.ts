@@ -93,6 +93,9 @@ export class CanvasView {
     this.container.scrollTop = 0;
     this.updateVisiblePages();
 
+    // [캔버스 한컴 포크] 쪽 수가 같은 다른 문서도 미리보기를 새로 그린다.
+    this.eventBus.emit('document-pages-loaded');
+
     console.log(`[CanvasView] ${this.pages.length}/${pageCount}페이지 로드, 총 높이: ${this.virtualScroll.getTotalHeight()}px`);
   }
 
@@ -577,6 +580,14 @@ export class CanvasView {
 
   getVirtualScroll(): VirtualScroll {
     return this.virtualScroll;
+  }
+
+  // [캔버스 한컴 포크] 미리보기 이동은 편집 커서·선택을 변경하지 않는다.
+  scrollToPage(page: number): void {
+    if (!Number.isInteger(page) || page < 0 || page >= this.pages.length) return;
+    this.viewportManager.setScrollTop(this.virtualScroll.getPageOffset(page));
+    this.updateVisiblePages();
+    this.resnapVisibleCanvases();
   }
 
   getViewportManager(): ViewportManager {

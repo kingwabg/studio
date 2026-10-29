@@ -1,0 +1,1580 @@
+{
+  "version": 1,
+  "operations": [
+    {
+      "tool": "set_page",
+      "props": {
+        "widthMm": 210,
+        "heightMm": 297,
+        "leftMm": 22.5,
+        "rightMm": 22.5,
+        "topMm": 20,
+        "bottomMm": 20,
+        "headerMm": 5,
+        "footerMm": 5,
+        "landscape": false
+      }
+    },
+    {
+      "tool": "define_style",
+      "name": "운영일지 본문",
+      "char": {
+        "fontName": "함초롬돋움",
+        "fontPt": 10,
+        "bold": false,
+        "textColor": "#000000",
+        "widthPercent": 100,
+        "spacingPercent": 0
+      },
+      "para": {
+        "alignment": "left",
+        "linePercent": 130,
+        "beforePt": 0,
+        "afterPt": 0,
+        "leftMm": 0,
+        "rightMm": 0,
+        "indentMm": 0
+      }
+    },
+    {
+      "tool": "insert_paragraph",
+      "text": "운영일지(아동)",
+      "char": {
+        "fontName": "함초롬돋움",
+        "fontPt": 24,
+        "bold": true,
+        "textColor": "#000000"
+      },
+      "para": {
+        "alignment": "center",
+        "rightMm": 26,
+        "linePercent": 100,
+        "beforePt": 0,
+        "afterPt": 0
+      }
+    },
+    {
+      "tool": "create_table",
+      "colWidthsMm": [
+        6.3,
+        20.2
+      ],
+      "rowHeightsMm": [
+        5,
+        17.5
+      ],
+      "merges": [
+        {
+          "top": 0,
+          "left": 0,
+          "bottom": 1,
+          "right": 0
+        }
+      ],
+      "cells": [
+        {
+          "row": 0,
+          "col": 0,
+          "text": "결\n재",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "text": "담당자",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "text": "",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        }
+      ],
+      "char": {
+        "fontName": "함초롬돋움",
+        "fontPt": 9,
+        "bold": false,
+        "textColor": "#000000",
+        "widthPercent": 100,
+        "spacingPercent": 0
+      },
+      "para": {
+        "alignment": "left",
+        "linePercent": 110,
+        "beforePt": 0,
+        "afterPt": 0,
+        "leftMm": 0,
+        "rightMm": 0,
+        "indentMm": 0
+      },
+      "cell": {
+        "paddingLeftMm": 1.8,
+        "paddingRightMm": 1,
+        "paddingTopMm": 0.25,
+        "paddingBottomMm": 0.25,
+        "applyInnerMargin": true,
+        "verticalAlign": 1,
+        "borderLeft": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderRight": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderTop": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderBottom": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        }
+      },
+      "placement": {
+        "textWrap": "InFrontOfText",
+        "horzRelTo": "Paper",
+        "vertRelTo": "Paper",
+        "horzAlign": "Left",
+        "vertAlign": "Top",
+        "horzOffsetMm": 161.5,
+        "vertOffsetMm": 17.5,
+        "restrictInPage": true,
+        "outerLeftMm": 0,
+        "outerRightMm": 0,
+        "outerTopMm": 0,
+        "outerBottomMm": 0
+      }
+    },
+    {
+      "tool": "create_table",
+      "colWidthsMm": [
+        15.573,
+        48.2022,
+        20.3933,
+        44.4944,
+        17.0562,
+        19.2809
+      ],
+      "rowHeightsMm": [
+        7.3
+      ],
+      "merges": [],
+      "cells": [
+        {
+          "row": 0,
+          "col": 0,
+          "text": "일자",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "text": "2026년 6월 26일 금",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "text": "운영시간",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "text": "방학중 (09:00 ~ 18:00)",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "text": "담당자",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 0,
+          "col": 5,
+          "text": "직원나",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        }
+      ],
+      "char": {
+        "fontName": "함초롬돋움",
+        "fontPt": 9,
+        "bold": false,
+        "textColor": "#000000",
+        "widthPercent": 100,
+        "spacingPercent": 0
+      },
+      "para": {
+        "alignment": "left",
+        "linePercent": 110,
+        "beforePt": 0,
+        "afterPt": 0,
+        "leftMm": 0,
+        "rightMm": 0,
+        "indentMm": 0
+      },
+      "cell": {
+        "paddingLeftMm": 1.8,
+        "paddingRightMm": 1,
+        "paddingTopMm": 0.25,
+        "paddingBottomMm": 0.25,
+        "applyInnerMargin": true,
+        "verticalAlign": 1,
+        "borderLeft": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderRight": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderTop": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderBottom": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        }
+      },
+      "placement": {
+        "textWrap": "InFrontOfText",
+        "horzRelTo": "Paper",
+        "vertRelTo": "Paper",
+        "horzAlign": "Left",
+        "vertAlign": "Top",
+        "horzOffsetMm": 22.5,
+        "vertOffsetMm": 71.5,
+        "restrictInPage": true,
+        "outerLeftMm": 0,
+        "outerRightMm": 0,
+        "outerTopMm": 0,
+        "outerBottomMm": 0
+      }
+    },
+    {
+      "tool": "create_table",
+      "colWidthsMm": [
+        15.573,
+        9.2697,
+        12.6067,
+        13.7191,
+        13.3483,
+        13.3483,
+        13.7191,
+        12.9775,
+        12.6067,
+        12.9775,
+        12.6067,
+        22.2472
+      ],
+      "rowHeightsMm": [
+        6.3,
+        6.1,
+        6.1
+      ],
+      "merges": [
+        {
+          "top": 0,
+          "left": 0,
+          "bottom": 2,
+          "right": 0
+        },
+        {
+          "top": 0,
+          "left": 9,
+          "bottom": 2,
+          "right": 9
+        }
+      ],
+      "cells": [
+        {
+          "row": 0,
+          "col": 0,
+          "text": "아동\n현황\n(위탁+자체)",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false,
+            "fontPt": 6.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 9,
+          "text": "급식\n현황",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "text": "성별",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "text": "취학전",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "text": "탈학교",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "text": "초등학교",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 5,
+          "text": "중학교",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 6,
+          "text": "고등학교",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 7,
+          "text": "기타",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 8,
+          "text": "계",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "text": "남",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "text": "1",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 5,
+          "text": "9",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 6,
+          "text": "",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 7,
+          "text": "",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 8,
+          "text": "10",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "text": "여",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 4,
+          "text": "1",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 5,
+          "text": "7",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 6,
+          "text": "",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 7,
+          "text": "",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 8,
+          "text": "8",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 10,
+          "text": "조식",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 0,
+          "col": 11,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 10,
+          "text": "중식",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 1,
+          "col": 11,
+          "text": "18",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 10,
+          "text": "석식",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 2,
+          "col": 11,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        }
+      ],
+      "char": {
+        "fontName": "함초롬돋움",
+        "fontPt": 8,
+        "bold": false,
+        "textColor": "#000000",
+        "widthPercent": 100,
+        "spacingPercent": 0
+      },
+      "para": {
+        "alignment": "left",
+        "linePercent": 110,
+        "beforePt": 0,
+        "afterPt": 0,
+        "leftMm": 0,
+        "rightMm": 0,
+        "indentMm": 0
+      },
+      "cell": {
+        "paddingLeftMm": 1.8,
+        "paddingRightMm": 1,
+        "paddingTopMm": 0.25,
+        "paddingBottomMm": 0.25,
+        "applyInnerMargin": true,
+        "verticalAlign": 1,
+        "borderLeft": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderRight": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderTop": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderBottom": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        }
+      },
+      "placement": {
+        "textWrap": "InFrontOfText",
+        "horzRelTo": "Paper",
+        "vertRelTo": "Paper",
+        "horzAlign": "Left",
+        "vertAlign": "Top",
+        "horzOffsetMm": 22.5,
+        "vertOffsetMm": 84,
+        "restrictInPage": true,
+        "outerLeftMm": 0,
+        "outerRightMm": 0,
+        "outerTopMm": 0,
+        "outerBottomMm": 0
+      }
+    },
+    {
+      "tool": "create_table",
+      "colWidthsMm": [
+        15.4,
+        12.1,
+        12.4667,
+        12.4667,
+        12.1,
+        13.5667,
+        12.1,
+        12.1,
+        12.8333,
+        12.4667,
+        12.1,
+        12.4667,
+        12.8333
+      ],
+      "rowHeightsMm": [
+        7,
+        7
+      ],
+      "merges": [
+        {
+          "top": 0,
+          "left": 0,
+          "bottom": 1,
+          "right": 0
+        },
+        {
+          "top": 0,
+          "left": 8,
+          "bottom": 1,
+          "right": 8
+        }
+      ],
+      "cells": [
+        {
+          "row": 0,
+          "col": 0,
+          "text": "이용\n실적\n(위탁+자체)",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false,
+            "fontPt": 6.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 8,
+          "text": "교사\n현황",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "text": "정원",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "text": "현원",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "text": "출석",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "text": "공결",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 5,
+          "text": "대체출석",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 6,
+          "text": "결석",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 0,
+          "col": 7,
+          "text": "기타",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "text": "35",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "text": "18",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "text": "",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 5,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 6,
+          "text": "0",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 1,
+          "col": 7,
+          "text": "2",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 9,
+          "text": "종사자",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 1,
+          "col": 9,
+          "text": "1",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 10,
+          "text": "교사",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 1,
+          "col": 10,
+          "text": "1",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 11,
+          "text": "공익",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 1,
+          "col": 11,
+          "text": "1",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 0,
+          "col": 12,
+          "text": "기타",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true,
+            "fontPt": 7.5
+          }
+        },
+        {
+          "row": 1,
+          "col": 12,
+          "text": "1",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": false
+          }
+        }
+      ],
+      "char": {
+        "fontName": "함초롬돋움",
+        "fontPt": 8,
+        "bold": false,
+        "textColor": "#000000",
+        "widthPercent": 100,
+        "spacingPercent": 0
+      },
+      "para": {
+        "alignment": "left",
+        "linePercent": 110,
+        "beforePt": 0,
+        "afterPt": 0,
+        "leftMm": 0,
+        "rightMm": 0,
+        "indentMm": 0
+      },
+      "cell": {
+        "paddingLeftMm": 1.8,
+        "paddingRightMm": 1,
+        "paddingTopMm": 0.25,
+        "paddingBottomMm": 0.25,
+        "applyInnerMargin": true,
+        "verticalAlign": 1,
+        "borderLeft": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderRight": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderTop": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderBottom": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        }
+      },
+      "placement": {
+        "textWrap": "InFrontOfText",
+        "horzRelTo": "Paper",
+        "vertRelTo": "Paper",
+        "horzAlign": "Left",
+        "vertAlign": "Top",
+        "horzOffsetMm": 22.5,
+        "vertOffsetMm": 108,
+        "restrictInPage": true,
+        "outerLeftMm": 0,
+        "outerRightMm": 0,
+        "outerTopMm": 0,
+        "outerBottomMm": 0
+      }
+    },
+    {
+      "tool": "create_table",
+      "colWidthsMm": [
+        15.6,
+        149.4
+      ],
+      "rowHeightsMm": [
+        5,
+        7,
+        7,
+        7,
+        70.5,
+        7.4
+      ],
+      "merges": [
+        {
+          "top": 0,
+          "left": 0,
+          "bottom": 0,
+          "right": 1
+        }
+      ],
+      "cells": [
+        {
+          "row": 0,
+          "col": 0,
+          "text": "통합 관리",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "center"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "text": "종사자",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "text": "출근 : 직원가(센터장), 직원나(사회복지사) / 2명",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "text": "아동",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "text": "결석 : 아동가, 아동나 / 2명",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 3,
+          "col": 0,
+          "text": "방문자",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 3,
+          "col": 1,
+          "text": "없음",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 4,
+          "col": 0,
+          "text": "업무\n내용",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 4,
+          "col": 1,
+          "text": "• 조식 및 오전 활동 준비\n* 문화예술 활동 (미술)\n* 점심식사 지원\n* 방과후 학습",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left",
+            "linePercent": 150
+          },
+          "char": {
+            "bold": false
+          }
+        },
+        {
+          "row": 5,
+          "col": 0,
+          "text": "기타",
+          "props": {
+            "fillColor": "#d9d9d9"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": true
+          }
+        },
+        {
+          "row": 5,
+          "col": 1,
+          "text": "",
+          "props": {
+            "fillColor": "#ffffff"
+          },
+          "para": {
+            "alignment": "left"
+          },
+          "char": {
+            "bold": false
+          }
+        }
+      ],
+      "char": {
+        "fontName": "함초롬돋움",
+        "fontPt": 10,
+        "bold": false,
+        "textColor": "#000000",
+        "widthPercent": 100,
+        "spacingPercent": 0
+      },
+      "para": {
+        "alignment": "left",
+        "linePercent": 110,
+        "beforePt": 0,
+        "afterPt": 0,
+        "leftMm": 0,
+        "rightMm": 0,
+        "indentMm": 0
+      },
+      "cell": {
+        "paddingLeftMm": 1.8,
+        "paddingRightMm": 1,
+        "paddingTopMm": 0.25,
+        "paddingBottomMm": 0.25,
+        "applyInnerMargin": true,
+        "verticalAlign": 1,
+        "borderLeft": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderRight": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderTop": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        },
+        "borderBottom": {
+          "type": 1,
+          "width": 1,
+          "color": "#000000"
+        }
+      },
+      "placement": {
+        "textWrap": "InFrontOfText",
+        "horzRelTo": "Paper",
+        "vertRelTo": "Paper",
+        "horzAlign": "Left",
+        "vertAlign": "Top",
+        "horzOffsetMm": 22.5,
+        "vertOffsetMm": 124.5,
+        "restrictInPage": true,
+        "outerLeftMm": 0,
+        "outerRightMm": 0,
+        "outerTopMm": 0,
+        "outerBottomMm": 0
+      }
+    },
+    {
+      "tool": "inspect_document"
+    }
+  ]
+}

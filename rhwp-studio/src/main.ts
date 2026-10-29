@@ -587,7 +587,7 @@ async function initialize(): Promise<void> {
     }
 
     // [캔버스 한컴 포크] 캔바식 좌/우 사이드바 (삽입 팔레트 · 속성 인스펙터 · AI)
-    mountCanvaSidebars({ wasm, eventBus, dispatcher, getInputHandler: () => inputHandler });
+    mountCanvaSidebars({ wasm, eventBus, dispatcher, getInputHandler: () => inputHandler, navigateToPage: page => canvasView?.scrollToPage(page) });
   } catch (error) {
     msg.textContent = `WASM 초기화 실패: ${error}`;
     console.error('[main] WASM 초기화 실패:', error);
@@ -1173,7 +1173,7 @@ async function restoreAutosaveDraft(draft: AutosaveDraft): Promise<void> {
 }
 
 
-async function createNewDocument(): Promise<void> {
+async function createNewDocument(): Promise<boolean> {
   const msg = sbMessage();
   try {
     msg.textContent = '새 문서 생성 중...';
@@ -1183,9 +1183,11 @@ async function createNewDocument(): Promise<void> {
       { discardPreviousDraft: true },
     );
     await initializeDocument(docInfo, `새 문서.hwp — ${docInfo.pageCount}페이지`);
+    return true;
   } catch (error) {
     msg.textContent = `새 문서 생성 실패: ${error}`;
     console.error('[main] 새 문서 생성 실패:', error);
+    return false;
   }
 }
 
@@ -1196,9 +1198,9 @@ async function canReplaceCurrentDocument(skipUnsavedGuard?: boolean): Promise<bo
 // 커맨드에서 새 문서 생성 호출
 eventBus.on('create-new-document', (payload) => {
   void (async () => {
-    const options = payload as { skipUnsavedGuard?: boolean; onReady?: () => void } | undefined;
-    if (!await canReplaceCurrentDocument(options?.skipUnsavedGuard)) return;
-    await createNewDocument();
+    const options = payload as { skipUnsavedGuard?: boolean; onReady?: () => void; onCancel?: () => void } | undefined;
+    if (!await canReplaceCurrentDocument(options?.skipUnsavedGuard)) { options?.onCancel?.(); return; }
+    if(!await createNewDocument()) { options?.onCancel?.(); return; }
     // 새 문서 준비가 끝난 뒤에 실행할 후속(예: 템플릿 편집 — 빈 새 문서에 내용 채우기).
     options?.onReady?.();
   })();
@@ -1434,6 +1436,17 @@ window.addEventListener('message', async (e) => {
         await initPromise;
         reply(JSON.parse(wasm.exportHwpVerify()));
         break;
+      case 'pageBreak': {
+        // 호스트(연간계획 등)의 "페이지 추가" 버튼용 — 편집기 명령과 같은 경로로 실행해
+        // 스냅샷(undo)·재조판·상태바 갱신이 함께 처리되게 한다.
+        await initPromise;
+        if (!dispatcher.dispatch('page:break')) {
+          reply(undefined, '쪽 나누기를 실행할 수 없습니다(커서 위치를 확인해 주세요).');
+          break;
+        }
+        reply({ ok: true, pageCount: wasm.pageCount });
+        break;
+      }
       default:
         reply(undefined, `Unknown method: ${method}`);
     }

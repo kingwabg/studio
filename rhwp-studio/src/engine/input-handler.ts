@@ -1,4 +1,5 @@
-import { WasmBridge } from '@/core/wasm-bridge';
+import { WasmBridge, type PageMoveResult, type PageEditAction, type PageEditResult } from '@/core/wasm-bridge';
+import { normalizePageSelection } from '@/core/page-selection';
 import { showToast } from '@/ui/toast';
 import { EventBus } from '@/core/event-bus';
 import { CursorState } from './cursor';
@@ -360,6 +361,8 @@ export class InputHandler {
     pageBboxes: CellBbox[];
     affectedCellIndices: number[];
     borderOriginalPos: number;
+    startPageX: number;
+    startPageY: number;
     minResizePos: number;
     maxResizePos: number;
     resizeTarget?: { cellIdx: number; side: 'start' | 'end' } | null;
@@ -2296,15 +2299,68 @@ export class InputHandler {
 
   /** 선택 범위에 글자 서식을 적용한다 */
   private applyCharFormat(props: Partial<CharProperties>): void {
+    // [캔버스 한컴 포크] 셀 범위 선택(F5·표 드래그) 상태면 선택된 **셀들의 글자 전부**에 적용한다.
+    // 종전엔 anchor(텍스트 선택)가 없어 조용히 무시됐다 — 사용자 신고(2026-10-29)
+    // "표에서 선택하고 리본 서식을 눌러도 아무 일이 없다". 한컴은 셀 범위 선택에도
+    // 글자 모양을 적용하므로 같은 규약으로 맞춘다.
+    if (this.applyCharFormatToCellSelection(props)) return;
+
     const sel = this.cursor.getSelectionOrdered();
     if (!sel) return;
     const cmd = new ApplyCharFormatCommand(sel.start, sel.end, props);
     this.executeOperation({ kind: 'command', command: cmd });
   }
 
+  /**
+   * [캔버스 한컴 포크] 셀 범위 선택에 글자 서식을 적용한다.
+   * 적용 대상 = 범위에 걸친 각 셀의 모든 문단·모든 글자. 셀이 하나도 없으면 false.
+   */
+  private applyCharFormatToCellSelection(props: Partial<CharProperties>): boolean {
+    if (!this.cursor.isInCellSelectionMode()) return false;
+    const ctx = this.cursor.getCellTableContext();
+    const range = this.cursor.getSelectedCellRange();
+    if (!ctx || !range) return false;
+    if (ctx.cellPath && ctx.cellPath.length > 1) return false; // 중첩 표는 아직 미지원(기존 규약)
+
+    let bboxes: Array<{ cellIdx: number; row: number; col: number }> = [];
+    try {
+      bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci) ?? [];
+    } catch {
+      return false;
+    }
+    const targets = bboxes.filter(
+      (b) => b.row >= range.startRow && b.row <= range.endRow &&
+             b.col >= range.startCol && b.col <= range.endCol,
+    );
+    if (!targets.length) return false;
+
+    for (const cell of targets) {
+      const paraCount = this.wasm.getCellParagraphCount(ctx.sec, ctx.ppi, ctx.ci, cell.cellIdx);
+      for (let para = 0; para < paraCount; para++) {
+        const len = this.wasm.getCellParagraphLength(ctx.sec, ctx.ppi, ctx.ci, cell.cellIdx, para);
+        if (len <= 0) continue;
+        const start: DocumentPosition = {
+          sectionIndex: ctx.sec, paragraphIndex: ctx.ppi, charOffset: 0,
+          parentParaIndex: ctx.ppi, controlIndex: ctx.ci,
+          cellIndex: cell.cellIdx, cellParaIndex: para,
+        };
+        const end: DocumentPosition = { ...start, charOffset: len };
+        this.executeOperation({
+          kind: 'command',
+          command: new ApplyCharFormatCommand(start, end, props),
+        });
+      }
+    }
+    return true;
+  }
+
   /** 토글 서식 적용 (상호 배타 처리 포함) */
   private applyToggleFormat(prop: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'emboss' | 'engrave' | 'outline' | 'superscript' | 'subscript'): void {
-    if (!this.cursor.hasSelection()) { _pend.togglePending.call(this, prop); return; }  // 대기 서식
+    // [캔버스 한컴 포크] 셀 범위 선택도 '선택'이다 — 대기 서식이 아니라 선택된 셀들에 적용한다
+    // (2026-10-29 신고: 표에서 드래그·F5로 선택하고 굵게를 눌러도 아무 일이 없었다).
+    if (!this.cursor.hasSelection() && !this.cursor.isInCellSelectionMode()) {
+      _pend.togglePending.call(this, prop); return;  // 대기 서식
+    }
     const current = this.getCharPropertiesAtCursor();
 
     if (prop === 'emboss') {
@@ -2378,10 +2434,56 @@ export class InputHandler {
   }
 
   private getParaFormatTargetsAtCursor(): ParaFormatTarget[] {
+    // [캔버스 한컴 포크] 셀 범위 선택이면 **선택된 모든 셀의 모든 문단**이 대상이다.
+    // 종전엔 커서가 놓인 셀 하나에만 적용돼, 여러 셀을 선택하고 정렬·줄간격을 눌러도
+    // 한 칸만 바뀌었다(2026-10-29 사용자 요청: 글자 서식과 같은 방식으로 확장).
+    const cellTargets = this.getParaFormatTargetsForCellSelection();
+    if (cellTargets) return cellTargets;
+
     const sel = this.cursor.getSelectionOrdered();
     if (sel) return this.getParaFormatTargetsForRange(sel.start, sel.end);
     const pos = this.cursor.getPosition();
     return this.getParaFormatTargetsForRange(pos, pos);
+  }
+
+  /**
+   * [캔버스 한컴 포크] 셀 범위 선택 → 선택된 셀들의 모든 문단을 문단 서식 대상으로 만든다.
+   * 셀 선택 상태가 아니면 null(기존 경로 유지). 중첩 표는 기존 규약대로 미지원.
+   */
+  private getParaFormatTargetsForCellSelection(): ParaFormatTarget[] | null {
+    if (!this.cursor.isInCellSelectionMode()) return null;
+    const ctx = this.cursor.getCellTableContext();
+    const range = this.cursor.getSelectedCellRange();
+    if (!ctx || !range) return null;
+    if (ctx.cellPath && ctx.cellPath.length > 1) return null;
+
+    let bboxes: Array<{ cellIdx: number; row: number; col: number }> = [];
+    try {
+      bboxes = this.wasm.getTableCellBboxes(ctx.sec, ctx.ppi, ctx.ci) ?? [];
+    } catch {
+      return null;
+    }
+    const cells = bboxes.filter(
+      (b) => b.row >= range.startRow && b.row <= range.endRow &&
+             b.col >= range.startCol && b.col <= range.endCol,
+    );
+    if (!cells.length) return null;
+
+    const targets: ParaFormatTarget[] = [];
+    for (const cell of cells) {
+      const paraCount = this.wasm.getCellParagraphCount(ctx.sec, ctx.ppi, ctx.ci, cell.cellIdx);
+      for (let cp = 0; cp < paraCount; cp++) {
+        targets.push({
+          kind: 'cell',
+          sec: ctx.sec,
+          parentPara: ctx.ppi,
+          controlIdx: ctx.ci,
+          cellIdx: cell.cellIdx,
+          cellParaIdx: cp,
+        });
+      }
+    }
+    return targets;
   }
 
   private getParaFormatTargetsForRange(start: DocumentPosition, end: DocumentPosition): ParaFormatTarget[] {
@@ -3238,6 +3340,12 @@ export class InputHandler {
 
   /** 선택 영역 하이라이트를 갱신한다 */
   private updateSelection(): void {
+    // [캔버스 한컴 포크] 선택이 있으면 **캐럿을 숨긴다** — 한컴 웹(webhwp) 실측 2026-10-29:
+    // Ctrl+A 후 .BLINK_CURSOR 는 DOM 에 남지만 opacity:0 이 되어 보이지 않는다.
+    // 종전엔 캐럿을 focus(선택 끝) 위치에 계속 그려, 전체 선택 시 다음 문단 자리에 찍혀
+    // "커서가 다음 문단에 나온다"로 보였다. 선택이 풀리면 다시 보인다.
+    if (this.cursor.hasSelection()) this.caret.hide();
+
     const fnSel = this.cursor.getFootnoteSelectionOrdered();
     if (fnSel) {
       const { start, end, pageNum, footnoteIndex } = fnSel;
@@ -3936,6 +4044,57 @@ export class InputHandler {
 
   /** 현재 커서 위치를 반환한다 */
   getCursorPosition(): DocumentPosition { return this.cursor.getPosition(); }
+
+  // [캔버스 한컴 포크] 원본 객체 이동 전체를 한 번의 Undo/Redo로 묶는다.
+  reorderPages(sourcePage: number, beforePageSlot: number): PageMoveResult | null {
+    if (this.isComposing) throw new Error('한글 입력을 마친 뒤 쪽을 이동해 주세요.');
+    const range = this.wasm.getPageMoveRanges().ranges.find(r => sourcePage >= r.startPage && sourcePage <= r.endPage);
+    if (!range) throw new Error('이동할 쪽을 찾을 수 없습니다.');
+    if (beforePageSlot >= range.startPage && beforePageSlot <= range.endPage + 1) return null;
+    let result: PageMoveResult | null = null;
+    this.cursor.clearSelection();
+    this.executeOperation({ kind: 'snapshot', operationType: 'reorderPages', operation: wasm => {
+      const moved = wasm.movePageRange(sourcePage, beforePageSlot);
+      if (!moved.ok) throw new Error('쪽을 이동하지 못했습니다.');
+      const pos = wasm.getPositionOfPage(moved.newStartPage);
+      if (!pos.ok || pos.sec === undefined || pos.para === undefined) throw new Error('이동한 쪽의 입력 위치를 찾을 수 없습니다.');
+      this.cursor.exitCellSelectionMode();
+      this.cursor.exitTableObjectSelection();
+      this.cursor.exitPictureObjectSelection();
+      this.cursor.exitHeaderFooterMode();
+      this.cursor.exitFootnoteMode();
+      result = moved;
+      return { sectionIndex: pos.sec, paragraphIndex: pos.para, charOffset: pos.charOffset ?? 0 };
+    } });
+    return result;
+  }
+
+  // [캔버스 한컴 포크] 복제·삭제·다중 이동도 각각 한 번의 Undo로 복원한다.
+  editPages(action: PageEditAction, pages: number[], beforePageSlot?: number): PageEditResult | null {
+    if (this.isComposing) throw new Error('한글 입력을 마친 뒤 쪽을 편집해 주세요.');
+    const selected = normalizePageSelection(pages, this.wasm.getPageMoveRanges().ranges);
+    if (!selected.length) return null;
+    if (action === 'move') {
+      if (!Number.isInteger(beforePageSlot) || beforePageSlot! < 0 || beforePageSlot! > this.wasm.pageCount) throw new Error('놓을 위치가 올바르지 않습니다.');
+      const order = Array.from({ length: this.wasm.pageCount }, (_, p) => p);
+      const remaining = order.filter(p => !selected.includes(p));
+      remaining.splice(remaining.filter(p => p < beforePageSlot!).length, 0, ...selected);
+      if (remaining.every((p, i) => p === i)) return null;
+    }
+    let result: PageEditResult | null = null;
+    this.cursor.clearSelection();
+    this.executeOperation({ kind: 'snapshot', operationType: `pages:${action}`, operation: wasm => {
+      const edited = wasm.editPages(action, selected, beforePageSlot);
+      if (!edited.ok) throw new Error('선택한 쪽을 편집하지 못했습니다.');
+      const pos = wasm.getPositionOfPage(edited.newStartPage);
+      if (!pos.ok || pos.sec === undefined || pos.para === undefined) throw new Error('편집한 쪽의 입력 위치를 찾을 수 없습니다.');
+      this.cursor.exitCellSelectionMode(); this.cursor.exitTableObjectSelection(); this.cursor.exitPictureObjectSelection();
+      this.cursor.exitHeaderFooterMode(); this.cursor.exitFootnoteMode();
+      result = edited;
+      return { sectionIndex: pos.sec, paragraphIndex: pos.para, charOffset: pos.charOffset ?? 0 };
+    } });
+    return result;
+  }
 
   /** [캔버스 한컴 포크] 표 안 커서를 본문으로 빼낸다 — '표 안에서 표 만들기'(table.ts)가
    *  두 번째 표를 본문에 만들 수 있게 한다(커서가 셀 안이면 표 생성이 막히던 버그). */

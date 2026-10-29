@@ -42,6 +42,7 @@ const HWP_PER_PX = 75;
 export type PageClampRange = { minX: number; minY: number; maxX: number; maxY: number };
 type PageDefWasm = { getPageDef(sectionIdx: number): {
   width: number; height: number;
+  landscape?: boolean;
   marginLeft: number; marginRight: number; marginTop: number; marginBottom: number;
   marginHeader: number; marginFooter: number;
 } };
@@ -93,6 +94,8 @@ export function clampRangeForRelTo(
   bboxW: number,
   bboxH: number,
   bboxCenterX: number,
+  restrictInPage = false,
+  outer: { outerLeft?: number; outerRight?: number; outerTop?: number; outerBottom?: number } = {},
 ): PageClampRange {
   const bodyTop = info.marginTop + (info.marginHeader ?? 0);
   const bodyBottom = info.height - info.marginBottom - (info.marginFooter ?? 0);
@@ -123,12 +126,20 @@ export function clampRangeForRelTo(
   }
   let minY = 0;
   let maxY = info.height;
-  if (vertRelTo === 'Page') {
+  // [캔버스 한컴 포크] 문단 기준 제한 ON도 같은 본문 상자를 쓴다 — 경계 밖 델타가 엔진에 쌓이지 않게 한다.
+  if (vertRelTo === 'Page' || (vertRelTo === 'Para' && restrictInPage)) {
     minY = bodyTop;
     maxY = bodyBottom;
   }
-  // Para(문단)의 세로는 본문 흐름을 따라가는 것이 본질이라 드래그 제한은 용지만 —
-  // "쪽 영역 안으로 제한" 체크는 엔진(restrictInPage)이 따로 지킨다.
+  // [캔버스 한컴 포크] 한컴은 표 바깥 여백까지 포함한 상자를 경계 안에 둔다(HU → px).
+  if (horzRelTo === 'Column' || horzRelTo === 'Para') {
+    minX += (outer.outerLeft ?? 0) / 75;
+    maxX -= (outer.outerRight ?? 0) / 75;
+  }
+  if (vertRelTo === 'Para' && restrictInPage) {
+    minY += (outer.outerTop ?? 0) / 75;
+    maxY -= (outer.outerBottom ?? 0) / 75;
+  }
   return {
     minX,
     minY,
@@ -152,7 +163,10 @@ export function clampFloatingTableToPage(wasm: FloatingClampWasm, sec: number, p
   try {
     const pd = wasm.getPageDef(sec);
     const bb = wasm.getTableBBox(sec, ppi, ci);
-    const range = pageClampRange(pd.width / HWP_PER_PX, pd.height / HWP_PER_PX, bb.width, bb.height);
+    // [캔버스 한컴 포크] PageDef는 가로 용지에서도 원래 폭·높이를 보관한다.
+    const width = pd.landscape ? pd.height : pd.width;
+    const height = pd.landscape ? pd.width : pd.height;
+    const range = pageClampRange(width / HWP_PER_PX, height / HWP_PER_PX, bb.width, bb.height);
     const t = clampToPage(bb.x, bb.y, range);
     const deltaH = Math.round((t.x - bb.x) * HWP_PER_PX);
     const deltaV = Math.round((t.y - bb.y) * HWP_PER_PX);

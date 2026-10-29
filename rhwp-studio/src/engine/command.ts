@@ -1153,6 +1153,17 @@ export class SnapshotCommand implements EditCommand {
   private beforeId: number | null = null;
   private afterId: number | null = null;
 
+  /** 드래그처럼 이미 적용된 구조 변경도 같은 스냅샷 Undo 경로로 기록한다. */
+  static fromApplied(
+    operationType: string, cursorBefore: DocumentPosition, cursorAfter: DocumentPosition,
+    beforeId: number, afterId: number,
+  ): SnapshotCommand {
+    const command = new SnapshotCommand(operationType, cursorBefore, cursorAfter, null);
+    command.beforeId = beforeId;
+    command.afterId = afterId;
+    return command;
+  }
+
   /**
    * @param operationType 작업 종류 (예: 'pasteInternal', 'deleteControl')
    * @param cursorBefore 작업 전 커서 위치

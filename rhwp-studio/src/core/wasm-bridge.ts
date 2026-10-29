@@ -36,6 +36,21 @@ export interface TableTransposeResult {
 import { installCanvasFontSubstitution, isCanvasFontSubstitutionInstalled, substituteCssFontFamily } from './canvas-font-substitution';
 import type { FileSystemFileHandleLike } from '@/command/file-system-access';
 
+export interface PageMoveRange { startPage: number; endPage: number }
+export interface PageMoveResult extends PageMoveRange {
+  ok: boolean; changed: boolean; newStartPage: number; pageCount: number;
+  sectionIndex: number; paragraphCount: number; tableCount: number;
+  preservationVerified: boolean; contentDigestBefore: string; contentDigestAfter: string;
+}
+export type PageEditAction = 'move' | 'duplicate' | 'delete' | 'insertBlank';
+export interface PageEditResult {
+  ok: boolean; changed: boolean; action: PageEditAction;
+  newSelectedPages: number[]; affectedPages: number[];
+  newStartPage: number; pageCount: number; sectionIndex: number;
+  paragraphCount: number; tableCount: number; preservationVerified: boolean;
+  contentDigestBefore: string; contentDigestAfter: string;
+}
+
 export class WasmBridge {
   private doc: HwpDocument | null = null;
   private initialized = false;
@@ -2407,4 +2422,55 @@ export class WasmBridge {
       this.doc = null;
     }
   }
+  /** 쪽 편집 API 지원 여부 (구버전 wasm 대비) */
+  isPageEditSupported(): boolean {
+    const doc = this.doc as any;
+    return typeof doc?.getPageMoveRanges === 'function'
+      && typeof doc?.movePages === 'function'
+      && typeof doc?.deletePages === 'function';
+  }
+
+  getPageMoveRanges(): { ok: boolean; ranges: PageMoveRange[]; pageCount: number } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const fn = (this.doc as any).getPageMoveRanges;
+    if (typeof fn !== 'function') {
+      const pageCount = this.pageCount ?? 0;
+      return { ok: true, ranges: Array.from({ length: pageCount }, (_, i) => ({ startPage: i, endPage: i })), pageCount };
+    }
+    return JSON.parse(fn.call(this.doc));
+  }
+
+  movePageRange(sourcePage: number, beforePageSlot: number): PageMoveResult {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const fn = (this.doc as any).movePageRange;
+    if (typeof fn !== 'function') {
+      return { ok: false, changed: false, startPage: sourcePage, endPage: sourcePage,
+        newStartPage: sourcePage, pageCount: this.pageCount ?? 0, sectionIndex: 0,
+        paragraphCount: 0, tableCount: 0, preservationVerified: false,
+        contentDigestBefore: '', contentDigestAfter: '' };
+    }
+    return JSON.parse(fn.call(this.doc, sourcePage, beforePageSlot));
+  }
+
+  editPages(action: PageEditAction, pages: number[], beforePageSlot?: number): PageEditResult {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const doc = this.doc as any, json = JSON.stringify(pages);
+    const fnName = action === 'move' ? 'movePages'
+      : action === 'duplicate' ? 'duplicatePages'
+      : action === 'insertBlank' ? 'insertBlankPages' : 'deletePages';
+    if (typeof doc[fnName] !== 'function') {
+      return { ok: false, changed: false, action, newSelectedPages: [], affectedPages: [],
+        newStartPage: Math.min(...pages) || 0,
+        pageCount: this.pageCount ?? 0, sectionIndex: 0, paragraphCount: 0, tableCount: 0,
+        preservationVerified: false, contentDigestBefore: '', contentDigestAfter: '' };
+    }
+    return JSON.parse(doc[fnName](json, beforePageSlot));
+  }
+
+  /** 페이지 렌더 트리 (구버전 wasm 이면 null) */
+  getPageRenderTree(page: number): any {
+    const fn = (this.doc as any)?.getPageRenderTree;
+    return typeof fn === 'function' ? JSON.parse(fn.call(this.doc, page)) : null;
+  }
+
 }

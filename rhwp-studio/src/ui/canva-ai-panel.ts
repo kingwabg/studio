@@ -10,7 +10,9 @@ import { mkEl, mkButton } from './canva-dom';
 import { gatherTextElements, runDocReview, applyFinding, jumpToElement } from './canva-ai-review';
 import { renderSendPreview, renderReviewFindings } from './canva-ai-review-ui';
 import { runAgentTurn } from './canva-ai-agent';
+import { generateImageDocument } from './ai-image-document';
 import { WriterSession } from '../ai-writer/writer-agent';
+import { createEditPlanPanel, createImageAttachment, IMAGE_REFERENCE_PROMPT } from './ai-edit-plan-panel';
 
 
 interface Msg { role: 'user' | 'ai'; text: string; err?: boolean; }
@@ -22,6 +24,7 @@ export class CanvaAiPanel {
   private sendBtn!: HTMLButtonElement;
   private modelBadge!: HTMLElement;
   private busy = false;
+  private attachment!: ReturnType<typeof createImageAttachment>;
   /**
    * 캔버스식(지면 배치) 모드인가.
    * ⚠ 편집기의 캔버스/문서 전환을 **따라간다**(사용자 지적 2026-08-01: "캔버스·문서
@@ -90,9 +93,13 @@ export class CanvaAiPanel {
 
     this.log = mkEl('div', 'canva-ai-log');
     pane.appendChild(this.log);
+    this.log.appendChild(createEditPlanPanel(this.services, () => this.busy));
 
     this.pushMsg({ role: 'ai', text: '안녕하세요! 위 버튼으로 기능을 고르세요.\n· 문서 작성 — 표준 목차로 보고서·계획서·공문을 조립 (빈 문서에서 시작 권장)\n· 문서 작업 — AI가 문서를 읽고 표·본문을 직접 고침\n· 문서 검토 — 문서 전체의 표현·오탈자를 점검' });
 
+    // [캔버스 한컴 포크] 첨부 이미지는 문서 작업 도구로 재현하며 동의 후에만 전송한다.
+    this.attachment = createImageAttachment(() => { this.mode = 'agent'; this.syncMode(); });
+    pane.appendChild(this.attachment.element);
     const bar = mkEl('div', 'canva-ai-input-bar');
     this.input = document.createElement('textarea');
     this.input.rows = 1;
@@ -149,16 +156,16 @@ export class CanvaAiPanel {
    * 문서 작업(에이전트) 턴 — AI가 도구 호출로 문서를 읽고 고친다.
    * ⚠ 문서 내용이 외부 모델로 나가는 경로: 첫 사용에서 1회 동의를 받는다(문서 검토와 같은 규약).
    */
-  private async sendAgent(text: string): Promise<void> {
-    if (!this.agentConsent) {
+  private async sendAgent(text: string, images = this.attachment.getImages()): Promise<void> {
+    if (!this.agentConsent && !images.length) {
       const msgEl = this.pushMsg({
         role: 'ai',
-        text: '문서 작업은 표·본문 내용을 AI로 전송해 진행합니다. 계속할까요?',
+        text: '문서 작업은 표·본문 내용과 첨부한 참고 이미지를 선택한 AI로 전송합니다. 계속할까요?',
       });
       const actions = mkEl('div', 'canva-ai-actions');
       const ok = mkButton('canva-ai-act', { text: '동의하고 진행' });
       const no = mkButton('canva-ai-act', { text: '취소' });
-      ok.addEventListener('click', () => { this.agentConsent = true; actions.remove(); void this.sendAgent(text); });
+      ok.addEventListener('click', () => { this.agentConsent = true; actions.remove(); void this.sendAgent(text, images); });
       no.addEventListener('click', () => { actions.remove(); this.pushMsg({ role: 'ai', text: '취소했습니다. 아무것도 전송하지 않았습니다.' }); });
       actions.append(ok, no);
       msgEl.appendChild(actions);
@@ -168,16 +175,20 @@ export class CanvaAiPanel {
     this.setBusy(true);
     const thinking = this.pushMsg({ role: 'ai', text: '문서를 살펴보는 중…' });
     try {
+      if(images.length){
+        const report=await generateImageDocument(this.services,images,text);
+        thinking.remove();this.pushMsg({role:'ai',text:report});return;
+      }
       const result = await runAgentTurn(
         this.services, text,
         // 표를 다 읽으면 입력이 길다 — 토큰을 넉넉히 준다(부족하면 답이 잘려 JSON 이 깨진다).
-        (sys, user) => this.callModel(user, sys, 4096),
+        (sys, user) => callAi(sys + (images.length ? IMAGE_REFERENCE_PROMPT : ''), user, 8192, images),
         (step) => { thinking.querySelector('.bubble')!.textContent = `작업 중 — ${step.name}: ${step.summary}`; },
       );
       thinking.remove();
       this.pushMsg({
         role: 'ai',
-        text: result.finalText + (result.wrote ? '\n\n(방금 수정은 Ctrl+Z 로 한 번에 되돌릴 수 있습니다)' : ''),
+        text: result.finalText + (result.wrote ? '\n\n(편집 명령 묶음 단위로 되돌릴 수 있습니다)' : ''),
       });
     } catch (e) {
       thinking.remove();
@@ -189,12 +200,12 @@ export class CanvaAiPanel {
   }
 
   private async send(): Promise<void> {
-    const text = this.input.value.trim();
+    const text = this.input.value.trim() || (this.attachment.getImages().length ? '첨부 이미지와 같은 문서를 새로 만들어 주세요.' : '');
     if (!text || this.busy) return;
     this.input.value = '';
     this.autosize();
     this.pushMsg({ role: 'user', text });
-    if (this.mode === 'agent') {
+    if (this.mode === 'agent' || this.attachment.getImages().length) {
       void this.sendAgent(text);
       return;
     }
@@ -431,5 +442,6 @@ export class CanvaAiPanel {
   private setBusy(b: boolean): void {
     this.busy = b;
     this.sendBtn.disabled = b;
+    this.attachment.setDisabled(b);
   }
 }

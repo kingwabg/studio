@@ -1,7 +1,7 @@
 /** input-handler table methods — extracted from InputHandler class */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { MoveTableCommand, MovePictureCommand, MoveShapeCommand } from './command';
+import { SnapshotCommand, MovePictureCommand, MoveShapeCommand } from './command';
 import { getObjectProperties, setObjectProperties } from './input-handler-picture';
 import { pageClampRange, clampRangeForRelTo, clampToPage } from './canvas-snap';
 import type { CellBbox, TableGrid } from '@/core/types';
@@ -414,6 +414,7 @@ export function startResizeDrag(this: any,
     pageBboxes,
     affectedCellIndices,
     borderOriginalPos,
+    startPageX: pageX, startPageY: pageY,
     minResizePos: resizeBounds.min,
     maxResizePos: resizeBounds.max,
     resizeTarget,
@@ -446,7 +447,11 @@ export function updateResizeDrag(this: any, e: MouseEvent): void {
   const pageY = (contentY - pageOffset) / zoom;
   const singleCellTarget = promoteResizeDragToSingleCell(this, this.resizeDragState, e.shiftKey);
 
-  const rawNewPos = this.resizeDragState.edge.type === 'row' ? pageY : pageX;
+  // [캔버스 한컴 포크] 프리뷰도 커밋과 같은 잡은 지점의 오프셋을 유지한다.
+  const pointerPos = this.resizeDragState.edge.type === 'row' ? pageY : pageX;
+  const pointerStart = (this.resizeDragState.edge.type === 'row'
+    ? this.resizeDragState.startPageY : this.resizeDragState.startPageX) ?? this.resizeDragState.borderOriginalPos;
+  const rawNewPos = this.resizeDragState.borderOriginalPos + pointerPos - pointerStart;
   const clamped = clampResizePosition(
     rawNewPos,
     singleCellTarget
@@ -512,7 +517,11 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
   const pageY = (contentY - pageOffset) / zoom;
   const singleCellTarget = promoteResizeDragToSingleCell(this, state, e.shiftKey);
 
-  const rawNewPos = state.edge.type === 'row' ? pageY : pageX;
+  // [캔버스 한컴 포크] 경계선 허용오차 안의 클릭 거리를 크기 변경으로 오인하지 않는다.
+  const pointerPos = state.edge.type === 'row' ? pageY : pageX;
+  const pointerStart = (state.edge.type === 'row' ? state.startPageY : state.startPageX) ?? state.borderOriginalPos;
+  const pointerDelta = pointerPos - pointerStart;
+  const rawNewPos = state.borderOriginalPos + pointerDelta;
   const clamped = clampResizePosition(
     rawNewPos,
     singleCellTarget
@@ -526,6 +535,20 @@ export function finishResizeDrag(this: any, e: MouseEvent): void {
   const deltaPagePx = newPos - state.borderOriginalPos;
   // 1 page px (96 DPI) = 75 HWPUNIT (7200/96)
   const deltaHwpUnit = Math.round(deltaPagePx * 75);
+  // [캔버스 한컴 포크] 클릭이 크기 변경으로 소비되는지 이동 진단과 같은 스위치로 추적한다.
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('tableDragTrace') === '1') {
+    console.info('[table-resize]', JSON.stringify({ kind: 'border', axis: state.edge.type,
+      original: state.borderOriginalPos, pointer: pointerPos, pointerStart, pointerDelta, resolved: newPos, deltaHwpUnit }));
+  }
+
+  // [캔버스 한컴 포크] 클릭/더블클릭은 스냅·최소 크기 보정·행 성장보다 먼저 제외한다.
+  if (Math.abs(pointerDelta) * zoom < 3) {
+    const shouldSelectTable = isOuterResizeEdge(this, state.edge, state.pageBboxes);
+    const tableRef = { ...state.tableRef };
+    this.cleanupResizeDrag();
+    if (shouldSelectTable && !singleCellTarget) selectTableObjectFromResize.call(this, tableRef);
+    return;
+  }
 
   // [2026-08-18] 행 안쪽 경계 성장 폴백 — 이웃 행이 글줄 바닥(최소)이면 위치
   // 클램프(maxResizePos)가 newPos 를 원위치로 되돌려, 기본 표에서 행 리사이즈가
@@ -1067,16 +1090,39 @@ export function moveSelectedTable(this: any, key: 'ArrowUp' | 'ArrowDown' | 'Arr
   }
 
   try {
-    const result = this.wasm.moveTableOffset(ref.sec, ref.ppi, ref.ci, deltaH, deltaV);
+    // [캔버스 한컴 포크] 키보드도 드래그와 같은 경계를 사용한다. bbox는 px, 이동 델타는 HU다.
+    const bbox = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
+    const props = this.wasm.getTableProperties(ref.sec, ref.ppi, ref.ci);
+    const page = this.wasm.getPageInfo(bbox.pageIndex ?? 0);
+    const range = clampRangeForRelTo(page, props.horzRelTo, props.vertRelTo,
+      bbox.width, bbox.height, bbox.x + bbox.width / 2, props.restrictInPage, props);
+    const target = clampToPage(bbox.x + deltaH / 75, bbox.y + deltaV / 75, range);
+    // [캔버스 한컴 포크] 기존 파일이 경계 밖이어도 입력 반대 방향으로 강제 보정하지 않는다.
+    deltaH = deltaH > 0 ? Math.max(0, Math.round((target.x - bbox.x) * 75))
+      : deltaH < 0 ? Math.min(0, Math.round((target.x - bbox.x) * 75)) : 0;
+    deltaV = deltaV > 0 ? Math.max(0, Math.round((target.y - bbox.y) * 75))
+      : deltaV < 0 ? Math.min(0, Math.round((target.y - bbox.y) * 75)) : 0;
+    if (deltaH === 0 && deltaV === 0) return;
+    const beforeId = this.wasm.saveSnapshot();
+    let result;
+    try {
+      result = this.wasm.moveTableOffset(ref.sec, ref.ppi, ref.ci, deltaH, deltaV);
+    } catch (error) {
+      this.wasm.restoreSnapshot(beforeId);
+      this.wasm.discardSnapshot(beforeId);
+      throw error;
+    }
     // Undo 기록
     // [어울림 #6] 표 이동은 옆 문단을 재줄바꿈한다 — 캐럿 rect 를 같이 갱신하지 않으면
     // 본문 캐럿이 옛 줄 위치에 남는다(hancom-format-parity #6).
     this.executeOperation({ kind: 'record', command:
-      new MoveTableCommand(ref.sec, ref.ppi, ref.ci, deltaH, deltaV, result.ppi, result.ci),
+      SnapshotCommand.fromApplied('moveTable',
+        { sectionIndex: ref.sec, paragraphIndex: ref.ppi, charOffset: 0 },
+        { sectionIndex: ref.sec, paragraphIndex: result.ppi, charOffset: 0 },
+        beforeId, this.wasm.saveSnapshot()),
       meta: { refresh: 'selectionOnly' },
     });
-    // [2026-07-30 사용자 결정] TAC 표 문단 교환(+커서 보정)은 한컴에 없는 기능이라 제거 —
-    // 엔진 moveTableOffset 이 TAC 무동작으로 바뀌어 ppi 는 이제 항상 불변이다.
+    // 자리차지 표가 본문을 넘으면 연결 문단도 함께 이동한다.
     if (result.ppi !== ref.ppi || result.ci !== ref.ci) {
       this.cursor.updateSelectedTableRef(ref.sec, result.ppi, result.ci);
     }
@@ -1159,6 +1205,16 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
   this.moveDragState.lastPageY = py;
 
   const ref = this.moveDragState.tableRef;
+  // [캔버스 한컴 포크] 명시적으로 켠 로컬 진단만 좌표를 기록한다(본문 내용 제외).
+  const tracing = typeof location !== 'undefined' && new URLSearchParams(location.search).get('tableDragTrace') === '1';
+  const trace: any = tracing ? {
+    frame: this.moveDragState.traceFrame = (this.moveDragState.traceFrame ?? 0) + 1,
+    pointer: { clientX: e.clientX, clientY: e.clientY, page: pi, x: px, y: py, zoom },
+    requestedPx: { x: deltaXpx, y: deltaYpx }, refBefore: { ...ref },
+  } : null;
+  const logTrace = () => {
+    if (trace && trace.frame <= 300) console.info('[table-drag]', JSON.stringify(trace));
+  };
 
   // [officex] 용지 경계 하드 클램프 — floating 표 bbox 가 용지를 벗어나지 못하게.
   // 현재 bbox 기준으로 이번 프레임 이동분을 잘라, 좌상단이 용지 밖으로 못 나가게 한다.
@@ -1168,37 +1224,54 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
     // [기준별 이동 범위] 표의 위치 기준(종이/쪽/단/문단)에 따라 허용 범위가 다르다 —
     // 종이=용지 전체(여백 무관), 쪽=본문 영역, 단·문단=해당 단. 드래그 시작 후 1회만
     // 조회해 캐시한다(프레임마다 getTableProperties 는 비용).
-    if (!this.moveDragState.relToCache) {
+    if (!this.moveDragState.relToCache || this.moveDragState.relToCache.pageIndex !== (bb.pageIndex ?? pi)) {
       let horzRelTo = 'Paper';
       let vertRelTo = 'Para';
+      let restrictInPage = false;
+      let outer = {};
       try {
         const tp = this.wasm.getTableProperties(ref.sec, ref.ppi, ref.ci);
         horzRelTo = tp.horzRelTo ?? horzRelTo;
         vertRelTo = tp.vertRelTo ?? vertRelTo;
+        restrictInPage = tp.restrictInPage ?? false;
+        outer = { outerLeft: tp.outerLeft, outerRight: tp.outerRight, outerTop: tp.outerTop, outerBottom: tp.outerBottom };
       } catch { /* 기본값 유지 */ }
       let info = null;
       try { info = this.wasm.getPageInfo(bb.pageIndex ?? pi); } catch { /* 아래 폴백 */ }
-      this.moveDragState.relToCache = { horzRelTo, vertRelTo, info };
+      // [캔버스 한컴 포크] 페이지가 바뀌면 그 쪽의 용지·여백을 다시 읽는다.
+      this.moveDragState.relToCache = { horzRelTo, vertRelTo, restrictInPage, outer, info, pageIndex: bb.pageIndex ?? pi };
     }
-    const { horzRelTo, vertRelTo, info } = this.moveDragState.relToCache;
+    const { horzRelTo, vertRelTo, restrictInPage, outer, info } = this.moveDragState.relToCache;
     const range = info
-      ? clampRangeForRelTo(info, horzRelTo, vertRelTo, bb.width, bb.height, bb.x + bb.width / 2)
+      ? clampRangeForRelTo(info, horzRelTo, vertRelTo, bb.width, bb.height, bb.x + bb.width / 2, restrictInPage, outer)
       : pageClampRange(
           this.virtualScroll.getPageWidth(pi) / zoom,
           this.virtualScroll.getPageHeight(pi) / zoom,
           bb.width, bb.height,
         );
+    if (trace) {
+      trace.before = bb;
+      trace.settings = { horzRelTo, vertRelTo, restrictInPage };
+      trace.bounds = range;
+    }
     const c = clampToPage(bb.x + deltaXpx, bb.y + deltaYpx, range);
-    deltaXpx = c.x - bb.x;
-    deltaYpx = c.y - bb.y;
+    // [캔버스 한컴 포크] 한 축 이동이 다른 축을 밀거나 경계 밖 표를 역방향으로 튕기면 안 된다.
+    deltaXpx = deltaXpx > 0 ? Math.max(0, c.x - bb.x) : deltaXpx < 0 ? Math.min(0, c.x - bb.x) : 0;
+    deltaYpx = deltaYpx > 0 ? Math.max(0, c.y - bb.y) : deltaYpx < 0 ? Math.min(0, c.y - bb.y) : 0;
   } catch { /* bbox 조회 실패 시 클램프 없이 원래 이동 */ }
 
   const deltaH = Math.round(deltaXpx * 75);
   const deltaV = Math.round(deltaYpx * 75);
 
-  if (deltaH === 0 && deltaV === 0) return;
+  if (trace) trace.sentHu = { h: deltaH, v: deltaV };
+  if (deltaH === 0 && deltaV === 0) {
+    if (trace) trace.outcome = 'clamped-before-engine';
+    logTrace();
+    return;
+  }
 
   try {
+    this.moveDragState.beforeSnapshotId ??= this.wasm.saveSnapshot();
     const bbBefore = this.wasm.getTableBBox(ref.sec, ref.ppi, ref.ci);
     const result = this.wasm.moveTableOffset(ref.sec, ref.ppi, ref.ci, deltaH, deltaV);
     if (result.ppi !== ref.ppi || result.ci !== ref.ci) {
@@ -1215,19 +1288,32 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
     // 페이지가 바뀐 프레임은 좌표계가 달라 비교 불능 — 종전 동작 유지.
     const cur = this.moveDragState.tableRef;
     const bbAfter = this.wasm.getTableBBox(cur.sec, cur.ppi, cur.ci);
-    if (bbBefore.pageIndex === bbAfter.pageIndex) {
+    if (bbBefore.pageIndex === bbAfter.pageIndex && ref.ppi === cur.ppi && ref.ci === cur.ci) {
       const absorbedH = Math.round((bbAfter.x - bbBefore.x) * 75);
       const absorbedV = Math.round((bbAfter.y - bbBefore.y) * 75);
       const excessH = deltaH - absorbedH;
       const excessV = deltaV - absorbedV;
       // 1px(75HU) 이하는 반올림 노이즈 — 미세 떨림 방지.
-      const rollH = Math.abs(excessH) > 75 ? excessH : 0;
-      const rollV = Math.abs(excessV) > 75 ? excessV : 0;
+      const rollH = Math.abs(excessH) > 75 && Math.sign(excessH) === Math.sign(deltaH)
+        && Math.abs(excessH) <= Math.abs(deltaH) ? excessH : 0;
+      const rollV = Math.abs(excessV) > 75 && Math.sign(excessV) === Math.sign(deltaV)
+        && Math.abs(excessV) <= Math.abs(deltaV) ? excessV : 0;
       if (rollH !== 0 || rollV !== 0) {
         this.wasm.moveTableOffset(cur.sec, cur.ppi, cur.ci, -rollH, -rollV);
         appliedH = deltaH - rollH;
         appliedV = deltaV - rollV;
       }
+    }
+    if (trace) {
+      trace.refAfter = { ...this.moveDragState.tableRef };
+      trace.engineAppliedHu = { h: appliedH, v: appliedV };
+      try {
+        trace.after = this.wasm.getTableBBox(cur.sec, cur.ppi, cur.ci);
+        const props = this.wasm.getTableProperties(cur.sec, cur.ppi, cur.ci);
+        trace.model = { wrap: props.textWrap, inline: props.treatAsChar, h: props.horzOffset, v: props.vertOffset };
+      } catch (error) { trace.readError = String(error); }
+      trace.outcome = 'engine-applied';
+      logTrace();
     }
     this.moveDragState.totalDeltaH += appliedH;
     this.moveDragState.totalDeltaV += appliedV;
@@ -1247,6 +1333,7 @@ export function updateMoveDrag(this: any, e: MouseEvent): void {
     }
     this.renderTableObjectSelection();
   } catch (err) {
+    if (trace) { trace.outcome = 'error'; trace.error = String(err); logTrace(); }
     console.warn('[InputHandler] 표 이동 드래그 실패:', err);
   }
 }
@@ -1260,20 +1347,19 @@ export function finishMoveDrag(this: any): void {
     if (totalDeltaH !== 0 || totalDeltaV !== 0) {
       // [어울림 #6] 드래그 이동도 동일 — 재줄바꿈 후 캐럿 rect 갱신
       this.executeOperation({ kind: 'record', command:
-        new MoveTableCommand(
-          tableRef.sec, startPpi, tableRef.ci,
-          totalDeltaH, totalDeltaV,
-          tableRef.ppi, tableRef.ci,
-        ),
+        SnapshotCommand.fromApplied('moveTable',
+          { sectionIndex: tableRef.sec, paragraphIndex: startPpi, charOffset: 0 },
+          { sectionIndex: tableRef.sec, paragraphIndex: tableRef.ppi, charOffset: 0 },
+          state.beforeSnapshotId, this.wasm.saveSnapshot()),
         meta: { refresh: 'selectionOnly' },
       });
+    } else if (state.beforeSnapshotId !== undefined) {
+      this.wasm.discardSnapshot(state.beforeSnapshotId);
     }
   }
   this.isMoveDragging = false;
   this.moveDragState = null;
-  // [드래그 안정화] 어울림 재줄바꿈 확정 — 억제를 풀면서 1회 재배치. 반드시 **모든**
-  // 드롭 경로(이동·제자리 클릭 공통)에서 실행돼야 한다 — 분기 안에 두면 실제 드래그가
-  // 훅을 건너뛰어 위 문단이 표와 겹친 채 남는다(2026-07-28 실측).
+  // [캔버스 한컴 포크] 이동 중 재배치한 본문을 드롭 후에도 한 번 더 동기화한다.
   try { (this.wasm as any).doc?.setSquareReflowSuppressed?.(false); } catch { /* 구버전 무시 */ }
   // 드래그 종료 정리 — 프레임 갱신은 페이지 단위였으므로 마지막에 전체 정합을 한 번 맞춘다.
   this.eventBus.emit('document-changed');
@@ -1525,6 +1611,11 @@ export function finishTableHandleResize(this: any, e: MouseEvent): void {
   this.tableHandleResizeState = null;
   this.container.style.cursor = '';
   if (!state || !s) return;
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('tableDragTrace') === '1') {
+    console.info('[table-resize]', JSON.stringify({ kind: 'handle', dir: state.dir,
+      pointerStart: { x: state.startPageX, y: state.startPageY }, pointerEnd: { x: e.clientX, y: e.clientY },
+      before: { width: state.tableW, height: state.tableH }, scale: s }));
+  }
   const wantX = state.dir === 'e' || state.dir === 'se';
   const wantY = state.dir === 's' || state.dir === 'se';
   if ((!wantX || Math.abs(s.sx - 1) < 0.002) && (!wantY || Math.abs(s.sy - 1) < 0.002)) return; // 무변화

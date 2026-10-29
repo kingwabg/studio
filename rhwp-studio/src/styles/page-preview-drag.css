@@ -1,0 +1,11 @@
+/* [캔버스 한컴 포크] 문서 내용은 놓을 때만 바꾸고, 잡은 쪽과 들어갈 자리는 즉시 보여 준다. */
+.page-preview-drag-ghost { position:fixed; left:0; top:0; z-index:30000; pointer-events:none; padding:5px; border:2px solid var(--ui-link); border-radius:7px; background:var(--ui-surface,#fff); box-shadow:0 12px 30px #0004,0 2px 7px #0003; will-change:transform; box-sizing:border-box; }
+.page-preview-drag-ghost canvas { display:block; width:100%; height:auto; background:#fff; }
+.page-preview-drag-ghost > span { display:block; padding:5px 0 1px; text-align:center; color:var(--ui-link); font:600 12px sans-serif; }
+.page-preview-drag-badge { position:absolute; right:-10px; top:-12px; border-radius:14px; padding:5px 8px; background:var(--ui-link); color:#fff; font:600 12px sans-serif; box-shadow:0 2px 6px #0003; }
+.page-preview-list.is-reordering { position:relative; }
+.page-preview-list.is-reordering .page-preview-item { transition:transform 160ms ease; will-change:transform; z-index:1; }
+.page-preview-list.is-reordering .page-preview-item.is-drag-source { opacity:0; }
+.page-preview-drop-space { position:absolute; left:4px; right:4px; border:2px dashed var(--ui-link); border-radius:7px; background:var(--ui-accent-bg-light); pointer-events:none; box-sizing:border-box; }
+.page-preview-drop-space[hidden] { display:none; }
+@media (prefers-reduced-motion:reduce) { .page-preview-list.is-reordering .page-preview-item { transition:none; } }

@@ -28,6 +28,8 @@ function executeTableCreate(ctrl: HwpCtrl, set: ParameterSet | null): boolean {
     const result = doc.createTable(cursor.section, cursor.para, cursor.pos, rows, cols);
     const parsed = JSON.parse(result);
     if (!parsed.ok) return false;
+    // [캔버스 한컴 포크] HwpCtrl 액션은 브리지를 우회하므로 새 표 기본값을 동일하게 적용한다.
+    doc.setTableProperties(cursor.section, parsed.paraIdx, parsed.controlIdx, JSON.stringify({ restrictInPage: true }));
 
     const tableParaIdx = parsed.paraIdx;
 

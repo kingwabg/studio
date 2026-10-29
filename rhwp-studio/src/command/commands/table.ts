@@ -258,19 +258,16 @@ export const tableCommands: CommandDef[] = [
               // 기본 테두리는 엔진 기본(0.12mm, 사용자 지정 2026-08-11)을 그대로 둔다.
               // 종전 applyDefaultTableBorders(0.25mm 덮어쓰기)는 속성창이 0.25로 보이는
               // 원인이었다 — 얇은 선의 흐림은 렌더러 헤어라인 바닥(1px)으로 해결.
-              // [기본 배치] 가로 기준을 "종이"로 — 드래그가 용지 전체에서 자유로워진다
-              // (사용자 지정 기본값 2026-07-27). 오프셋을 왼쪽 여백으로 줘 화면상 위치는
-              // 지금과 동일(본문 왼쪽 시작). 세로는 문단 기준 유지(본문 흐름을 따라감).
+              // [캔버스 한컴 포크] 새 표는 해당 단 안에서 이동하도록 가로 기준을 단·오프셋0으로 둔다.
               // 글자처럼취급 표는 배치 개념이 없으므로 건드리지 않는다.
               if (!(options?.treatAsChar)) {
                 try {
-                  const pd = wasm.getPageDef(pos.sectionIndex);
                   wasm.setTableProperties(pos.sectionIndex, result.paraIdx, result.controlIdx, {
-                    horzRelTo: 'Paper',
+                    horzRelTo: 'Column',
                     horzAlign: 'Left',
-                    horzOffset: pd.marginLeft ?? 0,
+                    horzOffset: 0,
                   });
-                } catch { /* 페이지 정의 조회 실패 시 엔진 기본(단) 유지 */ }
+                } catch { /* 속성 적용 실패 시 엔진 기본 배치 유지 */ }
               }
               return {
                 sectionIndex: pos.sectionIndex,

@@ -107,6 +107,12 @@ export class TablePanelSections {
   /** 표 위치 — 글자처럼 취급 / 배치 / 가로·세로 기준 / 겹침 규칙 */
   private buildPosition(): void {
     const inline = this.tp.treatAsChar ?? false;
+    // [캔버스 한컴 포크] 기준 변경은 엔진의 환산 결과로 관련 입력까지 다시 그린다.
+    const patchPosition = (partial: Partial<TableProperties>) => {
+      this.patchTable(partial);
+      this.host.replaceChildren();
+      this.buildPosition();
+    };
     // 글자처럼 취급이면 배치 컨트롤은 의미가 없다 — 흐려 끈다.
     // ⚠ 미리보기는 여기 넣지 않는다: '글자처럼 취급'이 무엇을 하는지 설명하는 게 바로
     //   미리보기인데, 켜는 순간 같이 흐려져 안 보였다(사용자 신고 2026-07-29).
@@ -127,16 +133,15 @@ export class TablePanelSections {
     paintWhy(inline);
 
     this.host.appendChild(this.switchRow('글자처럼 취급', inline, (v) => {
-      this.patchTable({ treatAsChar: v });
-      for (const d of [depSeg, depRest]) d.classList.toggle('is-off', v);
-      paintWhy(v);
-      this.refreshPos();
+      patchPosition({ treatAsChar: v });
     }));
     this.host.appendChild(whyOff);
 
     // 본문 위치는 '어울림'일 때만 의미가 있다 — 이유도 같이 말한다
     const flowRow = this.segRow('본문 위치', FLOW, this.tp.textFlow ?? 'BothSides',
       (v) => { this.patchTable({ textFlow: v }); this.refreshPos(); });
+    const keepAnchorRow = this.switchRow('개체와 조판부호를 항상 같은 쪽에 놓기',
+      this.tp.keepWithAnchor ?? false, (v) => this.patchTable({ keepWithAnchor: v }));
     const whyFlow = mkEl('div', 'tps-hint');
     const paintFlow = (wrap: string) => {
       const off = wrap !== 'Square';
@@ -145,6 +150,11 @@ export class TablePanelSections {
         : '';
       whyFlow.hidden = !off;
       flowRow.classList.toggle('is-off', off);
+      flowRow.querySelectorAll('button').forEach((button) => { button.disabled = off; });
+      keepAnchorRow.classList.toggle('is-off', wrap !== 'TopAndBottom');
+      keepAnchorRow.querySelectorAll('input').forEach((input) => {
+        input.disabled = wrap !== 'TopAndBottom';
+      });
     };
     depSeg.appendChild(this.segRow('본문과의 배치', WRAP, this.tp.textWrap ?? 'Square', (v) => {
       this.patchTable({ textWrap: v });
@@ -156,18 +166,40 @@ export class TablePanelSections {
     this.host.append(depSeg, this.posPreview(), depRest);
 
     depRest.appendChild(this.composeRow('가로', 'arrows-horizontal',
-      H_REL, this.tp.horzRelTo ?? 'Column', (v) => this.patchTable({ horzRelTo: v }),
-      H_ALIGN, this.tp.horzAlign ?? 'Left', (v) => this.patchTable({ horzAlign: v }),
+      H_REL, this.tp.horzRelTo ?? 'Column', (v) => patchPosition({ horzRelTo: v }),
+      H_ALIGN, this.tp.horzAlign ?? 'Left', (v) => patchPosition({
+        horzAlign: this.tp.horzRelTo === 'Para' ? (v === 'Inside' ? 'Left' : v === 'Outside' ? 'Right' : v) : v,
+        horzOffset: 0,
+      }),
       toMm(this.tp.horzOffset), (v) => this.patchTable({ horzOffset: fromMm(v) })));
     depRest.appendChild(this.composeRow('세로', 'arrows-vertical',
-      V_REL, this.tp.vertRelTo ?? 'Para', (v) => this.patchTable({ vertRelTo: v }),
-      V_ALIGN, this.tp.vertAlign ?? 'Top', (v) => this.patchTable({ vertAlign: v }),
+      V_REL, this.tp.vertRelTo ?? 'Para', (v) => patchPosition({
+        vertRelTo: v,
+        ...(v === 'Para' && this.tp.vertAlign !== 'Top' ? { vertAlign: 'Top', vertOffset: 0 } : {}),
+      }),
+      V_ALIGN.filter(([v]) => this.tp.vertRelTo !== 'Para' || v === 'Top'),
+      this.tp.vertAlign ?? 'Top', (v) => patchPosition({ vertAlign: v, vertOffset: 0 }),
       toMm(this.tp.vertOffset), (v) => this.patchTable({ vertOffset: fromMm(v) })));
     depRest.appendChild(mkEl('div', 'tps-help', '단: 글이 흐르는 단(칼럼)이 기준이에요 · 쪽: 여백을 뺀 본문 영역이 기준이에요'));
 
-    depRest.appendChild(this.switchRow('쪽 영역 안으로 제한', this.tp.restrictInPage ?? true, (v) => this.patchTable({ restrictInPage: v })));
-    depRest.appendChild(this.switchRow('서로 겹침 허용', this.tp.allowOverlap ?? false, (v) => this.patchTable({ allowOverlap: v })));
-    depRest.appendChild(this.switchRow('개체와 조판부호를 항상 같은 쪽에 놓기', this.tp.keepWithAnchor ?? false, (v) => this.patchTable({ keepWithAnchor: v })));
+    const restrictRow = this.switchRow('쪽 영역 안으로 제한', this.tp.restrictInPage ?? true,
+      (v) => patchPosition({ restrictInPage: v }));
+    const overlapRow = this.switchRow('서로 겹침 허용', this.tp.allowOverlap ?? false,
+      (v) => this.patchTable({ allowOverlap: v }));
+    // [캔버스 한컴 포크] 웹한글과 같은 적용 조건. 비활성 값은 문서에서 지우지 않는다.
+    for (const [row, enabled] of [[restrictRow, this.tp.vertRelTo === 'Para'],
+      [overlapRow, this.tp.vertRelTo === 'Para' && (this.tp.restrictInPage ?? true)]] as const) {
+      row.classList.toggle('is-off', !enabled);
+      row.querySelectorAll('input').forEach((input) => { input.disabled = !enabled; });
+    }
+    depRest.append(restrictRow, overlapRow);
+    depRest.appendChild(keepAnchorRow);
+    if (inline) {
+      for (const group of [depSeg, depRest]) {
+        group.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>('input, select, button')
+          .forEach((control) => { control.disabled = true; });
+      }
+    }
   }
 
   /** 표 크기 — 엔진이 셀 크기의 합으로 계산하므로 읽기 전용 */
@@ -550,6 +582,8 @@ export class TablePanelSections {
       if (partial.treatAsChar === false) clampFloatingTableToPage(this.wasm, sec, ppi, ci);
     });
     Object.assign(this.tp, partial);
+    // [캔버스 한컴 포크] relTo 전환 시 엔진이 offset을 재계산하므로 요청값만 캐시하면 안 된다.
+    try { this.tp = this.wasm.getTableProperties(sec, ppi, ci); } catch { /* 읽기 실패 시 적용한 값 유지 */ }
   }
 
   private patchCell(partial: Partial<CellProperties>): void {

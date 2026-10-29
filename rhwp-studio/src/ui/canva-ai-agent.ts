@@ -8,14 +8,16 @@
  *
  * 원칙:
  * ① 도구는 여기 등록된 것만 — 모델이 임의 함수명을 불러도 무시된다.
- * ② 쓰기는 **턴마다 스냅샷 1회** — Ctrl+Z 한 번으로 그 턴의 수정 전체가 원복된다.
+ * ② 정밀 편집은 명령 묶음마다 스냅샷 1회 — Ctrl+Z 한 번으로 해당 묶음이 원복된다.
  * ③ 읽기 도구가 처음 돌기 전에 **동의**를 받는다(문서 내용이 외부 모델로 나가는 경로).
  *    동의는 패널이 받고, 여기는 동의 없인 부르지 않는 계약이다.
  * ④ 이미 값이 있는 셀을 덮으려면 모델이 replace 를 명시해야 한다 — 기본은 빈 칸만.
  */
 import type { CanvaServices } from './canva-services';
 import { readTable } from './table-grid.ts';
-import { describeCommands, isAllowed } from './agent-commands.ts';
+import { describeCommands, describeCapabilities, isAllowed } from './agent-commands.ts';
+import { EDITOR_TOOL_PROMPT, runEditorTool } from './ai-editor-tools.ts';
+import { summarizeEditReport } from './ai-edit-report.ts';
 
 /**
  * 한 턴에서 도구를 부를 수 있는 최대 횟수 — 폭주 방지.
@@ -66,6 +68,13 @@ function listTables(services: CanvaServices): TableRef[] {
 /** 도구 실행. 결과는 모델에게 그대로 돌아간다 — 사람이 아니라 모델이 읽는 문자열이다. */
 function runTool(services: CanvaServices, name: string, args: Record<string, unknown>,
   state: { wrote: boolean }): string {
+  // [캔버스 한컴 포크] 정밀 편집은 커서가 아닌 문서 주소로 실행하고 엔진 값을 돌려준다.
+  if (name === 'list_capabilities') return describeCapabilities(services.dispatcher.list(), typeof args.keyword === 'string' ? args.keyword : '', 60);
+  const precise = runEditorTool(services, name, args) as {ok:boolean;logs:unknown[]} | undefined;
+  if (precise !== undefined) {
+    if (precise.ok && !['inspect_document','inspect_target','list_capabilities'].includes(name) && (name!=='apply_edits'||(Array.isArray(args.operations)&&args.operations.some((op:any)=>!['inspect_document','inspect_target','list_capabilities'].includes(op.tool))))) state.wrote = true;
+    return summarizeEditReport(precise,3500);
+  }
   const wasm = services.wasm;
   const tables = listTables(services);
   const pickTable = (): TableRef | string => {
@@ -190,9 +199,11 @@ function runTool(services: CanvaServices, name: string, args: Record<string, unk
       const ih = services.getInputHandler() as any;
       if (!ih) return 'ERROR: 편집기 없음';
       // dispatcher 가 canExecute 로 상황(선택 유무·표 안인지)을 판정한다 — 우리가 흉내내지 않는다.
-      const ok = services.dispatcher.dispatch(id);
+      const params = args.params;
+      if (params !== undefined && (!params || typeof params !== 'object' || Array.isArray(params))) return 'ERROR: params 객체 필요';
+      const ok = services.dispatcher.dispatch(id, params as Record<string, unknown> | undefined);
       if (ok) state.wrote = true;
-      return ok ? `실행 완료: ${id}`
+      return ok ? `명령 전달: ${id} — 실제 적용값은 inspect_target으로 확인`
         : `ERROR: ${id} 를 지금 실행할 수 없다(선택 영역이 없거나 표 밖일 수 있다)`;
     }
     default:
@@ -228,7 +239,7 @@ export async function runAgentTurn(
 
   let nudged = false;
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const reply = await callModel(AGENT_PROMPT, transcript);
+    const reply = await callModel(AGENT_PROMPT + EDITOR_TOOL_PROMPT + '\nlist_capabilities {keyword?:string}: 전체 편집기 기능과 실행 경로를 찾는다. 직접 도구를 우선 사용하고, ui_required/unsupported는 실행한 것으로 보고하지 않는다.', transcript);
     const call = parseToolCall(reply);
 
     if (!call) {

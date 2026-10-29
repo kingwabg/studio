@@ -46,11 +46,11 @@ export function isHostProxy(): boolean { return hostProxyKnown; }
  */
 const BUSY_RETRY_DELAYS = [1200, 3000];
 
-export async function callAi(systemPrompt: string, userText: string, maxTokens = 2048): Promise<string> {
+export async function callAi(systemPrompt: string, userText: string, maxTokens = 2048, images: string[] = []): Promise<string> {
   let lastErr = '';
   for (let attempt = 0; attempt <= BUSY_RETRY_DELAYS.length; attempt++) {
     try {
-      return await callOnce(systemPrompt, userText, maxTokens);
+      return await callOnce(systemPrompt, userText, maxTokens, images);
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e);
       if (!isBusy(lastErr) || attempt === BUSY_RETRY_DELAYS.length) throw e;
@@ -60,10 +60,14 @@ export async function callAi(systemPrompt: string, userText: string, maxTokens =
   throw new Error(lastErr || 'AI 호출 실패');
 }
 
-async function callOnce(systemPrompt: string, userText: string, maxTokens: number): Promise<string> {
+async function callOnce(systemPrompt: string, userText: string, maxTokens: number, images: string[]): Promise<string> {
+  const content = aiUserContent(userText, images);
   const chosen = getSelectedModel();
+  // [캔버스 한컴 포크] 이미지 원문·문서 내용·인증정보는 연결 로그에 기록하지 않는다.
+  if(images.length) console.info('[ai-image]',JSON.stringify({phase:'request',images:images.length,model:chosen||(isHostProxy()?'server-default':AI_MODEL),maxTokens}));
   const res = await fetch('/api/ai/v1/chat/completions', {
     method: 'POST',
+    signal: AbortSignal.timeout(240_000),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       // ⚠ 고른 모델이 없으면 model 을 **아예 안 보낸다**(2026-08-05 실사고 수리).
@@ -79,11 +83,11 @@ async function callOnce(systemPrompt: string, userText: string, maxTokens: numbe
       //   실측: thinking:false → reasoning_content 빈 문자열, content 는 순수 JSON.
       //   ⚠ 이 키는 NVIDIA 전용이다 — 호스트 프록시가 공급자별 허용 목록으로 거르므로
       //   다른 공급자에는 실려 나가지 않는다(sc- route.ts PROVIDER_EXTRA).
-      chat_template_kwargs: { thinking: false },
+      chat_template_kwargs: images.length ? { enable_thinking: false } : { thinking: false },
       max_tokens: maxTokens,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userText },
+        { role: 'user', content },
       ],
     }),
   });
@@ -96,7 +100,26 @@ async function callOnce(systemPrompt: string, userText: string, maxTokens: numbe
     const detail = typeof data.error === 'string' ? data.error : data.error?.message;
     throw new Error(detail || 'AI 호출 실패');
   }
+  if(images.length)console.info('[ai-image]',JSON.stringify({phase:'response',model:data.model??chosen,finishReason:data.choices[0]?.finish_reason,responseChars:data.choices[0]?.message?.content?.length??0}));
+  if(data.choices[0]?.finish_reason==='length')throw new Error('AI 응답이 길이 한도로 잘렸습니다. 표를 나누어 생성하도록 요청하세요.');
   const raw: string = data.choices[0]?.message?.content ?? '';
   // 추론 모델이 흘리는 사고 태그 제거 — 본문만 남긴다
   return raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+}
+
+/** [캔버스 한컴 포크] 텍스트 요청은 기존 형식 유지, 첨부한 로컬 이미지 한 장만 전송한다. */
+export function aiUserContent(text: string, images: string[] = []): string | Array<
+  { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
+> {
+  if (!images.length) return text;
+  if (images.length > 1) throw new Error('참고 이미지는 한 번에 한 장만 첨부해 주세요.');
+  for (const image of images) {
+    if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)) {
+      throw new Error('PNG, JPEG, WebP 이미지 파일만 지원합니다.');
+    }
+    if (image.slice(image.indexOf(',') + 1).replace(/=+$/, '').length * 3 / 4 > 10 * 1024 * 1024) {
+      throw new Error('이미지는 10MB 이하여야 합니다.');
+    }
+  }
+  return [{ type: 'text', text }, ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } }))];
 }

@@ -8,10 +8,13 @@ import { CanvaRightInspector, type PanelTab } from './canva-right-inspector';
 import { CanvaAiPanel } from './canva-ai-panel';
 import { CanvaRecordPanel } from './canva-record-panel';
 import { mkEl, mkButton } from './canva-dom';
+import { PagePreviewPanel } from './page-preview-panel';
+import { showToast } from './toast';
+import { importPagesFromFile } from './page-import';
 
 let mounted = false;
 
-// '1'=캔버스 모드(기본), '0'=문서 모드. main.ts(새 문서 여백 0 분기)와 공유 — 문자열 중복 금지.
+// '1'=캔버스 모드, '0'=문서 모드(부팅 기본 = 문서, 2026-10-29 사용자 지시). main.ts(새 문서 여백 0 분기)와 공유 — 문자열 중복 금지.
 export const CANVAS_MODE_KEY = 'rhwpCanvasMode';
 
 /**
@@ -40,6 +43,10 @@ export function mountCanvaSidebars(services: CanvaServices): void {
   // (insert:textbox · table:create · insert:shape · insert:image).
   const right = buildRail('right');
   ws.append(editorArea, right.rail);
+  // [캔버스 한컴 포크] 왼쪽은 삽입 팔레트 대신 문서 쪽 미리보기다.
+  const previewPanel = new PagePreviewPanel(ws, services);
+  // [캔버스 한컴 포크] P2: '불러오기' — 다른 문서를 보조 편집기에 로드해 쪽을 골라 삽입한다.
+  previewPanel.onImport = () => { void importPagesFromFile(services); };
 
   // 우: [속성] 인스펙터 + [AI] + [녹음] 탭 — buildRail이 만든 body를 인스펙터 창으로 재사용(잉여 노드 방지)
   const inspectorPane = right.body;
@@ -70,6 +77,8 @@ export function mountCanvaSidebars(services: CanvaServices): void {
     inspector.setPanelTab(ALL_TABS[idx]);
   };
   const tabs = right.setTabs(ALL_TABS.map((t) => LABELS[t]), showTab);
+  // 탭 클릭은 편집 캐럿/IME 입력기의 포커스를 옮기지 않는다.
+  tabs.forEach(b=>b.addEventListener('mousedown',e=>e.preventDefault()));
   inspector.onTabsState = (visible, active) => {
     tabs.forEach((b, i) => {
       const tab = ALL_TABS[i];
@@ -134,9 +143,11 @@ function mountModeToggle(services: CanvaServices): void {
   bCanvas.addEventListener('click', () => apply(true, true));
   bDoc.addEventListener('click', () => apply(false, true));
 
-  let initial = true;
-  try { initial = localStorage.getItem(CANVAS_MODE_KEY) !== '0'; } catch { /* ignore */ }
-  apply(initial, false);
+  // [캔버스 한컴 포크] 시작 모드는 **문서 모드로 고정**(사용자 지시 2026-10-29:
+  // "문서 처음기준이 캔버스 말고 문서로 고정"). 종전엔 저장값이 없거나 '1' 이면 캔버스로
+  // 떠서, 새로 열 때마다 글을 흘리는 기본 동작과 달랐다. 토글은 세션 중 그대로 쓸 수 있고
+  // 선택값은 계속 저장하지만, 부팅 시에는 저장값을 무시하고 문서로 시작한다.
+  apply(false, false);
 }
 
 interface RailParts {
