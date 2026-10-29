@@ -223,6 +223,7 @@ export class HwpDocument {
      * 머리말/꼬리말을 삭제한다 (컨트롤 자체 제거).
      */
     deleteHeaderFooter(section_idx: number, is_header: boolean, apply_to: number): string;
+    deletePages(pages_json: string): string;
     deleteParagraph(section_idx: number, para_idx: number): string;
     /**
      * 그림 컨트롤을 문단에서 삭제한다.
@@ -331,6 +332,7 @@ export class HwpDocument {
      * 지정 ID의 스냅샷을 제거하여 메모리를 해제한다.
      */
     discardSnapshot(id: number): void;
+    duplicatePages(pages_json: string): string;
     /**
      * Batch 모드를 종료하고 누적된 이벤트를 반환한다.
      */
@@ -866,6 +868,10 @@ export class HwpDocument {
     getPageLayerTree(page_num: number): string;
     getPageLayerTreeWithProfile(page_num: number, profile: string): string;
     /**
+     * [캔버스 한컴 포크] 원본 문단·표가 이어진 쪽 묶음 경계.
+     */
+    getPageMoveRanges(): string;
+    /**
      * 위치에 해당하는 글로벌 쪽 번호 반환
      */
     getPageOfPosition(section_idx: number, para_idx: number): string;
@@ -1183,6 +1189,10 @@ export class HwpDocument {
      */
     injectExternalImageByKey(key: string, data: Uint8Array, display_path: string): number;
     /**
+     * [캔버스 한컴 포크] 선택한 쪽 묶음 각각의 뒤에 빈 쪽을 한 장씩 삽입한다.
+     */
+    insertBlankPages(pages_json: string): string;
+    /**
      * 커서 위치에 그림을 삽입한다.
      *
      * image_data: 이미지 바이너리 데이터 (PNG/JPG/GIF/BMP 등)
@@ -1414,6 +1424,11 @@ export class HwpDocument {
      * options JSON 키: `{ sec, para, ci, sx, sy, ex, ey }` (좌표는 i32). positional 과 동일 동작.
      */
     moveLineEndpointEx(options_json: string): string;
+    /**
+     * 원본 문단 객체를 쪽 묶음 단위로 이동한다. before는 이동 전 삽입 슬롯이다.
+     */
+    movePageRange(source_page: number, before_page: number): string;
+    movePages(pages_json: string, before_page: number): string;
     moveTableOffset(section_idx: number, parent_para_idx: number, control_idx: number, delta_h: number, delta_v: number): string;
     /**
      * 수직 커서 이동 (ArrowUp/Down) — 단일 호출로 줄/문단/표/구역 경계를 모두 처리한다.
@@ -2099,6 +2114,7 @@ export interface InitOutput {
     readonly hwpdocument_deleteFootnote: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly hwpdocument_deleteFormObject: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly hwpdocument_deleteHeaderFooter: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly hwpdocument_deletePages: (a: number, b: number, c: number) => [number, number, number, number];
     readonly hwpdocument_deleteParagraph: (a: number, b: number, c: number) => [number, number, number, number];
     readonly hwpdocument_deletePictureControl: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly hwpdocument_deleteRange: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
@@ -2118,6 +2134,7 @@ export interface InitOutput {
     readonly hwpdocument_deleteTextInHeaderFooter: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
     readonly hwpdocument_deleteTextLogical: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly hwpdocument_discardSnapshot: (a: number, b: number) => void;
+    readonly hwpdocument_duplicatePages: (a: number, b: number, c: number) => [number, number, number, number];
     readonly hwpdocument_endBatch: (a: number) => [number, number, number, number];
     readonly hwpdocument_ensureDefaultBullet: (a: number, b: number, c: number) => number;
     readonly hwpdocument_ensureDefaultNumbering: (a: number) => number;
@@ -2220,6 +2237,7 @@ export interface InitOutput {
     readonly hwpdocument_getPageInfo: (a: number, b: number) => [number, number, number, number];
     readonly hwpdocument_getPageLayerTree: (a: number, b: number) => [number, number, number, number];
     readonly hwpdocument_getPageLayerTreeWithProfile: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly hwpdocument_getPageMoveRanges: (a: number) => [number, number, number, number];
     readonly hwpdocument_getPageOfPosition: (a: number, b: number, c: number) => [number, number, number, number];
     readonly hwpdocument_getPageOverlayImages: (a: number, b: number) => [number, number, number, number];
     readonly hwpdocument_getPageRenderTree: (a: number, b: number) => [number, number, number, number];
@@ -2274,6 +2292,7 @@ export interface InitOutput {
     readonly hwpdocument_hitTestInHeaderFooter: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly hwpdocument_injectExternalImage: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
     readonly hwpdocument_injectExternalImageByKey: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
+    readonly hwpdocument_insertBlankPages: (a: number, b: number, c: number) => [number, number, number, number];
     readonly hwpdocument_insertChart: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
     readonly hwpdocument_insertClickHereField: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number, number];
     readonly hwpdocument_insertClickHereFieldByPath: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number) => [number, number, number, number];
@@ -2316,6 +2335,8 @@ export interface InitOutput {
     readonly hwpdocument_moveFormObject: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly hwpdocument_moveLineEndpoint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
     readonly hwpdocument_moveLineEndpointEx: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly hwpdocument_movePageRange: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly hwpdocument_movePages: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly hwpdocument_moveTableOffset: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly hwpdocument_moveVertical: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => [number, number, number, number];
     readonly hwpdocument_moveVerticalByPath: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];

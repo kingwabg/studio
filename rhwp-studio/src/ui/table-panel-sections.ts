@@ -11,7 +11,7 @@
  *     표 기본으로 덮어써진다(배치만 바꿔도 셀 테두리가 회색으로 회귀했던 사고).
  */
 import { mkEl, mkButton } from './canva-dom';
-import { clampFloatingTableToPage } from '@/engine/canvas-snap';
+import { clampFloatingTableToPage, clampRangeForRelTo, clampToPage } from '@/engine/canvas-snap';
 import type { WasmBridge } from '@/core/wasm-bridge';
 import type { CellProperties, TableProperties } from '@/core/types';
 import type { CanvaServices } from './canva-services';
@@ -171,7 +171,7 @@ export class TablePanelSections {
         horzAlign: this.tp.horzRelTo === 'Para' ? (v === 'Inside' ? 'Left' : v === 'Outside' ? 'Right' : v) : v,
         horzOffset: 0,
       }),
-      toMm(this.tp.horzOffset), (v) => this.patchTable({ horzOffset: fromMm(v) })));
+      toMm(this.tp.horzOffset), (v) => patchPosition({ horzOffset: fromMm(v) })));
     depRest.appendChild(this.composeRow('세로', 'arrows-vertical',
       V_REL, this.tp.vertRelTo ?? 'Para', (v) => patchPosition({
         vertRelTo: v,
@@ -179,7 +179,7 @@ export class TablePanelSections {
       }),
       V_ALIGN.filter(([v]) => this.tp.vertRelTo !== 'Para' || v === 'Top'),
       this.tp.vertAlign ?? 'Top', (v) => patchPosition({ vertAlign: v, vertOffset: 0 }),
-      toMm(this.tp.vertOffset), (v) => this.patchTable({ vertOffset: fromMm(v) })));
+      toMm(this.tp.vertOffset), (v) => patchPosition({ vertOffset: fromMm(v) })));
     depRest.appendChild(mkEl('div', 'tps-help', '단: 글이 흐르는 단(칼럼)이 기준이에요 · 쪽: 여백을 뺀 본문 영역이 기준이에요'));
 
     const restrictRow = this.switchRow('쪽 영역 안으로 제한', this.tp.restrictInPage ?? true,
@@ -574,6 +574,18 @@ export class TablePanelSections {
           fills.set(idx, { fillType: cp.fillType, fillColor: cp.fillColor, patternColor: cp.patternColor, patternType: cp.patternType });
         }
       } catch { /* 개별 셀 조회 실패는 건너뛴다 */ }
+    }
+    if (!this.tp.treatAsChar && this.tp.vertRelTo === 'Para' && this.tp.restrictInPage &&
+        Object.keys(partial).length === 1 && (partial.horzOffset !== undefined || partial.vertOffset !== undefined)) {
+      const bb = this.wasm.getTableBBox(sec, ppi, ci);
+      const info = this.wasm.getPageInfo(bb.pageIndex);
+      const bounds = clampRangeForRelTo(info, this.tp.horzRelTo === 'Paper' ? 'Page' : this.tp.horzRelTo, this.tp.vertRelTo, bb.width, bb.height, bb.x + bb.width / 2, true, this.tp);
+      const direction = this.tp.horzAlign === 'Right' || this.tp.horzAlign === 'Outside' ? -1 : 1;
+      const requestedX = bb.x + direction * ((partial.horzOffset ?? this.tp.horzOffset ?? 0) - (this.tp.horzOffset ?? 0)) / 75;
+      const requestedY = bb.y + ((partial.vertOffset ?? this.tp.vertOffset ?? 0) - (this.tp.vertOffset ?? 0)) / 75;
+      const bounded = clampToPage(requestedX, requestedY, bounds);
+      if (partial.horzOffset !== undefined) partial.horzOffset = (this.tp.horzOffset ?? 0) + Math.round(direction * (bounded.x - bb.x) * 75);
+      if (partial.vertOffset !== undefined) partial.vertOffset = (this.tp.vertOffset ?? 0) + Math.round((bounded.y - bb.y) * 75);
     }
     this.run(() => {
       // ② border/fill 키는 싣지 않는다 — partial 에 들어올 일이 없도록 호출부가 보장한다

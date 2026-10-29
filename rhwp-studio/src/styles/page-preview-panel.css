@@ -1,8 +1,9 @@
 /* [캔버스 한컴 포크] 왼쪽 페이지 탐색. 본문과 독립적으로 스크롤한다. */
 /* [캔버스 한컴 포크] P1(2026-10-29 사용자 지시): 바탕을 흰색으로, 썸네일을 줄여 한 화면에 더 많은 쪽. */
-.page-preview-panel { position:relative; width:200px; flex:0 0 auto; min-height:0; display:flex; flex-direction:column; background:var(--ui-surface,#fff); border-right:1px solid var(--ui-border); }
-.page-preview-header { display:flex; align-items:center; gap:8px; height:38px; flex-shrink:0; padding:0 8px 0 12px; color:var(--ui-text); font-size:12px; }
-.page-preview-header span { margin-left:auto; padding:3px 9px; border-radius:12px; color:var(--ui-link); background:var(--ui-accent-bg-light); font-size:11px; font-weight:600; }
+.page-preview-panel { position:relative; width:150px; flex:0 0 auto; min-height:0; display:flex; flex-direction:column; container-type:inline-size; background:var(--ui-surface,#fff); border-right:1px solid var(--ui-border); }
+.page-preview-header { display:flex; align-items:center; gap:4px; height:38px; flex-shrink:0; padding:0 6px 0 8px; color:var(--ui-text); font-size:12px; }
+.page-preview-header strong { white-space:nowrap; font-size:11px; }
+.page-preview-header span { margin-left:auto; padding:3px 6px; border-radius:12px; white-space:nowrap; color:var(--ui-link); background:var(--ui-accent-bg-light); font-size:11px; font-weight:600; }
 .page-preview-header button { border:0; background:transparent; color:var(--ui-text); font-size:22px; cursor:pointer; min-width:22px; }
 .page-preview-list { overflow:auto; flex:1; min-height:0; padding:8px; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:color-mix(in srgb,var(--ui-text-muted) 50%,transparent) transparent; }
 .page-preview-item { display:block; width:100%; padding:5px; margin:0 0 8px; border:2px solid transparent; border-radius:9px; background:transparent; color:var(--ui-text-muted); cursor:grab; }
@@ -34,7 +35,8 @@
 .page-preview-toolbar { padding:0 8px; border-bottom:1px solid var(--ui-border); }
 .page-preview-toolbar button { border:1px solid var(--ui-border); border-radius:4px; padding:5px 4px; background:var(--ui-surface); color:var(--ui-text); cursor:pointer; font-size:10px; white-space:nowrap; }
 .page-preview-actions { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; padding-bottom:8px; }
-.page-preview-actions button { display:flex; flex-direction:column; align-items:center; gap:4px; }
+.page-preview-actions button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-width:0; }
+@container (max-width: 320px) { .page-preview-actions { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 .page-preview-action-icon { display:block; width:15px; height:15px; color:var(--ui-link); }
 .page-preview-action-icon svg { display:block; width:100%; height:100%; }
 .page-preview-actions button:nth-child(2) .page-preview-action-icon { color:var(--ui-warning-text); }
@@ -43,8 +45,8 @@
 .page-preview-toolbar button:hover:not(:disabled) { border-color:var(--ui-link); background:var(--ui-accent-bg-light); }
 .page-preview-toolbar button[aria-pressed="true"] { color:var(--ui-link); background:var(--ui-accent-bg-light); border-color:var(--ui-link); }
 .page-preview-toolbar button:disabled { opacity:.4; cursor:default; }
-.page-preview-selection { display:flex; align-items:center; justify-content:space-between; padding:8px 4px 5px; border-top:1px solid var(--ui-border); font-size:11px; color:var(--ui-text); }
-.page-preview-selection small { font-size:10px; color:var(--ui-text-muted); }
+.page-preview-selection { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:2px 6px; padding:8px 4px 5px; border-top:1px solid var(--ui-border); font-size:11px; color:var(--ui-text); }
+.page-preview-selection small { white-space:nowrap; font-size:10px; color:var(--ui-text-muted); }
 .page-preview-select-tools { display:flex; gap:4px; padding:0 4px 6px; }
 .page-preview-select-tools button { border:0; padding:2px 5px; color:var(--ui-text-muted); background:transparent; }
 .page-preview-panel.is-collapsed .page-preview-toolbar { display:none; }

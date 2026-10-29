@@ -2454,6 +2454,7 @@ export class WasmBridge {
 
   editPages(action: PageEditAction, pages: number[], beforePageSlot?: number): PageEditResult {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    if (!['move', 'duplicate', 'insertBlank', 'delete'].includes(action)) throw new Error('지원하지 않는 쪽 편집입니다');
     const doc = this.doc as any, json = JSON.stringify(pages);
     const fnName = action === 'move' ? 'movePages'
       : action === 'duplicate' ? 'duplicatePages'

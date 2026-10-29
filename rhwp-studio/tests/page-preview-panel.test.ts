@@ -9,6 +9,7 @@ class Element {
   classes = new Set<string>(); dataset: any = {}; style: any = {}; hidden = false; textContent = ''; className = ''; width = 0; height = 0; scrollTop = 0; parent?: Element;
   classList = { toggle: (c: string, force?:boolean) => { const on = force ?? !this.classes.has(c); on ? this.classes.add(c) : this.classes.delete(c); return on; } };
   append(...items: Element[]) { for (const x of items) { this.children.push(x); x.parent = this; } }
+  appendChild(item: Element) { this.append(item); return item; }
   prepend(x: Element) { this.children.unshift(x); x.parent = this; }
   replaceChildren() { this.children = []; }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter(x => x !== this); }
@@ -64,7 +65,7 @@ test('내용 수정·같은 쪽 수의 새 문서·쪽 수 변경을 갱신한�
   assert.equal(s.panel.slots.length,2);assert.equal(s.panel.slots[1].button.attrs.get('aria-current'),'page');s.panel.dispose();
 });
 test('접기·펼치기와 마우스 포커스 보존이 동작한다',()=>{
-  const s=setup(),toggle=s.panel.element.children[0].children[2];let prevented=false;
+  const s=setup(),toggle=s.panel.element.querySelector('.page-preview-header').children[2];let prevented=false;
   toggle.fire('mousedown',{preventDefault:()=>{prevented=true;}});assert(prevented);
   toggle.fire('click');assert.equal(s.panel.list.hidden,true);assert.equal(toggle.attrs.get('aria-expanded'),'false');
   toggle.fire('click');assert.equal(s.panel.list.hidden,false);s.panel.dispose();

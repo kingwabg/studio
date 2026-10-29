@@ -1584,6 +1584,15 @@ export function onDblClick(this: any, e: MouseEvent): void {
         const plan = planBlankBodyInput(this.wasm, point.pageIdx, point.pageX, point.pageY);
         if (plan) {
           e.preventDefault();
+          if (plan.kind === 'existingAfterTable') {
+            this.cursor.clearSelection();
+            this.cursor.moveTo({ sectionIndex: plan.sec, paragraphIndex: plan.para, charOffset: plan.offset ?? 0 });
+            this.cursor.resetPreferredX();
+            this.updateCaret();
+            if (trace) console.info('[blank-body-input]', JSON.stringify({ requested: point, kind: plan.kind, actual: this.cursor.getRect() }));
+            this.textarea.focus();
+            return;
+          }
           const before = trace ? { paragraphs: this.wasm.getParagraphCount(plan.sec), controls: this.wasm.getPageControlLayout(point.pageIdx).controls } : undefined;
           this.cursor.clearSelection();
           this.executeOperation({ kind: 'snapshot', operationType: 'blankBodyInput', operation: (wasm: any) => applyBlankBodyInput(wasm, plan) });

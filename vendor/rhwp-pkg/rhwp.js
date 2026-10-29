@@ -1035,6 +1035,30 @@ export class HwpDocument {
         }
     }
     /**
+     * @param {string} pages_json
+     * @returns {string}
+     */
+    deletePages(pages_json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(pages_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.hwpdocument_deletePages(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
      * @param {number} section_idx
      * @param {number} para_idx
      * @returns {string}
@@ -1536,6 +1560,30 @@ export class HwpDocument {
      */
     discardSnapshot(id) {
         wasm.hwpdocument_discardSnapshot(this.__wbg_ptr, id);
+    }
+    /**
+     * @param {string} pages_json
+     * @returns {string}
+     */
+    duplicatePages(pages_json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(pages_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.hwpdocument_duplicatePages(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
     }
     /**
      * Batch 모드를 종료하고 누적된 이벤트를 반환한다.
@@ -3888,6 +3936,28 @@ export class HwpDocument {
         }
     }
     /**
+     * [캔버스 한컴 포크] 원본 문단·표가 이어진 쪽 묶음 경계.
+     * @returns {string}
+     */
+    getPageMoveRanges() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.hwpdocument_getPageMoveRanges(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
      * 위치에 해당하는 글로벌 쪽 번호 반환
      * @param {number} section_idx
      * @param {number} para_idx
@@ -5145,6 +5215,31 @@ export class HwpDocument {
         return ret >>> 0;
     }
     /**
+     * [캔버스 한컴 포크] 선택한 쪽 묶음 각각의 뒤에 빈 쪽을 한 장씩 삽입한다.
+     * @param {string} pages_json
+     * @returns {string}
+     */
+    insertBlankPages(pages_json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(pages_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.hwpdocument_insertBlankPages(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
      * 커서 위치에 그림을 삽입한다.
      *
      * image_data: 이미지 바이너리 데이터 (PNG/JPG/GIF/BMP 등)
@@ -6354,6 +6449,55 @@ export class HwpDocument {
             const ptr0 = passStringToWasm0(options_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len0 = WASM_VECTOR_LEN;
             const ret = wasm.hwpdocument_moveLineEndpointEx(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * 원본 문단 객체를 쪽 묶음 단위로 이동한다. before는 이동 전 삽입 슬롯이다.
+     * @param {number} source_page
+     * @param {number} before_page
+     * @returns {string}
+     */
+    movePageRange(source_page, before_page) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.hwpdocument_movePageRange(this.__wbg_ptr, source_page, before_page);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * @param {string} pages_json
+     * @param {number} before_page
+     * @returns {string}
+     */
+    movePages(pages_json, before_page) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(pages_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.hwpdocument_movePages(this.__wbg_ptr, ptr0, len0, before_page);
             var ptr2 = ret[0];
             var len2 = ret[1];
             if (ret[3]) {

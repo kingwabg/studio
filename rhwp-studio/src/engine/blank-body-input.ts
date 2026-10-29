@@ -4,7 +4,8 @@ import type { DocumentPosition } from '../core/types';
 type Node = { type: string; pi?: number; text?: string; bbox: { x: number; y: number; w: number; h: number }; children?: Node[] };
 export type BlankBodyPlan = {
   page: number; sec: number; para: number; x: number; y: number; columnX: number;
-  kind: 'empty' | 'paragraph' | 'tab';
+  kind: 'empty' | 'paragraph' | 'tab' | 'existingAfterTable' | 'afterTable';
+  offset?: number;
 };
 
 // [캔버스 한컴 포크] 빈 지면 입력도 본문 문단/탭으로 저장한다. 글상자는 만들지 않는다.
@@ -16,7 +17,8 @@ export function planBlankBodyInput(wasm: WasmBridge, page: number, x: number, y:
   const column = (info.columns?.length ? info.columns : [{ x: info.marginLeft, width: info.width - info.marginLeft - info.marginRight }])
     .find(c => x >= c.x && x < c.x + c.width);
   if (!column || y < top || y >= bottom) return null;
-  if (wasm.getPageControlLayout(page).controls.some(c => x >= c.x - 3 && x <= c.x + c.w + 3 && y >= c.y - 3 && y <= c.y + c.h + 3)) return null;
+  const controls = wasm.getPageControlLayout(page).controls;
+  if (controls.some(c => x >= c.x - 3 && x <= c.x + c.w + 3 && y >= c.y - 3 && y <= c.y + c.h + 3)) return null;
   const tree: Node = wasm.getPageRenderTree(page);
   const lines: Node[] = [];
   function collect(node: Node, body = false): void {
@@ -29,6 +31,17 @@ export function planBlankBodyInput(wasm: WasmBridge, page: number, x: number, y:
   const sec = info.sectionIndex;
   const base = { page, sec, x, y, columnX: column.x };
   const line = lines.find(l => y >= l.bbox.y - 2 && y < l.bbox.y + l.bbox.h + 2);
+  const tableBelow = controls.filter(c => c.type === 'table' && c.secIdx === sec && c.paraIdx !== undefined &&
+    c.controlIdx !== undefined && c.y + c.h < y && c.x < column.x + column.width && c.x + c.w > column.x)
+    .sort((a, b) => b.y + b.h - a.y - a.h)[0];
+  if (tableBelow && (!line || x < line.bbox.x || x > line.bbox.x + line.bbox.w)) {
+    const following = lines.filter(l => l.pi! > tableBelow.paraIdx! && l.bbox.y >= tableBelow.y + tableBelow.h - 1 && l.bbox.y <= y).sort((a, b) => b.bbox.y - a.bbox.y)[0];
+    if (following) return { ...base, para: following.pi!, offset: wasm.getLogicalLength(sec, following.pi!), kind: 'existingAfterTable' };
+    if (wasm.getTableProperties(sec, tableBelow.paraIdx!, tableBelow.controlIdx!).treatAsChar) return { ...base, para: tableBelow.paraIdx!, kind: 'afterTable' };
+    const last = lines.filter(l => l.bbox.y <= y).sort((a, b) => b.bbox.y - a.bbox.y)[0];
+    if (last) return { ...base, para: last.pi!, offset: wasm.getLogicalLength(sec, last.pi!), kind: 'existingAfterTable' };
+    return null;
+  }
   if (line) {
     const para = line.pi!;
     const length = wasm.getLogicalLength(sec, para);
@@ -54,6 +67,13 @@ export function applyBlankBodyInput(wasm: WasmBridge, plan: BlankBodyPlan): Docu
     if (value.ok === false || value.error) throw new Error(value.error ?? '빈 공간 입력 위치 생성 실패');
     return value;
   };
+  if (plan.kind === 'afterTable') {
+    para = check(wasm.splitParagraph(sec, para, wasm.getLogicalLength(sec, para))).paraIdx;
+    const actual = wasm.getCursorRect(sec, para, 0);
+    if (actual.pageIndex !== plan.page) throw new Error('표 뒤에 본문을 넣을 공간이 없습니다.');
+    return { sectionIndex: sec, paragraphIndex: para, charOffset: 0 };
+  }
+  if (plan.kind === 'existingAfterTable') throw new Error('기존 문단은 변경하지 않습니다.');
   if (plan.kind === 'tab') {
     offset = wasm.getLogicalLength(sec, para);
     const props = wasm.getParaPropertiesAt(sec, para);

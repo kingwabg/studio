@@ -45,6 +45,7 @@ function splitEvenly(total: number, count: number): number[] {
 }
 
 export class TableCreateDialog {
+  constructor(private fitWidth: number) {}
   private overlay!: HTMLDivElement;
   private popup!: HTMLDivElement;
   private label!: HTMLDivElement;
@@ -308,7 +309,7 @@ export class TableCreateDialog {
     widthVal.className = 'dialog-input';
     widthVal.type = 'number';
     widthVal.step = '0.1';
-    widthVal.value = '148.0';
+    widthVal.value = (this.fitWidth / HWPUNIT_PER_MM).toFixed(1);
     widthVal.style.cssText = 'width:60px;margin-left:6px;';
     widthVal.disabled = true;
     widthRow.appendChild(widthVal);

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import init, { HwpDocument } from '../../pkg/rhwp.js';
+import { createPageReorderFixture } from './helpers/page-reorder-fixture.ts';
 
 await init({ module_or_path: readFileSync(new URL('../../pkg/rhwp_bg.wasm', import.meta.url)) });
 const module = { exports: {} as any };
@@ -12,7 +13,7 @@ vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.Mo
   { exports: module.exports });
 const { planBlankBodyInput: plan, applyBlankBodyInput: apply } = module.exports;
 function bridge(doc: HwpDocument): any {
-  const parsed = ['getPageRenderTree', 'getPageInfo', 'getPageControlLayout', 'getCursorRect', 'getParaPropertiesAt'];
+  const parsed = ['getPageRenderTree', 'getPageInfo', 'getPageControlLayout', 'getCursorRect', 'getParaPropertiesAt', 'getTableProperties'];
   return new Proxy({ doc }, { get(target, key: string) {
     if (key === 'doc') return doc;
     return (...args: any[]) => parsed.includes(key) ? JSON.parse((doc as any)[key](...args)) : (doc as any)[key](...args);
@@ -22,6 +23,55 @@ function blank() {
   const doc = HwpDocument.createEmpty(); doc.createBlankDocument();
   return { doc, w: bridge(doc) };
 }
+test('글자처럼 취급한 표 아래 더블클릭은 표 뒤에 입력하고 표 위치를 보존한다', () => {
+  const doc = createPageReorderFixture(HwpDocument), w = bridge(doc);
+  try {
+    const table = w.getPageControlLayout(0).controls.find((c: any) => c.type === 'table');
+    const before = JSON.parse(doc.getTableBBox(table.secIdx, table.paraIdx, table.controlIdx));
+    const saved = doc.exportHwp(), snapshot = doc.saveSnapshot();
+    const x = before.x + 50, y = before.y + before.height + 65;
+    const p = plan(w, 0, x, y); assert.equal(p.para, table.paraIdx); assert.equal(p.kind, 'afterTable');
+    const pos = apply(w, p);
+    const after = JSON.parse(doc.getTableBBox(table.secIdx, table.paraIdx, table.controlIdx));
+    assert.deepEqual(after, before);
+    assert.ok(pos.paragraphIndex > table.paraIdx);
+    const actual = w.getCursorRect(0, pos.paragraphIndex, pos.charOffset);
+    assert.ok(actual.y >= before.y + before.height && actual.y < y);
+    doc.insertTextLogical(0, pos.paragraphIndex, pos.charOffset, '표 아래');
+    assert.equal(doc.getTextRange(0, pos.paragraphIndex, 0, 100), '표 아래');
+    const reopened = new HwpDocument(doc.exportHwp());
+    try { assert.equal(reopened.getTextRange(0, pos.paragraphIndex, 0, 100), '표 아래'); }
+    finally { reopened.free(); }
+    console.info('[table-after-doubleclick]', JSON.stringify({ requested: { x, y }, anchor: table.paraIdx, caret: w.getCursorRect(0, pos.paragraphIndex, pos.charOffset), tableBefore: before, tableAfter: after }));
+    doc.restoreSnapshot(snapshot); assert.deepEqual(doc.exportHwp(), saved); doc.discardSnapshot(snapshot);
+  } finally { doc.free(); }
+});
+test('표 뒤에 기존 문단이 있으면 빈 곳 더블클릭이 문단을 추가하지 않는다', () => {
+  const doc = createPageReorderFixture(HwpDocument), w = bridge(doc);
+  try {
+    const table = w.getPageControlLayout(0).controls.find((c: any) => c.type === 'table');
+    const next = JSON.parse(doc.splitParagraph(0, table.paraIdx, doc.getLogicalLength(0, table.paraIdx))).paraIdx;
+    doc.insertTextLogical(0, next, 0, '표 뒤 문단');
+    const last = JSON.parse(doc.splitParagraph(0, next, doc.getLogicalLength(0, next))).paraIdx;
+    const rect = w.getCursorRect(0, last, 0), before = doc.exportHwp();
+    const p = plan(w, 0, rect.x + 80, rect.y + 70);
+    assert.equal(p.kind, 'existingAfterTable');
+    assert.deepEqual(doc.exportHwp(), before);
+  } finally { doc.free(); }
+});
+test('떠 있는 자리차지 표 아래는 기존 문단으로 이동하고 표를 움직이지 않는다', () => {
+  const doc = createPageReorderFixture(HwpDocument), w = bridge(doc);
+  try {
+    const table = w.getPageControlLayout(0).controls.find((c: any) => c.type === 'table');
+    doc.setTableProperties(0, table.paraIdx, table.controlIdx, JSON.stringify({ treatAsChar: false, textWrap: 'TopAndBottom' }));
+    const before = JSON.parse(doc.getTableBBox(0, table.paraIdx, table.controlIdx)), saved = doc.exportHwp();
+    const p = plan(w, 0, before.x + 50, before.y + before.height + 65);
+    assert.equal(p.kind, 'existingAfterTable');
+    assert.deepEqual(doc.exportHwp(), saved);
+    assert.deepEqual(JSON.parse(doc.getTableBBox(0, table.paraIdx, table.controlIdx)), before);
+    console.info('[floating-table-after-doubleclick]', JSON.stringify({ position: p, table: before, caret: w.getCursorRect(p.sec, p.para, p.offset) }));
+  } finally { doc.free(); }
+});
 test('빈 공간의 x/y에 본문 커서를 만들고 입력·저장·복원한다', () => {
   const { doc, w } = blank();
   const before = w.getCursorRect(0, 0, 0), target = { x: before.x + 100, y: before.y + 110 };

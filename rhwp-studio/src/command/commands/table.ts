@@ -5,6 +5,8 @@ import { CellSplitDialog } from '@/ui/cell-split-dialog';
 import { openTablePanel } from '@/ui/canva-sidebars';
 import { CellBorderBgDialog } from '@/ui/cell-border-bg-dialog';
 import { FormulaDialog } from '@/ui/formula-dialog';
+import { equalizeCellBoundaries } from './table-equal-cells';
+import { defaultTableWidth, splitTableWidth } from './table-create-width';
 import {
   TableDeleteRowColumnDialog,
   TableInsertRowColumnDialog,
@@ -26,6 +28,12 @@ type TableCellCommandContext = {
 
 function safeTableOp(fn: () => void, label: string): void {
   try { fn(); } catch (e) { console.error(`[table] ${label} 실패:`, e); }
+}
+
+function traceEqualCells(phase: string, axis: string, cells: unknown): void {
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tableEqualTrace') === '1') {
+    console.debug('[table-equal]', JSON.stringify({ phase, axis, cells }));
+  }
 }
 
 function equalizeTargetRange(ih: ReturnType<CommandServices['getInputHandler']>, dims: TableDimensions): CellRange {
@@ -236,7 +244,9 @@ export const tableCommands: CommandDef[] = [
         pos = ih.getCursorPosition();
         if (pos.parentParaIndex !== undefined) return; // 여전히 표 안이면 안전 중단
       }
-      const dialog = new TableCreateDialog();
+      const cursorRect = services.wasm.getCursorRect(pos.sectionIndex, pos.paragraphIndex, pos.charOffset);
+      const fitWidth = defaultTableWidth(services.wasm.getPageInfo(cursorRect.pageIndex), cursorRect.x);
+      const dialog = new TableCreateDialog(fitWidth);
       dialog.onApply = (rows, cols, options?: TableCreateOptions) => {
         const ih2 = services.getInputHandler();
         if (!ih2) return;
@@ -253,6 +263,7 @@ export const tableCommands: CommandDef[] = [
               rowCount: rows,
               colCount: cols,
               ...(options ?? { treatAsChar: false }),
+              colWidths: options?.colWidths ?? splitTableWidth(fitWidth, cols),
             });
             if (result.ok) {
               // 기본 테두리는 엔진 기본(0.12mm, 사용자 지정 2026-08-11)을 그대로 둔다.
@@ -260,15 +271,15 @@ export const tableCommands: CommandDef[] = [
               // 원인이었다 — 얇은 선의 흐림은 렌더러 헤어라인 바닥(1px)으로 해결.
               // [캔버스 한컴 포크] 새 표는 해당 단 안에서 이동하도록 가로 기준을 단·오프셋0으로 둔다.
               // 글자처럼취급 표는 배치 개념이 없으므로 건드리지 않는다.
-              if (!(options?.treatAsChar)) {
-                try {
-                  wasm.setTableProperties(pos.sectionIndex, result.paraIdx, result.controlIdx, {
+              const props = wasm.setTableProperties(pos.sectionIndex, result.paraIdx, result.controlIdx, {
+                restrictInPage: true,
+                ...(!(options?.treatAsChar) ? {
                     horzRelTo: 'Column',
                     horzAlign: 'Left',
                     horzOffset: 0,
-                  });
-                } catch { /* 속성 적용 실패 시 엔진 기본 배치 유지 */ }
-              }
+                } : {}),
+              });
+              if (!props.ok) throw new Error('표의 기본 위치 설정을 적용할 수 없습니다');
               return {
                 sectionIndex: pos.sectionIndex,
                 paragraphIndex: 0,
@@ -806,6 +817,15 @@ export const tableCommands: CommandDef[] = [
         const dims = services.wasm.getTableDimensions(sec, ppi, ci);
         const range = equalizeTargetRange(ih, dims);
         const bboxes = services.wasm.getTableCellBboxes(sec, ppi, ci);
+        if (bboxes.some(b => b.rowSpan > 1 || b.colSpan > 1)) {
+          const selected = bboxes.filter(b => isCellInRange(b, range));
+          traceEqualCells('before', 'height', selected.map(({ cellIdx, x, y, w, h }) => ({ cellIdx, x, y, w, h })));
+          safeTableOp(() => ih.executeOperation({ kind: 'snapshot', operationType: 'equalizeTableCellHeights',
+            operation: wasm => { equalizeCellBoundaries(wasm, sec, ppi, ci, selected, 'height');
+              traceEqualCells('after', 'height', wasm.getTableCellBboxes(sec, ppi, ci).map(({ cellIdx, h }) => ({ cellIdx, h }))); return pos; } }), '셀 높이를 같게');
+          restoreEditorFocus(ih);
+          return;
+        }
         const bboxByCellIdx = new Map(bboxes.map(bbox => [bbox.cellIdx, bbox]));
         // heightDelta 는 표시 높이 대비 변화량(엔진 base = 빈 셀이면 글줄 바닥 = 표시 높이)
         const cells: Array<{ idx: number; displayHeight: number }> = [];
@@ -818,6 +838,7 @@ export const tableCommands: CommandDef[] = [
           cells.push({ idx: i, displayHeight: Math.round(bbox.h * 75) });
         }
         if (cells.length < 2) return;
+        traceEqualCells('before', 'height', cells);
         const totalHeight = cells.reduce((sum, cell) => sum + cell.displayHeight, 0);
         const avgHeight = Math.round(totalHeight / cells.length);
         const updates: Parameters<CommandServices['wasm']['resizeTableCells']>[3] = [];
@@ -833,6 +854,7 @@ export const tableCommands: CommandDef[] = [
           operationType: 'equalizeTableCellHeights',
           operation: (wasm) => {
             wasm.resizeTableCells(sec, ppi, ci, updates);
+            traceEqualCells('after', 'height', wasm.getTableCellBboxes(sec, ppi, ci).map(({ cellIdx, h }) => ({ cellIdx, h })));
             return pos;
           },
         }), '셀 높이를 같게');
@@ -858,6 +880,15 @@ export const tableCommands: CommandDef[] = [
         const dims = services.wasm.getTableDimensions(sec, ppi, ci);
         const range = equalizeTargetRange(ih, dims);
         const bboxes = services.wasm.getTableCellBboxes(sec, ppi, ci);
+        if (bboxes.some(b => b.rowSpan > 1 || b.colSpan > 1)) {
+          const selected = bboxes.filter(b => isCellInRange(b, range));
+          traceEqualCells('before', 'width', selected.map(({ cellIdx, x, y, w, h }) => ({ cellIdx, x, y, w, h })));
+          safeTableOp(() => ih.executeOperation({ kind: 'snapshot', operationType: 'equalizeTableCellWidths',
+            operation: wasm => { equalizeCellBoundaries(wasm, sec, ppi, ci, selected, 'width');
+              traceEqualCells('after', 'width', wasm.getTableCellBboxes(sec, ppi, ci).map(({ cellIdx, w }) => ({ cellIdx, w }))); return pos; } }), '셀 너비를 같게');
+          restoreEditorFocus(ih);
+          return;
+        }
         const bboxByCellIdx = new Map(bboxes.map(bbox => [bbox.cellIdx, bbox]));
         const cells: Array<{ idx: number; col: number; width: number; displayWidth: number }> = [];
         for (let i = 0; i < dims.cellCount; i++) {
@@ -870,6 +901,7 @@ export const tableCommands: CommandDef[] = [
           cells.push({ idx: i, col: info.col, width: w, displayWidth });
         }
         if (cells.length < 2) return;
+        traceEqualCells('before', 'width', cells);
         const totalWidth = cells.reduce((sum, cell) => sum + cell.displayWidth, 0);
         const avgWidth = Math.round(totalWidth / cells.length);
         const updates: Parameters<CommandServices['wasm']['resizeTableCells']>[3] = [];
@@ -885,6 +917,7 @@ export const tableCommands: CommandDef[] = [
           operationType: 'equalizeTableCellWidths',
           operation: (wasm) => {
             wasm.resizeTableCells(sec, ppi, ci, updates);
+            traceEqualCells('after', 'width', wasm.getTableCellBboxes(sec, ppi, ci).map(({ cellIdx, w }) => ({ cellIdx, w })));
             return pos;
           },
         }), '셀 너비를 같게');

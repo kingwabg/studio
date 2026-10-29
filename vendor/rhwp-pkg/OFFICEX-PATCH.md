@@ -1,7 +1,8 @@
 # vendor/rhwp-pkg — 포크 엔진 패치판 (sc- vendor/rhwp-core 패턴의 studio 판)
 
-- 출처: github.com/kingwabg/rhwp `officex/engine-fixes` **efb9321fd** (2026-09-07 빌드,
-  `wasm-pack build --target web --out-dir pkg`, release).
+- 출처: github.com/kingwabg/rhwp `backup/table-placement-20261030` **6eec66c05** (2026-10-30 빌드, release; wasm-opt 미적용).
+- 6eec66c05 추가분: 자리차지·어울림 전환 시 빈 표 앵커와 후속 문단 간격 보존.
+- 5bd0da5d5 추가분: 쪽 묶음 범위 확인과 이동·복제·삭제·빈 쪽 삽입 API. 앞선 9b04afb01 표 붙여넣기 여백과 9e4597bf2 빈 문단 선택 표시 수정도 포함한다.
 - 직전 벤더(02af4f4dc+, 2026-08-09) 대비 추가분: 표 격자 단일 진실화 12단계 —
   구조·델타 불변식 관문(check_invariants/check_deltas, with_table_txn), HWPX row_sizes·common 치수 로더 수리,
   TableGrid 뷰(모델 getter·렌더러 열/행 축 소비), 표시 힌트(localResize/renderWidth/renderHeight) 폐기(키는
